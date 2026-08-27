@@ -161,7 +161,7 @@ resource "random_password" "clickhouse" {
 }
 
 resource "clickhouse_service" "main" {
-  name           = "${local.name}-demo"
+  name           = local.name
   cloud_provider = "gcp"
   region         = var.clickhouse_region
 
