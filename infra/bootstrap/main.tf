@@ -43,6 +43,7 @@ resource "google_project_service" "required" {
     "cloudbuild.googleapis.com",
     "cloudresourcemanager.googleapis.com",
     "cloudtrace.googleapis.com",
+    "compute.googleapis.com",
     "firestore.googleapis.com",
     "iam.googleapis.com",
     "iamcredentials.googleapis.com",
