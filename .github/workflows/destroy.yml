@@ -1,0 +1,63 @@
+# Tears down everything. Manual trigger only, with a typed confirmation.
+#
+# This exists so the environment can be removed the moment it is no longer needed.
+# It must never run on a schedule or on a push — a destroy that can fire on its own
+# is a footgun with a hair trigger.
+#
+# The bootstrap state bucket is not touched by this workflow.
+
+name: Destroy
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "destroy-demo" to confirm'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  destroy:
+    name: Destroy demo environment
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Check confirmation
+        if: ${{ inputs.confirm != 'destroy-demo' }}
+        run: |
+          echo "::error::Confirmation did not match. Nothing was destroyed."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.8"
+
+      - name: Terraform init
+        working-directory: infra/envs/demo
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="prefix=envs/demo"
+
+      - name: Terraform destroy
+        working-directory: infra/envs/demo
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_region: ${{ secrets.GCP_REGION }}
+          TF_VAR_clickhouse_org_id: ${{ secrets.CLICKHOUSE_ORG_ID }}
+          TF_VAR_clickhouse_token_key: ${{ secrets.CLICKHOUSE_TOKEN_KEY }}
+          TF_VAR_clickhouse_token_secret: ${{ secrets.CLICKHOUSE_TOKEN_SECRET }}
+        run: terraform destroy -auto-approve

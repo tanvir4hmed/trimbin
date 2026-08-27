@@ -1,0 +1,88 @@
+# Runs on every pull request. Fast, no cloud access, no secrets.
+#
+# Deliberately separate from deploy.yml: a check that needs credentials cannot run
+# on a fork's pull request, and a check that cannot run is a check nobody trusts.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Agents & API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install
+        run: uv sync --all-extras --dev
+        working-directory: agents
+
+      - name: Lint
+        run: uv run ruff check .
+        working-directory: agents
+
+      - name: Format check
+        run: uv run ruff format --check .
+        working-directory: agents
+
+      - name: Types
+        run: uv run mypy trimbin_agents
+        working-directory: agents
+
+      - name: Test
+        run: uv run pytest -q
+        working-directory: agents
+
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.8"
+
+      - name: Format
+        run: terraform fmt -check -recursive
+        working-directory: infra
+
+      # Validation without a backend — this job holds no credentials by design.
+      - name: Validate bootstrap
+        run: |
+          terraform init -backend=false
+          terraform validate
+        working-directory: infra/bootstrap
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan history
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

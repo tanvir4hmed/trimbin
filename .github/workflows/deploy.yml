@@ -1,0 +1,89 @@
+# Push to main deploys. There is no other path to production.
+#
+# Authentication is Workload Identity Federation — GitHub proves which repository
+# and which ref is running, and Google issues a short-lived token. No service
+# account key exists anywhere.
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # required to request the OIDC token
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false # never interrupt an apply mid-flight
+
+jobs:
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.8"
+
+      # -- infrastructure ---------------------------------------------------
+      - name: Terraform init
+        working-directory: infra/envs/demo
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="prefix=envs/demo"
+
+      - name: Terraform plan
+        working-directory: infra/envs/demo
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_region: ${{ secrets.GCP_REGION }}
+          TF_VAR_clickhouse_org_id: ${{ secrets.CLICKHOUSE_ORG_ID }}
+          TF_VAR_clickhouse_token_key: ${{ secrets.CLICKHOUSE_TOKEN_KEY }}
+          TF_VAR_clickhouse_token_secret: ${{ secrets.CLICKHOUSE_TOKEN_SECRET }}
+        run: terraform plan -out=tfplan
+
+      - name: Terraform apply
+        working-directory: infra/envs/demo
+        run: terraform apply -auto-approve tfplan
+
+      # -- schema -----------------------------------------------------------
+      # Migrations run after infrastructure exists and before anything is
+      # deployed that would read from it.
+      - name: ClickHouse migrations
+        working-directory: clickhouse
+        env:
+          CLICKHOUSE_URL: ${{ secrets.CLICKHOUSE_URL }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+        run: ./migrate.sh
+
+      # -- application ------------------------------------------------------
+      # Placeholders until Phase 2. Kept here so the shape of the pipeline is
+      # visible and proven from the first commit rather than assembled at the end.
+      - name: Build & deploy API
+        run: echo "Phase 2"
+
+      - name: Build & deploy web
+        run: echo "Phase 4"
+
+      - name: Deploy agents to Agent Engine
+        run: echo "Phase 2"
+
+      # -- proof ------------------------------------------------------------
+      - name: Smoke test
+        run: echo "Phase 2"

@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars and fill in. That file is gitignored and must stay so.
+#
+# Nothing here is a secret — these are identifiers, not credentials. They are kept
+# out of version control because they are environment-specific, not because they
+# would be dangerous to publish.
+
+project_id        = "trimbin-xxxxx"
+region            = "us-central1"
+github_repository = "tanvir4hmed/trimbin"
+
+# Optional. Leave empty to skip the budget guard — it needs billing-account-level
+# permission, which not every account has. Find the id with:
+#   gcloud billing accounts list
+billing_account_id = ""
+monthly_budget_usd = 100
