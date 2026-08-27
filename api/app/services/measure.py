@@ -130,11 +130,16 @@ def _require_ffmpeg() -> None:
             )
 
 
-async def _run(cmd: list[str], timeout_s: int = 900) -> tuple[int, str, str]:
+async def _run(
+    cmd: list[str],
+    timeout_s: int = 900,
+    cwd: Path | None = None,
+) -> tuple[int, str, str]:
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        cwd=str(cwd) if cwd else None,
     )
     try:
         out, err = await asyncio.wait_for(proc.communicate(), timeout=timeout_s)
