@@ -189,12 +189,22 @@ def generate(productions: int, out_dir: Path, seed: int = 7) -> dict[str, int]:
                         counts["decisions"] += 1
 
                     # -- the human's answer, where there was one ------------
-                    # Overrides are common where the system flagged a close call
-                    # and rare where it was confident. That asymmetry is the whole
-                    # point of splitting the published override rate in two.
-                    override_chance = 0.42 if margin < 0.15 else 0.04
-                    if rng.random() < override_chance and take_count > 1:
-                        chosen = take_ids[rng.randrange(1, take_count)]
+                    # Humans look at close calls far more often than confident
+                    # ones, which is the asymmetry the published metric is split
+                    # to expose.
+                    review_chance = 0.62 if margin < 0.15 else 0.05
+                    if rng.random() < review_chance and take_count > 1:
+                        # Reviewing is not the same as disagreeing. An editor who
+                        # opens a shot and keeps the system's pick has confirmed
+                        # it, and counting that as an error would make the metric
+                        # punish the product for being looked at. On a genuine
+                        # close call they change their mind about two thirds of
+                        # the time; on a confident one they rarely do.
+                        confirm_chance = 0.33 if margin < 0.15 else 0.75
+                        if rng.random() < confirm_chance:
+                            chosen = take_ids[winner_idx]
+                        else:
+                            chosen = take_ids[rng.randrange(1, take_count)]
                         decisions.writerow([
                             project_id, group_id, subgroup_id, chosen,
                             (captured + timedelta(days=1, hours=2)).strftime("%Y-%m-%d %H:%M:%S.000"),
