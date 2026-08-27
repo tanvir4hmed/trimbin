@@ -51,7 +51,9 @@ CREATE TABLE IF NOT EXISTS decisions
     out_point_s      Float32 DEFAULT 0
 )
 ENGINE = MergeTree
-PARTITION BY project_id
+-- Monthly, for the same reason as clips: the ORDER BY key does the query work,
+-- and partitions are for lifecycle operations rather than speed.
+PARTITION BY toYYYYMM(decided_at)
 ORDER BY (project_id, group_id, subgroup_id, decided_at)
 SETTINGS index_granularity = 8192;
 

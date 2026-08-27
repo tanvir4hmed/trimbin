@@ -164,7 +164,6 @@ resource "clickhouse_service" "main" {
   name           = "${local.name}-demo"
   cloud_provider = "gcp"
   region         = var.clickhouse_region
-  tier           = "development"
 
   password_hash = base64sha256(random_password.clickhouse.result)
 
@@ -175,10 +174,18 @@ resource "clickhouse_service" "main" {
     description = "open during build; restrict before public demo"
   }]
 
-  # Development tier fixes its own resources, which suits this workload: the demo
-  # is bursty — quiet for hours, then a judge arrives — and the tier idles on its
-  # own. Paying to keep memory warm would spend the scarce credit on latency
-  # nobody is waiting on.
+  # One replica at the smallest working size. The corpus is a few million rows
+  # and the queries are aggregations over a well-ordered table, which this
+  # handles comfortably; replicas exist for availability, and a demo does not
+  # need to survive a node failure.
+  num_replicas          = 1
+  min_replica_memory_gb = 8
+  max_replica_memory_gb = 16
+
+  # The demo is bursty — quiet for hours, then a judge arrives. Idling costs
+  # more than the few seconds of wake-up it saves.
+  idle_scaling         = true
+  idle_timeout_minutes = 15
 }
 
 resource "google_secret_manager_secret" "clickhouse_password" {

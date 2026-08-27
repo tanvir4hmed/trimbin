@@ -55,13 +55,22 @@ CREATE TABLE IF NOT EXISTS clips
     -- Native multimodal embedding of the footage itself, not of its written
     -- description. Whether a clip belongs to this scene is a question about how
     -- it looks, and routing that through prose loses most of the signal.
-    embedding        Array(Float32) DEFAULT [],
+    -- The index fixes the dimension, so the default has to match it rather than
+    -- being empty: a clip that has not been embedded yet still occupies a row.
+    -- A zero vector is degenerate in the index and simply never matches, which
+    -- is the correct behaviour for "not embedded".
+    embedding        Array(Float32) DEFAULT arrayWithConstant(768, toFloat32(0)),
 
     INDEX idx_embedding embedding TYPE vector_similarity('hnsw', 'cosineDistance', 768) GRANULARITY 1,
-    INDEX idx_description description TYPE text(tokenizer = 'default') GRANULARITY 1,
+    INDEX idx_description description TYPE text(tokenizer = 'splitByNonAlpha') GRANULARITY 1,
     INDEX idx_duration duration_ms TYPE minmax GRANULARITY 4
 )
 ENGINE = MergeTree
-PARTITION BY project_id
+-- Partition by month, not by project. Partitions exist for data manipulation —
+-- dropping an expired month in one operation — not for query speed; the ORDER BY
+-- key already makes project-scoped reads fast. Partitioning per project would
+-- create one partition per production and degrade everything, which is a common
+-- enough mistake that ClickHouse refuses the insert outright.
+PARTITION BY toYYYYMM(captured_at)
 ORDER BY (project_id, group_id, subgroup_id, take_no, captured_at)
 SETTINGS index_granularity = 8192;

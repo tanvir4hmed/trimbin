@@ -10,8 +10,18 @@ would answer quickly. The shape of the data matters as much as the volume: takes
 cluster into shots, margins cluster near the review threshold, and overrides
 follow the pattern real ones do — common on close calls, rare on confident ones.
 
-    uv run python generate.py --productions 200 --out ./out
-    clickhouse-client --query "INSERT INTO decisions FORMAT CSV" < out/decisions.csv
+Embeddings are deliberately not generated. They are 768 floats per row, which
+would dominate the file for no benefit — vector search is demonstrated on real
+footage with real embeddings, and the column defaults to a zero vector that the
+index simply never matches. So clips.csv is inserted with an explicit column
+list, leaving `embedding` to its default.
+
+    python generate.py --productions 400 --out ./out
+
+    curl -u default:PASSWORD --data-binary @out/clips.csv \\
+      "$URL/?query=INSERT+INTO+clips+($(cat out/clips.columns))+FORMAT+CSV"
+    curl -u default:PASSWORD --data-binary @out/decisions.csv \\
+      "$URL/?query=INSERT+INTO+decisions+FORMAT+CSV"
 """
 
 from __future__ import annotations
@@ -60,6 +70,15 @@ OVERRIDE_REASONS = [
 
 _weighted_reasons = [r for r in REJECTION_REASONS for _ in range(r[2])]
 
+# Written alongside the CSV so the insert never has to guess at column order —
+# the file and the statement that loads it stay in step by construction.
+CLIP_COLUMNS = (
+    "project_id,group_id,subgroup_id,take_no,clip_id,captured_at,ingested_at,"
+    "uploaded_by,storage_uri,proxy_uri,sprite_uri,duration_ms,description,tags,"
+    "exposure_rel,clipping_pct,sharpness_rel,motion_rel,audio_lufs,"
+    "noise_floor_db,dropped_frames,slate_confident,slate_raw,status"
+)
+
 
 def scene_slug(rng: random.Random) -> str:
     if rng.random() < 0.6:
@@ -99,7 +118,20 @@ def generate(productions: int, out_dir: Path, seed: int = 7) -> dict[str, int]:
                         days=group_id // 6, minutes=subgroup_id * 25
                     )
                     take_ids = [uuid.uuid4() for _ in range(take_count)]
-                    scores = sorted((rng.betavariate(5, 2) for _ in range(take_count)), reverse=True)
+
+                    # Most shots have an obvious winner — a crew shoots until
+                    # they get one, and the last take is usually the reason they
+                    # stopped. Roughly one in five is genuinely contested, and
+                    # those are the ones worth a person's attention. Drawing all
+                    # scores from one distribution would make almost every shot
+                    # look like a close call, which is the opposite of the truth.
+                    scores = sorted(
+                        (rng.betavariate(4, 3) for _ in range(take_count)), reverse=True
+                    )
+                    if rng.random() < 0.8:
+                        scores[0] = min(1.0, scores[0] + rng.uniform(0.18, 0.35))
+                    scores = sorted(scores, reverse=True)
+
                     winner_idx = 0
                     margin = round(scores[0] - scores[1], 4) if take_count > 1 else 1.0
 
@@ -126,7 +158,6 @@ def generate(productions: int, out_dir: Path, seed: int = 7) -> dict[str, int]:
                             1 if rng.random() < 0.88 else 0,  # slate_confident
                             f"{group_id}-{subgroup_id}-{i + 1}",
                             "active",
-                            "[]",
                         ])
                         counts["clips"] += 1
 
@@ -186,6 +217,7 @@ def main() -> None:
     args = parser.parse_args()
 
     counts = generate(args.productions, args.out, args.seed)
+    (args.out / "clips.columns").write_text(CLIP_COLUMNS, encoding="utf-8")
 
     print(f"{counts['clips']:,} clips")
     print(f"{counts['decisions']:,} decisions")

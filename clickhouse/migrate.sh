@@ -3,8 +3,13 @@
 # Applies migrations in order. Run by CI after Terraform, before anything deploys
 # that would read from the schema.
 #
-# Migrations are plain SQL and every statement is idempotent, so re-running is
-# safe and re-running is the normal case — CI applies them on every push.
+# ClickHouse's HTTP interface accepts one statement per request, so each file is
+# split on statement boundaries and sent separately. Comments are stripped first —
+# a `--` line containing a semicolon would otherwise split a statement in half,
+# and this schema deliberately documents itself in comments.
+#
+# Every statement is idempotent, so re-running is safe and re-running is the
+# normal case: CI applies migrations on every push.
 #
 #   CLICKHOUSE_URL=https://xxx.clickhouse.cloud:8443 \
 #   CLICKHOUSE_PASSWORD=... \
@@ -18,36 +23,44 @@ CLICKHOUSE_USER="${CLICKHOUSE_USER:-default}"
 
 cd "$(dirname "$0")"
 
-echo "Applying migrations to ${CLICKHOUSE_URL%%:*}…"
+run_statement() {
+    local sql="$1" file="$2"
+    [[ -z "${sql//[[:space:]]/}" ]] && return 0
+
+    local response
+    if ! response=$(curl --silent --show-error --fail-with-body \
+        --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}" \
+        --data-binary "$sql" \
+        "${CLICKHOUSE_URL}/?wait_end_of_query=1" 2>&1); then
+        echo "FAILED in ${file}" >&2
+        echo "${sql:0:200}…" >&2
+        echo "$response" >&2
+        exit 1
+    fi
+}
+
+echo "Applying migrations…"
 
 for file in migrations/*.sql; do
     echo "  → $(basename "$file")"
 
-    # --fail-with-body so a SQL error is an error here, not a 200 with a message
-    # buried in the response that a pipeline would happily ignore.
-    if ! response=$(curl --silent --show-error --fail-with-body \
-        --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}" \
-        --data-binary "@${file}" \
-        "${CLICKHOUSE_URL}/?wait_end_of_query=1" 2>&1); then
-        echo "FAILED on $(basename "$file")" >&2
-        echo "$response" >&2
-        exit 1
-    fi
+    # Strip line comments, then split on semicolons. awk keeps this to one pass
+    # and avoids depending on a SQL parser we would then have to maintain.
+    statements=$(sed 's/--.*$//' "$file")
+
+    while IFS= read -r -d ';' statement; do
+        run_statement "$statement" "$(basename "$file")"
+    done <<< "$statements;"
 done
 
-echo "Migrations applied."
-
-# Prove the schema is actually usable rather than merely created. A migration
-# that succeeds and leaves an unqueryable table is the failure worth catching.
 echo -n "Verifying… "
-curl --silent --fail --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}" \
-    --data-binary "SELECT count() FROM system.tables WHERE database = currentDatabase() AND name IN ('clips','decisions','supersessions','current_selection')" \
-    "${CLICKHOUSE_URL}/" | {
-        read -r count
-        if [[ "$count" -eq 4 ]]; then
-            echo "4/4 tables present."
-        else
-            echo "expected 4 tables, found ${count}" >&2
-            exit 1
-        fi
-    }
+count=$(curl --silent --fail --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}" \
+    --data-binary "SELECT count() FROM system.tables WHERE database = currentDatabase() AND name IN ('clips','decisions','supersessions','current_selection','mv_current_selection','review_queue','accuracy_summary')" \
+    "${CLICKHOUSE_URL}/")
+
+if [[ "$count" -eq 7 ]]; then
+    echo "7/7 objects present."
+else
+    echo "expected 7 objects, found ${count}" >&2
+    exit 1
+fi
