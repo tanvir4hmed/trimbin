@@ -57,7 +57,7 @@ class AnalystAgent:
         self._client = client or genai.Client(
             vertexai=True,
             project=settings.project_id,
-            location=settings.region,
+            location=settings.model_location,
         )
 
     async def run(self, request: AnalysisRequest, clip_bytes: dict[UUID, bytes]) -> AnalysisResult:

@@ -20,6 +20,15 @@ class Settings(BaseSettings):
     project_id: str = "trimbin"
     region: str = "us-central1"
 
+    # Where the models are served, which is not where the service runs.
+    #
+    # The current Gemini family is only published to the global endpoint:
+    # asking us-central1 for gemini-3.6-flash returns a 404 that reads like the
+    # model does not exist, when it exists and is served elsewhere. Cloud Run
+    # stays in us-central1 next to the buckets and the database; only the model
+    # calls leave.
+    model_location: str = "global"
+
     # ---- models -----------------------------------------------------------
     # One family, different settings per agent. The routing is the cost control:
     # reading six characters off a board and comparing seven takes are not the

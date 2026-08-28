@@ -22,11 +22,12 @@ from trimbin_agents.contracts.slate import (
     SlateResult,
 )
 from trimbin_agents.slate.agent import (
-    MISPLACEMENT_THRESHOLD,
+    MISPLACEMENT_RATIO,
     SlateAgent,
     _cosine,
     _infer_from_neighbours,
     _to_ordinal,
+    _typical_similarity,
 )
 
 
@@ -102,6 +103,15 @@ class TestNeighbourInference:
 
 
 class TestMisplacement:
+    """Group-relative, because absolute similarity does not separate anything.
+
+    On real footage every clip in a production scores 0.91-0.98 against every
+    group in it — same room, same light, same actors. What separates a stray is
+    scoring low *for that group*, and these fixtures are built to mirror that:
+    tightly clustered members, and an intruder that is still close in absolute
+    terms but loose relative to the cluster.
+    """
+
     @staticmethod
     def _clip(group: int = 1, subgroup: int = 1) -> ClipRef:
         return ClipRef(
@@ -109,48 +119,102 @@ class TestMisplacement:
             group_id=group, subgroup_id=subgroup, take_no=1,
         )
 
+    # A tight group and a looser one, both in the high nineties against each
+    # other, exactly as two setups on one scene behave.
+    TIGHT = [
+        [1.0, 0.02, 0.0],
+        [1.0, 0.00, 0.02],
+        [1.0, 0.01, 0.01],
+    ]
+    OTHER = [
+        [1.0, 0.30, 0.0],
+        [1.0, 0.32, 0.0],
+        [1.0, 0.31, 0.0],
+    ]
+
     async def test_a_clip_that_fits_is_left_alone(self) -> None:
-        agent = SlateAgent.__new__(SlateAgent)  # no client needed for this path
-        vector = [1.0, 0.0, 0.0]
+        agent = SlateAgent.__new__(SlateAgent)
+        member = [1.0, 0.01, 0.005]
         proposal = await agent.check_placement(
-            self._clip(), vector, {(1, 1): vector, (2, 1): [0.0, 1.0, 0.0]}
+            self._clip(), member, {(1, 1): [*self.TIGHT, member], (2, 1): self.OTHER}
         )
         assert proposal is None
 
     async def test_a_stray_is_proposed_not_moved(self) -> None:
-        """The return value is a suggestion with a reason an editor can read.
-        Similarity is right often enough to trust and wrong often enough to ruin
-        a shoot day, so nothing here moves footage."""
+        """A suggestion with a reason an editor can read. Similarity is right
+        often enough to trust and wrong often enough to ruin a shoot day, so
+        nothing here moves footage."""
         agent = SlateAgent.__new__(SlateAgent)
+        stray = [1.0, 0.31, 0.0]  # belongs with OTHER, filed with TIGHT
         proposal = await agent.check_placement(
-            self._clip(group=1),
-            [0.0, 1.0, 0.0],
-            {(1, 1): [1.0, 0.0, 0.0], (2, 1): [0.0, 1.0, 0.0]},
+            self._clip(group=1), stray, {(1, 1): [*self.TIGHT, stray], (2, 1): self.OTHER}
         )
         assert proposal is not None
         assert proposal.better_group_id == 2
-        assert proposal.similarity > MISPLACEMENT_THRESHOLD
         assert "scene 2" in proposal.detail
 
-    async def test_matching_nothing_is_reported_as_matching_nothing(self) -> None:
+    async def test_absolute_similarity_stays_high_even_for_a_stray(self) -> None:
+        """The reason the old absolute threshold never fired. A stray still
+        matches its wrong group in the nineties; only the ratio gives it away."""
         agent = SlateAgent.__new__(SlateAgent)
+        stray = [1.0, 0.31, 0.0]
         proposal = await agent.check_placement(
-            self._clip(group=1),
-            [0.0, 0.0, 1.0],
-            {(1, 1): [1.0, 0.0, 0.0], (2, 1): [0.0, 1.0, 0.0]},
+            self._clip(group=1), stray, {(1, 1): [*self.TIGHT, stray], (2, 1): self.OTHER}
         )
         assert proposal is not None
-        assert proposal.better_group_id is None
-        assert "any group" in proposal.detail
+        assert proposal.similarity > 0.9
 
-    async def test_a_lone_group_has_nothing_to_compare_against(self) -> None:
-        """A clip measured against a centroid it is the only member of is
-        measured against itself, which always matches and proves nothing."""
+    async def test_a_group_too_small_to_have_a_typical_score(self) -> None:
+        """Two members give a median of two numbers, which one unusual take
+        dominates. Saying nothing beats saying something unfounded."""
         agent = SlateAgent.__new__(SlateAgent)
+        stray = [0.0, 0.0, 1.0]
         proposal = await agent.check_placement(
-            self._clip(), [0.0, 0.0, 1.0], {(1, 1): [1.0, 0.0, 0.0]}
+            self._clip(), stray, {(1, 1): [self.TIGHT[0], stray], (2, 1): self.OTHER}
         )
         assert proposal is None
+
+    async def test_a_lone_group_has_nothing_to_compare_against(self) -> None:
+        agent = SlateAgent.__new__(SlateAgent)
+        proposal = await agent.check_placement(
+            self._clip(), [0.0, 0.0, 1.0], {(1, 1): self.TIGHT}
+        )
+        assert proposal is None
+
+    async def test_the_clip_is_never_compared_against_itself(self) -> None:
+        """A clip inside its own group's centroid always matches it, and the
+        stranger it is the harder it pulls the centroid its way. Including it
+        would make the check quietest exactly when it should speak."""
+        agent = SlateAgent.__new__(SlateAgent)
+        stray = [1.0, 0.31, 0.0]
+
+        with_itself = await agent.check_placement(
+            self._clip(group=1), stray, {(1, 1): [*self.TIGHT, stray], (2, 1): self.OTHER}
+        )
+        without_itself = await agent.check_placement(
+            self._clip(group=1), stray, {(1, 1): self.TIGHT, (2, 1): self.OTHER}
+        )
+        assert with_itself is not None
+        assert without_itself is not None
+        assert with_itself.similarity == pytest.approx(without_itself.similarity)
+
+
+class TestTypicalSimilarity:
+    def test_a_tight_group_scores_near_one(self) -> None:
+        assert _typical_similarity(TestMisplacement.TIGHT) > 0.99
+
+    def test_a_single_member_has_no_yardstick(self) -> None:
+        """One member left out leaves nothing to compare against."""
+        assert _typical_similarity([[1.0, 0.0, 0.0]]) == 0.0
+
+    def test_a_scattered_group_scores_lower_than_a_tight_one(self) -> None:
+        scattered = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+        assert _typical_similarity(scattered) < _typical_similarity(TestMisplacement.TIGHT)
+
+    def test_the_ratio_constant_is_a_ratio_not_a_cosine(self) -> None:
+        """Guards the regression this replaced: 0.62 as an absolute cosine
+        never fired, because nothing in a real production scores that low."""
+        assert 0.9 < MISPLACEMENT_RATIO < 1.0
 
 
 class TestCosine:

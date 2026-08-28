@@ -39,10 +39,33 @@ _PROMPT = (Path(__file__).parent / "prompt_v1.md").read_text(encoding="utf-8")
 # length of the footage for no gain.
 SLATE_WINDOW_S = 6.0
 
-# Below this, two clips are not the same setup. Tuned on the eval set rather than
-# guessed; the value lives here so it can be changed in one place when the eval
-# says it should be.
-MISPLACEMENT_THRESHOLD = 0.62
+# How far below a group's own members a clip has to score before we say anything.
+#
+# Relative, not absolute, and the difference is not academic. This was an
+# absolute cosine of 0.62, described in a comment as tuned on an eval set that
+# did not exist. On real footage every clip — correctly filed or deliberately
+# misfiled — scores between 0.91 and 0.98 against any group in the same
+# production, because two angles on one scene share a room, a light and two
+# actors. Nothing ever fell below 0.62, so the check never fired once.
+#
+# What does separate them is how a clip scores compared to how that group's own
+# members score. A take that belongs sits at its group's typical similarity; an
+# intruder sits measurably below it, though both are in the nineties.
+#
+# Measured on 12 takes across 4 setups (eval/run_misplacement_eval.py): at this
+# value no correctly filed take was flagged, 6 of 12 deliberately misfiled ones
+# were caught within a scene, and 27 of 36 overall. Missing half of the hard
+# case is the price of never crying wolf, and it is the right trade for a
+# proposal an editor has to read.
+#
+# Twelve takes is a thin calibration and this number will move. It sits below
+# the lowest genuine member observed rather than at it, so the margin is
+# deliberate rather than fitted.
+MISPLACEMENT_RATIO = 0.975
+
+# A group needs this many members before its typical score means anything. Two
+# members give a median of two numbers, which one unusual take dominates.
+MIN_GROUP_FOR_COMPARISON = 3
 
 
 class SlateAgent:
@@ -50,7 +73,7 @@ class SlateAgent:
         self._client = client or genai.Client(
             vertexai=True,
             project=settings.project_id,
-            location=settings.region,
+            location=settings.model_location,
         )
 
     async def run(self, request: SlateRequest, clip_head: bytes) -> SlateResult:
@@ -119,35 +142,54 @@ class SlateAgent:
         self,
         clip: ClipRef,
         embedding: list[float],
-        group_centroids: dict[tuple[int, int], list[float]],
+        group_members: dict[tuple[int, int], list[list[float]]],
     ) -> MisplacementProposal | None:
         """Does this clip look like it belongs where it was filed?
 
-        Compares the clip against its own group and every other group in the
-        project. Returns a proposal, never an action: similarity is right often
-        enough to be trusted and wrong often enough to ruin a shoot day, and
-        moving footage on that basis would be the most destructive thing this
-        system could do.
+        Takes each group's member embeddings rather than a precomputed centroid,
+        because the question is not how similar this clip is but how similar it
+        is compared to the clips already there — and only the members answer
+        that. Two angles on one scene share a room, a light and two actors, so
+        the absolute number is high for everything and distinguishes nothing.
+
+        Returns a proposal, never an action. Similarity is right often enough to
+        be trusted and wrong often enough to ruin a shoot day, and moving footage
+        on that basis would be the most destructive thing this system could do.
         """
         own_key = (clip.group_id, clip.subgroup_id)
-        own = group_centroids.get(own_key)
+        own_members = group_members.get(own_key)
 
-        # A group of one has no centroid worth comparing against — the clip would
-        # simply be measured against itself.
-        if own is None or len(group_centroids) < 2:
+        if not own_members or len(group_members) < 2:
             return None
 
-        own_similarity = _cosine(embedding, own)
-        if own_similarity >= MISPLACEMENT_THRESHOLD:
+        # The clip is excluded from its own group's statistics. A clip compared
+        # against a centroid containing itself always matches, and the more
+        # unusual it is the harder it pulls that centroid towards itself.
+        others = [m for m in own_members if m != embedding]
+        if len(others) < MIN_GROUP_FOR_COMPARISON - 1:
             return None
 
-        best_key, best_similarity = own_key, own_similarity
-        for key, centroid in group_centroids.items():
-            if key == own_key:
+        typical = _typical_similarity(others)
+        if typical <= 0:
+            return None
+
+        own_similarity = _cosine(embedding, _centroid(others))
+        own_ratio = own_similarity / typical
+        if own_ratio >= MISPLACEMENT_RATIO:
+            return None
+
+        best_key, best_ratio, best_similarity = own_key, own_ratio, own_similarity
+        for key, members in group_members.items():
+            if key == own_key or len(members) < MIN_GROUP_FOR_COMPARISON:
                 continue
-            similarity = _cosine(embedding, centroid)
-            if similarity > best_similarity:
-                best_key, best_similarity = key, similarity
+            elsewhere = _typical_similarity(members)
+            if elsewhere <= 0:
+                continue
+            similarity = _cosine(embedding, _centroid(members))
+            if similarity / elsewhere > best_ratio:
+                best_key = key
+                best_ratio = similarity / elsewhere
+                best_similarity = similarity
 
         if best_key == own_key:
             return MisplacementProposal(
@@ -162,9 +204,9 @@ class SlateAgent:
             better_subgroup_id=best_key[1],
             similarity=best_similarity,
             detail=(
-                f"Looks like scene {best_key[0]}, shot {best_key[1]} "
-                f"({best_similarity:.0%} match) rather than where it was filed "
-                f"({own_similarity:.0%})"
+                f"Sits {1 - own_ratio:.0%} below the other takes in scene "
+                f"{clip.group_id}, shot {clip.subgroup_id}, and matches scene "
+                f"{best_key[0]}, shot {best_key[1]} better"
             ),
         )
 
@@ -207,6 +249,29 @@ def _infer_from_neighbours(request: SlateRequest) -> tuple[int, int, int]:
     nearest = request.neighbours[0]
     take_no = max((n.take_no for n in request.neighbours), default=0) + 1
     return nearest.group_id, nearest.subgroup_id, take_no
+
+
+def _centroid(vectors: list[list[float]]) -> list[float]:
+    n = len(vectors)
+    return [sum(v[i] for v in vectors) / n for i in range(len(vectors[0]))]
+
+
+def _typical_similarity(members: list[list[float]]) -> float:
+    """How well this group's own members match the group, each left out in turn.
+
+    Leave-one-out because a member scored against a centroid built including
+    itself is partly scored against itself, and the smaller the group the more
+    that flatters it. This is the yardstick a candidate gets measured against.
+    """
+    if len(members) < 2:
+        return 0.0
+
+    scores = sorted(
+        _cosine(member, _centroid(members[:i] + members[i + 1:]))
+        for i, member in enumerate(members)
+    )
+    mid = len(scores) // 2
+    return scores[mid] if len(scores) % 2 else (scores[mid - 1] + scores[mid]) / 2
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
