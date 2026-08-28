@@ -31,6 +31,15 @@ class Settings(BaseSettings):
     artifacts_bucket: str = "trimbin-artifacts"
     cdn_base_url: str = ""
 
+    # ---- messaging --------------------------------------------------------
+    ingest_topic: str = "trimbin-ingest"
+
+    # ---- identity ---------------------------------------------------------
+    # Google verifies the token's signature and issuer regardless; naming the
+    # audience is what stops a token minted for a different application from
+    # being accepted here.
+    oauth_client_id: str = ""
+
     # ---- access -----------------------------------------------------------
     # Membership by email, which is all a small team needs. A permissions matrix
     # is real work for a real product and would earn nothing here.
