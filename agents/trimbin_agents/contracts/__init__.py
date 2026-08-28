@@ -12,6 +12,8 @@ from .analysis import (
     TakeVerdict,
 )
 from .base import (
+    FindingCode,
+    ReasonCode,
     Actor,
     ClipRef,
     Confidence,
@@ -29,8 +31,10 @@ __all__ = [
     "ClipRef",
     "Confidence",
     "Finding",
+    "FindingCode",
     "Measurements",
     "Provenance",
+    "ReasonCode",
     "Severity",
     "SpecialistReport",
     "Strict",

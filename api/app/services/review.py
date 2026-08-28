@@ -21,7 +21,9 @@ from tempfile import TemporaryDirectory
 from uuid import UUID
 
 from . import clips as clips_service
+from . import criteria
 from . import decisions as decisions_service
+from . import ranges as ranges_service
 from . import storage
 from .analytics import client
 from .ffmpeg_ops import remux
@@ -214,7 +216,8 @@ async def _load(project_id: int, group_id: int, subgroup_id: int) -> list[dict]:
         """
         SELECT clip_id, take_no, storage_uri, duration_ms,
                exposure_rel, clipping_pct, sharpness_rel, motion_rel,
-               audio_lufs, noise_floor_db, dropped_frames, normalised_at
+               audio_lufs, noise_floor_db, dropped_frames, normalised_at,
+               finding_codes, finding_starts_s, finding_ends_s
         FROM clips
         WHERE project_id = {p:UInt32} AND group_id = {g:UInt32}
           AND subgroup_id = {s:UInt32} AND status = 'active'
@@ -237,6 +240,19 @@ async def _load(project_id: int, group_id: int, subgroup_id: int) -> list[dict]:
             "audio_lufs": float(row[8]),
             "noise_floor_db": float(row[9]),
             "dropped_frames": int(row[10]),
+            # What ffmpeg found at ingest. These exist before any judgement and
+            # are the evidence the panel is handed, rather than something it is
+            # asked to notice for itself.
+            "findings": [
+                {
+                    "code": str(code),
+                    "start_s": float(start),
+                    "end_s": float(end),
+                    "severity": "attention",
+                    "detail": "",
+                }
+                for code, start, end in zip(row[12], row[13], row[14], strict=True)
+            ],
         })
     return takes
 
@@ -281,10 +297,14 @@ def _as_rows(result, takes: list[dict]) -> list[dict]:
 
     Outcome is assigned here rather than by the model. The model says which take
     leads and why; first, second and the rest follow from the scores, and letting
-    a model name its own runner-up invites it to be inconsistent with the
-    ranking it just produced.
+    a model name its own runner-up invites it to be inconsistent with the ranking
+    it just produced.
+
+    The per-criterion scores and the safe ranges are computed here too, from the
+    measurements and the findings. Asking the model for them would be asking it
+    to do arithmetic it cannot check and we can.
     """
-    duration = {t["clip_id"]: t["duration_s"] for t in takes}
+    by_clip = {t["clip_id"]: t for t in takes}
     ordered = sorted(result.verdicts, key=lambda v: v.score, reverse=True)
 
     runner_up = None
@@ -302,9 +322,19 @@ def _as_rows(result, takes: list[dict]) -> list[dict]:
         else:
             outcome = "not_selected"
 
-        # No safe range has been computed yet, so the whole take is offered
-        # rather than a guessed trim. Writing a narrower range than we can
-        # justify would quietly discard footage.
+        take = by_clip.get(v.clip_id, {})
+        duration = take.get("duration_s", 0.0)
+
+        # Findings from both sources in one list: what ffmpeg measured at ingest
+        # and what the panel observed. They are the same kind of thing to
+        # everything downstream, and an editor does not care which found the
+        # boom in shot.
+        findings = _merge_findings(take.get("findings", []), v.findings)
+
+        scores = criteria.score_take(take, findings)
+        ranges, trims = ranges_service.safe_ranges(duration, findings)
+        assembly = ranges_service.longest(ranges)
+
         rows.append({
             "clip_id": v.clip_id,
             "outcome": outcome,
@@ -312,8 +342,42 @@ def _as_rows(result, takes: list[dict]) -> list[dict]:
             "margin": result.margin if outcome == "selected" else 0.0,
             "reason": v.reason,
             "reason_code": v.reason_code,
-            "findings": v.findings,
-            "in_point_s": 0.0,
-            "out_point_s": duration.get(v.clip_id, 0.0),
+            "findings": findings,
+            "criterion_names": scores.names,
+            "criterion_scores": scores.scores,
+            "safe_starts_s": [r.start_s for r in ranges],
+            "safe_ends_s": [r.end_s for r in ranges],
+            "trim_reasons": trims,
+            # The single span an assembly would use. Zero-zero when nothing is
+            # usable, which is a real answer and not a missing one.
+            "in_point_s": assembly.start_s if assembly else 0.0,
+            "out_point_s": assembly.end_s if assembly else 0.0,
         })
     return rows
+
+
+def _merge_findings(measured: list[dict], observed) -> list[dict]:
+    """One list from two sources, each keeping its provenance.
+
+    Measured findings come from ffmpeg and carry a span it detected. Observed
+    ones come from the panel and carry a span it claims. Both are used, and the
+    source is recorded because an editor deciding whether to trust a trim should
+    know whether a machine measured it or a model saw it.
+    """
+    out: list[dict] = []
+
+    for f in measured:
+        out.append({**f, "source": "measured"})
+
+    for f in observed:
+        where = getattr(f, "where", None)
+        out.append({
+            "code": getattr(f, "code", ""),
+            "detail": getattr(f, "detail", ""),
+            "severity": getattr(getattr(f, "severity", None), "value", "attention"),
+            "start_s": getattr(where, "start_s", 0.0) if where else 0.0,
+            "end_s": getattr(where, "end_s", 0.0) if where else 0.0,
+            "source": "observed",
+        })
+
+    return out

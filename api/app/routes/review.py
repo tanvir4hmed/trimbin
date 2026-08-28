@@ -91,7 +91,10 @@ async def verdicts(
                d.in_point_s, d.out_point_s,
                d.decided_by, d.actor_id, d.model_id, d.prompt_version,
                d.panel_convened, d.decided_at,
-               c.proxy_uri, c.sprite_uri
+               c.proxy_uri, c.sprite_uri,
+               d.criterion_names, d.criterion_scores,
+               d.safe_starts_s, d.safe_ends_s, d.trim_reasons,
+               c.duration_ms
         FROM decisions AS d
         LEFT JOIN clips AS c ON c.clip_id = d.clip_id AND c.project_id = d.project_id
         WHERE d.project_id = {p:UInt32} AND d.group_id = {g:UInt32}
@@ -119,6 +122,7 @@ async def verdicts(
                 {"code": c, "start_s": float(a), "end_s": float(b)}
                 for c, a, b in zip(r[7], r[8], r[9], strict=True)
             ],
+            # The single span an assembly would use.
             "usable_from_s": round(float(r[10]), 2),
             "usable_to_s": round(float(r[11]), 2),
             "decided_by": r[12],
@@ -129,6 +133,17 @@ async def verdicts(
             "decided_at": r[17].isoformat() if r[17] else None,
             "proxy_uri": r[18],
             "sprite_uri": r[19],
+            # Per axis, never one opaque number. An editor who disagrees needs
+            # to see which criterion produced the answer.
+            "criteria": dict(zip(r[20], [round(float(s), 3) for s in r[21]], strict=True)),
+            # Every usable stretch, not only the longest. A take with a problem
+            # in the middle has two, and offering one would discard the other.
+            "safe_ranges": [
+                {"start_s": float(a), "end_s": float(b)}
+                for a, b in zip(r[22], r[23], strict=True)
+            ],
+            "trim_reasons": list(r[24]),
+            "duration_s": round(int(r[25] or 0) / 1000, 2),
         })
 
     if not takes:

@@ -32,6 +32,8 @@ _COLUMNS = [
     "decided_by", "actor_id",
     "model_id", "prompt_version", "bracket_round", "panel_convened", "run_hash",
     "in_point_s", "out_point_s",
+    "criterion_names", "criterion_scores",
+    "safe_starts_s", "safe_ends_s", "trim_reasons",
 ]
 
 
@@ -97,6 +99,9 @@ async def record(
             decided_by, actor_id,
             model_id, prompt_version, bracket_round, 1 if panel_convened else 0, key,
             float(v.get("in_point_s", 0.0)), float(v.get("out_point_s", 0.0)),
+            list(v.get("criterion_names", [])), list(v.get("criterion_scores", [])),
+            list(v.get("safe_starts_s", [])), list(v.get("safe_ends_s", [])),
+            list(v.get("trim_reasons", [])),
         ])
 
     await (await client()).insert("decisions", rows, column_names=_COLUMNS)

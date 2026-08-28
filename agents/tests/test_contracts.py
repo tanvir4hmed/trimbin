@@ -19,7 +19,9 @@ from trimbin_agents.contracts import (
     ClipRef,
     Confidence,
     Finding,
+    FindingCode,
     Provenance,
+    ReasonCode,
     Severity,
     TakeVerdict,
     TimeRange,
@@ -40,7 +42,7 @@ def _verdict(clip_id, score: float = 0.9) -> TakeVerdict:
         clip_id=clip_id,
         score=score,
         reason="cleanest complete take",
-        reason_code="selected.clean",
+        reason_code=ReasonCode.CLEAN,
         findings=[],
     )
 
@@ -107,7 +109,7 @@ class TestStrictness:
                 clip_id=uuid4(),
                 score=0.5,
                 reason="x" * 201,
-                reason_code="test",
+                reason_code=ReasonCode.CLEAN,
                 findings=[],
             )
 
@@ -133,3 +135,68 @@ class TestFindings:
             severity=Severity.NOTE,
         )
         assert finding.where is None
+
+
+class TestClosedVocabularies:
+    """The regression that made the archive unqueryable.
+
+    Findings and reason codes were free text. Across twelve real takes the panel
+    produced thirty-nine distinct finding codes and four spellings of "this take
+    is clean", with no two setups agreeing. Two things broke at once: per-axis
+    scoring recognised none of them and silently reported perfect continuity
+    everywhere, and "show me every take with a continuity problem" — the thing
+    a queryable archive is for — had no answer.
+    """
+
+    def test_a_finding_code_outside_the_taxonomy_is_refused(self) -> None:
+        with pytest.raises(ValidationError):
+            Finding(
+                code="hair.style_mismatch",  # what the model actually wrote
+                detail="Hair differs from the other takes",
+                severity=Severity.ATTENTION,
+            )
+
+    def test_the_taxonomy_covers_what_the_panel_reached_for(self) -> None:
+        """Each of these is a code the model invented because nothing named the
+        thing it saw. A closed list that cannot express a real observation just
+        moves the problem into `other`."""
+        for wanted in (
+            FindingCode.CONTINUITY_HAIR,
+            FindingCode.CONTINUITY_SET_DRESSING,
+            FindingCode.FRAME_OBSTRUCTION,
+            FindingCode.CAMERA_UNMOTIVATED_MOVE,
+            FindingCode.DIALOGUE_INCOMPLETE,
+        ):
+            assert Finding(code=wanted, detail="x", severity=Severity.NOTE).code is wanted
+
+    def test_an_unnameable_observation_has_somewhere_to_go(self) -> None:
+        """Better than forcing a wrong code onto a true observation. A rising
+        count of these is a signal the list needs an entry, not noise."""
+        f = Finding(code=FindingCode.OTHER, detail="Something none of these name",
+                    severity=Severity.NOTE)
+        assert f.code is FindingCode.OTHER
+
+    def test_a_shake_and_an_outlier_stay_different_things(self) -> None:
+        """A lurch at 4.2s can be cut around. A take that moves more than its
+        siblings throughout cannot. Collapsing them would lose that."""
+        assert FindingCode.STABILITY_SHAKE is not FindingCode.STABILITY_OUTLIER
+
+    def test_an_invented_reason_code_is_refused(self) -> None:
+        with pytest.raises(ValidationError):
+            TakeVerdict(
+                clip_id=uuid4(),
+                score=0.9,
+                reason="Complete dialogue delivery and technically clean",
+                reason_code="complete_and_clean",  # one of four spellings it used
+                findings=[],
+            )
+
+    def test_performance_is_observable_but_carries_no_weight(self) -> None:
+        """Emotion and story are the 74% of Murch's order that belongs to a
+        person. One code rather than a family of them makes it hard to forget
+        that none of them may move a ranking."""
+        assert FindingCode.PERFORMANCE_NOTE.value == "performance.note"
+        assert not [
+            c for c in FindingCode
+            if c.value.startswith("performance.") and c is not FindingCode.PERFORMANCE_NOTE
+        ]

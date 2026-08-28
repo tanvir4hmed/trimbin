@@ -15,7 +15,7 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
-from .base import ClipRef, Confidence, Finding, Provenance, Strict
+from .base import ClipRef, Confidence, Finding, Provenance, ReasonCode, Strict
 
 
 class Measurements(Strict):
@@ -64,7 +64,9 @@ class TakeVerdict(Strict):
         ),
     )
     reason: str = Field(max_length=200)
-    reason_code: str
+    reason_code: ReasonCode = Field(
+        description="For counting. The sentence above is for reading."
+    )
     findings: list[Finding]
 
 
@@ -110,9 +112,14 @@ class AnalysisResult(Strict):
         ),
     )
     rationale: str = Field(
-        max_length=400,
+        max_length=700,
         description="How the specialist reports were weighed, in Murch's terms.",
     )
+    # 700, not 400. The chief overran 400 on a close call between three takes,
+    # and losing the whole verdict because the explanation was two sentences too
+    # long is the wrong trade — the explanation is the product. Still capped,
+    # because an editor reads this beside the take and a page of prose is not
+    # read at all.
     specialist_reports: list[SpecialistReport]
     confidence: Confidence
     provenance: Provenance

@@ -120,6 +120,22 @@ async def corpus() -> dict[str, Any]:
     return row
 
 
+# Below this many occurrences, a percentage is noise wearing a number's
+# clothes. One disagreement out of two is 50% and describes nothing.
+MIN_SAMPLE_FOR_A_RATE = 20
+
+
+async def decision_count() -> int:
+    """How many real decisions every figure on the accuracy page rests on.
+
+    Published beside the figures rather than left implicit. A disagreement rate
+    over thirty decisions and one over thirty thousand are different claims, and
+    a reader who cannot see which they are looking at cannot weigh either.
+    """
+    row = await _one("SELECT count() AS n FROM real_decisions")
+    return int(row.get("n", 0)) if row else 0
+
+
 async def rejection_reasons(limit: int) -> list[dict[str, Any]]:
     """Why the system passed takes over, and how often a person disagreed.
 
@@ -131,15 +147,21 @@ async def rejection_reasons(limit: int) -> list[dict[str, Any]]:
         """
         WITH overruled AS (
             SELECT DISTINCT project_id, group_id, subgroup_id
-            FROM decisions
+            FROM real_decisions
             WHERE decided_by = 'human'
         )
         SELECT
             d.reason_code                                        AS reason_code,
             any(d.reason)                                        AS example,
             count()                                              AS occurrences,
-            round(100 * countIf(o.project_id != 0) / count(), 1)  AS disagreement_pct
-        FROM decisions AS d
+            -- Null rather than a percentage below a handful of occurrences.
+            -- One disagreement out of two reads as 50% and means nothing, and a
+            -- figure that means nothing is worse on a page about accuracy than
+            -- no figure at all.
+            if(count() >= {min_sample:UInt16},
+               round(100 * countIf(o.project_id != 0) / count(), 1),
+               NULL)                                             AS disagreement_pct
+        FROM real_decisions AS d
         LEFT JOIN overruled AS o
             ON  d.project_id  = o.project_id
             AND d.group_id    = o.group_id
@@ -149,7 +171,7 @@ async def rejection_reasons(limit: int) -> list[dict[str, Any]]:
         ORDER BY occurrences DESC
         LIMIT {limit:UInt8}
         """,
-        {"limit": limit},
+        {"limit": limit, "min_sample": MIN_SAMPLE_FOR_A_RATE},
     )
 
 
@@ -167,7 +189,7 @@ async def override_reasons(limit: int) -> list[dict[str, Any]]:
             reason,
             count()                 AS times,
             countDistinct(actor_id) AS editors
-        FROM decisions
+        FROM real_decisions
         WHERE decided_by = 'human'
         GROUP BY reason
         ORDER BY times DESC

@@ -34,11 +34,17 @@ from ..contracts.analysis import (
     SpecialistReport,
     TakeVerdict,
 )
-from ..contracts.base import ClipRef, Confidence, Finding, Provenance, Severity
+from ..contracts.base import ClipRef, Confidence, Finding, Provenance, ReasonCode, Severity
 
 log = logging.getLogger(__name__)
 
-PROMPT_VERSION = "analyst/v1"
+# v2: the specialists are given a closed list of finding codes.
+#
+# The version has to move with the prompt or the archive cannot be read back.
+# Rows stamped analyst/v1 carry invented codes; rows stamped v2 carry taxonomy
+# ones, and a query that treats them alike is comparing two different
+# vocabularies while believing it is comparing takes.
+PROMPT_VERSION = "analyst/v2"
 _HERE = Path(__file__).parent
 
 TECHNICAL = (_HERE / "prompt_technical_v1.md").read_text(encoding="utf-8")
@@ -98,7 +104,10 @@ class AnalystAgent:
                     if clip.clip_id == leader
                     else _shortfall(request.measurements[clip.clip_id])
                 ),
-                reason_code="selected.clean" if clip.clip_id == leader else "measurement.behind",
+                reason_code=(
+                    ReasonCode.CLEAN if clip.clip_id == leader
+                    else ReasonCode.BEHIND_ON_MEASUREMENT
+                ),
                 findings=_findings_for(clip.clip_id, technical),
             )
             for clip in request.clips

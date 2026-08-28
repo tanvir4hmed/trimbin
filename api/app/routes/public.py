@@ -143,7 +143,20 @@ async def reasons(
     becomes visible long before anyone thinks to look for it.
     """
     _cached(response)
+    total = await analytics.decision_count()
+
     return {
+        # What everything below rests on, stated rather than left to be
+        # inferred. These queries used to read the whole decisions table, which
+        # holds three hundred thousand generated rows against a few dozen real
+        # ones, so the published figures were a report about a fixture. They now
+        # read a view that cannot include them — and this number is how a reader
+        # sees for themselves how thin the real archive still is.
+        "decisions_counted": total,
+        "basis": (
+            "Real footage only. Generated rows are excluded at the view, not by "
+            "a filter someone has to remember to write."
+        ),
         "agent": await analytics.rejection_reasons(limit),
         # The half no public dataset contains: an editorial judgement paired
         # with the reason a person gave for it.

@@ -22,6 +22,7 @@ from trimbin_agents.contracts.base import (
     Confidence,
     Finding,
     Provenance,
+    ReasonCode,
     Severity,
     TimeRange,
 )
@@ -49,7 +50,7 @@ def _analysis(
             clip_id=winner,
             score=0.9,
             reason="cleanest complete take",
-            reason_code="selected.clean",
+            reason_code=ReasonCode.CLEAN,
             findings=findings or [],
         )
     ]
@@ -58,7 +59,7 @@ def _analysis(
             clip_id=uuid4(),
             score=0.9 - margin - (i * 0.05),
             reason="behind on measurements",
-            reason_code="measurement.behind",
+            reason_code=ReasonCode.BEHIND_ON_MEASUREMENT,
             findings=[],
         )
         for i in range(losers)

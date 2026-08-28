@@ -54,6 +54,21 @@ Reserve `blocking` for footage carrying no information: a false start, a lens
 cap, a camera that never rolled. A dark or shaky take is not blocking. It may
 hold the performance the scene needs.
 
+## Codes
+
+Every finding carries a code from a fixed list:
+
+    focus.soft / focus.lost      out of focus, throughout or from a point
+    stability.shake              more camera movement than the group
+    motion.blur                  smearing from movement
+    exposure.under / .over       darker or brighter than the group
+    exposure.clipped             detail lost at either end, unrecoverable
+    noise.high                   grain above the group
+    frames.dropped / .frozen     recording faults
+    clip.black / clip.too_short  no usable image
+    audio.clipping / .silence / .dropout / .noise_floor
+    other                        something real that none of these names
+
 ## Output
 
 Return the `SpecialistReport` schema. Observations only. No ranking, no
