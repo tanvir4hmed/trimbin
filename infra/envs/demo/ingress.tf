@@ -102,9 +102,38 @@ resource "google_storage_bucket_iam_member" "proxies_public" {
 # Routing.
 # ---------------------------------------------------------------------------
 
+resource "google_compute_region_network_endpoint_group" "web" {
+  name                  = "${local.name}-web-neg"
+  region                = var.region
+  network_endpoint_type = "SERVERLESS"
+
+  cloud_run {
+    service = google_cloud_run_v2_service.web.name
+  }
+}
+
+resource "google_compute_backend_service" "web" {
+  name                  = "${local.name}-web-backend"
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+  protocol              = "HTTPS"
+
+  backend {
+    group = google_compute_region_network_endpoint_group.web.id
+  }
+
+  enable_cdn = false # pages read live data; caching them would defeat the point
+
+  log_config {
+    enable      = true
+    sample_rate = 0.1
+  }
+}
+
+# The web app is the default, so a visitor typing the domain gets a page rather
+# than JSON. Only the paths that are genuinely an API go to the API.
 resource "google_compute_url_map" "main" {
   name            = "${local.name}-urlmap"
-  default_service = google_compute_backend_service.api.id
+  default_service = google_compute_backend_service.web.id
 
   host_rule {
     hosts        = [var.domain]
@@ -113,11 +142,27 @@ resource "google_compute_url_map" "main" {
 
   path_matcher {
     name            = "main"
-    default_service = google_compute_backend_service.api.id
+    default_service = google_compute_backend_service.web.id
 
+    # Video and sprites, cached hard at the edge. This is the path that would
+    # otherwise dominate the bill.
     path_rule {
       paths   = ["/media/*"]
       service = google_compute_backend_bucket.media.id
+
+      route_action {
+        url_rewrite {
+          path_prefix_rewrite = "/"
+        }
+      }
+    }
+
+    # Direct API access, for anyone who wants the raw numbers rather than the
+    # page that renders them. The accuracy figures should be checkable without
+    # going through a browser.
+    path_rule {
+      paths   = ["/api/*"]
+      service = google_compute_backend_service.api.id
 
       route_action {
         url_rewrite {

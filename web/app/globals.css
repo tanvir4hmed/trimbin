@@ -1,0 +1,473 @@
+/**
+ * One stylesheet, because the whole product is five screens and a component
+ * library would be more machinery than the thing it dresses.
+ *
+ * The palette is warm dark by default. Editors work in graded suites with the
+ * lights down and a bright interface beside a picture ruins their reference for
+ * what they are looking at — the tool should not compete with the footage.
+ */
+
+:root {
+  --bg: #12100c;
+  --surface: #1a1712;
+  --surface-2: #211d17;
+  --line: rgba(255, 255, 255, 0.09);
+  --line-soft: rgba(255, 255, 255, 0.05);
+
+  --ink: #f4efe6;
+  --mid: #b3ab9d;
+  --low: #7d766a;
+  --faint: #5c564c;
+
+  --amber: #d9a441;
+  --amber-soft: rgba(217, 164, 65, 0.13);
+  --green: #74b183;
+  --green-soft: rgba(116, 177, 131, 0.13);
+  --rust: #c4796a;
+  --rust-soft: rgba(196, 121, 106, 0.13);
+  --blue: #7fa8c4;
+  --violet: #a894c4;
+
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --serif: "Fraunces", Georgia, serif;
+}
+
+/* A light theme exists because directors review on tablets in daylight, and a
+   dark page in a bright room is as unreadable as the reverse. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f7f4ed;
+    --surface: #fffdf8;
+    --surface-2: #f0ebe0;
+    --line: rgba(0, 0, 0, 0.12);
+    --line-soft: rgba(0, 0, 0, 0.06);
+    --ink: #1d1a14;
+    --mid: #55503f;
+    --low: #857e6d;
+    --faint: #9a9384;
+    --amber: #8f6412;
+    --amber-soft: rgba(143, 100, 18, 0.1);
+    --green: #356b43;
+    --green-soft: rgba(53, 107, 67, 0.1);
+    --rust: #93412f;
+    --rust-soft: rgba(147, 65, 47, 0.1);
+    --blue: #356283;
+    --violet: #5f4a7d;
+  }
+}
+
+:root[data-theme="light"] {
+  --bg: #f7f4ed;
+  --surface: #fffdf8;
+  --surface-2: #f0ebe0;
+  --line: rgba(0, 0, 0, 0.12);
+  --line-soft: rgba(0, 0, 0, 0.06);
+  --ink: #1d1a14;
+  --mid: #55503f;
+  --low: #857e6d;
+  --faint: #9a9384;
+  --amber: #8f6412;
+  --amber-soft: rgba(143, 100, 18, 0.1);
+  --green: #356b43;
+  --green-soft: rgba(53, 107, 67, 0.1);
+  --rust: #93412f;
+  --rust-soft: rgba(147, 65, 47, 0.1);
+  --blue: #356283;
+  --violet: #5f4a7d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.dim {
+  color: var(--low);
+}
+.small {
+  font-size: 13px;
+}
+.bad {
+  color: var(--rust);
+}
+
+a {
+  color: var(--amber);
+}
+
+/* Focus has to be visible. Editors work on the keyboard and an invisible focus
+   ring means they cannot tell where they are. */
+:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- shell ---------- */
+
+.shell {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 26px 90px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 26px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  flex-wrap: wrap;
+}
+
+.logo {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  color: var(--ink);
+}
+.logo span {
+  color: var(--amber);
+}
+
+.nav {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.nav a {
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  color: var(--mid);
+  text-decoration: none;
+}
+.nav a:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.nav a[aria-current="page"] {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.eyebrow {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: 10px;
+}
+
+h1 {
+  font-family: var(--serif);
+  font-size: clamp(34px, 5vw, 50px);
+  line-height: 1.04;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 14px;
+  text-wrap: balance;
+}
+
+h2 {
+  font-family: var(--serif);
+  font-size: 27px;
+  font-weight: 600;
+  margin: 52px 0 10px;
+  text-wrap: balance;
+}
+
+h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+p {
+  margin: 0 0 13px;
+  max-width: 70ch;
+  text-wrap: pretty;
+}
+
+.lede {
+  font-size: 17px;
+  color: var(--mid);
+  max-width: 64ch;
+}
+
+/* ---------- states ---------- */
+
+.state {
+  text-align: center;
+  padding: 90px 20px;
+  color: var(--mid);
+}
+.state h2 {
+  margin-top: 0;
+  color: var(--ink);
+}
+.state p {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ---------- buttons ---------- */
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.primary {
+  background: var(--amber);
+  color: #1a1206;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: 7px;
+}
+
+.ghost {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--mid);
+  font-size: 12.5px;
+  padding: 7px 14px;
+  border-radius: 6px;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+.ghost:hover:not(:disabled) {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+kbd {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: var(--ink);
+}
+
+/* ---------- dashboard ---------- */
+
+.dashboard {
+  padding-top: 46px;
+}
+.dash-head {
+  margin-bottom: 40px;
+}
+
+/* The headline sits alone on purpose. A wall of equally weighted tiles lets a
+   reader pick whichever number flatters us; everything else on the page exists
+   to qualify this one. */
+.headline {
+  text-align: center;
+  padding: 52px 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  margin-bottom: 22px;
+}
+
+.big {
+  font-size: clamp(64px, 12vw, 108px);
+  line-height: 1;
+  font-weight: 500;
+  color: var(--green);
+  letter-spacing: -0.03em;
+}
+.big.dim {
+  color: var(--faint);
+}
+
+.big-label {
+  font-size: 17px;
+  color: var(--ink);
+  margin: 14px auto 0;
+  max-width: 46ch;
+}
+
+.definition {
+  font-size: 13.5px;
+  color: var(--low);
+  margin: 16px auto 0;
+  max-width: 62ch;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 13px;
+  margin-bottom: 22px;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-left-color: var(--line);
+  border-radius: 0 9px 9px 0;
+  padding: 17px 19px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.panel.good {
+  border-left-color: var(--green);
+}
+.panel.warn {
+  border-left-color: var(--amber);
+}
+
+.panel-label {
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--low);
+}
+.panel-value {
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 1.1;
+}
+.panel-detail {
+  font-size: 13px;
+  color: var(--mid);
+}
+.panel-note {
+  font-size: 12.5px;
+  color: var(--low);
+  margin-top: 6px;
+}
+
+.explainer {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 18px 21px;
+  margin-bottom: 22px;
+}
+.explainer h3 {
+  color: var(--amber);
+}
+
+.not-run {
+  color: var(--low);
+  font-style: italic;
+  padding: 22px;
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: 9px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 13px;
+  margin-bottom: 14px;
+}
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 15px 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.stat-value {
+  font-size: 24px;
+  font-weight: 500;
+}
+.stat-label {
+  font-size: 11.5px;
+  color: var(--low);
+}
+
+.caveat {
+  margin-top: 44px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+.caveat h3 {
+  color: var(--mid);
+}
+.caveat p {
+  color: var(--low);
+  font-size: 13.5px;
+}
+
+/* Wide content scrolls inside its own container so the page never does. */
+.scroll-x {
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 540px;
+  font-size: 13.5px;
+}
+th {
+  text-align: left;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--low);
+  font-weight: 500;
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+tbody tr:last-child td {
+  border-bottom: none;
+}

@@ -105,6 +105,21 @@ jobs:
             --region="${{ env.REGION }}" \
             --quiet
 
+      - name: Build and push web
+        working-directory: web
+        run: |
+          IMAGE="${{ steps.tf.outputs.registry }}/web"
+          docker build -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" .
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"
+
+      - name: Deploy web
+        run: |
+          gcloud run deploy trimbin-web \
+            --image="${{ steps.tf.outputs.registry }}/web:${{ github.sha }}" \
+            --region="${{ env.REGION }}" \
+            --quiet
+
       # -- proof ------------------------------------------------------------
       # A deploy that reports success while serving errors is worse than one
       # that fails, because nobody goes back to check.
@@ -123,5 +138,15 @@ jobs:
           # for waking it.
           curl --fail --silent --show-error --max-time 120 "$URL/public/accuracy" \
             | jq -e '.definition != null'
+
+          # And the page a visitor actually lands on. An API that answers while
+          # the site returns a 500 is a deploy that reports success and shows a
+          # stranger an error.
+          WEB=$(gcloud run services describe trimbin-web \
+            --region="${{ env.REGION }}" --format='value(status.url)')
+
+          echo "Web at $WEB"
+          curl --fail --silent --show-error --max-time 60 "$WEB/" > /dev/null
+          curl --fail --silent --show-error --max-time 120 "$WEB/accuracy" > /dev/null
 
           echo "Smoke test passed."

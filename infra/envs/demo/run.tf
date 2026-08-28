@@ -185,3 +185,58 @@ resource "google_cloud_run_v2_service_iam_member" "api_public" {
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
+
+resource "google_cloud_run_v2_service" "web" {
+  name     = "${local.name}-web"
+  location = var.region
+  labels   = local.labels
+
+  deletion_protection = false
+
+  template {
+    service_account = google_service_account.web.email
+
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 4
+    }
+
+    max_instance_request_concurrency = 80
+    timeout                          = "60s"
+
+    containers {
+      # Placeholder for the same reason as the API: Terraform runs before CI has
+      # built anything, and naming the real tag here creates a cycle it can never
+      # resolve. Replaced immediately by `gcloud run deploy`.
+      image = "us-docker.pkg.dev/cloudrun/container/hello"
+
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "512Mi"
+        }
+        cpu_idle          = true
+        startup_cpu_boost = true
+      }
+
+      # Next forwards API calls server-side, so the browser only ever talks to
+      # one origin. No CORS preflight on every request, and the API's address is
+      # not baked into client code where changing it would mean a rebuild.
+      env {
+        name  = "API_URL"
+        value = google_cloud_run_v2_service.api.uri
+      }
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [template[0].containers[0].image, client, client_version]
+  }
+}
+
+resource "google_cloud_run_v2_service_iam_member" "web_public" {
+  name     = google_cloud_run_v2_service.web.name
+  location = google_cloud_run_v2_service.web.location
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
