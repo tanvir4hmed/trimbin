@@ -137,6 +137,10 @@ resource "google_project_iam_member" "deployer_roles" {
     # Cloud Run services are made public by an IAM binding, which run.admin
     # permits and editor does not.
     "roles/run.admin",
+    # Same story for the queue: editor can publish and subscribe, but the dead
+    # letter policy needs Pub/Sub's own service agent granted rights on the
+    # topic, and granting is administration.
+    "roles/pubsub.admin",
     "roles/compute.loadBalancerAdmin",
   ])
 

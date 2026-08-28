@@ -113,6 +113,8 @@ jobs:
           gcloud run deploy trimbin-worker \
             --image="${{ steps.tf.outputs.registry }}/api:${{ github.sha }}" \
             --region="${{ env.REGION }}" \
+            --command=uvicorn \
+            --args="app.worker.main:app,--host,0.0.0.0,--port,8080,--workers,1,--no-access-log" \
             --quiet
 
       - name: Build and push web

@@ -78,15 +78,14 @@ resource "google_cloud_run_v2_service" "worker" {
       # Replaced by CI, exactly as with the API. See the comment there.
       image = "us-docker.pkg.dev/cloudrun/container/hello"
 
-      # The one line that makes this a worker rather than a second API.
-      command = ["uvicorn"]
-      args = [
-        "app.worker.main:app",
-        "--host", "0.0.0.0",
-        "--port", "8080",
-        "--workers", "1",
-        "--no-access-log",
-      ]
+      # The command that makes this a worker rather than a second API is set by
+      # CI, not here, and for the same reason the image is: this service is
+      # first created against Google's placeholder, and that image has no
+      # uvicorn in it. Declaring the override here fails the startup probe on
+      # every first apply, with an error that says the container failed to start
+      # and does not say why.
+      #
+      # It lives in the deploy workflow beside the image it belongs to.
 
       resources {
         limits = {
@@ -150,7 +149,13 @@ resource "google_cloud_run_v2_service" "worker" {
   }
 
   lifecycle {
-    ignore_changes = [template[0].containers[0].image, client, client_version]
+    ignore_changes = [
+      template[0].containers[0].image,
+      template[0].containers[0].command,
+      template[0].containers[0].args,
+      client,
+      client_version,
+    ]
   }
 }
 
