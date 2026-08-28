@@ -135,29 +135,77 @@ async def record_missing(job_id: UUID, missing: list[UUID]) -> None:
 
 
 async def record_progress(job_id: UUID, clip_id: UUID, ok: bool, reason: str = "") -> None:
+    """Count one clip, and close the job if that was the last one.
+
+    In a transaction, not two writes. Ten workers finish at once, and the last
+    of them has to see the other nine's counts to know it is the last. Reading
+    after an unconditioned increment gives every worker a different answer, and
+    either all of them or none of them decide the job is over.
+
+    Closing here rather than in a sweeper because there is no other moment that
+    knows. Nothing polls this collection, and a job left in "processing" tells an
+    editor who came back that their upload is still going.
+    """
     ref = db().collection(COLLECTION).document(str(job_id))
-    if ok:
-        await ref.update({"completed_items": firestore.Increment(1)})
-        return
 
-    await ref.update({
-        "failed_items": firestore.Increment(1),
-        "failures": firestore.ArrayUnion([{"clip_id": str(clip_id), "reason": reason}]),
-    })
+    @firestore.async_transactional
+    async def count(transaction) -> tuple[int, int, int]:
+        snapshot = await ref.get(transaction=transaction)
+        d = snapshot.to_dict() or {}
+
+        completed = d.get("completed_items", 0) + (1 if ok else 0)
+        failed = d.get("failed_items", 0) + (0 if ok else 1)
+        total = d.get("total_items", 0)
+
+        update: dict = {"completed_items": completed, "failed_items": failed}
+        if not ok:
+            update["failures"] = firestore.ArrayUnion(
+                [{"clip_id": str(clip_id), "reason": reason}]
+            )
+
+        # Every clip accounted for, one way or the other. A job with failures
+        # still finishes — "done" describes the work, not the outcome, and the
+        # failures are listed beside it.
+        if total and completed + failed >= total:
+            update["state"] = "done"
+            update["finished_at"] = datetime.now(UTC)
+
+        transaction.update(ref, update)
+        return completed, failed, total
+
+    completed, failed, total = await count(db().transaction())
+
+    if total and completed + failed >= total:
+        log.info(
+            "job %s finished: %d done, %d failed of %d", job_id, completed, failed, total
+        )
 
 
-async def finish(job_id: UUID) -> None:
+async def close_empty(job_id: UUID) -> None:
+    """Finish a job that has nothing to process.
+
+    Every clip the browser claimed is missing from storage, so no worker will
+    ever run and nothing will ever close this. Without it the editor watches a
+    progress bar for an upload that finished failing before it started.
+    """
     await db().collection(COLLECTION).document(str(job_id)).update({
         "state": "done",
         "finished_at": datetime.now(UTC),
     })
+    log.info("job %s closed with nothing to process", job_id)
 
 
-async def enqueue_ingest(job_id: UUID, clip_ids: list[UUID]) -> None:
+async def enqueue_ingest(job_id: UUID, project_id: int, clip_ids: list[UUID]) -> None:
     """One message per clip.
 
     Per clip rather than per batch so a single unreadable file cannot take the
     other 199 down with it, and so a retry re-runs one clip instead of a day.
+
+    project_id is not optional and is not a convenience. The worker builds the
+    object path from it, so a message without one sends the worker looking in a
+    bucket prefix that does not exist, and the clip is reported as never having
+    been uploaded — which is both wrong and the least helpful thing it could
+    say. This was exactly that bug.
     """
     topic = publisher().topic_path(settings.project_id, settings.ingest_topic)
 
@@ -167,6 +215,7 @@ async def enqueue_ingest(job_id: UUID, clip_ids: list[UUID]) -> None:
             b"",
             job_id=str(job_id),
             clip_id=str(clip_id),
+            project_id=str(project_id),
         )
 
-    log.info("queued %d clips for job %s", len(clip_ids), job_id)
+    log.info("queued %d clips for job %s, project %d", len(clip_ids), job_id, project_id)

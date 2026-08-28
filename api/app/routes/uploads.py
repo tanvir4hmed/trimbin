@@ -148,8 +148,20 @@ async def complete_upload(
         log.warning("%d clips reported but not found in storage", len(missing))
         await jobs.record_missing(body.job_id, missing)
 
-    await jobs.enqueue_ingest(job_id=body.job_id, clip_ids=confirmed)
-    await jobs.set_total(body.job_id, len(confirmed))
+    # The total is corrected before the work is queued, not after. A worker on a
+    # short clip can finish and close the job in the time it takes to make one
+    # more Firestore call, and a set_total arriving afterwards would reopen a
+    # job that had already finished.
+    await jobs.set_total(body.job_id, len(confirmed) + len(missing))
+
+    if not confirmed:
+        # Nothing arrived. No worker will run, so nothing else will ever mark
+        # this finished.
+        await jobs.close_empty(body.job_id)
+    else:
+        await jobs.enqueue_ingest(
+            job_id=body.job_id, project_id=job.project_id, clip_ids=confirmed
+        )
 
     return {
         "status": "queued",

@@ -98,7 +98,7 @@ async def receive(request: Request) -> Response:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     attributes = _attributes(envelope)
-    if not {"job_id", "clip_id"} <= attributes.keys():
+    if not {"job_id", "clip_id", "project_id"} <= attributes.keys():
         log.warning("discarding a push with no clip in it: %s", sorted(attributes))
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 

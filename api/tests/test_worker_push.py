@@ -92,6 +92,15 @@ class TestMalformedDelivery:
         body = envelope({"job_id": VALID["job_id"]})
         assert client.post("/pubsub", json=body).status_code == 204
 
+    def test_attributes_missing_the_project(self, client, monkeypatch):
+        """The worker builds the object path from the project id. Without one it
+        looked in a prefix that cannot exist and reported the clip as never
+        uploaded — blaming the upload for a fault in the queue. Rejecting the
+        message names the real problem."""
+        monkeypatch.setattr(worker_main, "handle_message", _must_not_run)
+        body = envelope({"job_id": VALID["job_id"], "clip_id": VALID["clip_id"]})
+        assert client.post("/pubsub", json=body).status_code == 204
+
     def test_identifier_that_is_not_a_uuid(self, client, monkeypatch):
         """Reaches handle_message, which raises ValueError parsing it. Without
         the guard in the route that would be a 500 and five redeliveries of a

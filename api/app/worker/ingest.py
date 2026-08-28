@@ -103,7 +103,10 @@ async def handle_message(attributes: dict[str, str]) -> bool:
     """
     job_id = UUID(attributes["job_id"])
     clip_id = UUID(attributes["clip_id"])
-    project_id = int(attributes.get("project_id", 0))
+    # No default. A missing project id used to become 0, which sent the download
+    # to a prefix that cannot exist and produced "not found in storage" — a
+    # message that blames the upload for a fault in the queue.
+    project_id = int(attributes["project_id"])
 
     try:
         await process(job_id, clip_id, project_id)
