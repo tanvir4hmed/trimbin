@@ -77,6 +77,16 @@ SPRITE_INTERVAL_S = 2
 SPRITE_WIDTH = 160
 SPRITE_COLUMNS = 10
 
+# The clip sent to the Slate Agent, and the frames sent to the embedding model.
+#
+# Both are deliberately small. A slate carries large hand-written figures that
+# survive heavy downscaling, and an embedding describes composition rather than
+# detail. Sending more would raise the cost of the two calls that run on every
+# clip ever uploaded, which is where an archive's model bill actually comes from.
+SLATE_HEIGHT = 360
+EMBED_FRAME_HEIGHT = 360
+EMBED_FRAME_COUNT = 5
+
 
 @dataclass(slots=True)
 class Span:

@@ -4,16 +4,19 @@ version = "0.1.0"
 description = "Agent network for Trimbin — slate reading, comparative analysis, assembly, retrieval"
 requires-python = ">=3.12,<3.14"
 
+# What the code imports, and nothing else.
+#
+# This list previously carried google-adk, aiplatform, storage, firestore,
+# pubsub, clickhouse-connect and an OpenTelemetry exporter. None of them was
+# imported anywhere in the package. That is not free: the worker runs on a
+# scale-to-zero service where image size is cold start latency, and a manifest
+# that names libraries the code does not use stops describing the code.
+#
+# Storage and the database belong to the API and the worker, which have their
+# own dependencies; agents receive bytes and return contracts. When a later
+# phase genuinely needs one of these, it comes back as one line.
 dependencies = [
-    # Google Cloud AI. These are the only AI libraries this project uses.
-    "google-adk>=1.0.0",
     "google-genai>=1.0.0",
-    "google-cloud-aiplatform>=1.70.0",
-    "google-cloud-storage>=2.18.0",
-    "google-cloud-firestore>=2.19.0",
-    "google-cloud-pubsub>=2.23.0",
-    "opentelemetry-exporter-gcp-trace>=1.7.0",
-    "clickhouse-connect>=0.8.0",
     "pydantic>=2.9.0",
     "pydantic-settings>=2.5.0",
 ]

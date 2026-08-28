@@ -38,13 +38,22 @@ resource "google_secret_manager_secret_iam_member" "worker_clickhouse" {
   member    = "serviceAccount:${google_service_account.worker.email}"
 }
 
-# Firestore only, for job progress. No pubsub.publisher — the worker consumes
-# and never queues; no aiplatform.user — judgement happens elsewhere, and a
-# process that runs unattended on uploaded files is the last one that should
-# hold a key to a paid model.
-resource "google_project_iam_member" "worker_firestore" {
+# Firestore for job progress, and Vertex for the two model calls the worker
+# makes on every clip: reading the slate and embedding the frames.
+#
+# No pubsub.publisher — the worker consumes and never queues. The aiplatform
+# grant is the one worth naming: this process runs unattended on files a
+# stranger uploaded, so it holds a key to a paid model. That is why the sandbox
+# has hard clip and duration limits, and why the worker's own endpoint takes no
+# public callers.
+resource "google_project_iam_member" "worker_roles" {
+  for_each = toset([
+    "roles/datastore.user",
+    "roles/aiplatform.user",
+  ])
+
   project = var.project_id
-  role    = "roles/datastore.user"
+  role    = each.value
   member  = "serviceAccount:${google_service_account.worker.email}"
 }
 

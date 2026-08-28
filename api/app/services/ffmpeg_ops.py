@@ -21,6 +21,7 @@ import tempfile
 from pathlib import Path
 
 from .measure import (
+    EMBED_FRAME_HEIGHT,
     GOP_SECONDS,
     PROXY_AUDIO_BITRATE,
     PROXY_BITRATE,
@@ -29,6 +30,7 @@ from .measure import (
     PROXY_FPS,
     PROXY_HEIGHT,
     SEGMENT_SECONDS,
+    SLATE_HEIGHT,
     SPRITE_COLUMNS,
     SPRITE_INTERVAL_S,
     SPRITE_WIDTH,
@@ -385,6 +387,70 @@ async def build_sprite(source: Path, out_path: Path, duration_s: float) -> Path:
     if code != 0:
         raise RuntimeError(f"sprite generation failed: {err.strip()[-300:]}")
     return out_path
+
+
+async def extract_head(source: Path, out_path: Path, seconds: float) -> Path | None:
+    """The opening seconds, small, for the Slate Agent to read.
+
+    A board is held up, clapped and pulled away; everything after that is the
+    take. Sending the whole clip would multiply the cost of the cheapest agent
+    in the system by the length of the footage and tell it nothing more.
+
+    Re-encoded rather than stream-copied. A copy starts at the previous keyframe,
+    which on a long GOP can be seconds before the board and, worse, can produce a
+    file whose first frames are undecodable on their own.
+
+    Returns None rather than raising: a clip whose head cannot be extracted still
+    has measurements worth keeping, and losing the whole ingest over an
+    unreadable board would be the wrong trade.
+    """
+    _require_ffmpeg()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    code, _, err = await _run([
+        "ffmpeg", "-hide_banner", "-nostats", "-y",
+        "-t", f"{seconds:.2f}", "-i", str(source),
+        "-an",  # the board is read, not heard
+        "-vf", f"scale=-2:{SLATE_HEIGHT}",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
+        "-pix_fmt", "yuv420p",
+        str(out_path),
+    ], timeout_s=300)
+
+    if code != 0:
+        log.warning("could not extract the head of %s: %s", source.name, err.strip()[-200:])
+        return None
+    return out_path
+
+
+async def extract_frames(source: Path, out_dir: Path, count: int, duration_s: float) -> list[Path]:
+    """Frames spread across the clip, for the embedding.
+
+    Spread rather than consecutive, and several rather than one. A single frame
+    is whatever happened to be on screen at that second — an actor turning, a
+    hand crossing the lens — and two takes of the same setup can differ more at
+    one instant than two setups differ on average. Averaging a handful describes
+    the take instead of a moment in it.
+    """
+    _require_ffmpeg()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Spread across whatever length the clip actually has. A fixed interval
+    # would sample a short clip once and a long one far past the point of
+    # diminishing return.
+    interval = max(duration_s / (count + 1), 0.5)
+
+    code, _, err = await _run([
+        "ffmpeg", "-hide_banner", "-nostats", "-y", "-i", str(source),
+        "-vf", f"fps=1/{interval:.3f},scale=-2:{EMBED_FRAME_HEIGHT}",
+        "-frames:v", str(count), "-q:v", "4",
+        str(out_dir / "f_%02d.jpg"),
+    ], timeout_s=300)
+
+    if code != 0:
+        log.warning("could not extract frames from %s: %s", source.name, err.strip()[-200:])
+        return []
+    return sorted(out_dir.glob("f_*.jpg"))
 
 
 async def ingest_one(source: Path, work_dir: Path) -> tuple[RawMeasurements, Path, Path]:

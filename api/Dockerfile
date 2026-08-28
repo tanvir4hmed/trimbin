@@ -13,7 +13,7 @@ WORKDIR /build
 # Dependencies before source. Layer caching then means a code change rebuilds in
 # seconds rather than reinstalling the world — which matters when CI runs on
 # every push.
-COPY pyproject.toml ./
+COPY api/pyproject.toml ./
 RUN pip install --prefix=/install --no-cache-dir \
     "fastapi>=0.115.0" \
     "uvicorn[standard]>=0.32.0" \
@@ -25,6 +25,17 @@ RUN pip install --prefix=/install --no-cache-dir \
     "google-cloud-firestore>=2.19.0" \
     "google-cloud-pubsub>=2.23.0" \
     "google-cloud-secret-manager>=2.20.0"
+
+# The agents, installed as a package rather than copied in.
+#
+# The worker calls the Slate Agent, so this image carries both. One image with
+# two entrypoints, because ffmpeg, the measurement code and the ClickHouse
+# client are already here and a second Dockerfile would be a second dependency
+# list to keep in step — drift there would show up as the worker measuring
+# differently from the eval harness.
+COPY agents/ ./agents/
+RUN pip install --prefix=/install --no-cache-dir --no-deps ./agents \
+    && pip install --prefix=/install --no-cache-dir "google-genai>=1.0.0"
 
 
 FROM python:3.12-slim
@@ -45,7 +56,7 @@ RUN useradd --create-home --shell /usr/sbin/nologin trimbin
 WORKDIR /app
 
 COPY --from=build /install /usr/local
-COPY --chown=trimbin:trimbin app ./app
+COPY --chown=trimbin:trimbin api/app ./app
 
 USER trimbin
 

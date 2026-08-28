@@ -88,13 +88,14 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
+      # Built from the repository root, not from api/. The image carries the
+      # agents package as well, and a build context inside api/ cannot see it.
       - name: Build and push API
-        working-directory: api
         run: |
           IMAGE="${{ steps.tf.outputs.registry }}/api"
           # Tagged with the commit as well as latest, so a bad deploy can be
           # rolled back to a specific build rather than a moving target.
-          docker build -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" .
+          docker build -f api/Dockerfile -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" .
           docker push "$IMAGE:${{ github.sha }}"
           docker push "$IMAGE:latest"
 

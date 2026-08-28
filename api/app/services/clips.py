@@ -24,6 +24,11 @@ from .measure import RawMeasurements
 
 log = logging.getLogger(__name__)
 
+# Fixed by the vector index on the clips table, which was declared with this
+# width. A row of a different length is rejected at insert, so this is not a
+# tuning knob — changing it means migrating the index.
+EMBEDDING_DIMENSIONS = 768
+
 
 async def write(
     project_id: int,
@@ -38,13 +43,18 @@ async def write(
     slate_confident: int = 0,
     slate_raw: str = "",
     description: str = "",
+    embedding: list[float] | None = None,
 ) -> None:
     """Insert one clip.
 
-    Grouping defaults to zero because the Slate Agent has not run yet at this
-    point in the pipeline. It fills these in afterwards, and until it does a clip
-    sits in group zero where the interface shows it as ungrouped rather than
-    guessing at a scene it has no evidence for.
+    Grouping defaults to zero for a clip whose slate could not be read. A clip
+    sits in group zero where the interface shows it as ungrouped, rather than
+    being guessed into a scene there is no evidence for.
+
+    An absent embedding is written as zeros rather than omitted, because the
+    column carries a vector index that needs a vector of the right shape in
+    every row. Zeros are distinguishable from a real embedding — nothing else
+    has zero magnitude — so a later pass can find and fill them.
     """
     await (await client()).insert(
         "clips",
@@ -61,8 +71,9 @@ async def write(
             round(measurements.audio_lufs, 2), round(measurements.noise_floor_db, 2),
             measurements.dropped_frames,
             slate_confident, slate_raw, "active",
+            embedding or [0.0] * EMBEDDING_DIMENSIONS,
         ]],
-        column_names=_COLUMNS,
+        column_names=[*_COLUMNS, "embedding"],
     )
     log.info("clip %s written to project %d", clip_id, project_id)
 

@@ -157,6 +157,24 @@ def download(object_path: str, destination) -> None:
     )
 
 
+def upload_file(local_path, object_path: str) -> None:
+    """One file to the CDN bucket, with its content type set.
+
+    Separate from upload_proxy because the worker's temporary directory holds
+    more than the proxy — the clip head sent to the Slate Agent, the frames sent
+    to the embedding model — and uploading the directory wholesale would put
+    unlisted stills of somebody's footage on a public CDN.
+    """
+    types = {
+        ".m3u8": "application/vnd.apple.mpegurl",
+        ".ts": "video/mp2t",
+        ".jpg": "image/jpeg",
+    }
+    blob = client().bucket(settings.proxies_bucket).blob(object_path)
+    blob.content_type = types.get(local_path.suffix, "application/octet-stream")
+    blob.upload_from_filename(str(local_path))
+
+
 def upload_proxy(local_dir, object_prefix: str) -> None:
     """Push an encoded proxy tree to the CDN bucket.
 

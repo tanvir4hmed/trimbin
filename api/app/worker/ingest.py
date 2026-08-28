@@ -17,7 +17,7 @@ from pathlib import Path
 from uuid import UUID
 
 from ..config import settings
-from ..services import clips, jobs, storage
+from ..services import clips, identify, jobs, storage
 from ..services.ffmpeg_ops import UnusableClip, analyse, build_proxy, build_sprite
 
 log = logging.getLogger(__name__)
@@ -71,13 +71,26 @@ async def process(job_id: UUID, clip_id: UUID, project_id: int) -> None:
             )
             raise Rejected(reason)
 
+        # Who is this clip? Both calls are best-effort and neither can cost the
+        # clip: a take with measurements and no slate reading is still a take an
+        # editor can use, while a take lost to a model timeout is gone.
+        log.info("clip %s: reading the slate", clip_id)
+        identity = await identify.read_slate(source, work, clip_id, project_id)
+        identity.embedding = await identify.embed(
+            source, work, clip_id, measurements.duration_s
+        )
+
         log.info("clip %s: encoding proxy", clip_id)
         proxy_dir = work / "proxy"
         await build_proxy(source, proxy_dir)
         await build_sprite(source, work / "sprite.jpg", measurements.duration_s)
 
         prefix = f"p{project_id}/{clip_id}"
-        storage.upload_proxy(work, prefix)
+        # Only the proxy tree and the sprite. The head clip and the embedding
+        # frames are working files, and uploading them would put unlisted stills
+        # of somebody's footage on a public CDN.
+        storage.upload_proxy(proxy_dir, f"{prefix}/proxy")
+        storage.upload_file(work / "sprite.jpg", f"{prefix}/sprite.jpg")
 
         await clips.write(
             project_id=project_id,
@@ -86,6 +99,12 @@ async def process(job_id: UUID, clip_id: UUID, project_id: int) -> None:
             measurements=measurements,
             proxy_uri=storage.proxy_url(f"{prefix}/proxy/index.m3u8"),
             sprite_uri=storage.proxy_url(f"{prefix}/sprite.jpg"),
+            group_id=identity.group_id,
+            subgroup_id=identity.subgroup_id,
+            take_no=identity.take_no,
+            slate_confident=identity.slate_confident,
+            slate_raw=identity.slate_raw,
+            embedding=identity.embedding,
         )
 
     log.info("clip %s: done", clip_id)

@@ -34,6 +34,19 @@ class Settings(BaseSettings):
     # ---- messaging --------------------------------------------------------
     ingest_topic: str = "trimbin-ingest"
 
+    # ---- models -----------------------------------------------------------
+    # Where the models are served, which is not where this service runs. The
+    # current Gemini family is published to the global endpoint only, and asking
+    # us-central1 for one returns a 404 that reads as if the model does not
+    # exist. Cloud Run stays next to the buckets and the database; only the
+    # model calls leave.
+    #
+    # The model ids themselves live in the agents package beside the prompts
+    # they were chosen for. Only the embedding model is named here, because it
+    # is called from the worker directly rather than through an agent.
+    model_location: str = "global"
+    embedding_model: str = "gemini-embedding-2"
+
     # ---- identity ---------------------------------------------------------
     # Google verifies the token's signature and issuer regardless; naming the
     # audience is what stops a token minted for a different application from
