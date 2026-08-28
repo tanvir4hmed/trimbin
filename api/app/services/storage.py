@@ -157,6 +157,47 @@ def download(object_path: str, destination) -> None:
     )
 
 
+def download_proxy_window(object_prefix: str, destination, seconds: float) -> bool:
+    """Fetch enough proxy segments to cover the opening of a take.
+
+    The panel watches proxies rather than originals, and that is a fairness
+    decision before it is a cost one. Proxies are encoded to one contract —
+    same resolution, same codec, same keyframe placement — so a model comparing
+    them is comparing the footage. Sent the originals, it would be comparing a
+    4K take against a 1080p one and could be swayed by which looked sharper for
+    reasons that have nothing to do with the take.
+
+    It is also the only thing that works. An original may never have been
+    uploaded, or may have aged into cold storage; a proxy exists for every
+    active clip by definition.
+
+    MPEG-TS segments concatenate byte-for-byte, which is what the format is for,
+    so the window is assembled by appending files rather than by re-encoding.
+
+    Returns False when nothing could be fetched, so the caller can judge the
+    rest of the setup rather than failing the whole shot.
+    """
+    from .measure import SEGMENT_SECONDS
+
+    bucket = client().bucket(settings.proxies_bucket)
+    needed = max(1, -(-int(seconds) // SEGMENT_SECONDS))  # ceiling division
+
+    written = 0
+    with open(destination, "wb") as out:
+        for index in range(needed):
+            blob = bucket.blob(f"{object_prefix}/proxy/seg_{index:04d}.ts")
+            if not blob.exists():
+                # A take shorter than the window simply has fewer segments.
+                break
+            out.write(blob.download_as_bytes())
+            written += 1
+
+    if written == 0:
+        log.warning("no proxy segments under %s", object_prefix)
+        return False
+    return True
+
+
 def upload_file(local_path, object_path: str) -> None:
     """One file to the CDN bucket, with its content type set.
 

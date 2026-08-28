@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .config import settings
-from .routes import public, uploads
+from .routes import public, review, uploads
 from .services import analytics
 
 logging.basicConfig(
@@ -57,6 +57,7 @@ app.add_middleware(
 
 app.include_router(public.router)
 app.include_router(uploads.router)
+app.include_router(review.router)
 
 
 @app.exception_handler(Exception)

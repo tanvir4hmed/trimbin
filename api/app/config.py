@@ -72,10 +72,10 @@ class Settings(BaseSettings):
     max_upload_bytes: int = Field(default=8 * 1024**3, description="8 GiB")
     signed_url_ttl_hours: int = 6
 
-    review_margin: float = Field(
-        default=0.15,
-        description="Must match the agents' threshold, or the queue and the archive disagree.",
-    )
+    # review_margin used to live here as well, with a note saying it had to match
+    # the agents' value or the queue and the archive would disagree. Two
+    # constants that must match, in two files, is not a rule — it is a bug with a
+    # comment on it. The API now reads the agents' threshold directly.
 
 
 @lru_cache

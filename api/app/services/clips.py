@@ -72,10 +72,51 @@ async def write(
             measurements.dropped_frames,
             slate_confident, slate_raw, "active",
             embedding or [0.0] * EMBEDDING_DIMENSIONS,
+            # The values the ratios above will be computed from, once the setup
+            # is complete. Discarding these is what left every clip in the
+            # archive carrying a placeholder 1.0 with no way back except
+            # decoding the video again.
+            round(measurements.mean_luma, 4),
+            round(measurements.sharpness, 4),
+            round(measurements.motion_mean, 4),
+            *_findings_columns(measurements),
         ]],
-        column_names=[*_COLUMNS, "embedding"],
+        column_names=[
+            *_COLUMNS, "embedding",
+            "exposure_raw", "sharpness_raw", "motion_raw",
+            "finding_codes", "finding_starts_s", "finding_ends_s",
+        ],
     )
     log.info("clip %s written to project %d", clip_id, project_id)
+
+
+def _findings_columns(m: RawMeasurements) -> tuple[list[str], list[float], list[float]]:
+    """What ffmpeg found, and where.
+
+    Timecoded because editors choose moments inside takes. "Unstable" is useless
+    where "unstable 4.2s-7.8s" becomes something the interface can seek to, and
+    the difference decides whether a take with a problem is discarded or trimmed.
+
+    Codes come from the taxonomy the prompts and the interface both use, so a
+    finding measured by ffmpeg and one observed by a model are the same kind of
+    thing to everything downstream.
+    """
+    codes: list[str] = []
+    starts: list[float] = []
+    ends: list[float] = []
+
+    for code, spans in (
+        ("focus.lost", m.focus_loss_spans),
+        ("stability.shake", m.motion_spikes),
+        ("frames.frozen", m.freeze_spans),
+        ("clip.black", m.black_spans),
+    ):
+        for span in spans:
+            codes.append(code)
+            starts.append(round(span.start_s, 2))
+            ends.append(round(span.end_s, 2))
+
+    return codes, starts, ends
 
 
 async def write_unusable(
@@ -109,38 +150,124 @@ async def write_unusable(
     log.info("clip %s recorded as unusable: %s", clip_id, reason)
 
 
-async def normalise_group(project_id: int, group_id: int, subgroup_id: int) -> None:
+async def normalise_group(project_id: int, group_id: int, subgroup_id: int) -> int:
     """Express every take in a setup against that setup's median.
 
-    Run once the group is complete. This is the step that makes a measurement
-    mean something: an absolute threshold would mark down all seven takes of a
-    night scene for being dark, while a ratio asks the only useful question —
-    is this take unlike its siblings?
+    This is the step that makes a measurement mean something. An absolute
+    threshold marks down all seven takes of a night scene for being dark; a
+    ratio asks the only useful question — is this take unlike its siblings?
 
-    Written as new rows rather than an update, because project_id is part of the
-    sort key and ClickHouse will not update those. The reader takes the latest.
+    Re-runnable, and meant to be re-run. Takes arrive one message at a time and
+    out of order, so the median moves as a setup fills: normalising after take
+    three and again after take seven gives different and equally correct
+    answers. Whichever ran last is the one that saw the most footage.
+
+    Returns how many takes were normalised, so a caller can tell "the group was
+    too small" from "nothing happened".
     """
     ch = await client()
 
     result = await ch.query(
         """
-        SELECT clip_id, exposure_rel, sharpness_rel, motion_rel
+        SELECT clip_id, exposure_raw, sharpness_raw, motion_raw
         FROM clips
         WHERE project_id = {p:UInt32} AND group_id = {g:UInt32}
           AND subgroup_id = {s:UInt32} AND status = 'active'
+        ORDER BY clip_id, ingested_at DESC
+        LIMIT 1 BY clip_id
         """,
         parameters={"p": project_id, "g": group_id, "s": subgroup_id},
     )
 
-    if len(result.result_rows) < 2:
+    rows = result.result_rows
+    if len(rows) < 2:
         # A group of one has no median worth computing; the take would only be
-        # compared against itself.
-        return
+        # compared against itself and would always sit exactly at 1.0.
+        return 0
+
+    # Refuse rather than normalise from nothing.
+    #
+    # A clip written before the raw columns existed, or by a tool that computed
+    # its own ratios and stored only those, carries zeros here. Every median
+    # would be zero, every ratio would fall back to 1.0, and the result would be
+    # a whole setup silently flattened to "all takes typical" — overwriting
+    # correct values with a confident-looking placeholder.
+    #
+    # This is not hypothetical: it happened to the twelve dataset takes the
+    # first time this ran, and the only reason it was visible is that
+    # normalised_at had just been added.
+    if not any(float(r[1]) or float(r[2]) or float(r[3]) for r in rows):
+        log.warning(
+            "project %d scene %d setup %d has no raw measurements; "
+            "leaving the existing ratios alone",
+            project_id, group_id, subgroup_id,
+        )
+        return 0
+
+    medians = {
+        axis: _median([float(r[i]) for r in rows])
+        for i, axis in ((1, "exposure"), (2, "sharpness"), (3, "motion"))
+    }
+
+    updates = []
+    for clip_id, exposure, sharpness, motion in rows:
+        updates.append((
+            str(clip_id),
+            _ratio(float(exposure), medians["exposure"]),
+            _ratio(float(sharpness), medians["sharpness"]),
+            _ratio(float(motion), medians["motion"]),
+        ))
+
+    # ALTER UPDATE rather than re-insert. The sort key is
+    # (project_id, group_id, subgroup_id, take_no, clip_id) and none of those
+    # change here, so a mutation is legal and a second row per clip would leave
+    # every reader responsible for picking the newer one.
+    for clip_id, exposure, sharpness, motion in updates:
+        await ch.command(
+            """
+            ALTER TABLE clips UPDATE
+                exposure_rel = {e:Float32},
+                sharpness_rel = {s:Float32},
+                motion_rel = {m:Float32},
+                normalised_at = now()
+            WHERE project_id = {p:UInt32} AND clip_id = {c:UUID}
+            """,
+            parameters={
+                "e": exposure, "s": sharpness, "m": motion,
+                "p": project_id, "c": clip_id,
+            },
+        )
 
     log.info(
         "normalised %d takes in project %d scene %d setup %d",
-        len(result.result_rows), project_id, group_id, subgroup_id,
+        len(updates), project_id, group_id, subgroup_id,
     )
+    return len(updates)
+
+
+def _median(values: list[float]) -> float:
+    """Median, not mean.
+
+    A single ruined take drags a mean far enough to make the rest look unusual —
+    which is backwards, since the ruined one is the thing to notice. The median
+    is what the group actually looks like.
+    """
+    ordered = sorted(values)
+    n = len(ordered)
+    mid = n // 2
+    return ordered[mid] if n % 2 else (ordered[mid - 1] + ordered[mid]) / 2
+
+
+def _ratio(value: float, median: float) -> float:
+    """1.0 at the median. Falls back to 1.0 rather than dividing by zero.
+
+    A median of zero means the whole setup measured zero on that axis — every
+    take pitch black, or a still frame throughout. Saying every take is typical
+    is honest there: they are identical, and the fault is not one take's.
+    """
+    if median <= 0:
+        return 1.0
+    return round(value / median, 4)
 
 
 def _captured_at(m: RawMeasurements) -> datetime:

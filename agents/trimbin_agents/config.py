@@ -53,8 +53,16 @@ class Settings(BaseSettings):
     embedding_dimensions: int = 768
 
     # ---- thresholds -------------------------------------------------------
-    # Tuned against the eval set. Guessing these is how a system ends up
-    # confidently wrong in a way nobody notices for weeks.
+    # Chosen, not yet measured, and said plainly because the misplacement
+    # threshold carried a comment claiming it had been tuned on an eval set that
+    # did not exist — and it turned out to be so far off that the check it
+    # governed had never once fired.
+    #
+    # These two decide when a shot goes to a person and when the panel sits.
+    # Validating them needs shots where an editor disagreed with us, which is
+    # data this system has not collected yet: it arrives the first time a real
+    # editor overrides a verdict. Until then 0.15 is a starting point, and the
+    # honest reading of any number derived from it is "at this setting".
 
     review_margin: float = Field(
         default=0.15,

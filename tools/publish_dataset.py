@@ -139,6 +139,14 @@ async def main() -> int:
                 0,
                 f"filename:{t['file']}",
                 "active",
+                # The values the ratios above were computed from. Written even
+                # though this script does its own normalisation, because
+                # normalise_group has to be able to redo it when a take is added
+                # — and without these it has nothing to take a median of.
+                round(m.mean_luma, 4),
+                round(m.sharpness, 4),
+                round(m.motion_mean, 4),
+                datetime.now(UTC),
             ])
 
     from app.services.analytics import client
@@ -178,6 +186,7 @@ _COLUMNS = [
     "exposure_rel", "clipping_pct", "sharpness_rel", "motion_rel",
     "audio_lufs", "noise_floor_db", "dropped_frames",
     "slate_confident", "slate_raw", "status",
+    "exposure_raw", "sharpness_raw", "motion_raw", "normalised_at",
 ]
 
 

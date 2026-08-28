@@ -423,6 +423,37 @@ async def extract_head(source: Path, out_path: Path, seconds: float) -> Path | N
     return out_path
 
 
+async def remux(source: Path, out_path: Path, seconds: float) -> Path | None:
+    """Put an existing video stream into a container, trimmed, without re-encoding.
+
+    Used on concatenated proxy segments before they go to the panel. The stream
+    is already the resolution and codec we want to send; decoding and
+    re-encoding it would cost CPU to arrive at a slightly worse copy of what we
+    started with.
+
+    Returns None rather than raising. A take whose proxy will not remux is one
+    take the panel does not see, not a shot that goes unjudged.
+    """
+    _require_ffmpeg()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    code, _, err = await _run([
+        "ffmpeg", "-hide_banner", "-nostats", "-y",
+        "-t", f"{seconds:.2f}", "-i", str(source),
+        "-c", "copy",
+        # Segment timestamps start wherever the take did; a container that
+        # begins at a non-zero PTS confuses players and seek offsets.
+        "-avoid_negative_ts", "make_zero",
+        "-movflags", "+faststart",
+        str(out_path),
+    ], timeout_s=300)
+
+    if code != 0:
+        log.warning("could not remux %s: %s", source.name, err.strip()[-200:])
+        return None
+    return out_path
+
+
 async def extract_frames(source: Path, out_dir: Path, count: int, duration_s: float) -> list[Path]:
     """Frames spread across the clip, for the embedding.
 
