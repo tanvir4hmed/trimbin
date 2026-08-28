@@ -24,6 +24,8 @@ from .measure import (
     GOP_SECONDS,
     PROXY_AUDIO_BITRATE,
     PROXY_BITRATE,
+    MEASURE_FPS,
+    MEASURE_HEIGHT,
     PROXY_FPS,
     PROXY_HEIGHT,
     SEGMENT_SECONDS,
@@ -103,7 +105,19 @@ async def analyse(source: Path) -> RawMeasurements:
         code, _, err = await _run([
             "ffmpeg", "-hide_banner", "-nostats", "-i", str(source.resolve()),
             "-filter_complex", (
-                "[0:v]split=2[a][b];"
+                # Scale before measuring, not after.
+                #
+                # Every metric here is either a ratio against the rest of the
+                # setup or a temporal comparison, and both survive downscaling
+                # intact. Measuring 2048x1152 costs fourteen times the pixels to
+                # answer the same question, and on a shoot day that is the
+                # difference between minutes and an hour.
+                #
+                # The one thing it costs: clipping is sampled rather than
+                # exhaustive, because scaling averages neighbouring pixels. A
+                # handful of blown pixels stops registering — which is the right
+                # answer anyway, since a handful is not a fault.
+                f"[0:v]fps={MEASURE_FPS},scale=-2:{MEASURE_HEIGHT}:flags=fast_bilinear,split=2[a][b];"
                 "[a]blurdetect=low=0.05:high=0.3,"
                 "signalstats=stat=tout+vrep+brng,"
                 "blackdetect=d=0.5:pic_th=0.98,"

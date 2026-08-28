@@ -48,6 +48,30 @@ SEGMENT_SECONDS = 4
 GOP_SECONDS = SEGMENT_SECONDS  # a keyframe exactly at every segment boundary
 PROXY_FPS = 25
 
+# Height at which measurements are taken, independent of the proxy.
+#
+# Every metric is either a ratio against the rest of the setup or a temporal
+# comparison, and both survive downscaling. Measuring a 2048x1152 source costs
+# fourteen times the pixels to answer the same question.
+#
+# Kept separate from PROXY_HEIGHT on purpose: one exists to make measuring fast,
+# the other to be watched, and tying them would let a change to one silently
+# alter the other.
+MEASURE_HEIGHT = 480
+
+# Frames per second sampled while measuring.
+#
+# Every metric is an aggregate or a span, and neither needs all 25 frames. Ten
+# gives 0.1s resolution on a span, which is finer than any editor cares about
+# when a finding says "unstable from 4.2s", and costs less than half the decode.
+#
+# The trade is real and worth naming: camera shake is a higher-frequency motion
+# than 10Hz, so sampling aliases it. That does not break the ranking, because
+# every take in a setup is aliased identically and the comparison is between
+# them — but it means the absolute motion figure is not a physical measurement
+# of how much the camera moved.
+MEASURE_FPS = 10
+
 # Sprite sheet for scrub preview, so hovering the timeline costs no video fetch.
 SPRITE_INTERVAL_S = 2
 SPRITE_WIDTH = 160
