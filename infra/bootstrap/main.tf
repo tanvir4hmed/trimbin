@@ -130,6 +130,14 @@ resource "google_project_iam_member" "deployer_roles" {
     "roles/iam.serviceAccountAdmin",
     "roles/iam.serviceAccountUser",
     "roles/resourcemanager.projectIamAdmin",
+    # Editor can read and write secrets but cannot grant access to them, and the
+    # API service account needs exactly that grant to read the database password
+    # at start.
+    "roles/secretmanager.admin",
+    # Cloud Run services are made public by an IAM binding, which run.admin
+    # permits and editor does not.
+    "roles/run.admin",
+    "roles/compute.loadBalancerAdmin",
   ])
 
   project = var.project_id

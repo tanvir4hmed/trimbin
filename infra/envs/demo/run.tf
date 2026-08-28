@@ -94,7 +94,15 @@ resource "google_cloud_run_v2_service" "api" {
     timeout = "600s"
 
     containers {
-      image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.images.repository_id}/api:latest"
+      # A placeholder, and deliberately so.
+      #
+      # Terraform creates the service before CI has built anything, so naming
+      # the real image here makes the first apply fail on an image that cannot
+      # exist yet — and every subsequent apply fight the tag CI just deployed.
+      # The service is created against Google's hello image and immediately
+      # replaced by `gcloud run deploy`; `ignore_changes` below keeps Terraform
+      # from reverting it afterwards.
+      image = "us-docker.pkg.dev/cloudrun/container/hello"
 
       resources {
         limits = {
