@@ -146,7 +146,22 @@ export interface Cut {
   entries: CutEntry[];
 }
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
+/**
+ * Everything goes through /api on the same origin.
+ *
+ * In production the load balancer routes that prefix straight to the API and
+ * strips it, so Next never sees the request. In development a rewrite in
+ * next.config does the same thing. Either way the browser makes a same-origin
+ * call: no CORS preflight, and no API address baked into client code where
+ * changing it would mean a rebuild.
+ *
+ * The first arrangement had the browser call bare paths and Next proxy them,
+ * which put the Next container in the path of every API call for no benefit —
+ * and it failed in production, because a server-side fetch inside Next has its
+ * own timeout that a cold-starting API can exceed. Routing at the edge removes
+ * the hop and the failure mode together.
+ */
+const BASE = "/api";
 
 class ApiError extends Error {
   constructor(

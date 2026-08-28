@@ -52,7 +52,7 @@ export function AccuracyDashboard() {
     Promise.all([
       api.accuracy() as Promise<AccuracyBody>,
       api.scale(),
-      fetch("/public/eval").then((r) => r.json() as Promise<EvalState>),
+      fetch("/api/public/eval").then((r) => r.json() as Promise<EvalState>),
     ])
       .then(([a, s, e]) => {
         setAccuracy(a);

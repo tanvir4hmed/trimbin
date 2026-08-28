@@ -8,15 +8,17 @@ const config: NextConfig = {
   // steps.
   output: "standalone",
 
-  // The browser calls same-origin and Next forwards to the API. Two benefits:
-  // no CORS preflight on every request, and the API's address is not baked into
-  // client code where changing it means a rebuild.
+  // For local development only.
+  //
+  // In production the load balancer routes /api/* to the API and strips the
+  // prefix before Next sees it, so this never fires. Running `next dev` there is
+  // no load balancer, and this makes the same URLs work.
+  //
+  // Deliberately not the production path: proxying every API call through the
+  // Next container adds a hop and its own fetch timeout, which a cold-starting
+  // API can exceed — and did.
   async rewrites() {
-    return [
-      { source: "/public/:path*", destination: `${API_URL}/public/:path*` },
-      { source: "/projects/:path*", destination: `${API_URL}/projects/:path*` },
-      { source: "/uploads/:path*", destination: `${API_URL}/uploads/:path*` },
-    ];
+    return [{ source: "/api/:path*", destination: `${API_URL}/:path*` }];
   },
 
   async headers() {
