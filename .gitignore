@@ -68,5 +68,10 @@ eval/fixtures/clips/
 # footage is licensed for analysis rather than redistribution.
 dataset-build/
 demo-build/
-*.ts
-*.m3u8
+
+# HLS output only. Not a bare *.ts rule: that would silently stop tracking every
+# TypeScript file in web/, and the failure would look like a missing import
+# rather than a gitignore mistake.
+**/proxy/*.ts
+**/proxy/*.m3u8
+seg_*.ts
