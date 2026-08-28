@@ -102,11 +102,30 @@ async def current_principal(request: Request) -> Principal:
 
     token = header.removeprefix("Bearer ").strip()
 
+    if not settings.oauth_client_id:
+        # Fail closed, not open.
+        #
+        # verify_oauth2_token with audience=None checks the signature and the
+        # issuer and then accepts the token — so any valid Google ID token,
+        # minted for any application in the world, would be honoured here. A
+        # member who signed into an unrelated site with Google could have that
+        # site's token replayed against us.
+        #
+        # Refusing every token when we cannot name our own audience is a worse
+        # experience and a correct one. It is loud rather than silent because a
+        # deployment that cannot authenticate anyone is a configuration mistake
+        # someone has to see.
+        log.error(
+            "TRIMBIN_OAUTH_CLIENT_ID is not set, so no bearer token can be "
+            "verified as intended for this application. Rejecting sign-in."
+        )
+        return Principal(email=None)
+
     try:
         claims = id_token.verify_oauth2_token(
             token,
             _request_adapter,
-            audience=settings.oauth_client_id or None,
+            audience=settings.oauth_client_id,
         )
     except ValueError as exc:
         # Expired, malformed, wrong audience, wrong issuer. All of them mean the

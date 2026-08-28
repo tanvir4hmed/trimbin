@@ -12,6 +12,14 @@ RUN npm install --no-audit --no-fund
 FROM node:22-slim AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# NEXT_PUBLIC_* values are inlined into the bundle at build time, not read at
+# start, so this has to arrive as a build argument rather than as an environment
+# variable on the service. Empty is a valid state: the sign-in control renders
+# nothing at all rather than a button that cannot work.
+ARG NEXT_PUBLIC_OAUTH_CLIENT_ID=""
+ENV NEXT_PUBLIC_OAUTH_CLIENT_ID=$NEXT_PUBLIC_OAUTH_CLIENT_ID
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build

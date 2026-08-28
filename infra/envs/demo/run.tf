@@ -156,6 +156,15 @@ resource "google_cloud_run_v2_service" "api" {
         value = "https://${var.domain}/media"
       }
 
+      # Which application a sign-in token has to have been minted for. Empty
+      # until the console step in docs/oauth-client.md is done, and while it is
+      # empty the API rejects every bearer token — see auth.py for why that is
+      # the safe direction to fail.
+      env {
+        name  = "TRIMBIN_OAUTH_CLIENT_ID"
+        value = var.oauth_client_id
+      }
+
       # Injected at start, never baked into the image and never in an env file
       # on disk.
       env {

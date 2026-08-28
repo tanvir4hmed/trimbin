@@ -245,3 +245,40 @@ class TestCriteria:
         s = criteria.score_take(self._typical(), [])
         assert set(s.measured_only) == criteria.MEASURED
         assert not (set(s.measured_only) & criteria.OBSERVED)
+
+
+class TestCodesReachStorageAsTheirValues:
+    """The bug that made every score perfect.
+
+    From Python 3.11 a `str, Enum` member stringifies to its class name, so
+    codes reached ClickHouse as "FindingCode.CONTINUITY_BLOCKING". Nothing
+    matched: not a query against the taxonomy, and not the cost tables here —
+    so every take scored 1.0 on continuity and completion while carrying
+    findings that said otherwise.
+    """
+
+    def test_an_enum_member_stores_as_its_taxonomy_string(self) -> None:
+        from app.services.decisions import _code_value
+        from trimbin_agents.contracts.base import FindingCode
+
+        assert _code_value(FindingCode.CONTINUITY_BLOCKING) == "continuity.blocking"
+        assert "FindingCode" not in _code_value(FindingCode.CONTINUITY_BLOCKING)
+
+    def test_a_plain_string_passes_through(self) -> None:
+        """A human override arrives as JSON with no enum to unwrap."""
+        from app.services.decisions import _code_value
+
+        assert _code_value("continuity.prop") == "continuity.prop"
+
+    def test_scoring_matches_what_gets_stored(self) -> None:
+        """The two have to agree or the breakdown is decorative."""
+        from app.services.decisions import _code_value
+        from trimbin_agents.contracts.base import FindingCode
+
+        stored = _code_value(FindingCode.DIALOGUE_INCOMPLETE)
+        assert stored in criteria.COMPLETION_COSTS
+
+        scored = criteria.score_take(
+            TestCriteria._typical(), [{"code": stored, "severity": "attention"}]
+        )
+        assert scored.values["completion"] < 1.0

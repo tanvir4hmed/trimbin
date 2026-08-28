@@ -471,3 +471,73 @@ td {
 tbody tr:last-child td {
   border-bottom: none;
 }
+
+/* ---------------------------------------------------------------------------
+   Sign-in and the project switcher.
+
+   Sits at the right of the header and stays out of the way. Nearly every page
+   here is readable without an account, so this is a control someone reaches for
+   once they have a reason — not a gate they meet on arrival.
+   --------------------------------------------------------------------------- */
+
+.signin {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* Google's button renders at its own height. Reserving it stops the header
+     jumping when the script finishes loading. */
+  min-height: 40px;
+}
+
+.project-switcher {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+  max-width: 220px;
+}
+
+.project-switcher:focus-visible {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 1px;
+}
+
+.signout {
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--low);
+  background: none;
+  border: none;
+  padding: 6px 2px;
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+}
+
+.signout:hover {
+  color: var(--ink);
+  border-bottom-color: var(--line);
+}
+
+.signin .hint {
+  font-size: 12.5px;
+  color: var(--low);
+}
+
+.signin .hint.error {
+  color: var(--warn, #b04a3a);
+}
+
+@media (max-width: 720px) {
+  /* The switcher matters more than the name on a narrow screen: you can always
+     tell who you are by the fact that you are signed in. */
+  .signout {
+    display: none;
+  }
+  .project-switcher {
+    max-width: 140px;
+  }
+}

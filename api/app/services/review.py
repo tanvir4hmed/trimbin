@@ -371,8 +371,12 @@ def _merge_findings(measured: list[dict], observed) -> list[dict]:
 
     for f in observed:
         where = getattr(f, "where", None)
+        code = getattr(f, "code", "")
         out.append({
-            "code": getattr(f, "code", ""),
+            # The enum's value, not its repr. Everything downstream matches on
+            # the taxonomy string, and a class name matches nothing — silently,
+            # by scoring every take as having no findings at all.
+            "code": getattr(code, "value", code),
             "detail": getattr(f, "detail", ""),
             "severity": getattr(getattr(f, "severity", None), "value", "attention"),
             "start_s": getattr(where, "start_s", 0.0) if where else 0.0,

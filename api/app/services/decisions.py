@@ -94,7 +94,7 @@ async def record(
         rows.append([
             project_id, group_id, subgroup_id, UUID(str(v["clip_id"])), now,
             v["outcome"], float(v.get("score", 0.0)), float(v.get("margin", 0.0)),
-            v.get("reason", "")[:400], v.get("reason_code", ""),
+            v.get("reason", "")[:400], _code_value(v.get("reason_code", "")),
             codes, starts, ends,
             decided_by, actor_id,
             model_id, prompt_version, bracket_round, 1 if panel_convened else 0, key,
@@ -134,11 +134,25 @@ def _findings(findings: list) -> tuple[list[str], list[float], list[float]]:
         if not code:
             continue
         where = _attr(f, "where")
-        codes.append(str(code))
+        # .value, not str(). From Python 3.11 a `str, Enum` member stringifies
+        # to "FindingCode.CONTINUITY_BLOCKING" rather than to its value, so the
+        # archive filled with class names — which match no query, and none of
+        # the scoring tables either. The scores came out perfect for every take
+        # because nothing recognised anything.
+        codes.append(_code_value(code))
         starts.append(round(float(_attr(where, "start_s") or 0.0), 2))
         ends.append(round(float(_attr(where, "end_s") or 0.0), 2))
 
     return codes, starts, ends
+
+
+def _code_value(code) -> str:
+    """The string an enum member stands for, whatever Python does to str().
+
+    Works for a bare string too, because a human override arrives as JSON and
+    has no enum to unwrap.
+    """
+    return str(getattr(code, "value", code))
 
 
 def _attr(obj, name: str):

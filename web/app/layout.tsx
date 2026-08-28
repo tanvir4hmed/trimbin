@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import SignIn from "@/components/SignIn";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -40,6 +41,9 @@ export default function RootLayout({
             <Link href="/accuracy">Accuracy</Link>
             <Link href="/demo">Demo project</Link>
           </div>
+          {/* Appears only once there is something to sign in for, and renders
+              nothing at all on a deployment without an OAuth client. */}
+          <SignIn />
         </nav>
         {children}
       </body>
