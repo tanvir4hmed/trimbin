@@ -69,12 +69,71 @@ class TestEmptyDeployment:
 
         async def empty() -> dict:
             return {
-                "productions": 0, "clips": 0, "scenes": 0,
-                "shots": 0, "decisions": 0, "footage_hours": 0.0,
+                "real_clips": 0, "synthetic_clips": 0,
+                "real_productions": 0, "synthetic_productions": 0,
+                "real_scenes": 0, "real_shots": 0,
+                "real_hours": 0.0, "synthetic_hours": 0.0,
             }
 
-        monkeypatch.setattr(analytics, "scale", empty)
-        assert client.get("/public/scale").json()["clips"] == 0
+        monkeypatch.setattr(analytics, "corpus", empty)
+        assert client.get("/public/scale").json()["real"]["clips"] == 0
+
+
+class TestProvenanceSeparation:
+    """Real and generated rows must never be presented as one number.
+
+    An accuracy figure computed over generated rows measures the generator. The
+    separation exists so that inference is impossible to draw by accident, and
+    these tests are what keep it that way.
+    """
+
+    def test_real_and_generated_are_never_summed(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async def mixed() -> dict:
+            return {
+                "real_clips": 7, "synthetic_clips": 306215,
+                "real_productions": 1, "synthetic_productions": 400,
+                "real_scenes": 1, "real_shots": 1,
+                "real_hours": 0.02, "synthetic_hours": 4209.7,
+            }
+
+        monkeypatch.setattr(analytics, "corpus", mixed)
+        body = client.get("/public/scale").json()
+
+        assert body["real"]["clips"] == 7
+        assert body["synthetic"]["clips"] == 306215
+        # No total anywhere, deliberately. A combined figure is the thing a
+        # reader would take as evidence about the system.
+        assert "clips" not in body
+        assert "total" not in body
+
+    def test_generated_data_says_what_it_is_for(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The label travels in the payload, not only in the page that renders
+        it, so it cannot be lost by whoever consumes the API."""
+
+        async def mixed() -> dict:
+            return {
+                "real_clips": 0, "synthetic_clips": 306215,
+                "real_productions": 0, "synthetic_productions": 400,
+                "real_scenes": 0, "real_shots": 0,
+                "real_hours": 0.0, "synthetic_hours": 4209.7,
+            }
+
+        monkeypatch.setattr(analytics, "corpus", mixed)
+        purpose = client.get("/public/scale").json()["synthetic"]["purpose"]
+        assert "Excluded from every accuracy figure" in purpose
+
+    def test_accuracy_declares_that_it_excludes_generated_rows(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async def empty() -> dict:
+            return {"shots_total": 0, "decision_accuracy_pct": None}
+
+        monkeypatch.setattr(analytics, "accuracy_summary", empty)
+        assert client.get("/public/accuracy").json()["counts_only_real_work"] is True
 
 
 class TestPopulatedDeployment:

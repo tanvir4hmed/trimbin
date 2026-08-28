@@ -1,24 +1,36 @@
 "use client";
 
 /**
- * The accuracy page — public, no account, computed live.
+ * The accuracy page.
  *
- * Most AI products never publish an error rate. Doing so is the most credible
- * move available, and it happens to be an ideal demonstration of the engine
- * underneath: these are aggregations over hundreds of thousands of rows,
- * recomputed on request rather than cached nightly. Precomputed, the page would
- * be a report; computed live, it is evidence, and a visitor can tell the
- * difference between a running system and a screenshot.
+ * Two numbers with very different standing live here, and the page's only real
+ * job is to keep them apart.
  *
- * The hardest thing to get right here is honesty about what is not known. A
- * fresh deployment has no measurements, and rendering that as 0% would claim the
- * system is wrong every time. Null and zero mean different things and the page
- * keeps them apart.
+ * The evaluation is earned: footage with a fault planted at a timecode we chose,
+ * so a finding is a fact rather than an agreement. The agreement figure — how
+ * often editors let a confident decision stand — needs real editorial work to
+ * exist at all, and until that work happens it says so instead of showing a
+ * number.
+ *
+ * The generated corpus is published as what it is: evidence the queries stay
+ * fast, evidence of nothing else. It is never added to a real total and never
+ * counted in an accuracy figure.
  */
 
 import { useEffect, useState } from "react";
-import type { AccuracySummary, Scale } from "@/lib/api";
-import { api } from "@/lib/api";
+
+interface AccuracyBody {
+  decision_accuracy_pct: number | null;
+  confident_decisions: number;
+  confident_overturned: number;
+  flagged_for_review: number;
+  flagged_changed_pct: number | null;
+  auto_decided_pct: number | null;
+  shots_total: number;
+  definition: string;
+  caveat: string;
+  counts_only_real_work: boolean;
+}
 
 interface EvalAxis {
   axis: string;
@@ -37,26 +49,37 @@ interface EvalState {
   axes: EvalAxis[];
 }
 
-interface AccuracyBody extends AccuracySummary {
-  definition: string;
-  caveat: string;
+interface Corpus {
+  real: {
+    productions: number;
+    clips: number;
+    scenes: number;
+    shots: number;
+    footage_hours: number;
+  };
+  synthetic: {
+    productions: number;
+    clips: number;
+    footage_hours: number;
+    purpose: string;
+  };
 }
 
 export function AccuracyDashboard() {
   const [accuracy, setAccuracy] = useState<AccuracyBody | null>(null);
-  const [scale, setScale] = useState<Scale | null>(null);
+  const [corpus, setCorpus] = useState<Corpus | null>(null);
   const [evaluation, setEvaluation] = useState<EvalState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
-      api.accuracy() as Promise<AccuracyBody>,
-      api.scale(),
+      fetch("/api/public/accuracy").then((r) => r.json() as Promise<AccuracyBody>),
+      fetch("/api/public/scale").then((r) => r.json() as Promise<Corpus>),
       fetch("/api/public/eval").then((r) => r.json() as Promise<EvalState>),
     ])
-      .then(([a, s, e]) => {
+      .then(([a, c, e]) => {
         setAccuracy(a);
-        setScale(s);
+        setCorpus(c);
         setEvaluation(e);
       })
       .catch((e: Error) => setError(e.message));
@@ -71,108 +94,73 @@ export function AccuracyDashboard() {
     );
   }
 
-  if (!accuracy || !scale || !evaluation) {
-    // The first request after a quiet period wakes an idling database, which
-    // takes a moment. Saying so is better than a spinner that looks stuck.
+  if (!accuracy || !corpus || !evaluation) {
     return (
       <div className="state">
         <p>Reading from the archive…</p>
-        <p className="dim small">First load can take a moment while the database wakes.</p>
+        <p className="dim small">
+          First load can take a moment while the database wakes.
+        </p>
       </div>
     );
   }
 
-  const hasData = accuracy.shots_total > 0;
+  const measured = evaluation.state === "measured";
+  const hasEditorialData = accuracy.shots_total > 0;
 
   return (
     <div className="dashboard">
       <header className="dash-head">
-        <span className="eyebrow">Live from production</span>
-        <h1>How often Trimbin is right</h1>
+        <span className="eyebrow">Measured, not asserted</span>
+        <h1>How well Trimbin actually works</h1>
         <p className="lede">
-          Recomputed on every load from the same archive the editors work in.
-          Nothing here is cached overnight or filled in by hand.
+          Two questions with very different answers: does it find a problem that
+          is genuinely there, and do editors agree with what it decides. The
+          first is measurable today. The second needs editors, and until there
+          are some this page says so.
         </p>
       </header>
 
-      {/* The headline. Deliberately alone — everything else on this page exists
-          to qualify it, and a wall of equally weighted tiles would let a reader
-          pick whichever number flattered us. */}
+      {/* The earned number leads, because it is the one with evidence behind it. */}
       <section className="headline">
-        {hasData ? (
+        {measured ? (
           <>
-            <div className="big mono">{accuracy.decision_accuracy_pct}%</div>
+            <div className="big mono">{overallRecall(evaluation.axes)}%</div>
             <p className="big-label">
-              of the decisions it made confidently, no editor later replaced
+              of faults planted on purpose were found — and every one at the
+              right timecode
             </p>
-            <p className="definition">{accuracy.definition}</p>
+            <p className="definition">
+              Footage was shot with a specific fault at a second we chose: camera
+              shake from 4.2s, focus lost at 6.0s, a freeze at 5.0s. Finding one
+              is a fact, not an opinion.
+            </p>
           </>
         ) : (
           <>
             <div className="big mono dim">—</div>
-            <p className="big-label">Not enough decisions yet to report accuracy.</p>
+            <p className="big-label">
+              {evaluation.message ?? "The evaluation has not been run yet."}
+            </p>
           </>
         )}
       </section>
 
-      {hasData && (
-        <>
-          <section className="split">
-            <Panel
-              label="Decided without a person"
-              value={`${accuracy.auto_decided_pct}%`}
-              detail={`${fmt(accuracy.confident_decisions)} of ${fmt(accuracy.shots_total)} shots`}
-              note="The claim this product rests on: most shots need nobody."
-            />
-            <Panel
-              label="Confident calls overturned"
-              value={`${accuracy.confident_overturned}`}
-              detail="the system was sure and an editor disagreed"
-              note="The honest error signal. Lower is better."
-              tone="warn"
-            />
-            <Panel
-              label="Flagged calls changed"
-              value={`${accuracy.flagged_changed_pct}%`}
-              detail={`of ${fmt(accuracy.flagged_for_review)} shots sent for review`}
-              note="High is success here. These were handed to a person on purpose."
-              tone="good"
-            />
-          </section>
-
-          {/* Why one combined number would have been worse than useless. */}
-          <aside className="explainer">
-            <h3>Why the override rate is published in two halves</h3>
-            <p>
-              Disagreement on a close call is the system working as designed —
-              those shots were handed to a person deliberately, because the takes
-              were technically equivalent and the decision had become an
-              editorial one. Disagreement on a confident call is a real error. A
-              single combined figure would average the two and describe neither.
-            </p>
-          </aside>
-        </>
-      )}
-
-      <section className="evaluation">
-        <h2>Against footage with faults planted deliberately</h2>
-        <p className="lede">
-          The number above measures whether editors disagreed with us. This
-          measures whether we found something we know is there, because we put it
-          there at a timecode we chose. Harder, and a much smaller sample.
-        </p>
-
-        {evaluation.state === "not_run" ? (
-          <p className="not-run">{evaluation.message}</p>
-        ) : (
+      {measured && (
+        <section>
+          <h2>What was found, and what was invented</h2>
+          <p>
+            Missed faults and false alarms are never added into one score. They
+            are not equally bad: a missed problem reaches the cut, while a false
+            alarm costs an editor ten seconds. A system that flagged everything
+            would score perfectly on one and be useless.
+          </p>
           <div className="scroll-x">
             <table>
               <thead>
                 <tr>
                   <th>Axis</th>
                   <th>Cases</th>
-                  {/* Never summed into one score. A missed problem reaches the
-                      cut; a false alarm costs ten seconds of attention. */}
                   <th>Missed</th>
                   <th>False alarms</th>
                   <th>Found</th>
@@ -187,7 +175,9 @@ export function AccuracyDashboard() {
                     <td className={`mono ${axis.missed > 0 ? "bad" : ""}`}>
                       {axis.missed}
                     </td>
-                    <td className="mono">{axis.false_alarms}</td>
+                    <td className={`mono ${axis.false_alarms > 0 ? "bad" : ""}`}>
+                      {axis.false_alarms}
+                    </td>
                     <td className="mono">{pct(axis.recall_pct)}</td>
                     <td className="mono">{pct(axis.timecode_accuracy_pct)}</td>
                   </tr>
@@ -195,32 +185,115 @@ export function AccuracyDashboard() {
               </tbody>
             </table>
           </div>
+          <p className="dim small">
+            Seven takes of one shot: six with a fault planted, one clean. The
+            clean take matters as much as the others — without it there is
+            nothing to measure false alarms against.
+          </p>
+        </section>
+      )}
+
+      <section>
+        <h2>Do editors agree with it?</h2>
+        {hasEditorialData ? (
+          <>
+            <div className="split">
+              <Panel
+                label="Confident calls that stood"
+                value={`${accuracy.decision_accuracy_pct}%`}
+                detail={`${fmt(accuracy.confident_decisions)} decisions`}
+                note="The system was sure and nobody disagreed."
+                tone="good"
+              />
+              <Panel
+                label="Confident calls overturned"
+                value={fmt(accuracy.confident_overturned)}
+                detail="the system was sure and an editor disagreed"
+                note="The honest error signal."
+                tone="warn"
+              />
+              <Panel
+                label="Flagged calls changed"
+                value={`${accuracy.flagged_changed_pct}%`}
+                detail={`of ${fmt(accuracy.flagged_for_review)} sent for review`}
+                note="High is success. These went to a person on purpose."
+              />
+            </div>
+            <aside className="explainer">
+              <h3>Why this is published in two halves</h3>
+              <p>
+                Disagreement on a close call is the system working as designed —
+                those shots were handed to a person because the takes were
+                technically equivalent and the decision had become editorial.
+                Disagreement on a confident call is a real error. One combined
+                figure would average the two and describe neither.
+              </p>
+            </aside>
+          </>
+        ) : (
+          <p className="not-run">
+            No editorial decisions have been recorded yet, so there is nothing to
+            report. This figure requires editors working on real footage and
+            overriding the system where they disagree; it cannot be simulated,
+            and a number here that came from anywhere else would be worthless.
+          </p>
         )}
       </section>
 
-      <section className="scale">
+      {/* Published, and labelled. The size of a generated set is not evidence
+          about a system, and presenting it beside real counts would invite
+          exactly that reading. */}
+      <section>
         <h2>What the archive holds</h2>
+
+        <h3 style={{ marginTop: 22 }}>Real footage</h3>
+        {corpus.real.clips > 0 ? (
+          <div className="stats">
+            <Stat label="Productions" value={fmt(corpus.real.productions)} />
+            <Stat label="Clips" value={fmt(corpus.real.clips)} />
+            <Stat label="Shots" value={fmt(corpus.real.shots)} />
+            <Stat label="Hours" value={fmt(corpus.real.footage_hours)} />
+          </div>
+        ) : (
+          <p className="not-run">
+            Only the evaluation fixtures so far — seven takes shot to test the
+            measurement layer, not a production.
+          </p>
+        )}
+
+        <h3 style={{ marginTop: 30 }}>Generated, for scale</h3>
         <div className="stats">
-          <Stat label="Productions" value={fmt(scale.productions)} />
-          <Stat label="Clips" value={fmt(scale.clips)} />
-          <Stat label="Scenes" value={fmt(scale.scenes)} />
-          <Stat label="Shots" value={fmt(scale.shots)} />
-          <Stat label="Decisions" value={fmt(scale.decisions)} />
-          <Stat label="Hours of footage" value={fmt(scale.footage_hours)} />
+          <Stat label="Productions" value={fmt(corpus.synthetic.productions)} />
+          <Stat label="Clips" value={fmt(corpus.synthetic.clips)} />
+          <Stat label="Hours" value={fmt(corpus.synthetic.footage_hours)} />
         </div>
-        <p className="dim small">
-          Accuracy over three hundred thousand decisions means something
-          different from accuracy over three hundred. Both numbers are here so
-          neither has to be taken on trust.
-        </p>
+        <p className="dim small">{corpus.synthetic.purpose}</p>
       </section>
 
       <footer className="caveat">
-        <h3>What this number does not prove</h3>
+        <h3>What none of this proves</h3>
+        <p>
+          The evaluation fixtures are synthetic video with faults introduced by
+          filter, not footage from a camera. Real faults carry sensor noise,
+          rolling shutter and motion blur that a generated pattern does not, so
+          scoring well here clears a lower bar than a shoot would set.
+        </p>
         <p>{accuracy.caveat}</p>
       </footer>
     </div>
   );
+}
+
+/** Weighted by cases, so an axis with more fixtures counts for more. */
+function overallRecall(axes: EvalAxis[]): number {
+  const withExpected = axes.filter((a) => a.recall_pct !== null);
+  if (withExpected.length === 0) return 0;
+  const total = withExpected.reduce((sum, a) => sum + a.cases, 0);
+  const weighted = withExpected.reduce(
+    (sum, a) => sum + (a.recall_pct ?? 0) * a.cases,
+    0,
+  );
+  return Math.round((weighted / total) * 10) / 10;
 }
 
 function Panel({

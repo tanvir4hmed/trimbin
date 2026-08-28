@@ -86,6 +86,16 @@ def scene_slug(rng: random.Random) -> str:
     return f"EXT. {rng.choice(EXTERIORS)} - {rng.choice(TIMES)}"
 
 
+# Synthetic rows live at and above this project id, and the accuracy view refuses
+# to count them.
+#
+# The separation is by id rather than a flag because a flag can be forgotten in a
+# WHERE clause. An accuracy figure computed over generated rows measures the
+# random number generator, and publishing one as though it measured the system is
+# the single thing a product built on not overclaiming cannot do.
+SYNTHETIC_PROJECT_BASE = 900_000
+
+
 def generate(productions: int, out_dir: Path, seed: int = 7) -> dict[str, int]:
     rng = random.Random(seed)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -100,7 +110,8 @@ def generate(productions: int, out_dir: Path, seed: int = 7) -> dict[str, int]:
         clips = csv.writer(cf)
         decisions = csv.writer(df)
 
-        for project_id in range(1, productions + 1):
+        for n in range(1, productions + 1):
+            project_id = SYNTHETIC_PROJECT_BASE + n
             shoot_start = base_date + timedelta(days=rng.randint(0, 300))
 
             for group_id in range(1, rng.randint(18, 45)):

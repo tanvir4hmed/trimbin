@@ -61,9 +61,13 @@ async def accuracy(response: Response) -> dict[str, Any]:
         ),
         "caveat": (
             "Confident decisions are not systematically re-reviewed, so this is "
-            "weaker evidence than a verified result. The evaluation set below "
-            "is the harder measure."
+            "weaker evidence than a verified result. The evaluation set is the "
+            "harder measure."
         ),
+        # Stated in the payload, not only in the page, so it cannot be lost in a
+        # rendering. Generated rows are excluded from this figure at the view
+        # level: a number computed over them would measure the generator.
+        "counts_only_real_work": True,
     }
 
 
@@ -94,14 +98,37 @@ async def eval_results(response: Response) -> dict[str, Any]:
 
 @router.get("/scale")
 async def scale(response: Response) -> dict[str, Any]:
-    """What the archive actually holds.
+    """What the archive holds, real and generated counted apart.
 
     Present because the accuracy figure means something different over a
     thousand decisions than over three hundred thousand, and a visitor cannot
     weigh one without the other.
+
+    The two are never summed. The generated corpus exists to show the queries
+    stay fast at scale and is evidence of nothing else; adding it to the real
+    total would invite exactly the inference it cannot support.
     """
     _cached(response)
-    return await analytics.scale()
+    counts = await analytics.corpus()
+
+    return {
+        "real": {
+            "productions": counts["real_productions"],
+            "clips": counts["real_clips"],
+            "scenes": counts["real_scenes"],
+            "shots": counts["real_shots"],
+            "footage_hours": counts["real_hours"],
+        },
+        "synthetic": {
+            "productions": counts["synthetic_productions"],
+            "clips": counts["synthetic_clips"],
+            "footage_hours": counts["synthetic_hours"],
+            "purpose": (
+                "Generated to demonstrate that queries stay fast over millions "
+                "of rows. Excluded from every accuracy figure on this site."
+            ),
+        },
+    }
 
 
 @router.get("/reasons")

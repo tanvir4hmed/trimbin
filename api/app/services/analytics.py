@@ -100,28 +100,24 @@ async def eval_summary() -> list[dict[str, Any]]:
     return await _many("SELECT * FROM eval_accuracy")
 
 
-async def scale() -> dict[str, Any]:
-    """What the archive holds.
+async def corpus() -> dict[str, Any]:
+    """What the archive holds, counted as two separate things.
 
-    countDistinct over a tuple rather than a concatenated string: the string
-    form is slower and quietly wrong when an id contains the separator.
+    Real footage and generated rows are never added together. The synthetic
+    corpus is worth publishing — it is the reason to believe the engine choice —
+    but only as what it is. A combined total would let a reader take the size of
+    the generated set as evidence about the system, which is precisely the
+    inference this separation exists to prevent.
     """
-    row = await _one(
-        """
-        SELECT
-            (SELECT countDistinct(project_id) FROM clips)                   AS productions,
-            (SELECT count() FROM clips)                                     AS clips,
-            (SELECT countDistinct((project_id, group_id)) FROM clips)       AS scenes,
-            (SELECT countDistinct((project_id, group_id, subgroup_id))
-               FROM clips)                                                  AS shots,
-            (SELECT count() FROM decisions)                                 AS decisions,
-            (SELECT round(sum(duration_ms) / 3600000, 1) FROM clips)        AS footage_hours
-        """
-    )
-    return row or {
-        "productions": 0, "clips": 0, "scenes": 0,
-        "shots": 0, "decisions": 0, "footage_hours": 0.0,
-    }
+    row = await _one("SELECT * FROM corpus")
+    if not row:
+        return {
+            "real_clips": 0, "synthetic_clips": 0,
+            "real_productions": 0, "synthetic_productions": 0,
+            "real_scenes": 0, "real_shots": 0,
+            "real_hours": 0.0, "synthetic_hours": 0.0,
+        }
+    return row
 
 
 async def rejection_reasons(limit: int) -> list[dict[str, Any]]:
