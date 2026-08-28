@@ -105,6 +105,16 @@ jobs:
             --region="${{ env.REGION }}" \
             --quiet
 
+      # Same image as the API. The service overrides the command, so there is
+      # nothing extra to build — only a second revision to point at the tag CI
+      # just pushed.
+      - name: Deploy ingest worker
+        run: |
+          gcloud run deploy trimbin-worker \
+            --image="${{ steps.tf.outputs.registry }}/api:${{ github.sha }}" \
+            --region="${{ env.REGION }}" \
+            --quiet
+
       - name: Build and push web
         working-directory: web
         run: |

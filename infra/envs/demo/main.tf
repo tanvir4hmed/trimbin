@@ -224,7 +224,26 @@ resource "google_pubsub_subscription" "ingest" {
   topic  = google_pubsub_topic.ingest.id
   labels = local.labels
 
-  # Long enough for ffmpeg to finish a proxy on a long take.
+  # Push, not pull. See worker.tf for why, and for the IAM that makes the OIDC
+  # token below acceptable to Cloud Run.
+  push_config {
+    push_endpoint = "${google_cloud_run_v2_service.worker.uri}/pubsub"
+
+    oidc_token {
+      service_account_email = google_service_account.pubsub_push.email
+      # The audience Cloud Run checks. Defaulting it to the push endpoint works
+      # until the endpoint gains a path, at which point every delivery 401s.
+      audience = google_cloud_run_v2_service.worker.uri
+    }
+  }
+
+  # Long enough for ffmpeg to finish a proxy on a long take, and equal to the
+  # worker's request timeout on purpose — a clip that outlives both is
+  # redelivered while the first attempt is still encoding it.
+  #
+  # 600s is the Pub/Sub maximum. At roughly 2.5x realtime that covers takes up
+  # to about twenty minutes; anything longer belongs in the batch tools, and
+  # would be redelivered forever here.
   ack_deadline_seconds = 600
 
   retry_policy {
