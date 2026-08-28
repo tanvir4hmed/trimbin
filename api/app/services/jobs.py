@@ -181,6 +181,22 @@ async def record_progress(job_id: UUID, clip_id: UUID, ok: bool, reason: str = "
         )
 
 
+async def abandon(job_id: UUID, reason: str) -> None:
+    """Close a job that failed before any work could be queued.
+
+    A job is opened before the first byte moves, which is right — an upload that
+    dies on the first file should still leave a record. But it means a failure
+    between opening and queueing leaves a job that nothing will ever advance,
+    and an editor watching a progress bar for work that was never started.
+    """
+    await db().collection(COLLECTION).document(str(job_id)).update({
+        "state": "failed",
+        "finished_at": datetime.now(UTC),
+        "failures": firestore.ArrayUnion([{"clip_id": "", "reason": reason}]),
+    })
+    log.warning("job %s abandoned: %s", job_id, reason)
+
+
 async def close_empty(job_id: UUID) -> None:
     """Finish a job that has nothing to process.
 

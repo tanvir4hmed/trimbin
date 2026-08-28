@@ -94,27 +94,35 @@ async def grant_upload(
         opened_by=principal.email,
     )
 
-    tickets: list[UploadTicket] = []
-    for filename in request.filenames:
-        clip_id = uuid4()
-        # The stored name comes from us, not from the browser: a filename is
-        # attacker-controlled input, and object paths are not the place to find
-        # out what someone typed.
-        safe = _SAFE_NAME.sub("_", filename)[-120:]
-        object_path = f"p{request.project_id}/{clip_id}/{safe}"
+    # The job exists now, so a failure from here on has to close it. Otherwise
+    # the editor is handed an error while a job sits in "uploading" forever,
+    # waiting for files that were never granted a URL to arrive with.
+    try:
+        tickets: list[UploadTicket] = []
+        for filename in request.filenames:
+            clip_id = uuid4()
+            # The stored name comes from us, not from the browser: a filename is
+            # attacker-controlled input, and object paths are not the place to
+            # find out what someone typed.
+            safe = _SAFE_NAME.sub("_", filename)[-120:]
+            object_path = f"p{request.project_id}/{clip_id}/{safe}"
 
-        tickets.append(
-            UploadTicket(
-                clip_id=clip_id,
-                filename=filename,
-                upload_url=await storage.signed_upload_url(
-                    object_path,
-                    ttl=SIGNED_URL_TTL,
-                    max_bytes=MAX_CLIP_BYTES,
-                ),
-                storage_uri=storage.originals_uri(object_path),
+            tickets.append(
+                UploadTicket(
+                    clip_id=clip_id,
+                    filename=filename,
+                    upload_url=await storage.signed_upload_url(
+                        object_path,
+                        ttl=SIGNED_URL_TTL,
+                        max_bytes=MAX_CLIP_BYTES,
+                    ),
+                    storage_uri=storage.originals_uri(object_path),
+                )
             )
-        )
+    except Exception:
+        log.exception("could not issue upload URLs for job %s", job_id)
+        await jobs.abandon(job_id, "could not issue upload URLs")
+        raise
 
     log.info("granted %d upload URLs for project %d", len(tickets), request.project_id)
     return UploadGrant(
