@@ -12,6 +12,8 @@ import logging
 from datetime import timedelta
 from uuid import UUID
 
+import google.auth
+import google.auth.transport.requests
 from google.cloud import storage as gcs
 
 from ..config import settings
@@ -26,6 +28,52 @@ def client() -> gcs.Client:
     if _client is None:
         _client = gcs.Client(project=settings.project_id)
     return _client
+
+
+def _signer() -> dict[str, str]:
+    """What generate_signed_url needs in order to sign at all.
+
+    Signing a URL is a private key operation, and on Cloud Run there is no
+    private key: the metadata server hands out access tokens and keeps the key
+    to itself. That is the point of it — a key that never exists on the instance
+    cannot leak from the instance — but it means the local signing path the
+    library takes by default simply cannot work here.
+
+    The way through is to ask IAM to sign on our behalf. Passing the service
+    account's own email and a current access token switches the library to the
+    signBlob API, which needs the account to hold serviceAccountTokenCreator on
+    itself (granted in run.tf).
+
+    Locally, where credentials come from a key file or gcloud, the default path
+    works and this returns nothing.
+
+    Worth stating plainly: this failed in production while every test passed,
+    because a key file is exactly what a developer machine has and a Cloud Run
+    instance never does. The difference is invisible until a real request runs
+    on a real instance.
+    """
+    credentials, _ = google.auth.default(
+        scopes=["https://www.googleapis.com/auth/cloud-platform"]
+    )
+
+    if hasattr(credentials, "signer_email") and getattr(credentials, "signer", None):
+        # A real private key is present. Sign locally: no network call, no IAM
+        # permission needed.
+        return {}
+
+    if not credentials.valid:
+        credentials.refresh(google.auth.transport.requests.Request())
+
+    email = getattr(credentials, "service_account_email", None)
+    if not email or email == "default":
+        # The metadata server answers "default" until asked properly. Without a
+        # real address IAM has nothing to sign as.
+        raise RuntimeError(
+            "cannot determine the service account to sign as; "
+            "signed URLs need an identity, not just a token"
+        )
+
+    return {"service_account_email": email, "access_token": credentials.token}
 
 
 def originals_uri(object_path: str) -> str:
@@ -61,6 +109,7 @@ async def signed_upload_url(
         method="PUT",
         content_type="application/octet-stream",
         headers={"x-goog-content-length-range": f"0,{max_bytes}"},
+        **_signer(),
     )
 
 

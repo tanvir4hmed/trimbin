@@ -49,6 +49,18 @@ resource "google_secret_manager_secret_iam_member" "api_clickhouse" {
   member    = "serviceAccount:${google_service_account.api.email}"
 }
 
+# Signing an upload URL is a private key operation, and Cloud Run instances have
+# no private key — the metadata server issues tokens and keeps the key. So the
+# API asks IAM to sign as itself, which requires exactly this grant. Without it
+# every upload request returns a 500 that says only "you need a private key",
+# and no amount of local testing reproduces it: a developer machine has a key
+# file and an instance never does.
+resource "google_service_account_iam_member" "api_signs_as_itself" {
+  service_account_id = google_service_account.api.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.api.email}"
+}
+
 resource "google_project_iam_member" "api_roles" {
   for_each = toset([
     "roles/aiplatform.user",   # Gemini, for the agents
