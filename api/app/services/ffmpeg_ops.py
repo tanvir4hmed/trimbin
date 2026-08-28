@@ -178,6 +178,11 @@ def _parse_picture(output: str, m: RawMeasurements) -> None:
     # comparison downstream assumes.
     if blurs:
         m.sharpness = 1.0 / (1.0 + sum(blurs) / len(blurs))
+        # Where focus went, not merely that it was soft on average. The two are
+        # different problems: a soft take is unusable, a take that drifts at
+        # eight seconds has eight usable seconds in it, and only a timecode tells
+        # the editor which one they are holding.
+        m.focus_loss_spans = _spikes(blurs, m.duration_s)
 
 
 def _parse_motion(output: str, m: RawMeasurements) -> None:
@@ -239,19 +244,27 @@ def _spikes(series: list[float], duration_s: float) -> list[Span]:
     if len(series) < 10 or duration_s <= 0:
         return []
 
-    mean = sum(series) / len(series)
-    if mean <= 0:
+    # The lower quartile, not the mean or the median.
+    #
+    # The faults this looks for are sustained: a handheld section runs for
+    # seconds, focus can drift for half a take. Any sustained elevation drags
+    # the mean up with it until the section cannot exceed a threshold derived
+    # from itself, and the median falls over too once a fault covers around half
+    # the clip. The lower quartile stays with the well-behaved part of the clip
+    # even when most of it is not, which is the baseline actually wanted here:
+    # what does this clip look like when nothing is wrong?
+    ordered = sorted(series)
+    baseline = ordered[len(ordered) // 4]
+    if baseline <= 0:
         return []
 
-    # Two standard deviations above this clip's own mean, not a multiple of it.
-    # A multiple only works when the baseline is near zero; anything with
-    # constant motion in frame — a crowd, traffic, a moving subject — raises the
-    # mean until a genuine jolt never reaches the threshold. Standard deviation
-    # measures how unusual a moment is for this clip, which is the actual
-    # question.
-    variance = sum((v - mean) ** 2 for v in series) / len(series)
-    threshold = mean + 2.0 * (variance ** 0.5)
+    threshold = baseline * 2.5
     seconds_per_frame = duration_s / len(series)
+
+    # Half a second. Anything briefer is a cut, a flash, or a subject crossing
+    # frame — none of which is camera movement, and all of which would produce
+    # findings an editor learns to ignore.
+    min_frames = max(3, int(0.5 / seconds_per_frame))
 
     spans: list[Span] = []
     start_index: int | None = None
@@ -260,12 +273,11 @@ def _spikes(series: list[float], duration_s: float) -> list[Span]:
         if value > threshold and start_index is None:
             start_index = i
         elif value <= threshold and start_index is not None:
-            # Ignore single-frame blips: a cut or a flash is not camera movement.
-            if i - start_index >= 3:
+            if i - start_index >= min_frames:
                 spans.append(Span(start_index * seconds_per_frame, i * seconds_per_frame))
             start_index = None
 
-    if start_index is not None:
+    if start_index is not None and len(series) - start_index >= min_frames:
         spans.append(Span(start_index * seconds_per_frame, duration_s))
 
     return spans

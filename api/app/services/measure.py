@@ -79,6 +79,12 @@ class RawMeasurements:
     # shot — a soft lens and a missed focus pull produce similar absolute numbers.
     sharpness: float = 0.0
 
+    # Where focus was lost, if it was lost partway rather than throughout. The
+    # average alone cannot tell those apart, and they are different problems: a
+    # soft take is unusable, while a take that drifts at eight seconds has eight
+    # usable seconds in it.
+    focus_loss_spans: list[Span] = field(default_factory=list)
+
     # Motion, from frame-to-frame difference. Again, only meaningful relatively:
     # a locked-off shot and a handheld one are both "correct" depending on intent.
     motion_mean: float = 0.0

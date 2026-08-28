@@ -69,10 +69,15 @@ FIXTURES: list[Fixture] = [
         #
         # Each expression is single-quoted because ffmpeg splits a filter chain
         # on commas, and between(t,4.2,7.8) contains two.
+        #
+        # The amplitude is large on purpose. Handheld shake on a mostly static
+        # scene is a dramatic frame-to-frame change; a few pixels of wobble is
+        # what a tripod does in wind, and calling that a fault would flag every
+        # take ever shot outdoors.
         filters=[
-            "crop=in_w-40:in_h-40:"
-            "'20+if(between(t,4.2,7.8),12*sin(t*38),0)':"
-            "'20+if(between(t,4.2,7.8),9*cos(t*31),0)'"
+            "crop=in_w-160:in_h-160:"
+            "'80+if(between(t,4.2,7.8),70*sin(t*30),0)':"
+            "'80+if(between(t,4.2,7.8),55*cos(t*24),0)'"
         ],
         faults=[PlantedFault("stability", 4.2, 7.8, "camera shake, mid-clip only")],
     ),
@@ -94,7 +99,10 @@ FIXTURES: list[Fixture] = [
     Fixture(
         fixture_id="take05_clipped_highlights",
         description="Blown highlights throughout.",
-        filters=["eq=brightness=0.55:contrast=2.6"],
+        # Far enough over that highlights actually clip. A take that is merely
+        # bright is not a fault — exposure is a choice, and only lost detail is
+        # unrecoverable.
+        filters=["eq=brightness=0.75:contrast=3.2"],
         faults=[PlantedFault("exposure", 0.0, DURATION_S, "clipped highlights")],
     ),
     Fixture(

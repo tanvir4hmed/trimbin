@@ -85,7 +85,10 @@ def _detect(
         or m.shadow_clip_pct > 20,
         0.0,
     )
-    findings["focus"] = (sharpness_rel <= 1 / OUTLIER_RATIO, 0.0)
+    findings["focus"] = (
+        sharpness_rel <= 1 / OUTLIER_RATIO or bool(m.focus_loss_spans),
+        _first(m.focus_loss_spans),
+    )
 
     completion_spans = m.freeze_spans + m.black_spans
     findings["completion"] = (bool(completion_spans), _first(completion_spans))
