@@ -1,0 +1,56 @@
+[
+  {
+    "clip_id": "352f8227-04db-546c-b9cf-1896380d4867",
+    "file": "DoP_C_Take_1_Female_Perspective.mov",
+    "setup_no": 1,
+    "setup_letter": "A",
+    "setup_label": "female perspective",
+    "take_no": 1,
+    "duration_s": 68.715
+  },
+  {
+    "clip_id": "cac7f475-aaa4-5403-873c-e172fbaa7bd6",
+    "file": "DoP_C_Take_2_Female_Perspective.mov",
+    "setup_no": 1,
+    "setup_letter": "A",
+    "setup_label": "female perspective",
+    "take_no": 2,
+    "duration_s": 74.837
+  },
+  {
+    "clip_id": "aef71d68-ec8c-5f1c-ab33-3fc1ba77088f",
+    "file": "DoP_C_Take_3_Female_Perspective.mov",
+    "setup_no": 1,
+    "setup_letter": "A",
+    "setup_label": "female perspective",
+    "take_no": 3,
+    "duration_s": 70.037
+  },
+  {
+    "clip_id": "b77071e1-952f-5605-bdc4-627f885b32ed",
+    "file": "DoP_C_Take_4_Male_Perspective.mov",
+    "setup_no": 2,
+    "setup_letter": "B",
+    "setup_label": "male perspective",
+    "take_no": 4,
+    "duration_s": 72.064
+  },
+  {
+    "clip_id": "3db52d76-3a87-5644-8034-0f83f3a59435",
+    "file": "DoP_C_Take_5_Male_Perspective.mov",
+    "setup_no": 2,
+    "setup_letter": "B",
+    "setup_label": "male perspective",
+    "take_no": 5,
+    "duration_s": 64.832
+  },
+  {
+    "clip_id": "e468ba01-bd65-510d-830d-b1f5ee0241cd",
+    "file": "DoP_C_Take_6_Male_Perspective.mov",
+    "setup_no": 2,
+    "setup_letter": "B",
+    "setup_label": "male perspective",
+    "take_no": 6,
+    "duration_s": 59.349
+  }
+]
