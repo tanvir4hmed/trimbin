@@ -1,8 +1,9 @@
 # Push to main deploys. There is no other path to production.
 #
-# Authentication is Workload Identity Federation — GitHub proves which repository
-# and which ref is running, and Google issues a short-lived token. No service
-# account key exists anywhere.
+# Authentication is Workload Identity Federation: GitHub proves which repository
+# and which ref is running, Google issues a short-lived token. No service account
+# key exists anywhere to leak, rotate, or find in a git history two years from
+# now.
 
 name: Deploy
 
@@ -18,6 +19,10 @@ permissions:
 concurrency:
   group: deploy-production
   cancel-in-progress: false # never interrupt an apply mid-flight
+
+env:
+  REGION: us-central1
+  SERVICE: trimbin-api
 
 jobs:
   deploy:
@@ -41,6 +46,8 @@ jobs:
           terraform_version: "1.15.8"
 
       # -- infrastructure ---------------------------------------------------
+      # Runs first: the image is pushed to a registry Terraform creates, and the
+      # service reads secrets Terraform provisions.
       - name: Terraform init
         working-directory: infra/envs/demo
         run: |
@@ -48,7 +55,7 @@ jobs:
             -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
             -backend-config="prefix=envs/demo"
 
-      - name: Terraform plan
+      - name: Terraform apply
         working-directory: infra/envs/demo
         env:
           TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
@@ -56,34 +63,65 @@ jobs:
           TF_VAR_clickhouse_org_id: ${{ secrets.CLICKHOUSE_ORG_ID }}
           TF_VAR_clickhouse_token_key: ${{ secrets.CLICKHOUSE_TOKEN_KEY }}
           TF_VAR_clickhouse_token_secret: ${{ secrets.CLICKHOUSE_TOKEN_SECRET }}
-        run: terraform plan -out=tfplan
+        run: terraform apply -auto-approve
 
-      - name: Terraform apply
+      - name: Read Terraform outputs
+        id: tf
         working-directory: infra/envs/demo
-        run: terraform apply -auto-approve tfplan
+        run: |
+          echo "registry=$(terraform output -raw artifact_registry)" >> "$GITHUB_OUTPUT"
+          echo "ch_host=$(terraform output -json clickhouse_endpoints | jq -r '.https.host')" >> "$GITHUB_OUTPUT"
 
       # -- schema -----------------------------------------------------------
-      # Migrations run after infrastructure exists and before anything is
-      # deployed that would read from it.
+      # After the database exists, before anything deploys that reads from it.
+      # Migrations are idempotent, so running on every push is the normal case.
       - name: ClickHouse migrations
         working-directory: clickhouse
         env:
-          CLICKHOUSE_URL: ${{ secrets.CLICKHOUSE_URL }}
+          CLICKHOUSE_URL: https://${{ steps.tf.outputs.ch_host }}:8443
           CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
-        run: ./migrate.sh
+        run: |
+          chmod +x migrate.sh
+          ./migrate.sh
 
       # -- application ------------------------------------------------------
-      # Placeholders until Phase 2. Kept here so the shape of the pipeline is
-      # visible and proven from the first commit rather than assembled at the end.
-      - name: Build & deploy API
-        run: echo "Phase 2"
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
-      - name: Build & deploy web
-        run: echo "Phase 4"
+      - name: Build and push API
+        working-directory: api
+        run: |
+          IMAGE="${{ steps.tf.outputs.registry }}/api"
+          # Tagged with the commit as well as latest, so a bad deploy can be
+          # rolled back to a specific build rather than a moving target.
+          docker build -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" .
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"
 
-      - name: Deploy agents to Agent Engine
-        run: echo "Phase 2"
+      - name: Deploy API
+        run: |
+          gcloud run deploy ${{ env.SERVICE }} \
+            --image="${{ steps.tf.outputs.registry }}/api:${{ github.sha }}" \
+            --region="${{ env.REGION }}" \
+            --quiet
 
       # -- proof ------------------------------------------------------------
+      # A deploy that reports success while serving errors is worse than one
+      # that fails, because nobody goes back to check.
       - name: Smoke test
-        run: echo "Phase 2"
+        run: |
+          URL=$(gcloud run services describe ${{ env.SERVICE }} \
+            --region="${{ env.REGION }}" --format='value(status.url)')
+
+          echo "Deployed to $URL"
+
+          # Liveness first — it touches nothing and should answer immediately.
+          curl --fail --silent --show-error --max-time 30 "$URL/public/health"
+
+          # Then a route that reads the database. Generous timeout: the service
+          # idles to save credit and the first request after a quiet period pays
+          # for waking it.
+          curl --fail --silent --show-error --max-time 120 "$URL/public/accuracy" \
+            | jq -e '.definition != null'
+
+          echo "Smoke test passed."
