@@ -26,7 +26,7 @@ world, would be honoured. A member who signed into an unrelated site with Google
 could have that site's token replayed against us. A deployment where nobody can
 sign in is a visible problem; one where anybody can is not.
 
-The public pages, the demo project and the sandbox do not need a token and are
+The public pages and the demo project do not need a token and are
 unaffected.
 
 ## What to click

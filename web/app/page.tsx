@@ -1,109 +1,86 @@
-import Link from "next/link";
+"use client";
 
 /**
- * The front page.
+ * The door.
  *
- * A visitor arrives with no context and roughly ten seconds of patience. The
- * job here is to say what this is, show that it is running, and get out of the
- * way — not to sell. Every claim on this page is checkable from another page on
- * this site, which is the only kind of claim worth making about an AI system.
+ * This page used to be nine screens of prose: the problem, the method, Murch,
+ * an honest list of what is not built. All of it worth reading and none of it
+ * what somebody arriving at an application is looking for. A person landing
+ * here does not read; they look for the way in.
+ *
+ * So: one screen, two buttons, and everything that was here moved to /about
+ * where it can be read by anyone who wants it. A signed-in person never sees
+ * this page at all — they are already working, and the front door of a tool you
+ * use every day should be the tool.
  */
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { CLIENT_ID, currentIdentity, renderSignInButton } from "@/lib/auth";
+
 export default function Home() {
+  const router = useRouter();
+  const [checked, setChecked] = useState(false);
+  const buttonRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (currentIdentity()) {
+      router.replace("/dashboard");
+      return;
+    }
+    setChecked(true);
+  }, [router]);
+
+  useEffect(() => {
+    if (!checked || !buttonRef.current) return;
+    void renderSignInButton(buttonRef.current, () => router.push("/dashboard"));
+  }, [checked, router]);
+
+  if (!checked) {
+    // Nothing rather than a flash of the door for somebody who is already
+    // inside. The redirect lands within a frame; a marketing page appearing
+    // first would read as being signed out.
+    return <main className="door" />;
+  }
+
   return (
-    <main className="shell">
-      <section style={{ paddingTop: 64, paddingBottom: 20 }}>
-        <span className="eyebrow">Agentic Cinema · ClickHouse track</span>
-        <h1>An assistant editor that never forgets</h1>
+    <main className="door">
+      <section className="door-inner">
+        <h1>Which take, and why.</h1>
         <p className="lede">
-          In film editing, the trim bin held every frame you cut away, and
-          editors went back to it constantly. Digital editing quietly threw that
-          away. Trimbin organises a shoot day on its own, surfaces only the shots
-          that need a human eye, and remembers every take it passed over and why.
+          Post-production triage for an editing company. Every take is measured,
+          compared against the others of its own shot, and the reason is kept —
+          so the question two years from now has an answer.
         </p>
 
-        <div style={{ display: "flex", gap: 10, marginTop: 26, flexWrap: "wrap" }}>
-          <Link href="/demo" className="primary" style={{ textDecoration: "none" }}>
-            Open the demo project
-          </Link>
-          <Link href="/accuracy" className="ghost" style={{ textDecoration: "none" }}>
-            See how often it is right
+        <div className="door-actions">
+          {CLIENT_ID ? (
+            <div className="signin big" ref={buttonRef} />
+          ) : (
+            <p className="hint">
+              Sign-in is not configured on this deployment. See
+              docs/oauth-client.md.
+            </p>
+          )}
+          <Link href="/project/1" className="ghost">
+            Look around a real project
           </Link>
         </div>
-      </section>
 
-      <section>
-        <h2>What it does</h2>
-        <div className="split">
-          <article className="panel">
-            <span className="panel-label">Organises the day</span>
-            <p className="panel-detail" style={{ margin: "6px 0 0" }}>
-              Drop a shoot folder. Slates are read, takes are grouped, proxies
-              are made. No forms and no manual logging.
-            </p>
-          </article>
-          <article className="panel">
-            <span className="panel-label">Narrows the work</span>
-            <p className="panel-detail" style={{ margin: "6px 0 0" }}>
-              Six of sixty-eight shots need your eye. The rest were clear calls
-              and nobody has to look at them.
-            </p>
-          </article>
-          <article className="panel">
-            <span className="panel-label">Remembers everything</span>
-            <p className="panel-detail" style={{ margin: "6px 0 0" }}>
-              Every take considered, every measurement, every reason, every human
-              override — queryable years later.
-            </p>
-          </article>
-        </div>
-      </section>
+        <p className="door-note">
+          Sign in with any Google account and you get a real workspace: your own
+          projects, your own footage, the same interface the editors here use.
+          In our productions you can read everything, comment, and overrule any
+          call we made.
+        </p>
 
-      <section>
-        <h2>What it will not claim</h2>
-        <p>
-          No model has been trained to judge which take an editor would choose,
-          because that data has never existed — nobody recorded it. So Trimbin
-          does not claim to judge acting. It handles everything around that
-          judgement and hands the editor a decision that takes seconds instead of
-          an hour.
-        </p>
-        <p>
-          Nothing is ever discarded automatically. A technically worse take is
-          often the right take, and a system that quietly drops it is worse than
-          no system at all.
-        </p>
-      </section>
-
-      <section>
-        <h2>How it decides</h2>
-        <p>
-          Judgement follows Walter Murch&rsquo;s Rule of Six, the standard
-          framework in film editing. Emotion and story are the top 74% and belong
-          to a person; Trimbin does not enter them. Rhythm, eye-trace, planarity
-          and spatial continuity are progressively more objective, and that is
-          where an agent earns its place.
-        </p>
-        <p>
-          Work splits by what is knowable. Exposure, focus, stability and audio
-          are <em>measured</em> with ffmpeg — exact, cheap and repeatable, where
-          asking a model would be a guess. Whether an action completed and
-          whether continuity holds are <em>observed</em> by a model. Whether the
-          performance is right is <em>left alone</em>.
-        </p>
-        <p>
-          Every measurement is relative to the other takes of the same shot,
-          never to an absolute standard. If all seven takes are handheld, that is
-          the language of the scene. If six are locked off and one is not, that
-          one is probably an accident.
-        </p>
-      </section>
-
-      <section>
-        <h2>Built on</h2>
-        <p className="dim small">
-          Gemini 3.6 Flash for video · Google ADK on Vertex AI Agent Engine ·
-          ClickHouse Cloud through the official MCP server · Cloud Run · all
-          infrastructure in Terraform, deployed by push.
+        <p className="door-links">
+          <Link href="/about">What this is</Link>
+          <span aria-hidden>·</span>
+          <Link href="/guide">How to use it</Link>
+          <span aria-hidden>·</span>
+          <Link href="/accuracy">How often it is right</Link>
         </p>
       </section>
     </main>

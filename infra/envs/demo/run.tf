@@ -232,7 +232,7 @@ resource "google_cloud_run_v2_service" "api" {
   }
 }
 
-# Public. The demo project, the accuracy page and the sandbox are all meant to
+# Public. The demo project and the accuracy page are both meant to
 # be reachable without an account, and authorisation is enforced per route.
 resource "google_cloud_run_v2_service_iam_member" "api_public" {
   name     = google_cloud_run_v2_service.api.name

@@ -16,8 +16,7 @@ import tempfile
 from pathlib import Path
 from uuid import UUID
 
-from ..config import settings
-from ..services import clips, identify, jobs, sandbox, storage
+from ..services import clips, identify, jobs, quota, storage
 from ..services.ffmpeg_ops import UnusableClip, analyse, build_proxy, build_sprite
 
 log = logging.getLogger(__name__)
@@ -58,21 +57,25 @@ async def process(job_id: UUID, clip_id: UUID, project_id: int) -> None:
         log.info("clip %s: measuring", clip_id)
         measurements = await analyse(source)
 
-        # Length is a sandbox rule and cannot be known before measuring. Checked
-        # here rather than at upload, and recorded as a rejection with a reason
-        # so the visitor sees the limit rather than a clip that vanished.
-        if sandbox.is_sandbox(project_id) and sandbox.clip_is_too_long(
-            measurements.duration_s
-        ):
+        # Length is a guest-project rule and cannot be known before measuring —
+        # only ffmpeg can tell sixty seconds from six minutes at a low bitrate.
+        # Checked here rather than at upload, and recorded as a rejection with a
+        # reason, so the person sees the limit rather than a clip that vanished.
+        #
+        # The limits follow the project's owner, not whoever uploaded. A limit
+        # that changed with the uploader is one a guest could raise by asking an
+        # editor to press the button.
+        limits = await quota.limits_for_project(project_id)
+        if quota.clip_is_too_long(measurements.duration_s, limits):
             await clips.write_unusable(
                 project_id=project_id,
                 clip_id=clip_id,
                 object_path=object_path,
                 measurements=measurements,
-                reason="sandbox.too_long",
+                reason="guest.too_long",
             )
             raise Rejected(
-                f"The sandbox takes clips up to {settings.sandbox_max_seconds} "
+                f"A guest project takes clips up to {limits.clip_seconds} "
                 f"seconds; this one is {measurements.duration_s:.0f}."
             )
 
@@ -98,6 +101,30 @@ async def process(job_id: UUID, clip_id: UUID, project_id: int) -> None:
             source, work, clip_id, measurements.duration_s
         )
 
+        # How many takes of this shot are already here.
+        #
+        # Only knowable now: which shot a clip belongs to is what the slate read
+        # decides, and that has just happened. A guest project that has already
+        # had its five takes of 12A keeps the clip as a rejected row rather than
+        # dropping it, so the person sees the limit they were told about instead
+        # of a file that went nowhere.
+        if limits.takes_per_shot and identity.subgroup_id:
+            held = await quota.takes_in_shot(
+                project_id, identity.group_id, identity.subgroup_id
+            )
+            if held >= limits.takes_per_shot:
+                await clips.write_unusable(
+                    project_id=project_id,
+                    clip_id=clip_id,
+                    object_path=object_path,
+                    measurements=measurements,
+                    reason="guest.too_many_takes",
+                )
+                raise Rejected(
+                    f"This shot already has {held} takes, which is the limit "
+                    f"for a guest project."
+                )
+
         log.info("clip %s: encoding proxy", clip_id)
         proxy_dir = work / "proxy"
         await build_proxy(source, proxy_dir)
@@ -122,6 +149,7 @@ async def process(job_id: UUID, clip_id: UUID, project_id: int) -> None:
             take_no=identity.take_no,
             slate_confident=identity.slate_confident,
             slate_raw=identity.slate_raw,
+            camera=identity.camera,
             embedding=identity.embedding,
         )
 

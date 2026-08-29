@@ -15,7 +15,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .config import settings
-from .routes import ask, maintenance, projects, public, review, uploads
+from .routes import (
+    ask,
+    dashboard,
+    maintenance,
+    projects,
+    public,
+    review,
+    scenes,
+    uploads,
+)
 from .services import analytics
 
 logging.basicConfig(
@@ -51,13 +60,20 @@ app.add_middleware(
         "http://localhost:3000",
     ],
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    # PUT is here because the brief, the circled take, the assignee and the set
+    # state are all replacements of one field rather than events, and a POST for
+    # each would make four ways to say the same thing. It was missing when those
+    # routes were added, and the failure would have been a CORS preflight
+    # rejection in the browser with a working endpoint behind it.
+    allow_methods=["GET", "POST", "PUT"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(public.router)
+app.include_router(dashboard.router)
 app.include_router(uploads.router)
 app.include_router(review.router)
+app.include_router(scenes.router)
 app.include_router(projects.router)
 app.include_router(maintenance.router)
 app.include_router(ask.router)

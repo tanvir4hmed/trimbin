@@ -29,7 +29,7 @@ interface ProjectAccuracy {
   shots_total: number;
   clips: number;
   scenes: number;
-  setups: number;
+  shots: number;
   unusable: number;
   footage_hours: number;
 }
@@ -132,12 +132,12 @@ export function PerProjectAccuracy() {
         <Stat
           label="Sent to a person"
           value={String(current.flagged_for_review)}
-          note={`of ${current.shots_total} setup${current.shots_total === 1 ? "" : "s"}`}
+          note={`of ${current.shots_total} shot${current.shots_total === 1 ? "" : "s"} with a decision`}
         />
         <Stat
           label="Takes"
           value={String(current.clips)}
-          note={`${current.setups} setup${current.setups === 1 ? "" : "s"} · ${current.footage_hours.toFixed(2)} h`}
+          note={`${current.shots} shot${current.shots === 1 ? "" : "s"} · ${current.footage_hours.toFixed(2)} h`}
         />
         <Stat
           label="Unusable"
@@ -153,7 +153,7 @@ export function PerProjectAccuracy() {
       {current.decision_accuracy_pct === null && (
         <p className="dim small">
           Null, not zero. A system with no confident decisions is not a system
-          that is wrong every time — and every setup in this project came back
+          that is wrong every time — and every shot in this project came back
           too close to call, which is the honest answer to twelve competently
           shot takes rather than a failure to produce one.
         </p>

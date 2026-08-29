@@ -48,7 +48,7 @@ resource "google_project_service" "required" {
     "iam.googleapis.com",
     "iamcredentials.googleapis.com",
     "pubsub.googleapis.com",
-    # Sweeps sandbox footage on a schedule. The API scales to zero, and a job
+    # Sweeps guest footage on a schedule. The API scales to zero, and a job
     # that must run at 3am cannot live inside a service that may not exist then.
     "cloudscheduler.googleapis.com",
     # The budget guard below needs this, and the guard is the difference between

@@ -10,11 +10,13 @@ remembers every take it passed over and why.
 Built for **Agentic Cinema: The Blockbuster Hackathon** — ClickHouse track.
 
 **Live:** [trimbin.qlitch.com](https://trimbin.qlitch.com) ·
-[the workspace](https://trimbin.qlitch.com/project/1) ·
-[try it on your own footage](https://trimbin.qlitch.com/sandbox) ·
+[a real project](https://trimbin.qlitch.com/project/1) ·
+[what it is](https://trimbin.qlitch.com/about) ·
 [our error rate](https://trimbin.qlitch.com/accuracy)
 
-Nothing needs an account.
+Reading needs no account. Sign in with any Google account and you get the same
+application the editors here use: your own projects, your own footage — and in
+our productions you can comment and overrule any call we made.
 
 ---
 
@@ -41,11 +43,15 @@ Verified against the deployed system, not asserted from the code.
 
 | | |
 |---|---|
-| **Ingest, end to end** | A clip uploaded to a signed URL is measured, read for a slate, embedded, encoded and playing through the CDN in about a minute — no account needed for the sandbox. |
+| **Ingest, end to end** | A clip uploaded to a signed URL is measured, read for a slate, embedded, encoded and playing through the CDN in about a minute. |
 | **Measurement** | Exposure, focus, stability, audio and freeze detection with ffmpeg, in the same pass that builds the proxy. Every finding carries a timecode. |
 | **Slate reading** | A board on the front of a clip becomes scene, shot and take. No board is *said to be* no board, and the take is left ungrouped rather than guessed at. |
-| **The panel** | Three specialists and a chief compare every take of a setup and write a verdict per take — including the rejected ones, with reasons. |
-| **The workspace** | Scene → setup tree, six criteria side by side, every take openable, findings that seek the player to the moment they describe. |
+| **The panel** | Three specialists and a chief compare every take of a shot and write a verdict per take — including the rejected ones, with reasons. |
+| **The dashboard** | One queue across every project: the close calls, the shots nothing has compared, and the ones where the take the director circled is not the take the measurements chose. |
+| **The workspace** | Scene → shot tree filtered by camera, shoot day and assignee; six criteria side by side; every take openable; findings that seek the player to the moment they describe. |
+| **The stringout** | The scene assembled from the takes that stand, shot by shot, in order — what an assistant editor actually hands the editor. |
+| **Comments** | Timecoded, threaded one level, resolved by writing forward rather than deleting. |
+| **Export** | CMX3600 EDL with the reasoning in the comment lines, and every finding and note as timeline markers in record time. |
 | **Overrides** | An editor picks a different take and says why. Recorded as a new decision beside the panel's, never over it. |
 | **Retrieval** | A question in plain language returns takes with their reasons, and the query that produced them. |
 
@@ -54,11 +60,13 @@ Verified against the deployed system, not asserted from the code.
 Stated because a demo that omits this is the same overclaim as an invented accuracy figure,
 and this project made that mistake once already.
 
-- **The assembled cut.** Selected portions do not yet stream as one continuous film, and
-  there is no EDL export.
-- **Browser upload for a signed-in project.** The API is proven; the form exists only in
-  the sandbox.
-- **Any accuracy figure.** The number is null, not zero — see below.
+- **Any editorial accuracy figure.** The number is null, not zero — see below. It can
+  only come from editors overriding the system, and that has to happen first.
+- **Frame rate.** Exports declare it rather than measure it; nothing in the archive
+  records what the original was shot at. The EDL header says which rate was used.
+- **Embeddings on the generated corpus.** Only worker-ingested clips carry one.
+- **The panel window.** Specialists watch the first thirty seconds of each take, so a
+  continuity error at 0:58 of a 1:10 take will be missed.
 - **Sign-in on this deployment**, pending one console step
   ([docs/oauth-client.md](docs/oauth-client.md)).
 - **Cloud Trace spans per agent call**, and keyboard shuttle controls.
@@ -109,14 +117,14 @@ Twelve takes from a published, openly licensed dataset
 whole pipeline.
 
 **Measurement found nothing wrong with any of them** — every take within a few percent of
-its setup median. That is the correct answer: competent takes have nothing technical to
+its shot median. That is the correct answer: competent takes have nothing technical to
 separate them, and a system that manufactured a confident winner from that would be lying.
 
 **The panel found what measurement could not.** A take that stops mid-sentence. A whip pan
 that breaks eye-trace. A wall crossing the foreground for the first sixteen seconds. An
 extra stoop to pick up shoes that no other take has.
 
-Every setup came back below the review margin and was flagged for a person. Four out of
+Every shot came back below the review margin and was flagged for a person. Four out of
 four went to a human, which is the honest outcome for four close calls.
 
 ---
@@ -158,7 +166,7 @@ Browser ──▶ Cloud Run: API ──▶ Pub/Sub ──▶ Cloud Run: worker
 ClickHouse Cloud        Firestore
 the logbook             the whiteboard
 clips · decisions       projects · members · jobs
-embeddings · findings   sandbox quotas
+embeddings · findings   guest quotas
 ```
 
 Four decisions worth naming.
@@ -198,7 +206,7 @@ signal this system has about its own quality.
 | Embeddings | `gemini-embedding-2`, 768 dimensions, natively multimodal |
 | Agent framework | None. The `google-genai` SDK directly, with pydantic response schemas. |
 | Analytics store | ClickHouse Cloud — clips, decisions, embeddings; reached at runtime through the official `mcp-clickhouse` server |
-| Mutable store | Firestore — projects, members, jobs, sandbox quotas |
+| Mutable store | Firestore — projects, members, jobs, shot briefs, circled takes |
 | Media | Cloud Storage + Cloud CDN, uniform HLS proxies |
 | Measurement | ffmpeg filter graph, one decode, two branches |
 | API / Web | FastAPI · Next.js 15, both on Cloud Run |
@@ -274,7 +282,7 @@ person can use it.
 
 - **Filmed Scenes** — Yilmaz, Rietdijk, Primett, Mukhina, Lotman & Tikka (2025), Zenodo,
   [doi:10.5281/zenodo.15767853](https://doi.org/10.5281/zenodo.15767853), CC BY 4.0.
-  Twelve takes across four camera setups. Attribution is recorded in the archive beside
+  Twelve takes across four camera shots. Attribution is recorded in the archive beside
   the rows it produced.
 - **Blackmagic Fusion training material** — analysed locally, never published or
   redistributed. It is given away freely and still owned by Blackmagic.

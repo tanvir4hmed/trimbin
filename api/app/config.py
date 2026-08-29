@@ -73,16 +73,15 @@ class Settings(BaseSettings):
     # Membership by email, which is all a small team needs. A permissions matrix
     # is real work for a real product and would earn nothing here.
     demo_project_id: int = 1
-    sandbox_project_id: int = 2
 
-    # ---- sandbox limits ---------------------------------------------------
-    # A visitor can try the system on their own footage without it becoming a
-    # way to spend our credits. Deliberately tight: enough to see it work, not
-    # enough to process a shoot day.
-    sandbox_max_clips: int = 3
-    sandbox_max_seconds: int = 30
-    sandbox_max_per_ip_per_day: int = 3
-    sandbox_retention_hours: int = 24
+    # ---- guest workspaces -------------------------------------------------
+    # The numbers themselves live in services/members.py, beside the roster and
+    # the capability table, because a limit and the role it applies to are one
+    # decision and splitting them across two files is how they drift.
+    #
+    # What used to be here was a block of sandbox_* settings for a separate
+    # project with separate rules. The sandbox is gone: everyone gets the same
+    # application, and the limits sit on a project a guest actually owns.
 
     # ---- limits -----------------------------------------------------------
     max_upload_bytes: int = Field(default=8 * 1024**3, description="8 GiB")

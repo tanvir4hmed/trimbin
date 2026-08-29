@@ -1,9 +1,20 @@
-"""Asking the panel to judge a setup, and reading what it decided.
+"""One shot: what was decided about it, and everything a person does to it.
+
+A *shot* is one camera position — 12A the wide, 12B her close-up. A *take* is one
+attempt at it. That is the vocabulary a script supervisor uses when they draw a
+vertical line down the page for each setup, and the vocabulary on the slate the
+camera is pointed at. This file used to say "setup" for the same thing, which is
+a real word on set for the same object but not the one anybody says afterwards,
+and the interface was the poorer for it.
 
 Judging is a POST because it spends money and writes rows. Reading is a GET and
 open to anyone on a public project, because the whole argument of this system is
 that a decision with its reasons attached is worth more than a decision — and an
 argument you have to sign in to check is not much of one.
+
+Overriding needs a name but not a membership. A guest who disagrees with the
+panel is producing the single most valuable row in the archive, and refusing it
+would be refusing the evidence.
 """
 
 from __future__ import annotations
@@ -15,10 +26,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
-from ..auth import Principal, current_principal, require_member
+from ..auth import Principal, current_principal, require_signed_in
+from ..services import comments as comments_service
 from ..services import decisions as decisions_service
-from ..services import shots
+from ..services import members
 from ..services import review as review_service
+from ..services import shots
 from ..services.analytics import client
 
 log = logging.getLogger(__name__)
@@ -53,20 +66,20 @@ class Override(BaseModel):
 @router.get("/{project_id}/pending")
 async def pending(
     project_id: int,
-    principal: Annotated[Principal, Depends(require_member)],
+    principal: Annotated[Principal, Depends(current_principal)],
 ) -> dict:
-    """Setups with takes and no verdict yet."""
+    """Shots with takes and no verdict yet."""
     await principal.assert_can_read(project_id)
-    setups = await review_service.pending(project_id)
+    found = await review_service.pending(project_id)
     return {
         "project_id": project_id,
         "pending": [
             {
                 "scene": s.group_id,
-                "setup": s.subgroup_id,
+                "shot": s.subgroup_id,
                 "takes": len(s.clip_ids),
             }
-            for s in setups
+            for s in found
         ],
     }
 
@@ -76,17 +89,21 @@ async def judge(
     project_id: int,
     group_id: int,
     subgroup_id: int,
-    principal: Annotated[Principal, Depends(require_member)],
+    principal: Annotated[Principal, Depends(require_signed_in)],
     force: bool = False,
 ) -> dict:
-    """Compare every take of one setup and record the verdicts.
+    """Compare every take of one shot and record the verdicts.
 
-    Synchronous. A setup is a handful of takes and the fast path answers in
+    Uploading is restricted; asking the system to think about footage that is
+    already here is not. A guest looking at our archive can run the comparison
+    again and watch it reach the same answer, which is a considerably better
+    demonstration than a screenshot of one.
+
+    Synchronous. A shot is a handful of takes and the fast path answers in
     seconds; queueing it would add a job to poll for an answer that has usually
-    already arrived. A full panel on a large setup is slower, which is what the
-    long request timeout on this service is for.
+    already arrived.
     """
-    await principal.assert_can_write(project_id)
+    await principal.assert_can_comment(project_id)
 
     try:
         return await review_service.judge(project_id, group_id, subgroup_id, force=force)
@@ -103,7 +120,7 @@ async def verdicts(
     subgroup_id: int,
     principal: Annotated[Principal, Depends(current_principal)],
 ) -> dict:
-    """What was decided about this setup, and why.
+    """What was decided about this shot, and why.
 
     Every take, not only the winner. "Why not that one?" is the question this
     endpoint exists to answer, and it is asked months later by someone who was
@@ -123,7 +140,7 @@ async def verdicts(
                c.proxy_uri, c.sprite_uri,
                d.criterion_names, d.criterion_scores,
                d.safe_starts_s, d.safe_ends_s, d.trim_reasons,
-               c.duration_ms
+               c.duration_ms, c.camera, c.captured_at
         FROM decisions AS d
         LEFT JOIN clips AS c ON c.clip_id = d.clip_id AND c.project_id = d.project_id
         WHERE d.project_id = {p:UInt32} AND d.group_id = {g:UInt32}
@@ -173,32 +190,49 @@ async def verdicts(
             ],
             "trim_reasons": list(r[24]),
             "duration_s": round(int(r[25] or 0) / 1000, 2),
+            "camera": r[26] or "",
+            "captured_at": r[27].isoformat() if r[27] else None,
         })
 
     if not takes:
         raise HTTPException(
             status.HTTP_404_NOT_FOUND,
-            "No verdicts for this setup yet",
+            "No verdicts for this shot yet",
         )
+
+    brief = await shots.get(project_id, group_id, subgroup_id)
+    chosen = next((t for t in takes if t["outcome"] == "selected"), None)
 
     return {
         "project_id": project_id,
         "scene": group_id,
-        "setup": subgroup_id,
+        "shot": subgroup_id,
         "takes": sorted(takes, key=lambda t: t["take_no"]),
-        "recommended": next(
-            (t["clip_id"] for t in takes if t["outcome"] == "selected"), None
+        "recommended": chosen["clip_id"] if chosen else None,
+        # The set's own preference, carried through to the screen where it
+        # matters. Never fed to the panel: a model told which take a human liked
+        # stops measuring and starts agreeing, and the agreement would then be
+        # published as an independent confirmation, which it would not be.
+        "circled_take": brief.circled_take,
+        "circled_by": brief.circled_by,
+        "differs_from_circle": bool(
+            brief.circled_take and chosen and brief.circled_take != chosen["take_no"]
         ),
+        "assignee": brief.assignee,
+        "state": brief.state,
     }
 
 
-@router.post("/{project_id}/{group_id}/{subgroup_id}/select", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{project_id}/{group_id}/{subgroup_id}/select",
+    status_code=status.HTTP_201_CREATED,
+)
 async def override(
     project_id: int,
     group_id: int,
     subgroup_id: int,
     body: Override,
-    principal: Annotated[Principal, Depends(require_member)],
+    principal: Annotated[Principal, Depends(require_signed_in)],
 ) -> dict:
     """An editor choosing a take, overriding or confirming the panel.
 
@@ -211,36 +245,42 @@ async def override(
     Confirming the panel's choice is recorded too. "The editor agreed" is
     evidence; silence is not, and a system that only writes down disagreements
     cannot tell a good decision from an unexamined one.
-    """
-    await principal.assert_can_write(project_id)
 
-    verdicts = await _verdicts_for(project_id, group_id, subgroup_id)
-    if not verdicts:
+    Open to anyone signed in, on any project they can read. That is a deliberate
+    widening: a guest overruling us produces exactly the row this table was built
+    for, and every version of it is kept, attributed, and undoable.
+    """
+    await principal.assert_can_comment(project_id)
+
+    verdicts_now = await _verdicts_for(project_id, group_id, subgroup_id)
+    if not verdicts_now:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            "This setup has not been judged yet, so there is nothing to override.",
+            "This shot has not been judged yet, so there is nothing to override.",
         )
 
     chosen = str(body.clip_id)
-    if chosen not in {v["clip_id"] for v in verdicts}:
-        # Not a 404: the setup exists and was judged. The clip simply is not one
+    if chosen not in {v["clip_id"] for v in verdicts_now}:
+        # Not a 404: the shot exists and was judged. The clip simply is not one
         # of its takes, which is a different mistake and worth saying so.
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            "That clip is not one of the takes in this setup.",
+            "That clip is not one of the takes in this shot.",
         )
 
-    previous = next((v["clip_id"] for v in verdicts if v["outcome"] == "selected"), None)
+    previous = next(
+        (v["clip_id"] for v in verdicts_now if v["outcome"] == "selected"), None
+    )
     agreed = previous == chosen
 
-    rows = rows_for_choice(verdicts, chosen, body)
+    rows = rows_for_choice(verdicts_now, chosen, body)
 
     await decisions_service.record(
         project_id=project_id,
         group_id=group_id,
         subgroup_id=subgroup_id,
         verdicts=rows,
-        # Keyed on the person and the clip so a second look at the same setup
+        # Keyed on the person and the clip so a second look at the same shot
         # replaces nothing — an editor may change their mind twice, and both
         # times happened.
         key=decisions_service.run_hash(
@@ -253,7 +293,7 @@ async def override(
     )
 
     log.info(
-        "project %d scene %d setup %d: %s %s take %s",
+        "project %d scene %d shot %d: %s %s take %s",
         project_id, group_id, subgroup_id, principal.email,
         "confirmed" if agreed else "overrode to", chosen[:8],
     )
@@ -263,6 +303,95 @@ async def override(
         "agreed_with_panel": agreed,
         "previously_recommended": previous,
         "now_selected": chosen,
+    }
+
+
+@router.post(
+    "/{project_id}/{group_id}/{subgroup_id}/undo",
+    status_code=status.HTTP_201_CREATED,
+)
+async def undo(
+    project_id: int,
+    group_id: int,
+    subgroup_id: int,
+    principal: Annotated[Principal, Depends(require_signed_in)],
+) -> dict:
+    """Put back what stood before the last human decision on this shot.
+
+    Undo by writing forward, never by deleting. Three rows now exist: what the
+    panel said, what somebody changed it to, and this — a person putting it
+    back. All three are true, and an archive whose whole claim is that it
+    remembers every decision cannot be the kind of archive that erases one.
+
+    Only human decisions are undone. Rolling back the panel would mean rolling
+    back to nothing, and re-running the comparison is what that button is for.
+    """
+    await principal.assert_can_comment(project_id)
+
+    ch = await client()
+    result = await ch.query(
+        """
+        SELECT clip_id, outcome, decided_by, actor_id, decided_at
+        FROM decisions
+        WHERE project_id = {p:UInt32} AND group_id = {g:UInt32}
+          AND subgroup_id = {s:UInt32} AND outcome = 'selected'
+        ORDER BY decided_at DESC
+        LIMIT 2
+        """,
+        parameters={"p": project_id, "g": group_id, "s": subgroup_id},
+    )
+
+    if len(result.result_rows) < 2:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Nothing to undo — only one decision has ever been made here.",
+        )
+
+    newest, previous_row = result.result_rows[0], result.result_rows[1]
+    if newest[2] != "human":
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "The most recent decision here is the panel's. Run the comparison "
+            "again rather than undoing it.",
+        )
+
+    restore_to = str(previous_row[0])
+    verdicts_now = await _verdicts_for(project_id, group_id, subgroup_id)
+
+    rows = rows_for_choice(
+        verdicts_now,
+        restore_to,
+        Override(
+            clip_id=UUID(restore_to),
+            reason=(
+                f"Undone by {principal.email}: put back the take that stood "
+                f"before the last change."
+            ),
+        ),
+    )
+
+    await decisions_service.record(
+        project_id=project_id,
+        group_id=group_id,
+        subgroup_id=subgroup_id,
+        verdicts=rows,
+        key=decisions_service.run_hash(
+            project_id, group_id, subgroup_id, [UUID(restore_to)]
+        ),
+        model_id="",
+        prompt_version="",
+        decided_by="human",
+        actor_id=principal.email or "",
+    )
+
+    log.info(
+        "project %d scene %d shot %d: %s undid a change back to %s",
+        project_id, group_id, subgroup_id, principal.email, restore_to[:8],
+    )
+    return {
+        "status": "undone",
+        "restored": restore_to,
+        "undone_from": str(newest[0]),
     }
 
 
@@ -357,17 +486,25 @@ async def _verdicts_for(project_id: int, group_id: int, subgroup_id: int) -> lis
 async def tree(
     project_id: int,
     principal: Annotated[Principal, Depends(current_principal)],
+    scene: int | None = None,
+    camera: str | None = None,
+    shoot_day: str | None = None,
+    assignee: str | None = None,
 ) -> dict:
-    """Every scene and setup in a project, with enough to draw the navigation.
+    """Every scene and shot in a project, with enough to draw the navigation.
 
-    One query rather than one per setup. A shoot day is dozens of setups and a
+    One query rather than one per shot. A shoot day is dozens of shots and a
     tree that fetches each node as it opens spends a round trip per click on
     data the first query already had.
 
-    Status is derived here rather than stored, because it is a function of three
+    The filters are the axes a real bin is cut on: scene, camera, shoot day, and
+    who is on it. A tree with one axis cannot answer "everything from Tuesday"
+    or "everything on the B camera", and both are ordinary Monday questions.
+
+    Status is derived here rather than stored, because it is a function of four
     things that each change independently — how many takes arrived, whether the
-    panel has run, and whether a person has looked. Storing it would mean three
-    places that can forget to update it.
+    panel has run, whether a person has looked, and whether the room circled a
+    different take. Storing it would mean four places that can forget to update.
     """
     await principal.assert_can_read(project_id)
 
@@ -385,13 +522,16 @@ async def tree(
         )
         SELECT
             c.group_id                                       AS scene,
-            c.subgroup_id                                    AS setup,
+            c.subgroup_id                                    AS shot,
             count()                                          AS takes,
             countIf(c.status = 'failed')                     AS unusable,
             anyIf(c.description, c.description != '')        AS label,
             max(l.outcome = 'selected')                      AS has_verdict,
             maxIf(l.decided_by = 'human', l.outcome = 'selected') AS reviewed,
-            maxIf(l.margin, l.outcome = 'selected')           AS margin
+            maxIf(l.margin, l.outcome = 'selected')          AS margin,
+            maxIf(c.take_no, l.outcome = 'selected')         AS chosen_take,
+            arrayDistinct(groupArray(c.camera))              AS cameras,
+            toString(min(toDate(c.captured_at)))             AS shoot_day
         FROM clips AS c
         LEFT JOIN latest AS l
             ON l.group_id = c.group_id
@@ -404,49 +544,134 @@ async def tree(
         parameters={"p": project_id},
     )
 
+    described = await shots.for_project(project_id)
+    note_counts = await comments_service.counts_for_project(project_id)
+    threshold = _review_margin()
+
     scenes: dict[int, dict] = {}
-    for scene, setup, takes, unusable, label, has_verdict, reviewed, margin in result.result_rows:
-        node = scenes.setdefault(int(scene), {"scene": int(scene), "setups": []})
-        node["setups"].append({
-            "setup": int(setup),
+    cameras_seen: set[str] = set()
+    days_seen: set[str] = set()
+
+    for row in result.result_rows:
+        (scene_id, shot_id, takes, unusable, label, has_verdict,
+         reviewed, margin, chosen_take, cameras, day) = row
+        scene_id, shot_id = int(scene_id), int(shot_id)
+
+        cams = [c for c in cameras if c]
+        cameras_seen.update(cams)
+        if day:
+            days_seen.add(str(day))
+
+        meta = described.get((scene_id, shot_id))
+        circled = meta.circled_take if meta else 0
+        notes = note_counts.get((scene_id, shot_id), {"total": 0, "open": 0})
+
+        # Filters applied after the query rather than inside it. A project is
+        # dozens of shots, not millions, and pushing four optional predicates
+        # into the SQL would produce four branches of a string nobody can read
+        # for a saving no one can measure.
+        if scene is not None and scene_id != scene:
+            continue
+        if camera and camera not in cams:
+            continue
+        if shoot_day and str(day) != shoot_day:
+            continue
+        if assignee is not None:
+            wanted = assignee.strip().lower()
+            here = (meta.assignee if meta else "")
+            if wanted == "unassigned":
+                if here:
+                    continue
+            elif here != wanted:
+                continue
+
+        node = scenes.setdefault(scene_id, {"scene": scene_id, "shots": []})
+        node["shots"].append({
+            "shot": shot_id,
+            "slug": (meta.slug if meta else "") or "",
             "label": label or "",
             "takes": int(takes),
             "unusable": int(unusable),
-            "status": _status(int(takes), bool(has_verdict), bool(reviewed), float(margin)),
+            "status": _status(
+                int(takes), bool(has_verdict), bool(reviewed), float(margin),
+                circled, int(chosen_take or 0), meta.state if meta else "",
+            ),
+            "state": meta.state if meta else "",
+            "assignee": meta.assignee if meta else "",
+            "circled_take": circled,
+            "chosen_take": int(chosen_take or 0),
+            "differs_from_circle": bool(
+                circled and chosen_take and circled != int(chosen_take)
+            ),
             "margin": round(float(margin), 4),
+            "cameras": cams,
+            "shoot_day": str(day) if day else "",
+            "open_notes": notes["open"],
         })
 
     return {
         "project_id": project_id,
         "scenes": sorted(scenes.values(), key=lambda s: s["scene"]),
+        # The axes this project actually has, so the interface offers filters
+        # that will match something rather than a camera dropdown on a
+        # single-camera shoot.
+        "cameras": sorted(cameras_seen),
+        "shoot_days": sorted(days_seen),
+        "review_margin": threshold,
     }
 
 
-# Below this gap between first and second place, the call is close enough that a
-# person should look. Mirrors the agents' review_margin; imported rather than
-# repeated so the queue and the archive cannot disagree.
 def _review_margin() -> float:
+    """Below this gap between first and second place, a person should look.
+
+    Mirrors the agents' review_margin; imported rather than repeated so the
+    queue and the archive cannot disagree.
+    """
     from trimbin_agents.config import settings as agent_settings
 
     return agent_settings.review_margin
 
 
-def _status(takes: int, has_verdict: bool, reviewed: bool, margin: float) -> str:
-    """What the dot beside a setup means.
+def _status(
+    takes: int,
+    has_verdict: bool,
+    reviewed: bool,
+    margin: float,
+    circled: int = 0,
+    chosen: int = 0,
+    state: str = "",
+) -> str:
+    """What the dot beside a shot means.
 
-    Five states, and the distinction that matters most is between "decided" and
-    "confirmed". A verdict nobody has looked at is not the same as one an editor
-    agreed with, and a tree that shows them alike hides the only work left.
+    Six states now. The distinction that matters most is still between "decided"
+    and "confirmed" — a verdict nobody has looked at is not the same as one an
+    editor agreed with, and a tree showing them alike hides the only work left.
+
+    The new one is `differs_from_circle`, and it outranks a close call. A shot
+    where the room circled take 3 and the measurements chose take 1 needs a
+    person whether or not the numbers were close, because the circle knows about
+    performance and this system deliberately does not.
+
+    A person marking the shot approved ends it, whatever the margin says.
     """
+    if state == "approved":
+        return "confirmed"
     if takes < 2:
         return "too_few_takes"
     if not has_verdict:
         return "not_judged"
+    if circled and chosen and circled != chosen:
+        return "differs_from_circle"
     if reviewed:
         return "confirmed"
     if margin < _review_margin():
         return "needs_review"
     return "decided"
+
+
+# ---------------------------------------------------------------------------
+# What a shot was meant to be, and who is looking after it.
+# ---------------------------------------------------------------------------
 
 
 class ShotBrief(BaseModel):
@@ -455,6 +680,11 @@ class ShotBrief(BaseModel):
     Every field optional. A production that fills none of this in gets exactly
     what it gets today — a system that needs paperwork before it is useful is a
     system nobody opens on a Friday.
+
+    None of it is invented by us either: this is the lined script and the
+    continuity report a script supervisor already writes on every professional
+    shoot. We are not asking for a new artefact; we are the first thing that
+    reads one that already exists.
     """
 
     slug: str = Field(default="", max_length=40, description="What the slate says: 12A")
@@ -465,6 +695,31 @@ class ShotBrief(BaseModel):
     look: str = Field(default="", max_length=60, description="handheld, locked off, dolly in")
 
 
+class Circle(BaseModel):
+    """The take the director or DoP marked on the day. Zero clears it."""
+
+    take_no: int = Field(ge=0, le=999)
+
+
+class Assignment(BaseModel):
+    """Whose shot this is. An empty address unassigns it."""
+
+    assignee: str = Field(default="", max_length=254)
+
+
+class SetState(BaseModel):
+    state: str = Field(default="")
+
+    @field_validator("state")
+    @classmethod
+    def _known(cls, value: str) -> str:
+        if value not in shots.STATES:
+            raise ValueError(
+                "A shot is unset, needs_review, in_progress, or approved."
+            )
+        return value
+
+
 @router.get("/{project_id}/{group_id}/{subgroup_id}/brief")
 async def read_brief(
     project_id: int,
@@ -472,7 +727,8 @@ async def read_brief(
     subgroup_id: int,
     principal: Annotated[Principal, Depends(current_principal)],
 ) -> dict:
-    """The shot's description. Readable by anyone who can read the project."""
+    """The shot's description and working state. Readable by anyone who can read
+    the project."""
     await principal.assert_can_read(project_id)
     shot = await shots.get(project_id, group_id, subgroup_id)
     return {**shot.as_dict(), "is_empty": shot.is_empty}
@@ -484,7 +740,7 @@ async def write_brief(
     group_id: int,
     subgroup_id: int,
     body: ShotBrief,
-    principal: Annotated[Principal, Depends(require_member)],
+    principal: Annotated[Principal, Depends(require_signed_in)],
 ) -> dict:
     """Describe a shot, so the panel checks against intent rather than majority.
 
@@ -492,7 +748,7 @@ async def write_brief(
     and a description typed one field at a time would spend it on every
     keystroke — the editor presses compare when they are ready.
     """
-    await principal.assert_can_write(project_id)
+    await principal.assert_can_comment(project_id)
 
     shot = await shots.put(
         project_id, group_id, subgroup_id,
@@ -507,3 +763,168 @@ async def write_brief(
             else "Cleared."
         ),
     }
+
+
+@router.put("/{project_id}/{group_id}/{subgroup_id}/circle")
+async def circle_take(
+    project_id: int,
+    group_id: int,
+    subgroup_id: int,
+    body: Circle,
+    principal: Annotated[Principal, Depends(require_signed_in)],
+) -> dict:
+    """Record which take the room circled.
+
+    This never changes a verdict and is never shown to the panel. Feeding it in
+    would be the end of the measurement: a model told which take a human liked
+    agrees with the human, and the agreement would then be reported as an
+    independent confirmation of a judgement it was handed.
+
+    Kept out on purpose, and used on the way out instead — a shot where the
+    circle and the measurements disagree goes to the top of the queue, because
+    that is the shot where a person adds the most.
+    """
+    await principal.assert_can_comment(project_id)
+    shot = await shots.circle(
+        project_id, group_id, subgroup_id, body.take_no, principal.email or ""
+    )
+    return {**shot.as_dict(), "is_empty": shot.is_empty}
+
+
+@router.put("/{project_id}/{group_id}/{subgroup_id}/assignee")
+async def assign_shot(
+    project_id: int,
+    group_id: int,
+    subgroup_id: int,
+    body: Assignment,
+    principal: Annotated[Principal, Depends(require_signed_in)],
+) -> dict:
+    """Put a name on a shot, or take one off.
+
+    Anybody who can comment can assign, including to themselves and including to
+    somebody else. A permission gate here would mean the lead editor is the only
+    person who can pick up a shot, which is how a queue stops moving on a Friday
+    afternoon.
+    """
+    await principal.assert_can_comment(project_id)
+    shot = await shots.assign(project_id, group_id, subgroup_id, body.assignee)
+    return {**shot.as_dict(), "is_empty": shot.is_empty}
+
+
+@router.put("/{project_id}/{group_id}/{subgroup_id}/state")
+async def set_shot_state(
+    project_id: int,
+    group_id: int,
+    subgroup_id: int,
+    body: SetState,
+    principal: Annotated[Principal, Depends(require_signed_in)],
+) -> dict:
+    """What a person says the state of this work is.
+
+    Alongside the derived status, never replacing it. They answer different
+    questions and the tree shows both: derived says how sure the system is, set
+    says whether anybody is still working on it.
+    """
+    await principal.assert_can_comment(project_id)
+    shot = await shots.set_state(
+        project_id, group_id, subgroup_id, body.state, principal.email or ""
+    )
+    return {**shot.as_dict(), "is_empty": shot.is_empty}
+
+
+# ---------------------------------------------------------------------------
+# What people said about it.
+# ---------------------------------------------------------------------------
+
+
+class NewComment(BaseModel):
+    body: str = Field(min_length=1, max_length=comments_service.MAX_BODY)
+    # Absent means the note is about the shot rather than one take.
+    clip_id: UUID | None = None
+    at_s: float = Field(default=0.0, ge=0)
+    to_s: float = Field(default=0.0, ge=0)
+    parent_id: UUID | None = None
+
+    @field_validator("body")
+    @classmethod
+    def _has_something_in_it(cls, value: str) -> str:
+        cleaned = " ".join(value.split())
+        if not cleaned:
+            raise ValueError("A comment with nothing in it is not a comment.")
+        return cleaned
+
+
+@router.get("/{project_id}/{group_id}/{subgroup_id}/comments")
+async def read_comments(
+    project_id: int,
+    group_id: int,
+    subgroup_id: int,
+    principal: Annotated[Principal, Depends(current_principal)],
+) -> dict:
+    """Every note on this shot, oldest first, replies under their parent."""
+    await principal.assert_can_read(project_id)
+    found = await comments_service.for_shot(project_id, group_id, subgroup_id)
+    return {
+        "project_id": project_id,
+        "scene": group_id,
+        "shot": subgroup_id,
+        "comments": found,
+        "open": sum(1 for c in found if not c["resolved"]),
+    }
+
+
+@router.post(
+    "/{project_id}/{group_id}/{subgroup_id}/comments",
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_comment(
+    project_id: int,
+    group_id: int,
+    subgroup_id: int,
+    body: NewComment,
+    principal: Annotated[Principal, Depends(require_signed_in)],
+) -> dict:
+    """Say something, anchored to a second if you were watching one.
+
+    Anyone signed in, on anything they can read. A note is additive, attributed
+    and reversible; the reasons for gating uploads do not apply to it.
+    """
+    await principal.assert_can_comment(project_id)
+    try:
+        return await comments_service.add(
+            project_id=project_id,
+            scene=group_id,
+            shot=subgroup_id,
+            body=body.body,
+            author=principal.email or "",
+            author_role=members.role_of(principal.email),
+            clip_id=body.clip_id,
+            at_s=body.at_s,
+            to_s=body.to_s,
+            parent_id=body.parent_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
+@router.post("/{project_id}/{group_id}/{subgroup_id}/comments/{comment_id}/resolve")
+async def resolve_comment(
+    project_id: int,
+    group_id: int,
+    subgroup_id: int,
+    comment_id: UUID,
+    principal: Annotated[Principal, Depends(require_signed_in)],
+) -> dict:
+    """Mark a note dealt with.
+
+    Written as another row rather than an update, for the same reason an
+    override is: what somebody said and the fact that it was answered are two
+    events, and only keeping the second loses the first.
+    """
+    await principal.assert_can_comment(project_id)
+    done = await comments_service.resolve(
+        project_id, group_id, subgroup_id, comment_id, principal.email or ""
+    )
+    if not done:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such comment.")
+    return {"status": "resolved", "comment_id": str(comment_id)}

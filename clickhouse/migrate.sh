@@ -73,14 +73,24 @@ fi
 
 echo -n "Verifying… "
 count=$(curl --silent --fail --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}" \
-    --data-binary "SELECT count() FROM system.tables WHERE database = currentDatabase() AND name IN ('clips','decisions','supersessions','current_selection','mv_current_selection','review_queue','accuracy_summary','real_clips','real_decisions','accuracy_by_project','project_corpus')" \
+    --data-binary "SELECT count() FROM system.tables WHERE database = currentDatabase() AND name IN ('clips','decisions','comments','supersessions','current_selection','mv_current_selection','review_queue','accuracy_summary','real_clips','real_decisions','real_comments','accuracy_by_project','project_corpus','shoot_days')" \
     "${CLICKHOUSE_URL}/")
 
-if [[ "$count" -ne 11 ]]; then
-    echo "expected 11 objects, found ${count}" >&2
+if [[ "$count" -ne 14 ]]; then
+    echo "expected 14 objects, found ${count}" >&2
     exit 1
 fi
-echo "${count}/11 objects present."
+echo "${count}/14 objects present."
+
+echo -n "Camera column... "
+camera=$(curl --silent --fail --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}" \
+    --data-binary "SELECT count() FROM system.columns WHERE database = currentDatabase() AND table = 'clips' AND name = 'camera'" \
+    "${CLICKHOUSE_URL}/")
+if [[ "$camera" -ne 1 ]]; then
+    echo "missing - the shoot-day and camera filters will find nothing" >&2
+    exit 1
+fi
+echo "present."
 
 # The reader is a boundary, not a convenience. Without it every search falls
 # back to the direct client and nothing says so out loud, so a deploy that

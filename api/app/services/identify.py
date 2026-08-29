@@ -14,6 +14,7 @@ says so in the log rather than raising.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from uuid import UUID
@@ -46,6 +47,9 @@ class Identity:
     take_no: int = 0
     slate_confident: int = 0
     slate_raw: str = ""
+    # Which body shot it, when the board says so. Empty is the ordinary answer
+    # on a single-camera production and is not a gap.
+    camera: str = ""
     embedding: list[float] = field(default_factory=list)
 
     @property
@@ -113,12 +117,38 @@ async def read_slate(source: Path, work: Path, clip_id: UUID, project_id: int) -
     identity.subgroup_id = result.subgroup_id
     identity.take_no = result.take_no
     identity.slate_confident = 1 if result.confidence.value == "confident" else 0
+    identity.camera = camera_from_slate(result.reading.raw)
     log.info(
         "clip %s: board reads %r -> scene %d, shot %d, take %d",
         clip_id, result.reading.raw.replace("\n", " / "),
         result.group_id, result.subgroup_id, result.take_no,
     )
     return identity
+
+
+# Only an explicit camera marking counts.
+#
+# The tempting shortcut is to read the letter in "12A" as the camera. It is not:
+# that letter is the setup — 12A the wide, 12B her close-up — and treating it as
+# a camera would put every shot of a single-camera day on a different one. On a
+# multi-camera shoot the board says so in as many words, and if it does not, the
+# honest answer is that we do not know.
+_CAMERA = re.compile(
+    r"\b(?:CAM(?:ERA)?\.?\s*([A-D])\b|([A-D])\s*CAM(?:ERA)?\b)",
+    re.IGNORECASE,
+)
+
+
+def camera_from_slate(raw: str) -> str:
+    """The camera letter the board declares, or an empty string.
+
+    A pure function so it can be tested without a model, and so the rule that
+    decides it is one readable line rather than a branch inside the worker.
+    """
+    match = _CAMERA.search(raw or "")
+    if not match:
+        return ""
+    return (match.group(1) or match.group(2) or "").upper()
 
 
 async def embed(source: Path, work: Path, clip_id: UUID, duration_s: float) -> list[float]:

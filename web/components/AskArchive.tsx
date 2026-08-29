@@ -44,10 +44,13 @@ interface Answer {
 export default function AskArchive({
   projectId,
   onOpen,
+  initialQuestion,
 }: {
   projectId: number;
   /** Jump to a take in the workspace, at the timecode if there is one. */
-  onOpen?: (scene: number, setup: number, at?: number) => void;
+  onOpen?: (scene: number, shot: number, at?: number) => void;
+  /** Rendered on the archive screen, where the box is the whole page. */
+  initialQuestion?: string;
 }) {
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
@@ -86,6 +89,15 @@ export default function AskArchive({
     },
     [projectId],
   );
+
+  // A question arriving in the URL is asked straight away. Somebody who typed
+  // it on the dashboard has already asked it once; making them press the button
+  // again on the next screen is asking twice.
+  useEffect(() => {
+    if (!initialQuestion) return;
+    setQuestion(initialQuestion);
+    void send(initialQuestion);
+  }, [initialQuestion, send]);
 
   return (
     <section className="ask">

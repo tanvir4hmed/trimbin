@@ -1,10 +1,15 @@
 /**
- * The sandbox sweep.
+ * The guest retention sweep.
  *
  * A visitor's footage is theirs. Keeping it because deleting is work would be
- * the wrong default for material somebody uploaded to try a demo, so it is
- * removed after a day — objects and rows together, since a row pointing at a
+ * the wrong default for material somebody uploaded to try something, so it is
+ * removed after a week — objects and rows together, since a row pointing at a
  * deleted object is an archive claiming a clip it cannot play.
+ *
+ * This used to sweep a single shared "sandbox" project. That project is gone:
+ * everyone gets the same application now, and a guest works in a project they
+ * own. So the sweep asks who owns each project rather than matching an id, and
+ * the company's own productions are never touched.
  *
  * Cloud Scheduler rather than a cron inside the service. The API scales to zero
  * and a process that must run at 3am cannot live inside one that may not exist
@@ -26,18 +31,18 @@ resource "google_cloud_run_v2_service_iam_member" "scheduler_invokes_api" {
   member   = "serviceAccount:${google_service_account.scheduler.email}"
 }
 
-resource "google_cloud_scheduler_job" "sandbox_retention" {
-  name        = "${local.name}-sandbox-retention"
-  description = "Delete visitor footage older than the sandbox retention window."
+resource "google_cloud_scheduler_job" "guest_retention" {
+  name        = "${local.name}-guest-retention"
+  description = "Delete guest footage older than the retention window."
   region      = var.region
 
-  # Hourly, not daily. The retention window is measured in hours, so a daily
-  # sweep would keep some clips for nearly twice as long as promised — and a
-  # promise about somebody's footage is not one to round off.
-  schedule  = "17 * * * *"
+  # Daily now, not hourly. The window is measured in days rather than hours, so
+  # an hourly sweep would run twenty-four times to find nothing twenty-three of
+  # them — and each run is a full pass over the project list.
+  schedule  = "17 4 * * *"
   time_zone = "UTC"
 
-  # Deleting is idempotent and the next run is an hour away, so a failed attempt
+  # Deleting is idempotent and the next run is a day away, so a failed attempt
   # is better left to the schedule than retried against a service that may be
   # having a bad minute.
   retry_config {
@@ -48,8 +53,8 @@ resource "google_cloud_scheduler_job" "sandbox_retention" {
     # Through the load balancer, like every other caller. The service's own
     # generated URL cannot be referenced from inside its own definition, and
     # routing maintenance differently from everything else would mean one more
-    # path that is only exercised at 3am.
-    uri         = "https://${var.domain}/api/maintenance/sandbox-retention"
+    # path that is only exercised at 4am.
+    uri         = "https://${var.domain}/api/maintenance/guest-retention"
     http_method = "POST"
 
     # A body, so the request carries a Content-Length. The load balancer
@@ -68,6 +73,6 @@ resource "google_cloud_scheduler_job" "sandbox_retention" {
   }
 }
 
-# The API deletes sandbox objects on that schedule, so objectAdmin on the
-# originals bucket is now load-bearing rather than incidental. Named here beside
-# the thing that needs it; the grant itself is in run.tf with the others.
+# The API deletes guest objects on that schedule, so objectAdmin on the
+# originals bucket is load-bearing rather than incidental. Named here beside the
+# thing that needs it; the grant itself is in run.tf with the others.

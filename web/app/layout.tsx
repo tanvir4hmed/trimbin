@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import SignIn from "@/components/SignIn";
+import AppBar from "@/components/AppBar";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Trimbin",
   description:
-    "An assistant editor that never forgets. It organises a shoot day, surfaces only the shots that need a human eye, and remembers every take it passed over and why.",
+    "Post-production triage. Every take measured, compared within its shot, and the reason kept.",
 };
 
 export default function RootLayout({
@@ -29,24 +28,9 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <nav className="topbar">
-          <Link href="/" className="logo">
-            Trim<span>bin</span>
-          </Link>
-          {/* Every route here is reachable without an account. A system that
-              publishes its own error rate should not put that behind a signup,
-              and a visitor who has to register to look will not look. */}
-          <div className="nav">
-            <Link href="/">Overview</Link>
-            <Link href="/accuracy">Accuracy</Link>
-            <Link href="/project/1">Workspace</Link>
-            <Link href="/sandbox">Try it</Link>
-            <Link href="/demo">Status</Link>
-          </div>
-          {/* Appears only once there is something to sign in for, and renders
-              nothing at all on a deployment without an OAuth client. */}
-          <SignIn />
-        </nav>
+        {/* One bar, both states. A visitor who signs in finds the same product
+            with more of it available, rather than being moved to another one. */}
+        <AppBar />
         {children}
       </body>
     </html>

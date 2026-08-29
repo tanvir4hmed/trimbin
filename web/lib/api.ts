@@ -5,17 +5,18 @@
  * A generated client would drift silently when a field is renamed on one side;
  * a hand-written one fails to compile, which is the failure mode you want at a
  * boundary two languages meet.
+ *
+ * The vocabulary is scene → shot → take throughout. A *shot* is one camera
+ * position — 12A the wide, 12B her close-up — and a *take* is one attempt at
+ * it. The word used to be "setup", which is a real word on set for the same
+ * object but not the one anybody says afterwards.
  */
 
 import { currentToken } from "./auth";
 
 export type Severity = "note" | "attention" | "blocking";
 
-export type ReviewReason =
-  | "narrow_margin"
-  | "no_winner"
-  | "blocking"
-  | "inferred_grouping";
+export type Role = "lead" | "editor" | "guest";
 
 export interface TimeRange {
   start_s: number;
@@ -73,52 +74,103 @@ export interface Take {
   prompt_version: string;
   panel_convened: boolean;
   decided_at: string | null;
+  camera: string;
+  captured_at: string | null;
 }
 
 export interface Verdicts {
   project_id: number;
   scene: number;
-  setup: number;
+  shot: number;
   takes: Take[];
   recommended: string | null;
+  /** What the room preferred on the day. Never shown to the panel. */
+  circled_take: number;
+  circled_by: string;
+  differs_from_circle: boolean;
+  assignee: string;
+  state: ShotState;
 }
 
-export type SetupStatus =
+/** What a person set, as distinct from what the system derived. */
+export type ShotState = "" | "needs_review" | "in_progress" | "approved";
+
+export type ShotStatus =
   | "too_few_takes"
   | "not_judged"
   | "needs_review"
+  | "differs_from_circle"
   | "decided"
   | "confirmed";
 
-export interface SetupNode {
-  setup: number;
+export interface ShotNode {
+  shot: number;
+  slug: string;
   label: string;
   takes: number;
   unusable: number;
-  status: SetupStatus;
+  status: ShotStatus;
+  state: ShotState;
+  assignee: string;
+  circled_take: number;
+  chosen_take: number;
+  differs_from_circle: boolean;
   margin: number;
+  cameras: string[];
+  shoot_day: string;
+  open_notes: number;
 }
 
 export interface SceneNode {
   scene: number;
-  setups: SetupNode[];
+  shots: ShotNode[];
 }
 
 export interface Tree {
   project_id: number;
   scenes: SceneNode[];
+  /** The axes this project actually has, so a filter never offers nothing. */
+  cameras: string[];
+  shoot_days: string[];
+  review_margin: number;
 }
 
-export interface ReviewItem {
-  group_id: number;
-  subgroup_id: number;
-  scene_slug: string;
-  reason: ReviewReason;
-  detail: string;
-  margin: number;
-  takes: Take[];
-  /** Set once someone has looked, so two people never review the same shot. */
-  reviewed_by?: string | null;
+/** What a shot was meant to be — the lined script, as a script supervisor writes it. */
+export interface Brief {
+  scene: number;
+  shot: number;
+  slug: string;
+  heading: string;
+  action: string;
+  line: string;
+  notes: string;
+  look: string;
+  circled_take: number;
+  circled_by: string;
+  assignee: string;
+  state: ShotState;
+  state_by: string;
+  state_at: string | null;
+  updated_at: string;
+  updated_by: string;
+  is_empty: boolean;
+  note?: string;
+}
+
+export interface Comment {
+  comment_id: string;
+  parent_id: string | null;
+  clip_id: string | null;
+  author: string;
+  author_role: string;
+  body: string;
+  at_s: number;
+  to_s: number;
+  whole_take: boolean;
+  created_at: string;
+  resolved_by: string;
+  resolved: boolean;
+  is_reply?: boolean;
 }
 
 export interface Project {
@@ -129,6 +181,143 @@ export interface Project {
   is_public: boolean;
   created_at: string;
   you_are_owner: boolean;
+  you_can_upload: boolean;
+  /** Present only when the list was asked for with detail. */
+  scenes?: number;
+  shots?: number;
+  takes?: number;
+  settled?: number;
+  waiting?: number;
+  progress_pct?: number | null;
+}
+
+export interface Limits {
+  projects: number;
+  scenes: number;
+  takes_per_shot: number;
+  clip_seconds: number;
+  retention_days: number;
+}
+
+/**
+ * Who is asking, and what the API will let them do.
+ *
+ * Asked rather than worked out. A page that decides whether to draw the upload
+ * button by comparing an address against a list is a second implementation of
+ * the permission rules, and the two will disagree — the failure being a button
+ * that is drawn and then refused, which is worse than no button.
+ */
+export interface Me {
+  email: string | null;
+  signed_in: boolean;
+  role: Role;
+  can_read: boolean;
+  can_comment: boolean;
+  can_override: boolean;
+  can_upload_to_team_projects: boolean;
+  can_create_own_project: boolean;
+  can_add_members: boolean;
+  can_supersede: boolean;
+  limits: Limits;
+  demo_project_id: number;
+}
+
+export interface QueueItem {
+  project_id: number;
+  project_name: string;
+  scene: number;
+  shot: number;
+  slug: string;
+  takes: number;
+  margin: number;
+  reason: string;
+  assignee: string;
+  state: ShotState;
+  circled_take: number;
+  chosen_take: number;
+  open_comments: number;
+}
+
+export interface RecentDecision {
+  project_id: number;
+  project_name: string;
+  scene: number;
+  shot: number;
+  take_no: number;
+  decided_by: "agent" | "human";
+  actor: string;
+  reason: string;
+  decided_at: string | null;
+  margin: number;
+}
+
+export interface RecentNote {
+  project_id: number;
+  project_name: string;
+  scene: number;
+  shot: number;
+  author: string;
+  body: string;
+  created_at: string;
+}
+
+export interface Dashboard {
+  you: string;
+  role: Role;
+  queue: QueueItem[];
+  queue_total: number;
+  totals: { waiting: number; yours: number; unassigned: number; projects: number };
+  projects: (Project & {
+    members: number;
+    scenes: number;
+    shots: number;
+    takes: number;
+    settled: number;
+    waiting: number;
+    progress_pct: number | null;
+  })[];
+  recent: RecentDecision[];
+  notes: RecentNote[];
+  limits: Limits;
+}
+
+/** One shot's place in the assembled scene. */
+export interface StringoutEntry {
+  scene: number;
+  shot: number;
+  slug: string;
+  clip_id: string;
+  take_no: number;
+  start_s: number;
+  end_s: number;
+  duration_s: number;
+  proxy_uri: string;
+  sprite_uri: string;
+  reason: string;
+  decided_by: "agent" | "human";
+  actor: string;
+  margin: number;
+  needs_review: boolean;
+  circled_take: number;
+  differs_from_circle: boolean;
+  open_comments: number;
+}
+
+/**
+ * The scene assembled from the takes that were chosen.
+ *
+ * A cutting room calls this a **stringout**, and it is what an assistant editor
+ * hands the editor: every shot of the scene, in order, one take each. It is not
+ * an edit — nothing here decides where a cut goes, which is a story question.
+ */
+export interface Stringout {
+  project_id: number;
+  scene: number;
+  entries: StringoutEntry[];
+  duration_s: number;
+  shots: number;
+  unresolved: number;
+  disagreements: number;
 }
 
 export interface AccuracySummary {
@@ -187,25 +376,6 @@ export interface QueryResult {
   /** Shown in the interface, so a result can be checked rather than trusted. */
   sql: string;
   elapsed_ms: number;
-}
-
-/** A shot in the assembled cut, for the timeline. */
-export interface CutEntry {
-  group_id: number;
-  subgroup_id: number;
-  scene_slug: string;
-  take_no: number;
-  start_s: number;
-  end_s: number;
-  reason: string;
-  needs_review: boolean;
-  note_count: number;
-}
-
-export interface Cut {
-  playlist_uri: string;
-  duration_s: number;
-  entries: CutEntry[];
 }
 
 /**
@@ -284,12 +454,22 @@ async function request<T>(path: string, init?: RequestInit, retriedWake = false)
 }
 
 export const api = {
-  /** Projects this person can open. */
-  projects: () =>
-    request<{ you: string; projects: Project[] }>("/projects"),
+  /** Who is asking, and what they may do. Works signed out, and answers truthfully. */
+  me: () => request<Me>("/me"),
+
+  /** The queue, the project cards, and what the team did while you were away. */
+  dashboard: () => request<Dashboard>("/dashboard"),
+
+  /** Projects this person can open. `detail` adds the counts a list screen needs. */
+  projects: (detail = false) =>
+    request<{ you: string; role: Role; limits: Limits; projects: Project[] }>(
+      detail ? "/projects?detail=true" : "/projects",
+    ),
+
+  project: (projectId: number) => request<Project>(`/projects/${projectId}`),
 
   createProject: (name: string) =>
-    request<Project>("/projects", {
+    request<Project & { limits: Limits }>("/projects", {
       method: "POST",
       body: JSON.stringify({ name }),
     }),
@@ -300,23 +480,39 @@ export const api = {
       { method: "POST", body: JSON.stringify({ email }) },
     ),
 
-  /** Every scene and setup, with enough to draw the tree. One request. */
-  tree: (projectId: number) => request<Tree>(`/review/${projectId}`),
+  /**
+   * Every scene and shot, with enough to draw the tree. One request.
+   *
+   * The filters are the axes a real bin is cut on — scene, camera, shoot day,
+   * who is on it. A tree with one axis cannot answer "everything from Tuesday".
+   */
+  tree: (
+    projectId: number,
+    filters?: { scene?: number; camera?: string; shoot_day?: string; assignee?: string },
+  ) => {
+    const q = new URLSearchParams();
+    if (filters?.scene !== undefined) q.set("scene", String(filters.scene));
+    if (filters?.camera) q.set("camera", filters.camera);
+    if (filters?.shoot_day) q.set("shoot_day", filters.shoot_day);
+    if (filters?.assignee) q.set("assignee", filters.assignee);
+    const query = q.toString();
+    return request<Tree>(`/review/${projectId}${query ? `?${query}` : ""}`);
+  },
 
-  /** Setups with takes and no verdict yet. */
+  /** Shots with takes and no verdict yet. */
   pending: (projectId: number) =>
-    request<{ pending: { scene: number; setup: number; takes: number }[] }>(
+    request<{ pending: { scene: number; shot: number; takes: number }[] }>(
       `/review/${projectId}/pending`,
     ),
 
-  /** What was decided about one setup, and why — every take, not only the winner. */
-  verdicts: (projectId: number, scene: number, setup: number) =>
-    request<Verdicts>(`/review/${projectId}/${scene}/${setup}`),
+  /** What was decided about one shot, and why — every take, not only the winner. */
+  verdicts: (projectId: number, scene: number, shot: number) =>
+    request<Verdicts>(`/review/${projectId}/${scene}/${shot}`),
 
-  /** Ask the panel to judge a setup. Spends money; hence a POST. */
-  judge: (projectId: number, scene: number, setup: number) =>
+  /** Ask the panel to judge a shot. Spends money; hence a POST. */
+  judge: (projectId: number, scene: number, shot: number) =>
     request<{ status: string; margin?: number; needs_review?: boolean; rationale?: string }>(
-      `/review/${projectId}/${scene}/${setup}`,
+      `/review/${projectId}/${scene}/${shot}`,
       { method: "POST" },
     ),
 
@@ -333,7 +529,7 @@ export const api = {
   select: (
     projectId: number,
     scene: number,
-    setup: number,
+    shot: number,
     body: { clip_id: string; reason: string; in_point_s?: number; out_point_s?: number },
   ) =>
     request<{
@@ -341,21 +537,99 @@ export const api = {
       agreed_with_panel: boolean;
       previously_recommended: string | null;
       now_selected: string;
-    }>(`/review/${projectId}/${scene}/${setup}/select`, {
+    }>(`/review/${projectId}/${scene}/${shot}/select`, {
       method: "POST",
       body: JSON.stringify(body),
     }),
 
-  /** What a visitor may do without an account, from the API that enforces it. */
-  sandboxLimits: () =>
-    request<{
-      project_id: number;
-      max_clips: number;
-      max_seconds: number;
-      max_per_ip_per_day: number;
-      retention_hours: number;
-      note: string;
-    }>("/public/sandbox"),
+  /** Put back what stood before the last human decision. Written forward, never deleted. */
+  undo: (projectId: number, scene: number, shot: number) =>
+    request<{ status: string; restored: string; undone_from: string }>(
+      `/review/${projectId}/${scene}/${shot}/undo`,
+      { method: "POST" },
+    ),
+
+  brief: (projectId: number, scene: number, shot: number) =>
+    request<Brief>(`/review/${projectId}/${scene}/${shot}/brief`),
+
+  saveBrief: (
+    projectId: number,
+    scene: number,
+    shot: number,
+    body: Partial<Pick<Brief, "slug" | "heading" | "action" | "line" | "notes" | "look">>,
+  ) =>
+    request<Brief>(`/review/${projectId}/${scene}/${shot}/brief`, {
+      method: "PUT",
+      body: JSON.stringify({
+        slug: "", heading: "", action: "", line: "", notes: "", look: "",
+        ...body,
+      }),
+    }),
+
+  /** The take the room circled. Zero clears it. Never shown to the panel. */
+  circle: (projectId: number, scene: number, shot: number, take_no: number) =>
+    request<Brief>(`/review/${projectId}/${scene}/${shot}/circle`, {
+      method: "PUT",
+      body: JSON.stringify({ take_no }),
+    }),
+
+  assign: (projectId: number, scene: number, shot: number, assignee: string) =>
+    request<Brief>(`/review/${projectId}/${scene}/${shot}/assignee`, {
+      method: "PUT",
+      body: JSON.stringify({ assignee }),
+    }),
+
+  setState: (projectId: number, scene: number, shot: number, state: ShotState) =>
+    request<Brief>(`/review/${projectId}/${scene}/${shot}/state`, {
+      method: "PUT",
+      body: JSON.stringify({ state }),
+    }),
+
+  comments: (projectId: number, scene: number, shot: number) =>
+    request<{ comments: Comment[]; open: number }>(
+      `/review/${projectId}/${scene}/${shot}/comments`,
+    ),
+
+  comment: (
+    projectId: number,
+    scene: number,
+    shot: number,
+    body: { body: string; clip_id?: string | null; at_s?: number; to_s?: number; parent_id?: string },
+  ) =>
+    request<Comment>(`/review/${projectId}/${scene}/${shot}/comments`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  resolveComment: (projectId: number, scene: number, shot: number, commentId: string) =>
+    request<{ status: string }>(
+      `/review/${projectId}/${scene}/${shot}/comments/${commentId}/resolve`,
+      { method: "POST" },
+    ),
+
+  /** Which scenes a project has. */
+  scenes: (projectId: number) =>
+    request<{ scenes: number[] }>(`/scenes/${projectId}`),
+
+  /** The scene as it currently stands, shot by shot. */
+  stringout: (projectId: number, scene: number) =>
+    request<Stringout>(`/scenes/${projectId}/${scene}`),
+
+  /**
+   * Where the exports live.
+   *
+   * Returned as URLs rather than fetched, because these are downloads: the
+   * browser has a perfectly good way to save a file and reimplementing it with
+   * a blob would break the filename the server already chose.
+   */
+  edlUrl: (projectId: number, scene: number, fps = 24) =>
+    `${BASE}/scenes/${projectId}/${scene}/edl?fps=${fps}`,
+  markersUrl: (projectId: number, scene: number, fps = 24) =>
+    `${BASE}/scenes/${projectId}/${scene}/markers.csv?fps=${fps}`,
+
+  /** What a guest account may hold, from the API that enforces it. */
+  guestLimits: () =>
+    request<Limits & { note: string }>("/public/limits"),
 
   grantUpload: (projectId: number, filenames: string[]) =>
     request<{
@@ -378,7 +652,15 @@ export const api = {
       { method: "POST", body: JSON.stringify({ job_id: jobId, clip_ids: clipIds }) },
     ),
 
-  jobStatus: (jobId: string) => request<unknown>(`/uploads/jobs/${jobId}`),
+  jobStatus: (jobId: string) =>
+    request<{
+      job_id: string;
+      state: string;
+      total: number;
+      completed: number;
+      failed: number;
+      failures: { clip_id: string; reason: string }[];
+    }>(`/uploads/jobs/${jobId}`),
 
   /** Questions worth asking, so an empty box is not a blank page. */
   suggestions: (projectId: number) =>
@@ -392,7 +674,7 @@ export const api = {
    * system rests on.
    */
   ask: (projectId: number, question: string) =>
-    request<unknown>(`/ask/${projectId}`, {
+    request<QueryResult>(`/ask/${projectId}`, {
       method: "POST",
       body: JSON.stringify({ question }),
     }),

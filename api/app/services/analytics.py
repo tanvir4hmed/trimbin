@@ -145,7 +145,7 @@ async def accuracy_by_project() -> list[dict[str, Any]]:
             a.shots_total                   AS shots_total,
             c.clips                         AS clips,
             c.scenes                        AS scenes,
-            c.setups                        AS setups,
+            c.shots                         AS shots,
             c.unusable                      AS unusable,
             c.footage_hours                 AS footage_hours
         FROM project_corpus AS c

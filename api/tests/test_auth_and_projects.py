@@ -20,6 +20,7 @@ from fastapi import HTTPException
 
 from app import auth
 from app.auth import Principal
+from app.services import members
 
 
 class FakeProject:
@@ -127,7 +128,6 @@ class TestReadAccess:
     @pytest.mark.asyncio
     async def test_a_private_project_is_not(self, monkeypatch) -> None:
         monkeypatch.setattr(auth.settings, "demo_project_id", 1)
-        monkeypatch.setattr(auth.settings, "sandbox_project_id", 2)
         monkeypatch.setattr(auth.projects, "get", _no_such_project)
         with pytest.raises(HTTPException) as raised:
             await Principal(email=None).assert_can_read(7)
@@ -140,31 +140,30 @@ class TestReadAccess:
         started. Read only: whether a public project accepts writes is a
         separate question with a separate answer."""
         monkeypatch.setattr(auth.settings, "demo_project_id", 1)
-        monkeypatch.setattr(auth.settings, "sandbox_project_id", 2)
         monkeypatch.setattr(auth.projects, "get", _public_project)
 
         await Principal(email=None).assert_can_read(3)
 
     @pytest.mark.asyncio
-    async def test_public_does_not_mean_writable(self, monkeypatch) -> None:
+    async def test_public_does_not_mean_uploadable(self, monkeypatch) -> None:
+        """The flag governs who may look, and never who may put footage in.
+
+        It used to be tested against a single write permission that covered both
+        commenting and uploading. Splitting those was the point of this release:
+        a stranger on a public project may argue with every call it contains and
+        may not add a frame to it.
+        """
         monkeypatch.setattr(auth.settings, "demo_project_id", 1)
-        monkeypatch.setattr(auth.settings, "sandbox_project_id", 2)
         monkeypatch.setattr(auth.projects, "get", _public_project)
 
-        async def not_a_member(project_id, email):
-            return False
-
-        monkeypatch.setattr(auth.projects, "is_member", not_a_member)
-
         with pytest.raises(HTTPException):
-            await Principal(email="stranger@example.com").assert_can_write(3)
+            await Principal(email="stranger@example.com").assert_can_upload(3)
 
     @pytest.mark.asyncio
     async def test_a_non_member_is_told_it_does_not_exist(self, monkeypatch) -> None:
         """404, not 403. A 403 confirms the project is real, and that is enough
         to enumerate every project on the system."""
         monkeypatch.setattr(auth.settings, "demo_project_id", 1)
-        monkeypatch.setattr(auth.settings, "sandbox_project_id", 2)
         monkeypatch.setattr(auth.projects, "get", _private_project)
 
         async def not_a_member(project_id, email):
@@ -178,29 +177,141 @@ class TestReadAccess:
         assert "forbidden" not in raised.value.detail.lower()
 
 
-class TestWriteAccess:
+class TestCommentingAndOverruling:
+    """The permission that used to be membership, and narrowing it that way was
+    wrong.
+
+    An override is an additive row with a name on it: the panel verdict survives
+    underneath, the archive keeps both, and the disagreement is the single most
+    valuable thing in the table. Refusing a guest is refusing the evidence.
+    """
+
     @pytest.mark.asyncio
-    async def test_the_demo_is_read_only_even_for_a_member(self, monkeypatch) -> None:
-        """It is readable by everyone precisely so that it stays the same for
-        everyone. One visitor's override would change what the next one sees."""
+    async def test_a_guest_may_overrule_us_on_a_public_project(
+        self, monkeypatch
+    ) -> None:
         monkeypatch.setattr(auth.settings, "demo_project_id", 1)
-        monkeypatch.setattr(auth.settings, "sandbox_project_id", 2)
+        monkeypatch.setattr(auth.projects, "get", _public_project)
+
+        await Principal(email="a-judge@example.com").assert_can_comment(3)
+
+    @pytest.mark.asyncio
+    async def test_a_guest_may_overrule_us_on_the_demo(self, monkeypatch) -> None:
+        """This is a deliberate reversal. The demo used to be read-only for
+        everyone so that it stayed identical for every visitor; the product
+        argument won instead. Watching somebody disagree with the system is the
+        thing worth showing, and every version of every decision is kept,
+        attributed, and undoable."""
+        monkeypatch.setattr(auth.settings, "demo_project_id", 1)
+        await Principal(email="a-judge@example.com").assert_can_comment(1)
+
+    @pytest.mark.asyncio
+    async def test_an_anonymous_visitor_may_not(self, monkeypatch) -> None:
+        """A row saying a decision was made by nobody. The whole argument of
+        this system is that a decision is worth what its attribution is worth,
+        so an unattributed one is worse than none."""
+        monkeypatch.setattr(auth.settings, "demo_project_id", 1)
+        with pytest.raises(HTTPException) as raised:
+            await Principal(email=None).assert_can_comment(1)
+        assert raised.value.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_commenting_still_needs_read_access(self, monkeypatch) -> None:
+        """Signed in is not the same as allowed. A private project a guest
+        cannot read is a private project a guest cannot argue with."""
+        monkeypatch.setattr(auth.settings, "demo_project_id", 1)
+        monkeypatch.setattr(auth.projects, "get", _private_project)
 
         async def not_a_member(project_id, email):
             return False
 
         monkeypatch.setattr(auth.projects, "is_member", not_a_member)
 
-        with pytest.raises(HTTPException):
-            await Principal(email="editor@example.com").assert_can_write(1)
+        with pytest.raises(HTTPException) as raised:
+            await Principal(email="a-judge@example.com").assert_can_comment(7)
+        assert raised.value.status_code == 404
+
+
+class TestUploading:
+    """The one thing a guest cannot do in our productions.
+
+    Not for lack of trust. Footage costs storage, encoding and model time, and
+    none of those are free.
+    """
 
     @pytest.mark.asyncio
-    async def test_the_sandbox_takes_writes_without_an_account(self, monkeypatch) -> None:
-        """It exists to be written to by a stranger. Its limits are enforced by
-        the route, not by identity."""
-        monkeypatch.setattr(auth.settings, "sandbox_project_id", 2)
-        await Principal(email=None).assert_can_write(2)
+    async def test_a_guest_may_not_upload_into_a_company_project(
+        self, monkeypatch
+    ) -> None:
+        async def company_project(project_id):
+            project = FakeProject(project_id, is_public=True)
+            project.owner_email = members.LEAD_EDITOR
+            return project
 
+        monkeypatch.setattr(auth.projects, "get", company_project)
+
+        with pytest.raises(HTTPException) as raised:
+            await Principal(email="a-judge@example.com").assert_can_upload(1)
+        assert raised.value.status_code == 403
+        # The refusal has to say what they can do instead, or it reads as a
+        # wall rather than as a rule.
+        assert "your own project" in raised.value.detail.lower()
+
+    @pytest.mark.asyncio
+    async def test_a_guest_uploads_into_their_own_project(self, monkeypatch) -> None:
+        """Inside a project they made, a guest is an editor. Without this the
+        guest role is a read-only tour with extra steps."""
+
+        async def their_project(project_id):
+            project = FakeProject(project_id, is_public=False)
+            project.owner_email = "a-judge@example.com"
+            return project
+
+        monkeypatch.setattr(auth.projects, "get", their_project)
+        await Principal(email="a-judge@example.com").assert_can_upload(9)
+
+    @pytest.mark.asyncio
+    async def test_an_editor_uploads_into_a_company_project(
+        self, monkeypatch
+    ) -> None:
+        """Membership rows are not the only route in. A new editor on the roster
+        should not be locked out of the archive they were hired to work on."""
+
+        async def company_project(project_id):
+            project = FakeProject(project_id, is_public=True)
+            project.owner_email = members.LEAD_EDITOR
+            return project
+
+        monkeypatch.setattr(auth.projects, "get", company_project)
+        await Principal(email=next(iter(members.EDITORS))).assert_can_upload(1)
+
+    @pytest.mark.asyncio
+    async def test_an_editor_may_not_upload_into_a_strangers_project(
+        self, monkeypatch
+    ) -> None:
+        """Being on the roster is not being on everything. A guest project is
+        somebody else's work."""
+
+        async def their_project(project_id):
+            project = FakeProject(project_id, is_public=False)
+            project.owner_email = "a-judge@example.com"
+            return project
+
+        monkeypatch.setattr(auth.projects, "get", their_project)
+
+        with pytest.raises(HTTPException):
+            await Principal(email=next(iter(members.EDITORS))).assert_can_upload(9)
+
+    @pytest.mark.asyncio
+    async def test_an_anonymous_visitor_may_not_upload_anywhere(
+        self, monkeypatch
+    ) -> None:
+        with pytest.raises(HTTPException) as raised:
+            await Principal(email=None).assert_can_upload(1)
+        assert raised.value.status_code == 401
+
+
+class TestWriteAccess:
     @pytest.mark.asyncio
     async def test_only_the_owner_supersedes(self, monkeypatch) -> None:
         async def not_the_owner(project_id, email):

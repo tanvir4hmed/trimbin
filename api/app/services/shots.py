@@ -28,8 +28,6 @@ import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from google.cloud import firestore
-
 from .jobs import db
 
 log = logging.getLogger(__name__)
@@ -65,6 +63,29 @@ class Shot:
     notes: str = ""         # script supervisor: props, wardrobe, continuity
     look: str = ""          # declared intent: "handheld", "locked off"
 
+    # -- what the set already decided ---------------------------------------
+    # The take the director or DoP circled on the day. This is the strongest
+    # prior that exists about a shot and it is not ours: a script supervisor
+    # writes it down at the moment the decision is made, with the performance
+    # in the room and the whole day's context in their head.
+    #
+    # Zero means nobody circled anything, which is common and not a gap.
+    circled_take: int = 0
+    circled_by: str = ""
+
+    # -- who is doing it, and how far along ---------------------------------
+    # Three editors sharing a project will do the same scene twice on the first
+    # Monday without this. Empty means unassigned, which is a state worth
+    # showing rather than a missing value.
+    assignee: str = ""
+
+    # What a person says the state is, alongside the state the system derives.
+    # They answer different questions: derived says "how sure is the system",
+    # set says "is this work finished". At a standup only the second is asked.
+    state: str = ""         # "", needs_review, in_progress, approved
+    state_by: str = ""
+    state_at: datetime | None = None
+
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_by: str = ""
 
@@ -82,27 +103,37 @@ class Shot:
             "line": self.line,
             "notes": self.notes,
             "look": self.look,
+            "circled_take": self.circled_take,
+            "circled_by": self.circled_by,
+            "assignee": self.assignee,
+            "state": self.state,
+            "state_by": self.state_by,
+            "state_at": self.state_at.isoformat() if self.state_at else None,
             "updated_at": self.updated_at.isoformat(),
             "updated_by": self.updated_by,
         }
+
+
+# What a person may set the state to, and nothing else.
+#
+# A free-text status field becomes six spellings of "done" within a fortnight,
+# and then nothing can be counted. Empty is a real member of this set: nobody
+# has said, which is different from somebody saying it needs review.
+STATES = ("", "needs_review", "in_progress", "approved")
 
 
 def _doc(project_id: int, scene: int, shot: int):
     return db().collection(COLLECTION).document(f"p{project_id}_s{scene}_h{shot}")
 
 
-async def get(project_id: int, scene: int, shot: int) -> Shot:
-    """The shot's description, or an empty one.
+def _from_doc(project_id: int, scene: int, shot: int, d: dict) -> Shot:
+    """One reader for the document shape.
 
-    Never None. A shot nobody has described is a normal state with a sensible
-    default, and making every caller check for absence would spread that
-    decision across the codebase.
+    Written once because there were two: get and for_project each unpacked the
+    same fields, so the moment a field was added only one of them learned about
+    it. The screen listing shots would show a blank where the screen opening one
+    showed a value, and nothing anywhere would look broken.
     """
-    snapshot = await _doc(project_id, scene, shot).get()
-    if not snapshot.exists:
-        return Shot(project_id=project_id, scene=scene, shot=shot)
-
-    d = snapshot.to_dict() or {}
     return Shot(
         project_id=project_id,
         scene=scene,
@@ -113,9 +144,28 @@ async def get(project_id: int, scene: int, shot: int) -> Shot:
         line=d.get("line", ""),
         notes=d.get("notes", ""),
         look=d.get("look", ""),
+        circled_take=int(d.get("circled_take", 0) or 0),
+        circled_by=d.get("circled_by", ""),
+        assignee=d.get("assignee", ""),
+        state=d.get("state", ""),
+        state_by=d.get("state_by", ""),
+        state_at=d.get("state_at"),
         updated_at=d.get("updated_at") or datetime.now(UTC),
         updated_by=d.get("updated_by", ""),
     )
+
+
+async def get(project_id: int, scene: int, shot: int) -> Shot:
+    """The shot's description and working state, or an empty one.
+
+    Never None. A shot nobody has described is a normal state with a sensible
+    default, and making every caller check for absence would spread that
+    decision across the codebase.
+    """
+    snapshot = await _doc(project_id, scene, shot).get()
+    if not snapshot.exists:
+        return Shot(project_id=project_id, scene=scene, shot=shot)
+    return _from_doc(project_id, scene, shot, snapshot.to_dict() or {})
 
 
 async def put(
@@ -127,11 +177,23 @@ async def put(
 ) -> Shot:
     """Write or replace a shot's description.
 
-    Replaces rather than merges. A form that submits three fields and silently
-    keeps a fourth from last week produces a description nobody wrote, and the
-    person looking at it has no way to know which half is current.
+    Replaces the description rather than merging it. A form that submits three
+    fields and silently keeps a fourth from last week produces a description
+    nobody wrote, and the person reading it cannot tell which half is current.
+
+    It does not replace the *document*, which is the correction. The circled
+    take, the assignee and the set state live here too and are edited from
+    elsewhere at other times; a set without merge would clear all three every
+    time somebody fixed a typo in a slug, and the loss would be silent — the
+    fields would simply be empty the next time anyone looked.
+
+    scene and shot go into the body as well as into the key, because reading
+    them back out of the key means parsing it and for_project needs them.
     """
     cleaned = {
+        "project_id": project_id,
+        "scene": scene,
+        "shot": shot,
         "slug": _clean(fields.get("slug"), 40),
         "heading": _clean(fields.get("heading"), MAX_HEADING),
         "action": _clean(fields.get("action"), MAX_ACTION),
@@ -142,40 +204,121 @@ async def put(
         "updated_by": author,
     }
 
-    await _doc(project_id, scene, shot).set(cleaned)
+    await _doc(project_id, scene, shot).set(cleaned, merge=True)
     log.info("shot %d/%d described by %s", scene, shot, author)
 
     return await get(project_id, scene, shot)
 
 
-async def for_project(project_id: int) -> dict[tuple[int, int], Shot]:
-    """Every described shot in a project, keyed by scene and shot.
+async def circle(
+    project_id: int, scene: int, shot: int, take_no: int, author: str
+) -> Shot:
+    """Record the take the director circled on the day. Zero clears it.
 
-    One query rather than one per node. A scene view draws a dozen shots and a
+    A take number rather than a clip id, because that is what the script
+    supervisor wrote down and what the slate says — and because a circle should
+    survive a clip being re-ingested under a new id.
+
+    This never selects anything. The circle is evidence about what the room
+    wanted; the verdict is a measurement of what the camera got. Where the two
+    disagree is exactly the shot a person should open, and collapsing either
+    into the other destroys the only signal that says so.
+    """
+    await _doc(project_id, scene, shot).set(
+        {
+            "project_id": project_id,
+            "scene": scene,
+            "shot": shot,
+            "circled_take": max(0, int(take_no)),
+            "circled_by": author if take_no else "",
+        },
+        merge=True,
+    )
+    log.info("shot %d/%d: take %d circled by %s", scene, shot, take_no, author)
+    return await get(project_id, scene, shot)
+
+
+async def assign(project_id: int, scene: int, shot: int, assignee: str) -> Shot:
+    """Put somebody's name on a shot. An empty string unassigns it."""
+    await _doc(project_id, scene, shot).set(
+        {
+            "project_id": project_id,
+            "scene": scene,
+            "shot": shot,
+            "assignee": (assignee or "").strip().lower(),
+        },
+        merge=True,
+    )
+    return await get(project_id, scene, shot)
+
+
+async def set_state(
+    project_id: int, scene: int, shot: int, state: str, author: str
+) -> Shot:
+    """What a person says the state of this work is.
+
+    Deliberately separate from the status the tree derives. Derived status
+    answers "how sure is the system"; this answers "is anybody still working on
+    it", and only the second is asked at a standup. A system that conflates them
+    tells a lead editor eleven shots are decided while three people are still
+    arguing about four of them.
+    """
+    if state not in STATES:
+        raise ValueError(f"{state!r} is not a state a shot can be in")
+
+    await _doc(project_id, scene, shot).set(
+        {
+            "project_id": project_id,
+            "scene": scene,
+            "shot": shot,
+            "state": state,
+            "state_by": author if state else "",
+            "state_at": datetime.now(UTC) if state else None,
+        },
+        merge=True,
+    )
+    return await get(project_id, scene, shot)
+
+
+async def for_project(project_id: int) -> dict[tuple[int, int], Shot]:
+    """Every shot document in a project, keyed by scene and shot.
+
+    One query rather than one per node. A scene view draws a dozen shots, and a
     round trip each would make the page wait on the network for something the
     first query already had.
     """
     found: dict[tuple[int, int], Shot] = {}
-    prefix = f"p{project_id}_s"
 
-    async for snapshot in db().collection(COLLECTION).stream():
-        if not snapshot.id.startswith(prefix):
-            continue
+    async for snapshot in (
+        db().collection(COLLECTION).where("project_id", "==", project_id).stream()
+    ):
         d = snapshot.to_dict() or {}
         scene, shot = int(d.get("scene", 0)), int(d.get("shot", 0))
-        found[(scene, shot)] = Shot(
-            project_id=project_id,
-            scene=scene,
-            shot=shot,
-            slug=d.get("slug", ""),
-            heading=d.get("heading", ""),
-            action=d.get("action", ""),
-            line=d.get("line", ""),
-            notes=d.get("notes", ""),
-            look=d.get("look", ""),
-            updated_at=d.get("updated_at") or datetime.now(UTC),
-            updated_by=d.get("updated_by", ""),
-        )
+        found[(scene, shot)] = _from_doc(project_id, scene, shot, d)
+    return found
+
+
+async def for_projects(project_ids: list[int]) -> dict[tuple[int, int, int], Shot]:
+    """The same, across every project one person can open.
+
+    The dashboard needs assignment and state for every shot waiting anywhere,
+    and asking per project would be a round trip per card. Firestore takes up to
+    thirty values in an "in" filter — more projects than anyone here will have —
+    and beyond that this asks in batches rather than failing.
+    """
+    found: dict[tuple[int, int, int], Shot] = {}
+    if not project_ids:
+        return found
+
+    for i in range(0, len(project_ids), 30):
+        batch = project_ids[i : i + 30]
+        async for snapshot in (
+            db().collection(COLLECTION).where("project_id", "in", batch).stream()
+        ):
+            d = snapshot.to_dict() or {}
+            pid = int(d.get("project_id", 0))
+            scene, shot = int(d.get("scene", 0)), int(d.get("shot", 0))
+            found[(pid, scene, shot)] = _from_doc(pid, scene, shot, d)
     return found
 
 

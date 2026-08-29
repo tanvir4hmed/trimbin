@@ -1,37 +1,40 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "Demo project · Trimbin",
+  title: "Status · Trimbin",
   description: "What is running, what is measured, and what is not built yet.",
 };
 
 export const dynamic = "force-dynamic";
 
 /**
- * The demo page.
+ * The status page.
  *
- * There is no interactive demo project yet, and the honest thing is to say so
- * rather than dress the archive up as one. A page that implies a working editor
- * dashboard and delivers a table of generated rows is the failure mode this
- * whole product is built to avoid.
+ * Kept, and kept honest. A page that quietly omits what is missing is the same
+ * overclaim as an accuracy figure computed over invented data, and this project
+ * has already made that mistake once.
+ *
+ * It used to say there was no interactive product. There is one now, so the
+ * page says that instead — and the list of what is still not earned stays,
+ * because that half is the half worth publishing.
  */
-export default async function DemoPage() {
+export default async function StatusPage() {
   const corpus = await loadCorpus();
 
   return (
-    <main className="shell">
+    <main className="shell prose">
       <section style={{ paddingTop: 56 }}>
-        <span className="eyebrow">Demo project</span>
+        <span className="eyebrow">Status</span>
         <h1>What is running, and what is not</h1>
         <p className="lede">
-          Trimbin is mid-build. This page is a status report rather than a
-          product tour, because the alternative is showing something that looks
-          finished and is not.
+          Every claim on this page is checkable from an endpoint listed at the
+          bottom. That is the only kind of claim worth making about a system that
+          judges things.
         </p>
       </section>
 
       <section>
-        <h2>Running, and measured</h2>
+        <h2>Running</h2>
         <ul>
           <li>
             <strong>The measurement layer.</strong> Exposure, focus, stability,
@@ -41,78 +44,64 @@ export default async function DemoPage() {
             they are the only earned numbers on this site.
           </li>
           <li>
-            <strong>The archive and its queries.</strong> ClickHouse with vector
-            and text indexes, holding a generated corpus of several hundred
-            thousand decisions. That corpus proves the queries stay fast; it is
-            excluded from every accuracy figure, because a number computed over
-            generated rows measures the generator.
-          </li>
-          <li>
-            <strong>The deployment.</strong> Everything here is Terraform,
-            deployed by push, with the whole environment reproducible from an
-            empty project.
-          </li>
-        </ul>
-      </section>
-
-      <section>
-        <h2>Running on real footage</h2>
-        <p>
-          Twelve takes from a published, openly licensed dataset have been
-          through the whole pipeline: measured with ffmpeg, read for a slate,
-          embedded, encoded, and compared by the panel.{" "}
-          <Link href="/project/1">Open the workspace</Link> and look at any
-          setup — every take is there with its reasons, including the ones that
-          were not chosen.
-        </p>
-        <ul>
-          <li>
-            <strong>Upload, end to end.</strong> A clip uploaded to a signed URL
-            is measured, encoded and playing through the CDN without anyone
-            touching it.
-          </li>
-          <li>
-            <strong>Slate reading.</strong> A board on the front of a clip
-            becomes a scene, shot and take number. No board is said to be no
-            board, and the take is left ungrouped rather than guessed at.
-          </li>
-          <li>
             <strong>The panel.</strong> Three specialists and a chief, on the
-            footage. It found what measurement could not: a take that stops
+            footage. It finds what measurement cannot: a take that stops
             mid-sentence, a whip pan that breaks eye-trace, a wall crossing the
             foreground.
           </li>
+          <li>
+            <strong>Upload, end to end.</strong> A clip uploaded to a signed URL
+            is measured, read for a slate, embedded, encoded and playing through
+            the CDN without anyone touching it.
+          </li>
+          <li>
+            <strong>The application.</strong> A dashboard with a queue across
+            projects, a shot screen with per-criterion reasoning and timecoded
+            findings, timecoded comments, assignment and set status, the scene
+            as a stringout, and EDL and marker export.{" "}
+            <Link href="/project/1">Open a project</Link>.
+          </li>
+          <li>
+            <strong>The archive and its queries.</strong> ClickHouse with vector
+            and text indexes, reached by the agent through the official MCP
+            server as a read-only user. It holds a generated corpus of several
+            hundred thousand decisions, which proves the queries stay fast and is
+            excluded from every published figure — a number computed over
+            generated rows measures the generator.
+          </li>
+          <li>
+            <strong>The deployment.</strong> Terraform, deployed by push, with
+            the whole environment reproducible from an empty project.
+          </li>
         </ul>
-        <p className="dim small">
-          Every setup so far has come back below the review margin and been
-          flagged for a person. That is the correct answer, not a failure to
-          produce one: twelve competently shot takes have nothing technical
-          separating them, and a system that manufactured a confident winner
-          from that would be lying.
-        </p>
       </section>
 
       <section>
-        <h2>Not built, or not yet earned</h2>
+        <h2>Not earned yet</h2>
         <ul>
           <li>
-            <strong>Any accuracy figure.</strong> The number stays null. It can
-            only come from editors overriding the system, and none has yet —
-            the dataset ships an empty annotation template, so there is no
-            ground truth to score against either.
+            <strong>An editorial accuracy figure.</strong> It stays null until
+            editors have overridden enough decisions to compute one. Null is not
+            zero, and the interface keeps them apart.
           </li>
-          <li>The assembled cut, and EDL export</li>
-          <li>Natural-language retrieval over the archive</li>
-          <li>Upload from the browser for anyone but us</li>
           <li>
-            Sign-in on this deployment, pending one console step for an OAuth
-            client
+            <strong>Embeddings on the generated corpus.</strong> Only
+            worker-ingested clips carry one, so similarity search reaches the
+            real rows and not the synthetic ones.
+          </li>
+          <li>
+            <strong>Frame rate.</strong> Exports declare it rather than measure
+            it — nothing in the archive records what the original was shot at.
+          </li>
+          <li>
+            <strong>The panel window.</strong> Specialists watch the first
+            thirty seconds of each take. A continuity error at 0:58 of a 1:10
+            take will be missed.
           </li>
         </ul>
         <p className="dim small">
-          Listing these is deliberate. A demo page that quietly omits what is
-          missing is the same overclaim as an accuracy figure computed over
-          invented data, and this project has already made that mistake once.
+          Listing these is deliberate. A status page that omits what is missing
+          is worth nothing to the person reading it.
         </p>
       </section>
 
@@ -122,10 +111,7 @@ export default async function DemoPage() {
           <div className="stats">
             <Stat label="Real clips" value={fmt(corpus.real.clips)} />
             <Stat label="Real hours" value={fmt(corpus.real.footage_hours)} />
-            <Stat
-              label="Generated clips"
-              value={fmt(corpus.synthetic.clips)}
-            />
+            <Stat label="Generated clips" value={fmt(corpus.synthetic.clips)} />
             <Stat
               label="Generated hours"
               value={fmt(corpus.synthetic.footage_hours)}
@@ -148,11 +134,15 @@ export default async function DemoPage() {
           </li>
           <li>
             <a href="/api/public/accuracy">/api/public/accuracy</a> — editorial
-            agreement, currently empty and saying so
+            agreement, and what it says when there is not enough of it
           </li>
           <li>
             <a href="/api/public/scale">/api/public/scale</a> — real and
             generated counted apart
+          </li>
+          <li>
+            <a href="/api/public/limits">/api/public/limits</a> — what a guest
+            account may hold, from the code that enforces it
           </li>
         </ul>
       </section>

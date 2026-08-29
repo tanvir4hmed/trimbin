@@ -15,10 +15,10 @@ from __future__ import annotations
 import logging
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Query, Response
 
 from ..config import settings
-from ..services import analytics, projects
+from ..services import analytics, members, projects
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/public", tags=["public"])
@@ -119,9 +119,7 @@ async def accuracy_per_project(response: Response) -> dict[str, Any]:
     for row in rows:
         project = await projects.get(int(row["project_id"]))
         public = project is not None and (
-            project.is_public
-            or project.project_id
-            in (settings.demo_project_id, settings.sandbox_project_id)
+            project.is_public or project.project_id == settings.demo_project_id
         )
         named.append({
             **row,
@@ -140,25 +138,32 @@ async def accuracy_per_project(response: Response) -> dict[str, Any]:
     }
 
 
-@router.get("/sandbox")
-async def sandbox_limits(response: Response) -> dict[str, Any]:
-    """What a visitor may do without an account.
+@router.get("/limits")
+async def guest_limits(response: Response) -> dict[str, Any]:
+    """What a guest account may hold, published before anyone signs up for one.
 
     Published rather than hard-coded into the page, so the numbers a visitor is
     shown and the numbers the API enforces are the same numbers. Two copies
-    would drift, and the drift shows up as a person being refused for exceeding
-    a limit the page told them they were within.
+    drift, and the drift shows up as a person being refused for exceeding a
+    limit the page told them they were within.
+
+    This used to describe a sandbox — a separate project with separate rules,
+    reached by a separate page. That was the wrong shape: it sent a visitor
+    somewhere the real users never go and then asked them to judge the thing
+    they had not seen. The limits now sit on a project a guest actually owns, in
+    the same interface everybody else uses.
     """
     _cached(response)
+    limits = members.GUEST_LIMITS
     return {
-        "project_id": settings.sandbox_project_id,
-        "max_clips": settings.sandbox_max_clips,
-        "max_seconds": settings.sandbox_max_seconds,
-        "max_per_ip_per_day": settings.sandbox_max_per_ip_per_day,
-        "retention_hours": settings.sandbox_retention_hours,
+        **limits.as_dict(),
         "note": (
-            "No account needed. Everything uploaded here is deleted within "
-            f"{settings.sandbox_retention_hours} hours."
+            f"Sign in with any Google account and you get a real workspace: "
+            f"{limits.projects} projects of your own, {limits.scenes} scenes "
+            f"each, up to {limits.takes_per_shot} takes a shot, clips up to "
+            f"{limits.clip_seconds} seconds, kept for {limits.retention_days} "
+            f"days. In our projects you can read everything, comment, and "
+            f"overrule any call we made — you just cannot upload into them."
         ),
     }
 

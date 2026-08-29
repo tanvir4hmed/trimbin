@@ -1,13 +1,22 @@
 """Who is asking, and what they may touch.
 
-Two kinds of caller share every route. Someone signed in works on projects they
-belong to; anyone at all can read the demo project without an account, because a
-system that publishes its own error rate should not put that behind a signup.
+Three kinds of caller share every route: the lead editor, an editor, and a
+guest — which is everybody else, including a judge with three minutes and no
+intention of creating an account for us.
+
+The rule that shapes this file is that a guest is not a spectator. They may read
+our productions, comment on a shot, and overrule the panel with a reason,
+because watching somebody disagree with the system is the product and a
+demonstration you can only look at is a video. What they may not do is put
+footage into our productions — a limit about storage and cost, not about trust.
+
+In a project they created, a guest is an editor, upload included, under the
+limits in services/members.py.
 
 There is deliberately no development bypass. A header that grants access when an
 environment variable is set is a backdoor that reaches production the first time
-someone copies a deployment, and the cost of verifying a token properly is small
-enough that the shortcut is never worth it.
+someone copies a deployment, and verifying a token properly is cheap enough that
+the shortcut is never worth it.
 """
 
 from __future__ import annotations
@@ -20,7 +29,7 @@ from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
 
 from .config import settings
-from .services import projects
+from .services import members, projects
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +46,16 @@ class Principal:
     def is_anonymous(self) -> bool:
         return self.email is None
 
+    @property
+    def role(self) -> members.Role:
+        return members.role_of(self.email)
+
+    @property
+    def is_staff(self) -> bool:
+        return members.is_staff(self.email)
+
+    # -- reading ------------------------------------------------------------
+
     async def assert_can_read(self, project_id: int) -> None:
         """Reading is allowed for members, and for anyone on a public project.
 
@@ -44,17 +63,12 @@ class Principal:
         create an account, and asking them to is the difference between being
         evaluated and being skipped.
 
-        The demo and sandbox ids come from config and cannot be changed by
-        anything a user does. Beyond those, the project's own `is_public` flag
-        decides — otherwise the flag would be a field that says one thing while
-        the code does another, which is how the two most recent bugs in this
-        system started.
-
-        Read only. Whether a public project accepts writes is a separate
-        question with a separate answer below, because the flag governs who may
-        look and never who may change.
+        The demo id comes from config and cannot be changed by anything a user
+        does. Beyond that the project's own is_public flag decides — otherwise
+        the flag would say one thing while the code did another, which is how
+        the two worst bugs in this system started.
         """
-        if project_id in (settings.demo_project_id, settings.sandbox_project_id):
+        if project_id == settings.demo_project_id:
             return
 
         project = await projects.get(project_id)
@@ -63,18 +77,60 @@ class Principal:
 
         await self._assert_member(project_id)
 
-    async def assert_can_write(self, project_id: int) -> None:
-        """Writing always needs an identity.
+    # -- saying something ---------------------------------------------------
 
-        Including on the demo project — it is readable by everyone precisely so
-        that it stays the same for everyone, and one visitor's override would
-        change what the next one sees.
+    async def assert_can_comment(self, project_id: int) -> None:
+        """A note or an override: anyone signed in, on anything they can read.
+
+        This is the permission that used to be membership, and narrowing it that
+        way was wrong. An override is an additive row with a name on it — the
+        panel's verdict survives underneath, the archive keeps both, and the
+        disagreement is the single most valuable thing in the table. Refusing a
+        guest is refusing the evidence.
+
+        Signed in, though. An anonymous override is a row saying a decision was
+        made by nobody, and the whole argument of this system is that a decision
+        is worth what its attribution is worth.
         """
-        if project_id == settings.sandbox_project_id:
-            # The sandbox exists to be written to without an account. Its limits
-            # are enforced by the route, not by identity.
+        if self.is_anonymous:
+            raise _unauthorised()
+        await self.assert_can_read(project_id)
+
+    # -- putting footage in -------------------------------------------------
+
+    async def assert_can_upload(self, project_id: int) -> None:
+        """Footage goes into our productions from the company only.
+
+        And into anyone's own project by whoever owns it. That second clause is
+        why this is not simply is_staff: a guest who made a project is an editor
+        inside it, and the limits that bound the cost live in
+        services/members.py rather than here.
+        """
+        if self.is_anonymous:
+            raise _unauthorised()
+
+        project = await projects.get(project_id)
+        if project is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "No such project.")
+
+        email = (self.email or "").lower()
+        if email == project.owner_email.lower():
             return
-        await self._assert_member(project_id)
+        if email in {m.lower() for m in project.member_emails}:
+            return
+
+        # A company production the roster can reach without an explicit
+        # membership row, so a new editor is not locked out of the archive they
+        # were hired to work on.
+        if self.is_staff and members.is_staff(project.owner_email):
+            return
+
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "You can comment on this project and overrule its calls, but "
+            "uploading into it is for the editors who own it. Make your own "
+            "project to work on your footage.",
+        )
 
     async def assert_is_owner(self, project_id: int) -> None:
         """For the decisions that set other people's work aside."""
@@ -92,7 +148,7 @@ class Principal:
         if not await projects.is_member(project_id, self.email or ""):
             # Deliberately the same response as a project that does not exist.
             # Distinguishing them would let anyone enumerate which projects are
-            # real by watching which ones say "forbidden".
+            # real by watching which ones answer differently.
             raise HTTPException(status.HTTP_404_NOT_FOUND, "No such project.")
 
 
@@ -157,10 +213,24 @@ async def current_principal(request: Request) -> Principal:
     return Principal(email=(claims.get("email") or "").lower())
 
 
-async def require_member(
+async def require_signed_in(
     principal: Principal = Depends(current_principal),
 ) -> Principal:
-    """For routes that need an identity before they know which project."""
+    """An identity, whatever role it carries.
+
+    Most write routes want this rather than membership: a guest signing in with
+    any Google account is a legitimate caller here, and the project-level
+    question is asked afterwards by the assertion that knows which project.
+    """
     if principal.is_anonymous:
         raise _unauthorised()
     return principal
+
+
+# The old name, aliased rather than reimplemented.
+#
+# It now means something it never actually checked. Leaving two functions would
+# leave one of them wrong, and a route reading as if it checks membership while
+# checking only sign-in is exactly the comment-shaped security this codebase has
+# already been bitten by twice.
+require_member = require_signed_in

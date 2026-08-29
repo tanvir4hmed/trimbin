@@ -1,21 +1,29 @@
 "use client";
 
 /**
- * The workspace: the tree on the left, one setup open on the right.
+ * One production: the tree on the left, one shot open on the right.
  *
- * Reachable without an account when the project is public, because the demo is
- * the argument and an argument you have to sign in to read is not much of one.
- * Everything that writes is gated; everything that looks is not.
+ * Reachable without an account when the project is public, because the argument
+ * of this system is checkable and an argument you have to sign in to read is not
+ * much of one. What changes with sign-in is what is *possible*, never what is
+ * visible: a guest sees the upload button and is told why it is off, rather than
+ * being sent somewhere the real users never go.
+ *
+ * The filters across the top are the axes a real bin is cut on — scene, camera,
+ * shoot day, and who is on it. A tree with one axis cannot answer "everything
+ * from Tuesday" or "everything on the B camera", and both are ordinary Monday
+ * questions.
  */
 
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import AskArchive from "@/components/AskArchive";
 import SceneTree from "@/components/SceneTree";
 import ShotDetail from "@/components/ShotDetail";
-import type { Project, Tree } from "@/lib/api";
+import Upload from "@/components/Upload";
+import type { Me, Project, Tree } from "@/lib/api";
 import { ApiError, api } from "@/lib/api";
-import { currentIdentity } from "@/lib/auth";
 
 export default function ProjectPage({
   params,
@@ -24,32 +32,65 @@ export default function ProjectPage({
 }) {
   const { id } = use(params);
   const projectId = Number(id);
+  const router = useRouter();
+  const search = useSearchParams();
 
   const [tree, setTree] = useState<Tree | null>(null);
   const [project, setProject] = useState<Project | null>(null);
-  const [selected, setSelected] = useState<{ scene: number; setup: number } | null>(null);
+  const [me, setMe] = useState<Me | null>(null);
+  const [selected, setSelected] = useState<{ scene: number; shot: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [canEdit, setCanEdit] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const [camera, setCamera] = useState("");
+  const [shootDay, setShootDay] = useState("");
+  const [assignee, setAssignee] = useState("");
 
   const load = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
-      const found = await api.tree(projectId);
+      const found = await api.tree(projectId, {
+        camera: camera || undefined,
+        shoot_day: shootDay || undefined,
+        assignee: assignee || undefined,
+      });
       setTree(found);
 
-      // Open the first thing that needs a person, not the first thing in the
-      // list. The point of the queue is that it puts the work in front of you.
+      // A link from the dashboard names the shot it was about. Honouring it is
+      // the difference between a queue that takes you somewhere and one that
+      // takes you to a project and leaves you to find the row again.
+      const wantScene = Number(search.get("scene"));
+      const wantShot = Number(search.get("shot"));
+      const asked =
+        wantScene && wantShot
+          ? found.scenes
+              .find((s) => s.scene === wantScene)
+              ?.shots.find((h) => h.shot === wantShot)
+          : undefined;
+
+      if (asked) {
+        setSelected({ scene: wantScene, shot: wantShot });
+        return;
+      }
+
+      // Otherwise open the first thing that needs a person, not the first thing
+      // in the list. The point of the queue is that it puts the work in front
+      // of you.
       const waiting = found.scenes
-        .flatMap((s) => s.setups.map((x) => ({ scene: s.scene, ...x })))
-        .find((s) => s.status === "needs_review" || s.status === "not_judged");
-      const first = found.scenes[0]?.setups[0];
+        .flatMap((s) => s.shots.map((x) => ({ scene: s.scene, ...x })))
+        .find(
+          (s) =>
+            s.status === "differs_from_circle" ||
+            s.status === "needs_review" ||
+            s.status === "not_judged",
+        );
+      const first = found.scenes[0]?.shots[0];
       setSelected(
         waiting
-          ? { scene: waiting.scene, setup: waiting.setup }
+          ? { scene: waiting.scene, shot: waiting.shot }
           : first
-            ? { scene: found.scenes[0].scene, setup: first.setup }
+            ? { scene: found.scenes[0].scene, shot: first.shot }
             : null,
       );
     } catch (e) {
@@ -67,30 +108,33 @@ export default function ProjectPage({
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, camera, shootDay, assignee, search]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  // Membership decides what is writable. Asked separately from the tree because
-  // a public project is readable by people who may not touch it, and drawing
-  // an override button they cannot use is worse than drawing none.
+  // Asked rather than worked out. A page that decides whether to draw the
+  // upload button by comparing an address against a list is a second
+  // implementation of the permission rules, and the two will disagree.
   useEffect(() => {
-    if (!currentIdentity()) {
-      setCanEdit(false);
-      setProject(null);
-      return;
-    }
+    void api.me().then(setMe).catch(() => setMe(null));
     void api
-      .projects()
-      .then(({ projects }) => {
-        const mine = projects.find((p) => p.project_id === projectId) ?? null;
-        setProject(mine);
-        setCanEdit(mine !== null);
-      })
-      .catch(() => setCanEdit(false));
+      .project(projectId)
+      .then(setProject)
+      .catch(() => setProject(null));
   }, [projectId]);
+
+  const teamEmails = useMemo(
+    () =>
+      project
+        ? [project.owner_email, ...project.member_emails].filter(Boolean)
+        : [],
+    [project],
+  );
+
+  const canComment = Boolean(me?.signed_in);
+  const canUpload = Boolean(project?.you_can_upload);
 
   if (loading) {
     return (
@@ -110,41 +154,149 @@ export default function ProjectPage({
   }
 
   const empty = !tree || tree.scenes.length === 0;
+  const filtered = Boolean(camera || shootDay || assignee);
 
   return (
     <main className="workspace">
-      <div className="crumbs">
-        <Link href="/">Trimbin</Link>
-        <span aria-hidden>›</span>
-        <span>{project?.name ?? `Project ${projectId}`}</span>
-        {selected && (
-          <>
-            <span aria-hidden>›</span>
-            <span>
-              Scene {selected.scene} · Setup {selected.setup}
-            </span>
-          </>
-        )}
-      </div>
+      <header className="project-head">
+        <div className="crumbs">
+          <Link href={me?.signed_in ? "/dashboard" : "/"}>
+            {me?.signed_in ? "Dashboard" : "Trimbin"}
+          </Link>
+          <span aria-hidden>›</span>
+          <span>{project?.name ?? `Project ${projectId}`}</span>
+          {selected && (
+            <>
+              <span aria-hidden>›</span>
+              <span>
+                Scene {selected.scene} · Shot {selected.shot}
+              </span>
+            </>
+          )}
+        </div>
+
+        <div className="project-tools">
+          {selected && (
+            <Link
+              className="ghost"
+              href={`/project/${projectId}/scene/${selected.scene}`}
+            >
+              Play scene {selected.scene}
+            </Link>
+          )}
+          {canUpload ? (
+            <button
+              type="button"
+              className="primary"
+              onClick={() => setUploading((v) => !v)}
+            >
+              {uploading ? "Close" : "Upload takes"}
+            </button>
+          ) : (
+            me?.signed_in && (
+              // Drawn and disabled, with the reason. A missing button is a
+              // question; a disabled one with a sentence beside it is an answer.
+              <span className="hint small">
+                You can comment here and overrule any call. Uploading is for the
+                editors who own this project —{" "}
+                <Link href="/projects">make your own</Link> to work on your
+                footage.
+              </span>
+            )
+          )}
+        </div>
+      </header>
+
+      {uploading && canUpload && (
+        <Upload projectId={projectId} onFinished={() => void load()} />
+      )}
+
+      {!empty && (
+        <div className="filters">
+          {tree.cameras.length > 0 && (
+            <label>
+              Camera
+              <select value={camera} onChange={(e) => setCamera(e.target.value)}>
+                <option value="">all</option>
+                {tree.cameras.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {tree.shoot_days.length > 1 && (
+            <label>
+              Shoot day
+              <select
+                value={shootDay}
+                onChange={(e) => setShootDay(e.target.value)}
+              >
+                <option value="">all</option>
+                {tree.shoot_days.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label>
+            Assigned
+            <select
+              value={assignee}
+              onChange={(e) => setAssignee(e.target.value)}
+            >
+              <option value="">anyone</option>
+              <option value="unassigned">unclaimed</option>
+              {me?.email && <option value={me.email}>me</option>}
+              {teamEmails
+                .filter((t) => t !== me?.email)
+                .map((t) => (
+                  <option key={t} value={t}>
+                    {t.split("@")[0]}
+                  </option>
+                ))}
+            </select>
+          </label>
+          {filtered && (
+            <button
+              type="button"
+              className="linkish"
+              onClick={() => {
+                setCamera("");
+                setShootDay("");
+                setAssignee("");
+              }}
+            >
+              clear
+            </button>
+          )}
+        </div>
+      )}
 
       {!empty && (
         <AskArchive
           projectId={projectId}
-          onOpen={(scene, setup) => setSelected({ scene, setup })}
+          onOpen={(scene, shot) => setSelected({ scene, shot })}
         />
       )}
 
       {empty ? (
         <div className="empty-project">
-          <h2>Nothing here yet</h2>
-          <p>
-            Drop a folder of takes to begin. Every clip is measured, read and
-            compared against the others of its setup.
-          </p>
-          {!canEdit && (
+          <h2>{filtered ? "Nothing matches those filters" : "Nothing here yet"}</h2>
+          {!filtered && (
+            <p>
+              Drop a folder of takes to begin. Every clip is measured, read and
+              compared against the others of its own shot.
+            </p>
+          )}
+          {!canUpload && !filtered && (
             <p className="hint">
-              You are looking at this project without being a member of it, so
-              nothing here is editable.
+              You are looking at this project without being able to upload into
+              it. Everything else — comments, overrides, running the comparison —
+              is open to you.
             </p>
           )}
         </div>
@@ -153,24 +305,29 @@ export default function ProjectPage({
           <SceneTree
             scenes={tree.scenes}
             selected={selected}
-            onSelect={(scene, setup) => setSelected({ scene, setup })}
+            onSelect={(scene, shot) => setSelected({ scene, shot })}
+            onOpenScene={(scene) =>
+              router.push(`/project/${projectId}/scene/${scene}`)
+            }
           />
 
           <section className="pane">
             {selected ? (
               <ShotDetail
-                // Remounts when the setup changes, so no state leaks between
+                // Remounts when the shot changes, so no state leaks between
                 // two shots — an expanded take from the last one staying open
                 // over a different take's findings is a real confusion.
-                key={`${selected.scene}-${selected.setup}`}
+                key={`${selected.scene}-${selected.shot}`}
                 projectId={projectId}
                 scene={selected.scene}
-                setup={selected.setup}
-                canEdit={canEdit}
+                shot={selected.shot}
+                canComment={canComment}
+                you={me?.email ?? ""}
+                teamEmails={teamEmails}
                 onDecided={() => void load()}
               />
             ) : (
-              <p className="hint">Choose a setup.</p>
+              <p className="hint">Choose a shot.</p>
             )}
           </section>
         </div>

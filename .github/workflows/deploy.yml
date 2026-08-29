@@ -173,8 +173,28 @@ jobs:
             --region="${{ env.REGION }}" --format='value(status.url)')
 
           echo "Web at $WEB"
-          curl --fail --silent --show-error --max-time 60 "$WEB/" > /dev/null
-          curl --fail --silent --show-error --max-time 120 "$WEB/accuracy" > /dev/null
+          for page in / /about /guide /dashboard /projects /archive /accuracy /project/1; do
+            echo "  $page"
+            curl --fail --silent --show-error --max-time 120 "$WEB$page" > /dev/null
+          done
+
+          # Who the API thinks an anonymous caller is. The interface asks this
+          # before drawing anything, so a route that 500s here leaves every
+          # visitor looking at a page with no buttons and no explanation.
+          curl --fail --silent --show-error --max-time 60 "$URL/me" \
+            | jq -e '.role == "guest" and .can_read == true'
+
+          # The scene assembly and its exports. A stringout that answers and an
+          # EDL that does not is a scene an editor can watch and cannot use.
+          curl --fail --silent --show-error --max-time 120 "$URL/scenes/1" \
+            | jq -e 'has("entries")'
+
+          SCENE=$(curl --fail --silent --max-time 60 "$URL/scenes/1" | jq -r '.scenes[0] // empty')
+          if [ -n "$SCENE" ]; then
+            curl --fail --silent --show-error --max-time 120 \
+              "$URL/scenes/1/$SCENE/edl" | head -1 | grep -q '^TITLE:'
+            echo "  EDL export answers."
+          fi
 
           # The track requires ClickHouse to be reached through mcp-clickhouse at
           # runtime, and a missing dependency makes that fail silently — the

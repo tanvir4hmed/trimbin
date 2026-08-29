@@ -10,8 +10,13 @@ Ids are not chosen here so much as reserved. Two of them are named in config and
 have to keep the meaning config gives them:
 
     1   the demo scene, public, what a visitor sees without an account
-    2   the sandbox, public and writable, where a judge uploads their own footage
+    2   the third dataset scene
     3   the second dataset scene
+
+Id 2 was the visitor sandbox, which no longer exists. Everyone gets the same
+application now: a guest signs in, makes their own project, and works it as an
+editor here would. The id is kept as an ordinary production rather than reused
+for something new, because it already has rows in the archive.
 
 The counter is then set past them, so the next project a person creates does not
 land on one of these and inherit its footage.
@@ -37,10 +42,10 @@ from app.services import jobs, projects  # noqa: E402
 OWNER = "tanvir4hmed@gmail.com"
 EDITORS = ["dipon778@gmail.com", "mohidewan10@gmail.com"]
 
-# is_public governs reading without an account, not writing. Only the sandbox
-# accepts uploads from a stranger, and that is enforced in the routes rather
-# than here — a flag on a document is the wrong place to hold the rule that
-# decides who may spend our encoding budget.
+# is_public governs reading without an account, and nothing else. Who may write
+# is decided by role, in services/members.py, and who may upload is decided by
+# who owns the project — both enforced in the routes. A flag on a document is
+# the wrong place to hold the rule that decides who may spend our budget.
 PLANNED = [
     {
         "id": 1,
@@ -50,9 +55,9 @@ PLANNED = [
     },
     {
         "id": 2,
-        "name": "Visitor sandbox",
+        "name": "Scene 3 - two perspectives (Zenodo)",
         "is_public": True,
-        "note": "Judges and visitors upload here. Kept empty of curated footage.",
+        "note": "CC BY 4.0. Formerly the visitor sandbox, which no longer exists.",
     },
     {
         "id": 3,

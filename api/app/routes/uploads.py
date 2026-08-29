@@ -18,11 +18,11 @@ from datetime import timedelta
 from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
-from ..auth import Principal, current_principal
-from ..services import jobs, sandbox, storage
+from ..auth import Principal, current_principal, require_signed_in
+from ..services import jobs, quota, storage
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/uploads", tags=["uploads"])
@@ -32,7 +32,6 @@ router = APIRouter(prefix="/uploads", tags=["uploads"])
 # dragged a folder containing a PDF should know immediately.
 ACCEPTED_SUFFIXES = frozenset({".mov", ".mp4", ".mxf", ".m4v", ".avi", ".mkv", ".braw", ".r3d"})
 
-MAX_CLIP_BYTES = 8 * 1024**3  # 8 GiB: a long take at high bitrate, with room
 SIGNED_URL_TTL = timedelta(hours=6)  # long enough for a slow connection
 
 _SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]")
@@ -80,8 +79,7 @@ class UploadComplete(BaseModel):
 @router.post("/grant", response_model=UploadGrant)
 async def grant_upload(
     request: UploadRequest,
-    http: Request,
-    principal: Annotated[Principal, Depends(current_principal)],
+    principal: Annotated[Principal, Depends(require_signed_in)],
 ) -> UploadGrant:
     """Hand back one signed URL per file, and open a job to track the batch.
 
@@ -89,24 +87,23 @@ async def grant_upload(
     close the tab. Without something durable to come back to, a long ingest is
     indistinguishable from one that silently died.
 
-    current_principal rather than require_member, so the sandbox can be used by
-    someone with no account — which is the point of it. assert_can_write already
-    knows which projects allow that; demanding an identity here as well would
-    have put the decision in two places, and one of them would eventually be
-    wrong.
+    Uploading is the one thing a guest cannot do in our productions. Not for
+    lack of trust — they may overrule any call we made — but because footage
+    costs storage, encoding and model time, and none of those are free. In their
+    own project they upload like anybody else.
     """
-    await principal.assert_can_write(request.project_id)
+    await principal.assert_can_upload(request.project_id)
 
-    # The sandbox is an open door to a paid model and a video encoder. Checked
-    # before the job is opened, so a refused visitor leaves nothing behind.
-    if sandbox.is_sandbox(request.project_id):
-        await sandbox.check_and_count(http, len(request.filenames))
+    # Checked before the job is opened, so a refused upload leaves nothing
+    # behind to clean up.
+    await quota.check_room_for(request.project_id, len(request.filenames))
+    max_bytes = await quota.max_bytes_for(request.project_id)
 
     job_id = await jobs.open_job(
         project_id=request.project_id,
         kind="ingest",
         total_items=len(request.filenames),
-        opened_by=principal.email or f"visitor:{sandbox.caller_ip(http)}",
+        opened_by=principal.email or "",
     )
 
     # The job exists now, so a failure from here on has to close it. Otherwise
@@ -127,13 +124,11 @@ async def grant_upload(
                 ttl=SIGNED_URL_TTL,
                 # A byte cap is the only limit enforceable before anything
                 # arrives. Length is checked after measurement, because only
-                # ffmpeg can tell thirty seconds from three minutes at a low
-                # bitrate.
-                max_bytes=(
-                    sandbox.MAX_SANDBOX_BYTES
-                    if sandbox.is_sandbox(request.project_id)
-                    else MAX_CLIP_BYTES
-                ),
+                # ffmpeg can tell sixty seconds from six minutes at a low
+                # bitrate. Which cap applies follows the project's owner, not
+                # the person uploading — otherwise a guest could raise their own
+                # limit by inviting an editor.
+                max_bytes=max_bytes,
             )
 
             tickets.append(
@@ -174,7 +169,7 @@ async def complete_upload(
     job = await jobs.get_job(body.job_id)
     if job is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such job")
-    await principal.assert_can_write(job.project_id)
+    await principal.assert_can_upload(job.project_id)
 
     confirmed, missing = await storage.confirm_uploads(job.project_id, body.clip_ids)
 

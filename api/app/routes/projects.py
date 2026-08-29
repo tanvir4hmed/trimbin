@@ -1,12 +1,17 @@
-"""Projects: making one, listing yours, and saying who else may work in it.
+"""Projects: making one, listing them, and saying who else may work in one.
 
-Deliberately thin. A production has a hundred roles and this has two, because a
-permissions matrix is real work for a real product and would earn nothing on a
-team of three. Owner adds people and supersedes; member does everything else.
+The rule that shapes this file is that everyone gets the same application. A
+guest signs in, makes a project, uploads their own footage and works it exactly
+as an editor here does — under limits stated on the form before they start.
 
-The one rule that is not thin: a project nobody may read answers 404, never 403.
-A 403 tells a stranger the project exists, which is enough to enumerate every
-project on the system by watching which ids answer differently.
+That replaced a sandbox, which was the wrong idea twice over: it sent a visitor
+somewhere the real users never go, and then asked them to judge the thing they
+had not seen. One interface, permissions changing what is *possible* and never
+what is *visible*.
+
+The other rule that is not thin: a project nobody may read answers 404, never
+403. A 403 tells a stranger the project exists, which is enough to enumerate
+every project on the system by watching which ids answer differently.
 """
 
 from __future__ import annotations
@@ -18,18 +23,15 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
-from ..auth import Principal, current_principal, require_member
+from ..auth import Principal, current_principal, require_signed_in
 from ..config import settings
-from ..services import projects
+from ..services import dashboard as dashboard_service
+from ..services import members, projects
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-
-# A cap on projects per person, so an authenticated visitor cannot fill the
-# archive with empty projects. High enough that nobody working normally meets it.
-MAX_PROJECTS_PER_PERSON = 25
 
 
 class NewProject(BaseModel):
@@ -70,45 +72,99 @@ def _as_dict(project, viewer_email: str | None) -> dict:
         "you_are_owner": bool(
             viewer_email and viewer_email.lower() == project.owner_email.lower()
         ),
+        "you_can_upload": bool(
+            viewer_email
+            and (
+                viewer_email.lower() == project.owner_email.lower()
+                or viewer_email.lower() in {m.lower() for m in project.member_emails}
+                or (
+                    members.is_staff(viewer_email)
+                    and members.is_staff(project.owner_email)
+                )
+            )
+        ),
     }
 
 
 @router.get("")
 async def mine(
-    principal: Annotated[Principal, Depends(require_member)],
+    principal: Annotated[Principal, Depends(require_signed_in)],
+    detail: bool = False,
 ) -> dict:
-    """Everything this person can open, for the project switcher."""
+    """Everything this person can open.
+
+    `detail=true` adds the counts a list screen needs — scenes, shots, takes,
+    how far through, how many are waiting. It is one extra query across every
+    project rather than one per row, and it is optional because the project
+    switcher in the header wants names and nothing else.
+    """
     found = await projects.for_member(principal.email or "")
+    rows = [_as_dict(p, principal.email) for p in found]
+
+    if detail and found:
+        stats = await dashboard_service.for_projects(
+            [p.project_id for p in found], principal.email or ""
+        )
+        by_id = {s["project_id"]: s for s in stats["projects"]}
+        for row in rows:
+            row.update(by_id.get(row["project_id"], {}))
+
     return {
         "you": principal.email,
-        "projects": [_as_dict(p, principal.email) for p in found],
+        "role": members.role_of(principal.email),
+        "limits": members.limits_for(principal.email).as_dict(),
+        "projects": rows,
     }
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create(
     body: NewProject,
-    principal: Annotated[Principal, Depends(require_member)],
+    principal: Annotated[Principal, Depends(require_signed_in)],
 ) -> dict:
     """Name only.
 
     No scene list, no crew, no shoot dates. Everything else about a production is
     discovered from the footage, and a form that asks for it up front is a form
     someone abandons.
+
+    Anyone signed in may do this, including a guest — that is the whole of how a
+    visitor gets a real workspace instead of a demonstration. What bounds the
+    cost is the limit on how many, stated on the form rather than discovered
+    here.
     """
+    limits = members.limits_for(principal.email)
     existing = await projects.for_member(principal.email or "")
-    owned = [p for p in existing if p.owner_email.lower() == (principal.email or "").lower()]
-    if len(owned) >= MAX_PROJECTS_PER_PERSON:
+    owned = [
+        p for p in existing
+        if p.owner_email.lower() == (principal.email or "").lower()
+    ]
+
+    if len(owned) >= limits.projects:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
-            f"You already own {len(owned)} projects. Ask us to raise the limit.",
+            f"You own {len(owned)} projects, which is the limit for your "
+            f"account. Delete one, or ask us to raise it."
+            if members.is_staff(principal.email)
+            else (
+                f"A guest account can own {limits.projects} projects and you "
+                f"have {len(owned)}. Everything in them stays for "
+                f"{limits.retention_days} days."
+            ),
         )
 
     project_id = await projects.create(name=body.name, owner_email=principal.email or "")
-    log.info("project %d created by %s", project_id, principal.email)
+    log.info(
+        "project %d created by %s (%s)",
+        project_id, principal.email, members.role_of(principal.email),
+    )
 
     project = await projects.get(project_id)
-    return _as_dict(project, principal.email) if project else {"project_id": project_id}
+    return (
+        {**_as_dict(project, principal.email), "limits": limits.as_dict()}
+        if project
+        else {"project_id": project_id}
+    )
 
 
 @router.get("/{project_id}")
@@ -131,6 +187,8 @@ async def one(
             "name": project.name,
             "is_public": True,
             "created_at": project.created_at.isoformat(),
+            "you_are_owner": False,
+            "you_can_upload": False,
         }
 
     return _as_dict(project, principal.email)
@@ -140,7 +198,7 @@ async def one(
 async def add_member(
     project_id: int,
     body: NewMember,
-    principal: Annotated[Principal, Depends(require_member)],
+    principal: Annotated[Principal, Depends(require_signed_in)],
 ) -> dict:
     """Only the owner may add people.
 
@@ -164,12 +222,12 @@ async def add_member(
     if body.email in {m.lower() for m in project.member_emails}:
         return {"status": "already_a_member", "email": body.email}
 
-    if project_id in (settings.demo_project_id, settings.sandbox_project_id):
-        # These two are read by strangers and written to by the pipeline. Adding
-        # editors to them would let a member change what every visitor sees.
+    if project_id == settings.demo_project_id:
+        # Read by strangers and written to by the pipeline. Adding editors to it
+        # would let a member change what every visitor sees.
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            "The demo and sandbox projects do not take members.",
+            "The demo project does not take members.",
         )
 
     await projects.add_member(project_id, body.email)

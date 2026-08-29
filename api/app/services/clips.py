@@ -42,6 +42,7 @@ async def write(
     take_no: int = 0,
     slate_confident: int = 0,
     slate_raw: str = "",
+    camera: str = "",
     description: str = "",
     embedding: list[float] | None = None,
 ) -> None:
@@ -80,11 +81,17 @@ async def write(
             round(measurements.sharpness, 4),
             round(measurements.motion_mean, 4),
             *_findings_columns(measurements),
+            # Which body shot it, when the board said so. Empty on a
+            # single-camera day, which is most of them, and empty is an answer
+            # here rather than a gap — "everything on the B camera" is a
+            # question you can only ask of a production that had a B camera.
+            camera,
         ]],
         column_names=[
             *_COLUMNS, "embedding",
             "exposure_raw", "sharpness_raw", "motion_raw",
             "finding_codes", "finding_starts_s", "finding_ends_s",
+            "camera",
         ],
     )
     log.info("clip %s written to project %d", clip_id, project_id)

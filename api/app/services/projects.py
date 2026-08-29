@@ -135,4 +135,10 @@ async def for_member(email: str) -> list[Project]:
 
 
 def is_public_project(project_id: int) -> bool:
-    return project_id in (settings.demo_project_id, settings.sandbox_project_id)
+    """Open to a reader with no account.
+
+    One id, from config. The sandbox that used to be the second one is gone —
+    everyone gets the same application now, and a guest works in a project they
+    own rather than in a shared scratch space.
+    """
+    return project_id == settings.demo_project_id

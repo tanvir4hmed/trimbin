@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * The core screen: every take of one setup, why each landed where it did, and
+ * The core screen: every take of one shot, why each landed where it did, and
  * the part of each that is safe to use.
  *
- * Three decisions carry this screen.
+ * Four decisions carry this screen.
  *
  * **Findings are links, not labels.** An editor told "unstable" has to go and
  * find it; an editor told "unstable, 4.2s" and given a click that seeks there
@@ -17,10 +17,18 @@
  * **Every take is openable, including the rejected ones.** "Why not that one?"
  * is the question this whole system exists to answer, and a screen that shows
  * only the winner cannot answer it.
+ *
+ * **The circle is shown and never fed in.** The take the room preferred is the
+ * strongest prior about a shot that exists, and telling the panel about it would
+ * end the measurement — it would agree, and the agreement would be reported as
+ * independent confirmation of a judgement it was handed. So it is displayed
+ * beside the verdict instead, where a person can weigh both.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Take, Verdicts } from "@/lib/api";
+import Comments from "@/components/Comments";
+import ShotBrief from "@/components/ShotBrief";
+import type { Brief, ShotState, Take, Verdicts } from "@/lib/api";
 import { ApiError, api } from "@/lib/api";
 
 /** Offered as one-tap chips because a free-text box gets skipped.
@@ -60,6 +68,13 @@ const CRITERION_LABELS: Record<string, string> = {
 /** Which axes a machine measured, so the reader knows what they are trusting. */
 const MEASURED = new Set(["focus", "exposure", "stability", "audio"]);
 
+const STATE_LABELS: { value: ShotState; label: string }[] = [
+  { value: "", label: "unset" },
+  { value: "needs_review", label: "needs review" },
+  { value: "in_progress", label: "in progress" },
+  { value: "approved", label: "approved" },
+];
+
 function seconds(value: number): string {
   const m = Math.floor(value / 60);
   const s = value % 60;
@@ -69,37 +84,46 @@ function seconds(value: number): string {
 export default function ShotDetail({
   projectId,
   scene,
-  setup,
-  canEdit,
+  shot,
+  canComment,
+  you,
+  teamEmails,
   onDecided,
 }: {
   projectId: number;
   scene: number;
-  setup: number;
-  canEdit: boolean;
+  shot: number;
+  /** Anyone signed in, on anything they can read. Not membership. */
+  canComment: boolean;
+  you: string;
+  teamEmails: string[];
   onDecided?: () => void;
 }) {
   const [data, setData] = useState<Verdicts | null>(null);
+  const [brief, setBrief] = useState<Brief | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [commentAt, setCommentAt] = useState<{ clipId: string; at: number } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const found = await api.verdicts(projectId, scene, setup);
+      const [found, description] = await Promise.all([
+        api.verdicts(projectId, scene, shot).catch((e) => {
+          if (e instanceof ApiError && e.status === 404) return null;
+          throw e;
+        }),
+        api.brief(projectId, scene, shot).catch(() => null),
+      ]);
       setData(found);
-      setOpen(found.recommended ?? found.takes[0]?.clip_id ?? null);
+      setBrief(description);
+      setOpen(found?.recommended ?? found?.takes[0]?.clip_id ?? null);
     } catch (e) {
-      if (e instanceof ApiError && e.status === 404) {
-        // Not an error. A setup nobody has judged is a normal state with an
-        // obvious next action, and showing it as a failure hides that.
-        setData(null);
-        setError(null);
-      } else if (e instanceof ApiError && e.waking) {
+      if (e instanceof ApiError && e.waking) {
         // Named, so the reader knows to wait rather than to give up.
         setError(
           "The archive is still waking up. It sleeps when nobody is using it.",
@@ -110,7 +134,7 @@ export default function ShotDetail({
     } finally {
       setLoading(false);
     }
-  }, [projectId, scene, setup]);
+  }, [projectId, scene, shot]);
 
   useEffect(() => {
     void load();
@@ -120,7 +144,7 @@ export default function ShotDetail({
     setSaving(true);
     setNote("Comparing the takes. This can take a minute — the panel watches them.");
     try {
-      await api.judge(projectId, scene, setup);
+      await api.judge(projectId, scene, shot);
       await load();
       onDecided?.();
       setNote(null);
@@ -130,6 +154,22 @@ export default function ShotDetail({
       setSaving(false);
     }
   };
+
+  const undo = async () => {
+    setSaving(true);
+    try {
+      await api.undo(projectId, scene, shot);
+      setNote("Put back. The change is still in the archive — nothing was deleted.");
+      await load();
+      onDecided?.();
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : "Could not undo that.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const label = brief?.slug || `Shot ${shot}`;
 
   if (loading) {
     return (
@@ -157,10 +197,10 @@ export default function ShotDetail({
     return (
       <div className="shot-detail empty">
         <h2>
-          Scene {scene} · Setup {setup}
+          Scene {scene} · {label}
         </h2>
-        <p>No comparison has been run for this setup yet.</p>
-        {canEdit ? (
+        <p>No comparison has been run for this shot yet.</p>
+        {canComment ? (
           <>
             <button type="button" onClick={() => void judge()} disabled={saving}>
               {saving ? "Comparing…" : "Compare the takes"}
@@ -168,35 +208,90 @@ export default function ShotDetail({
             {note && <p className="waiting">{note}</p>}
           </>
         ) : (
-          <p className="hint">Sign in as a member of this project to run it.</p>
+          <p className="hint">Sign in to run it.</p>
+        )}
+        {brief && (
+          <ShotBrief
+            projectId={projectId}
+            scene={scene}
+            shot={shot}
+            brief={brief}
+            canEdit={canComment}
+            onSaved={setBrief}
+          />
         )}
       </div>
     );
   }
 
+  const chosen = data.takes.find((t) => t.clip_id === data.recommended);
+  const humanDecided = data.takes.some(
+    (t) => t.outcome === "selected" && t.decided_by === "human",
+  );
+
   return (
     <div className="shot-detail">
       <header className="shot-head">
-        <h2>
-          Scene {scene} · Setup {setup}
-        </h2>
-        <p className="shot-sub">
-          {data.takes.length} takes ·{" "}
-          {data.recommended ? (
-            <>
-              take{" "}
-              {data.takes.find((t) => t.clip_id === data.recommended)?.take_no}{" "}
-              recommended
-            </>
-          ) : (
-            "nothing recommended"
-          )}
-        </p>
+        <div>
+          <h2>
+            Scene {scene} · {label}
+          </h2>
+          <p className="shot-sub">
+            {data.takes.length} takes ·{" "}
+            {chosen ? (
+              <>take {chosen.take_no} standing</>
+            ) : (
+              "nothing recommended"
+            )}
+            {data.takes[0]?.camera && <> · camera {data.takes[0].camera}</>}
+          </p>
+        </div>
+
+        <div className="shot-actions">
+          <Assignment
+            projectId={projectId}
+            scene={scene}
+            shot={shot}
+            value={data.assignee}
+            you={you}
+            options={teamEmails}
+            disabled={!canComment}
+            onChanged={(b) => {
+              setBrief(b);
+              setData({ ...data, assignee: b.assignee });
+              onDecided?.();
+            }}
+          />
+          <StatePicker
+            projectId={projectId}
+            scene={scene}
+            shot={shot}
+            value={data.state}
+            disabled={!canComment}
+            onChanged={(b) => {
+              setBrief(b);
+              setData({ ...data, state: b.state });
+              onDecided?.();
+            }}
+          />
+        </div>
       </header>
+
+      {data.differs_from_circle && (
+        // The most interesting row in the archive, said as loudly as it deserves
+        // and without a verdict attached. Neither side is wrong: the circle
+        // knows about the performance, which this system deliberately does not
+        // judge, and the measurements know about the frame.
+        <p className="disagreement">
+          The director circled <strong>take {data.circled_take}</strong>; the
+          measurements chose <strong>take {chosen?.take_no}</strong>. Both are
+          worth watching.
+        </p>
+      )}
 
       {note && <p className="waiting">{note}</p>}
 
-      <CriteriaTable takes={data.takes} />
+      <CriteriaTable takes={data.takes} circled={data.circled_take} />
 
       <ol className="takes">
         {data.takes.map((take) => (
@@ -204,15 +299,33 @@ export default function ShotDetail({
             key={take.clip_id}
             take={take}
             isRecommended={take.clip_id === data.recommended}
+            isCircled={data.circled_take === take.take_no}
             expanded={open === take.clip_id}
             onToggle={() =>
               setOpen(open === take.clip_id ? null : take.clip_id)
             }
-            canEdit={canEdit}
+            canEdit={canComment}
+            onNoteAt={(at) => setCommentAt({ clipId: take.clip_id, at })}
+            onCircle={async () => {
+              setSaving(true);
+              try {
+                const updated = await api.circle(
+                  projectId, scene, shot,
+                  data.circled_take === take.take_no ? 0 : take.take_no,
+                );
+                setBrief(updated);
+                await load();
+                onDecided?.();
+              } catch (e) {
+                setNote(e instanceof Error ? e.message : "Could not record that.");
+              } finally {
+                setSaving(false);
+              }
+            }}
             onChoose={async (reason) => {
               setSaving(true);
               try {
-                const result = await api.select(projectId, scene, setup, {
+                const result = await api.select(projectId, scene, shot, {
                   clip_id: take.clip_id,
                   reason,
                 });
@@ -232,7 +345,145 @@ export default function ShotDetail({
           />
         ))}
       </ol>
+
+      <div className="shot-footer">
+        {canComment && (
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => void judge()}
+            disabled={saving}
+            title="Compare the takes again — useful after describing the shot"
+          >
+            Compare again
+          </button>
+        )}
+        {canComment && humanDecided && (
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => void undo()}
+            disabled={saving}
+            title="Put back what stood before the last change. Nothing is deleted."
+          >
+            Undo the last change
+          </button>
+        )}
+      </div>
+
+      {brief && (
+        <ShotBrief
+          projectId={projectId}
+          scene={scene}
+          shot={shot}
+          brief={brief}
+          canEdit={canComment}
+          onSaved={setBrief}
+        />
+      )}
+
+      <Comments
+        projectId={projectId}
+        scene={scene}
+        shot={shot}
+        canComment={canComment}
+        takes={data.takes.map((t) => ({ clip_id: t.clip_id, take_no: t.take_no }))}
+        pending={commentAt}
+        onConsumedPending={() => setCommentAt(null)}
+      />
     </div>
+  );
+}
+
+/** Whose shot this is. Anyone who can comment can assign, including to
+ * themselves — a gate here would make the lead editor the only person who can
+ * pick up a shot, which is how a queue stops moving on a Friday afternoon. */
+function Assignment({
+  projectId,
+  scene,
+  shot,
+  value,
+  you,
+  options,
+  disabled,
+  onChanged,
+}: {
+  projectId: number;
+  scene: number;
+  shot: number;
+  value: string;
+  you: string;
+  options: string[];
+  disabled: boolean;
+  onChanged: (brief: Brief) => void;
+}) {
+  const people = useMemo(() => {
+    const set = new Set(options.filter(Boolean));
+    if (you) set.add(you);
+    if (value) set.add(value);
+    return Array.from(set).sort();
+  }, [options, you, value]);
+
+  return (
+    <label className="picker">
+      <span>Assigned</span>
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={async (e) => {
+          onChanged(await api.assign(projectId, scene, shot, e.target.value));
+        }}
+      >
+        <option value="">unclaimed</option>
+        {people.map((p) => (
+          <option key={p} value={p}>
+            {p === you ? `${p.split("@")[0]} (you)` : p.split("@")[0]}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/** What a person says the state is, alongside what the system derived.
+ *
+ * They answer different questions. Derived status says how sure the system is;
+ * this says whether anybody is still working on it, and only the second one is
+ * asked at a standup. */
+function StatePicker({
+  projectId,
+  scene,
+  shot,
+  value,
+  disabled,
+  onChanged,
+}: {
+  projectId: number;
+  scene: number;
+  shot: number;
+  value: ShotState;
+  disabled: boolean;
+  onChanged: (brief: Brief) => void;
+}) {
+  return (
+    <label className="picker">
+      <span>State</span>
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={async (e) => {
+          onChanged(
+            await api.setState(projectId, scene, shot, e.target.value as ShotState),
+          );
+        }}
+      >
+        {STATE_LABELS.map((s) => (
+          <option key={s.value} value={s.value}>
+            {s.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -243,7 +494,7 @@ export default function ShotDetail({
  * *comparative* — which axis separates these takes — and that is a column, not
  * a cell.
  */
-function CriteriaTable({ takes }: { takes: Take[] }) {
+function CriteriaTable({ takes, circled }: { takes: Take[]; circled: number }) {
   const axes = useMemo(() => {
     const seen = new Set<string>();
     takes.forEach((t) => Object.keys(t.criteria).forEach((a) => seen.add(a)));
@@ -259,7 +510,14 @@ function CriteriaTable({ takes }: { takes: Take[] }) {
           <tr>
             <th>Criterion</th>
             {takes.map((t) => (
-              <th key={t.clip_id}>Take {t.take_no}</th>
+              <th key={t.clip_id} className={circled === t.take_no ? "circled" : undefined}>
+                Take {t.take_no}
+                {circled === t.take_no && (
+                  <span className="circle" title="The director circled this take">
+                    ◎
+                  </span>
+                )}
+              </th>
             ))}
           </tr>
         </thead>
@@ -298,17 +556,23 @@ function CriteriaTable({ takes }: { takes: Take[] }) {
 function TakeRow({
   take,
   isRecommended,
+  isCircled,
   expanded,
   onToggle,
   canEdit,
   onChoose,
+  onCircle,
+  onNoteAt,
 }: {
   take: Take;
   isRecommended: boolean;
+  isCircled: boolean;
   expanded: boolean;
   onToggle: () => void;
   canEdit: boolean;
   onChoose: (reason: string) => Promise<void>;
+  onCircle: () => Promise<void>;
+  onNoteAt: (at: number) => void;
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const [reason, setReason] = useState("");
@@ -328,14 +592,23 @@ function TakeRow({
     .join(", ");
 
   return (
-    <li className={`take${isRecommended ? " recommended" : ""}`}>
+    <li
+      className={`take${isRecommended ? " recommended" : ""}${isCircled ? " circled" : ""}`}
+    >
       <button
         type="button"
         className="take-head"
         onClick={onToggle}
         aria-expanded={expanded}
       >
-        <span className="take-no">Take {take.take_no}</span>
+        <span className="take-no">
+          Take {take.take_no}
+          {isCircled && (
+            <span className="circle" title="The director circled this take">
+              ◎
+            </span>
+          )}
+        </span>
         <span className={`outcome ${take.outcome}`}>
           {take.outcome === "selected"
             ? take.decided_by === "human"
@@ -369,11 +642,7 @@ function TakeRow({
 
           <SafeRangeBar take={take} onSeek={seekTo} />
 
-          {trimmed && (
-            <p className="trimmed">
-              Shortened because {trimmed}.
-            </p>
-          )}
+          {trimmed && <p className="trimmed">Shortened because {trimmed}.</p>}
 
           {take.findings.length > 0 ? (
             <ul className="findings">
@@ -422,6 +691,33 @@ function TakeRow({
               </>
             )}
           </p>
+
+          {canEdit && (
+            <div className="take-tools">
+              <button
+                type="button"
+                className="ghost small"
+                onClick={() =>
+                  onNoteAt(Math.max(0, video.current?.currentTime ?? 0))
+                }
+              >
+                Note at{" "}
+                {seconds(Math.max(0, video.current?.currentTime ?? 0))}
+              </button>
+              <button
+                type="button"
+                className={isCircled ? "ghost small on" : "ghost small"}
+                onClick={() => void onCircle()}
+                title={
+                  isCircled
+                    ? "Remove the circle"
+                    : "Record that the director circled this take on the day"
+                }
+              >
+                {isCircled ? "◎ circled" : "Mark as circled"}
+              </button>
+            </div>
+          )}
 
           {canEdit && !isRecommended && (
             <div className="choose">

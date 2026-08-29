@@ -43,7 +43,7 @@ resource "google_secret_manager_secret_iam_member" "worker_clickhouse" {
 #
 # No pubsub.publisher — the worker consumes and never queues. The aiplatform
 # grant is the one worth naming: this process runs unattended on files a
-# stranger uploaded, so it holds a key to a paid model. That is why the sandbox
+# stranger uploaded, so it holds a key to a paid model. That is why a guest
 # has hard clip and duration limits, and why the worker's own endpoint takes no
 # public callers.
 resource "google_project_iam_member" "worker_roles" {
