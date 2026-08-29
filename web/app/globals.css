@@ -930,3 +930,32 @@ button.primary:disabled {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
+
+/* The project selector on the accuracy page.
+   Sits above the figures rather than beside them, because changing it changes
+   every number below and that relationship should be obvious. */
+.project-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 18px;
+}
+.project-picker label {
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--low);
+}
+.project-picker select {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+  min-width: 220px;
+}
+.stat-note {
+  margin-top: 4px;
+}

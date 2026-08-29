@@ -17,7 +17,8 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Response
 
-from ..services import analytics
+from ..config import settings
+from ..services import analytics, projects
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/public", tags=["public"])
@@ -94,6 +95,49 @@ async def eval_results(response: Response) -> dict[str, Any]:
         }
 
     return {"state": "measured", "axes": rows}
+
+
+@router.get("/accuracy/by-project")
+async def accuracy_per_project(response: Response) -> dict[str, Any]:
+    """The figure broken out by production, with the counts it needs to be read.
+
+    Public and unauthenticated, like the headline number. A system that
+    publishes its own error rate should not put the breakdown behind a signup —
+    the breakdown is where the number stops being asserted and becomes
+    checkable.
+
+    Names come from the project records so a reader sees "Scene 1 - two
+    perspectives" rather than "project 1". Only public projects are named: a
+    private one appears as its id and its counts and nothing else, because a
+    list of project names is a list of who is using this.
+    """
+    _cached(response)
+
+    rows = await analytics.accuracy_by_project()
+
+    named = []
+    for row in rows:
+        project = await projects.get(int(row["project_id"]))
+        public = project is not None and (
+            project.is_public
+            or project.project_id
+            in (settings.demo_project_id, settings.sandbox_project_id)
+        )
+        named.append({
+            **row,
+            "name": project.name if (project and public) else None,
+            "is_public": bool(public),
+        })
+
+    return {
+        "projects": named,
+        "definition": (
+            "Accuracy is the share of confident decisions no editor overturned. "
+            "A confident decision is one where the gap to the runner-up was at "
+            "least 15%. Null means no confident decision has been made yet, "
+            "which is not the same as being wrong every time."
+        ),
+    }
 
 
 @router.get("/scale")

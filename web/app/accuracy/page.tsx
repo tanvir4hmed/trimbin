@@ -1,4 +1,5 @@
 import { AccuracyDashboard } from "@/components/AccuracyDashboard";
+import { PerProjectAccuracy } from "@/components/PerProjectAccuracy";
 
 export const metadata = {
   title: "Accuracy · Trimbin",
@@ -15,6 +16,7 @@ export default function AccuracyPage() {
   return (
     <main className="shell">
       <AccuracyDashboard />
+      <PerProjectAccuracy />
     </main>
   );
 }

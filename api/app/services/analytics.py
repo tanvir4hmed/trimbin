@@ -120,6 +120,41 @@ async def accuracy_summary() -> dict[str, Any]:
     return row
 
 
+async def accuracy_by_project() -> list[dict[str, Any]]:
+    """The same figure, per production.
+
+    One number across every project is the wrong shape. Accuracy on a scene of
+    locked-off interiors and accuracy on a handheld chase are different claims,
+    and an editor asking how well this works on their footage cannot be answered
+    by a mean over somebody else's.
+
+    Joined to the corpus counts because a percentage without them is unreadable:
+    four shots and four hundred both produce one, and only one of them means
+    anything.
+    """
+    return await _many(
+        """
+        SELECT
+            c.project_id                    AS project_id,
+            a.decision_accuracy_pct         AS decision_accuracy_pct,
+            a.confident_decisions           AS confident_decisions,
+            a.confident_overturned          AS confident_overturned,
+            a.flagged_for_review            AS flagged_for_review,
+            a.flagged_changed_pct           AS flagged_changed_pct,
+            a.auto_decided_pct              AS auto_decided_pct,
+            a.shots_total                   AS shots_total,
+            c.clips                         AS clips,
+            c.scenes                        AS scenes,
+            c.setups                        AS setups,
+            c.unusable                      AS unusable,
+            c.footage_hours                 AS footage_hours
+        FROM project_corpus AS c
+        LEFT JOIN accuracy_by_project AS a ON a.project_id = c.project_id
+        ORDER BY c.project_id
+        """
+    )
+
+
 async def eval_summary() -> list[dict[str, Any]]:
     """Per-axis results from the planted-fault set. Empty until it has run."""
     return await _many("SELECT * FROM eval_accuracy")
