@@ -164,3 +164,67 @@ class TestServerEnvironment:
 
         with pytest.raises(ReaderMissing):
             server_env()
+
+
+class TestAnErrorIsNotAnEmptyResult:
+    """The failure that made a working search answer "nothing matched".
+
+    mcp-clickhouse reports a database error as plain text in the same field it
+    uses for results. Parsed as "not JSON" and returned as an empty list, that
+    becomes an empty archive — and the caller has no way to tell it apart from a
+    genuine no-match.
+
+    The cause was a result-size limit on the reader profile, which ClickHouse
+    counts *before* LIMIT is applied. A statement ending in LIMIT 20 tripped it,
+    and every search came back empty over an archive that had rows.
+    """
+
+    @staticmethod
+    def _block(text: str):
+        class Text:
+            def __init__(self, t): self.text = t
+
+        class Result:
+            content = [Text(text)]
+
+        return Result()
+
+    def test_a_database_exception_raises(self) -> None:
+        from trimbin_agents.tools.clickhouse_mcp import QueryFailed, _rows_from
+
+        message = (
+            "Error calling tool 'run_query': Received ClickHouse exception, "
+            "code: 396, server response: Code: 396. DB::Exception: Limit for "
+            "result exceeded, max rows: 1.00 thousand."
+        )
+        with pytest.raises(QueryFailed):
+            _rows_from(self._block(message))
+
+    def test_the_message_survives_for_the_log(self) -> None:
+        """An error that reaches a person as "the search failed" and nothing
+        else costs an afternoon."""
+        from trimbin_agents.tools.clickhouse_mcp import QueryFailed, _rows_from
+
+        with pytest.raises(QueryFailed, match="TOO_MANY_ROWS"):
+            _rows_from(self._block("DB::Exception: TOO_MANY_ROWS_OR_BYTES"))
+
+    def test_real_rows_still_parse(self) -> None:
+        import json
+
+        from trimbin_agents.tools.clickhouse_mcp import _rows_from
+
+        rows = [{"clip_id": "abc", "outcome": "selected"}]
+        assert _rows_from(self._block(json.dumps(rows))) == rows
+
+    def test_a_genuinely_empty_result_is_still_empty(self) -> None:
+        """The distinction only helps if both sides of it work."""
+        from trimbin_agents.tools.clickhouse_mcp import _rows_from
+
+        assert _rows_from(self._block("[]")) == []
+
+    def test_text_that_is_neither_is_reported_not_raised(self) -> None:
+        """An unfamiliar shape is a bug in this parser, not a failed query. It
+        degrades to empty and says so in the log."""
+        from trimbin_agents.tools.clickhouse_mcp import _rows_from
+
+        assert _rows_from(self._block("some future format")) == []

@@ -179,7 +179,15 @@ def _rows_from(result: Any) -> list[dict[str, Any]]:
 
     # A list of content blocks, each carrying text. The usual shape.
     if isinstance(content, list) and content and hasattr(content[0], "text"):
-        text = content[0].text
+        text = content[0].text or ""
+
+        # The server reports a database error as plain text in the same field it
+        # uses for results. Parsed as "not JSON" and returned as an empty list,
+        # that becomes "nothing matched" — which is how a result-size limit came
+        # to look like an empty archive.
+        if text.lstrip().startswith(("Error", "Traceback")) or "DB::Exception" in text:
+            raise QueryFailed(text.strip()[:400])
+
         try:
             content = json.loads(text)
         except (ValueError, AttributeError):
