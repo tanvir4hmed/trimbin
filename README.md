@@ -252,7 +252,7 @@ Setup and required secrets: [docs/deployment.md](docs/deployment.md).
 
 ## Tests
 
-265 tests across the API and the agents. They cover the shapes that go wrong quietly:
+278 tests across the API and the agents. They cover the shapes that go wrong quietly:
 a normalisation that flattens real ratios into placeholders, a quota that returns a
 plausible integer while allowing everything through, an enum that stringifies to its class
 name and matches nothing.
