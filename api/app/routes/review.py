@@ -232,34 +232,7 @@ async def override(
     previous = next((v["clip_id"] for v in verdicts if v["outcome"] == "selected"), None)
     agreed = previous == chosen
 
-    rows = []
-    for v in verdicts:
-        is_chosen = v["clip_id"] == chosen
-        rows.append({
-            "clip_id": v["clip_id"],
-            "outcome": "selected" if is_chosen else "not_selected",
-            # The panel's score is carried forward unchanged. It is a
-            # measurement of the take, and a person disagreeing with the
-            # conclusion does not change what was measured.
-            "score": v["score"],
-            "margin": 0.0,
-            "reason": body.reason if is_chosen else "Not chosen by the editor.",
-            "reason_code": "selected.clean" if is_chosen else "behind.measurement",
-            "findings": v["findings"],
-            "criterion_names": v["criterion_names"],
-            "criterion_scores": v["criterion_scores"],
-            "safe_starts_s": v["safe_starts_s"],
-            "safe_ends_s": v["safe_ends_s"],
-            "trim_reasons": v["trim_reasons"],
-            "in_point_s": (
-                body.in_point_s if is_chosen and body.in_point_s is not None
-                else v["in_point_s"]
-            ),
-            "out_point_s": (
-                body.out_point_s if is_chosen and body.out_point_s is not None
-                else v["out_point_s"]
-            ),
-        })
+    rows = rows_for_choice(verdicts, chosen, body)
 
     await decisions_service.record(
         project_id=project_id,
@@ -290,6 +263,49 @@ async def override(
         "previously_recommended": previous,
         "now_selected": chosen,
     }
+
+
+def rows_for_choice(verdicts: list[dict], chosen: str, body: Override) -> list[dict]:
+    """One row per take, with the editor's choice marked and everything else kept.
+
+    A function rather than inline, so a test can exercise the real construction
+    instead of restating it — a restated version drifts, and the drift is
+    invisible until the archive holds two shapes of the same event.
+    """
+    rows = []
+    for v in verdicts:
+        is_chosen = v["clip_id"] == chosen
+        rows.append({
+            "clip_id": v["clip_id"],
+            "outcome": "selected" if is_chosen else "not_selected",
+            # The panel's score is carried forward unchanged. It is a
+            # measurement of the take, and a person disagreeing with the
+            # conclusion does not change what was measured. Rewriting it to
+            # justify the choice would destroy the evidence that makes the
+            # disagreement worth keeping.
+            "score": v["score"],
+            "margin": 0.0,
+            "reason": body.reason if is_chosen else "Not chosen by the editor.",
+            "reason_code": "selected.clean" if is_chosen else "behind.measurement",
+            # The findings stay. An editor who chose a take with a prop
+            # continuity problem decided to live with it, which is a different
+            # thing from the problem not being there.
+            "findings": v["findings"],
+            "criterion_names": v["criterion_names"],
+            "criterion_scores": v["criterion_scores"],
+            "safe_starts_s": v["safe_starts_s"],
+            "safe_ends_s": v["safe_ends_s"],
+            "trim_reasons": v["trim_reasons"],
+            "in_point_s": (
+                body.in_point_s if is_chosen and body.in_point_s is not None
+                else v["in_point_s"]
+            ),
+            "out_point_s": (
+                body.out_point_s if is_chosen and body.out_point_s is not None
+                else v["out_point_s"]
+            ),
+        })
+    return rows
 
 
 async def _verdicts_for(project_id: int, group_id: int, subgroup_id: int) -> list[dict]:
