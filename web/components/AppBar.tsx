@@ -125,6 +125,12 @@ export default function AppBar() {
               <Link href="/accuracy" role="menuitem">
                 How often it is right
               </Link>
+              {/* What is running and what is not earned yet. Reachable rather
+                  than buried: a status page nobody can find is the same as one
+                  that omits things. */}
+              <Link href="/demo" role="menuitem">
+                What is built, and what is not
+              </Link>
               {!identity && (
                 <Link href="/project/1" role="menuitem">
                   Look at a real project
