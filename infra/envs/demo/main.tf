@@ -216,8 +216,19 @@ resource "google_secret_manager_secret_version" "clickhouse_password" {
 # ---------------------------------------------------------------------------
 
 resource "random_password" "clickhouse_reader" {
-  length  = 32
-  special = false # ClickHouse takes it in a URL and a connection string
+  length = 32
+
+  # ClickHouse Cloud enforces a password policy and refuses one with no special
+  # character — "special = false" failed the deploy with a message about the
+  # policy rather than about Terraform, which is the useful direction.
+  #
+  # The set is restricted rather than left to the default, because this password
+  # travels in a URL and in a curl --user argument during migration. A default
+  # set includes characters that would need escaping in both, and an escaping
+  # bug in a credential path fails as "invalid password" long after the change
+  # that caused it.
+  min_special      = 2
+  override_special = "-_.~"
 }
 
 resource "google_secret_manager_secret" "clickhouse_reader_password" {
