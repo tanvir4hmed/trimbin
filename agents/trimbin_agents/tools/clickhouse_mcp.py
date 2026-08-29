@@ -121,7 +121,19 @@ class ClickHouseMCP:
     def __init__(self, session: Any = None) -> None:
         self._session = session
 
-    async def run_query(self, sql: str, project_id: int | None) -> QueryOutcome:
+    async def run_query(
+        self,
+        sql: str,
+        project_id: int | None,
+        columns: list[str] | None = None,
+    ) -> QueryOutcome:
+        """Run a statement and return rows as dicts.
+
+        `columns` is supplied by the caller because the caller wrote the SELECT
+        and therefore knows its shape. mcp-clickhouse returns positional rows
+        with no usable header, and guessing at whichever field a future version
+        puts the names in is how six rows became "nothing matched" once already.
+        """
         assert_read_only(sql)
         scope = scope_clause(project_id)
 
@@ -139,7 +151,7 @@ class ClickHouseMCP:
             raise QueryFailed(str(exc)) from exc
 
         elapsed_ms = int((time.perf_counter() - started) * 1000)
-        rows = _rows_from(result)
+        rows = _rows_from(result, columns)
 
         log.info("query returned %d rows in %dms", len(rows), elapsed_ms)
 
@@ -162,7 +174,7 @@ class ClickHouseMCP:
         return f"{sql.rstrip().rstrip(';')} LIMIT {MAX_ROWS + 1}"
 
 
-def _rows_from(result: Any) -> list[dict[str, Any]]:
+def _rows_from(result: Any, columns: list[str] | None = None) -> list[dict[str, Any]]:
     """Unwrap whatever shape the MCP response arrived in.
 
     Tolerant on purpose — the transport is not the interesting part. But an
@@ -194,7 +206,23 @@ def _rows_from(result: Any) -> list[dict[str, Any]]:
             log.warning("MCP returned text that is not JSON: %r", text[:300])
             return []
 
+    # Column names arrive beside the rows, not inside them.
+    #
+    # mcp-clickhouse returns positional rows — a list of lists — with the header
+    # in a sibling field. The first version of this looked only for a list of
+    # objects, found none, and returned empty. Six rows became "nothing matched",
+    # which is the failure this whole file is careful about.
+    # Names from the caller first. It wrote the SELECT, so it knows; anything
+    # the server volunteers is a bonus, not the source of truth.
     if isinstance(content, dict):
+        for key in ("columns", "column_names", "meta", "header"):
+            if key in content and not columns:
+                raw = content[key]
+                columns = [
+                    c.get("name") if isinstance(c, dict) else str(c) for c in raw
+                ]
+                break
+
         for key in ("rows", "data", "result", "records"):
             if key in content:
                 content = content[key]
@@ -207,10 +235,23 @@ def _rows_from(result: Any) -> list[dict[str, Any]]:
         log.warning("MCP returned an unexpected shape: %r", str(content)[:300])
         return []
 
-    rows = [r for r in content if isinstance(r, dict)]
-    if content and not rows:
-        log.warning("MCP rows were not objects: %r", str(content[:2])[:300])
-    return rows
+    if content and isinstance(content[0], dict):
+        return [r for r in content if isinstance(r, dict)]
+
+    # Positional rows. Zipped back to names where we have them; without them a
+    # row is unusable to the caller, so say that rather than returning indexes.
+    if content and isinstance(content[0], list | tuple):
+        if not columns:
+            log.warning(
+                "MCP returned positional rows with no column names: %r",
+                str(content[0])[:200],
+            )
+            return []
+        return [dict(zip(columns, row, strict=False)) for row in content]
+
+    if content:
+        log.warning("MCP rows were an unfamiliar type: %r", str(content[:2])[:300])
+    return []
 
 
 class ReaderMissing(RuntimeError):

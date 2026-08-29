@@ -50,6 +50,21 @@ log = logging.getLogger(__name__)
 # hundred rows has been handed the problem back.
 HARD_LIMIT = 100
 
+# The shape of every statement this module builds, in order.
+#
+# Kept beside the SELECT it describes and passed to MCP, which returns positional
+# rows with no usable header. Reading names out of the response instead is how a
+# six-row result once became "nothing matched" — the parser looked for objects,
+# found lists, and returned empty.
+#
+# It has to match the SELECT below. A mismatch mislabels every column, which is
+# worse than an error, so the test suite asserts the two agree.
+_COLUMNS = [
+    "clip_id", "scene", "setup", "take_no", "outcome", "reason", "reason_code",
+    "decided_by", "actor", "score", "finding_codes", "finding_starts_s",
+    "duration_s", "proxy_uri", "usable_from_s", "usable_to_s", "relevance",
+]
+
 # How much a semantic match is worth beside an exact one.
 #
 # Deliberately small. Cosine similarity within one production sits between 0.91
@@ -188,7 +203,9 @@ async def _execute(
         from trimbin_agents.tools.clickhouse_mcp import ReaderMissing, session
 
         async with session() as mcp:
-            outcome = await mcp.run_query(_interpolated(sql, params), project_id)
+            outcome = await mcp.run_query(
+                _interpolated(sql, params), project_id, columns=_COLUMNS
+            )
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         log.info("search via MCP: %d rows in %dms", len(outcome.rows), elapsed_ms)
         return outcome.rows, elapsed_ms

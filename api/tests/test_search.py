@@ -16,6 +16,7 @@ regex over SQL is a filter, not a boundary.
 from __future__ import annotations
 
 import inspect
+import re
 
 import pytest
 
@@ -250,3 +251,45 @@ class TestThePlanTheModelFillsIn:
 
         assert SearchPlan().is_empty()
         assert not SearchPlan(scene=1).is_empty()
+
+
+class TestTheColumnNamesMatchTheSelect:
+    """The names are supplied by us, so they have to be right.
+
+    mcp-clickhouse returns positional rows with no usable header, so the caller
+    zips its own names onto them. That is correct — the caller wrote the SELECT
+    — but it means a mismatch mislabels every column silently rather than
+    failing, which is worse than an error.
+
+    Reading them out of the response instead is what shipped first: the parser
+    looked for objects, found lists, returned empty, and six rows became
+    "nothing matched".
+    """
+
+    @staticmethod
+    def _aliases(sql: str) -> list[str]:
+        """The AS names in the SELECT, in order."""
+        select = sql[sql.index("SELECT") : sql.index("FROM decisions")]
+        return re.findall(r"\bAS\s+(\w+)", select)
+
+    def test_every_selected_column_is_named(self) -> None:
+        sql, _ = sql_for({})
+        assert self._aliases(sql) == search._COLUMNS
+
+    def test_the_count_matches(self) -> None:
+        sql, _ = sql_for({})
+        assert len(self._aliases(sql)) == len(search._COLUMNS)
+
+    def test_it_holds_with_every_filter_on(self) -> None:
+        """The relevance expression changes shape when text or an embedding is
+        present. The alias must not move with it."""
+        sql, _ = sql_for(
+            {"text": "boom", "scene": 1, "outcome": "not_selected", "semantic": "wide"},
+            [0.1] * 768,
+        )
+        assert self._aliases(sql) == search._COLUMNS
+
+    def test_clip_id_comes_first(self) -> None:
+        """Everything downstream keys on it. If the order drifts, this is the
+        one that turns a result into somebody else's take."""
+        assert search._COLUMNS[0] == "clip_id"
