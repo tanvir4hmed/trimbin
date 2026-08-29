@@ -88,6 +88,10 @@ async def sweep_sandbox(
 
     expired = await sandbox.expired_clips()
     if not expired:
+        # Logged, not silent. "The sweep ran and found nothing" and "the sweep
+        # never ran" produce the same empty log otherwise, which is exactly the
+        # silence that lets a broken schedule sit unnoticed for weeks.
+        log.info("sandbox sweep: nothing past its keep-by date")
         return {"status": "nothing_to_do", "removed": 0}
 
     removed, failed = 0, 0
