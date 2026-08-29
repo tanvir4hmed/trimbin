@@ -45,12 +45,25 @@ resource "google_cloud_scheduler_job" "sandbox_retention" {
   }
 
   http_target {
-    uri         = "${google_cloud_run_v2_service.api.uri}/maintenance/sandbox-retention"
+    # Through the load balancer, like every other caller. The service's own
+    # generated URL cannot be referenced from inside its own definition, and
+    # routing maintenance differently from everything else would mean one more
+    # path that is only exercised at 3am.
+    uri         = "https://${var.domain}/api/maintenance/sandbox-retention"
     http_method = "POST"
+
+    # A body, so the request carries a Content-Length. The load balancer
+    # answers a POST without one with a 411 before it reaches the service, and
+    # that failure looks like the route being broken rather than the request
+    # being malformed.
+    headers = {
+      "Content-Type" = "application/json"
+    }
+    body = base64encode("{}")
 
     oidc_token {
       service_account_email = google_service_account.scheduler.email
-      audience              = google_cloud_run_v2_service.api.uri
+      audience              = "https://${var.domain}"
     }
   }
 }

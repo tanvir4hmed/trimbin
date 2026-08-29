@@ -172,9 +172,14 @@ resource "google_cloud_run_v2_service" "api" {
         name  = "TRIMBIN_SCHEDULER_SERVICE_ACCOUNT"
         value = google_service_account.scheduler.email
       }
+      # The domain, not the service's own URL. Referencing
+      # google_cloud_run_v2_service.api.uri from inside the api service is a
+      # cycle Terraform refuses, and the scheduler calls through the load
+      # balancer anyway — so both sides derive this from var.domain and neither
+      # has to know the other's generated address.
       env {
         name  = "TRIMBIN_SCHEDULER_AUDIENCE"
-        value = google_cloud_run_v2_service.api.uri
+        value = "https://${var.domain}"
       }
 
       # Injected at start, never baked into the image and never in an env file
