@@ -47,6 +47,23 @@ terraform apply
 
 The output prints exactly what to paste into GitHub secrets.
 
+**Fill in `billing_account_id`.** Left empty, the budget guard's `count` is zero
+and no guard is created — nothing watches spend, silently. It was empty here for
+weeks beside a comment claiming the alerting lived somewhere else; it did not.
+
+```
+billing_account_id = "01BF97-E4E92D-6319C7"   # gcloud billing accounts list
+monthly_budget_usd = 100                      # alerts at 50%, 80%, 100%
+```
+
+`terraform.tfvars` is gitignored, so this has to be re-entered on a fresh
+machine and there is nothing in the repository to remind you. That is what this
+paragraph is for.
+
+The guard also needs `billingbudgets.googleapis.com`, which bootstrap enables —
+but the API takes a minute to propagate, so a first apply can fail on it and
+succeed on the second. That is the API waking, not a misconfiguration.
+
 ### 3. ClickHouse credentials
 
 In the ClickHouse Cloud console: **Organization → API Keys → New key**. Grant it

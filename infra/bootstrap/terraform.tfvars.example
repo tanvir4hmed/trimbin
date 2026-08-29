@@ -8,7 +8,13 @@ project_id        = "trimbin-xxxxx"
 region            = "us-central1"
 github_repository = "tanvir4hmed/trimbin"
 
-# Optional. Leave empty to skip the budget guard — it needs billing-account-level
+# Not optional in practice, whatever "optional" suggests.
+#
+# Empty means count = 0 and no budget guard exists — nothing watches spend, and
+# nothing says so. This sat empty for weeks beside a comment claiming the
+# alerting was set elsewhere. It was not.
+#
+# Needs billing-account-level
 # permission, which not every account has. Find the id with:
 #   gcloud billing accounts list
 billing_account_id = ""
