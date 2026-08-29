@@ -75,6 +75,7 @@ jobs:
         run: |
           echo "registry=$(terraform output -raw artifact_registry)" >> "$GITHUB_OUTPUT"
           echo "ch_host=$(terraform output -json clickhouse_endpoints | jq -r '.https.host')" >> "$GITHUB_OUTPUT"
+          echo "ch_reader_secret=$(terraform output -raw clickhouse_reader_secret)" >> "$GITHUB_OUTPUT"
 
       # -- schema -----------------------------------------------------------
       # After the database exists, before anything deploys that reads from it.
@@ -85,6 +86,13 @@ jobs:
           CLICKHOUSE_URL: https://${{ steps.tf.outputs.ch_host }}:8443
           CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
         run: |
+          # The read-only user's password comes from Secret Manager, where
+          # Terraform generated it. Not a GitHub secret: nobody types this one,
+          # and a credential that exists in two places is a credential that gets
+          # rotated in one.
+          CLICKHOUSE_READER_PASSWORD=$(gcloud secrets versions access latest             --secret="${{ steps.tf.outputs.ch_reader_secret }}" 2>/dev/null || true)
+          export CLICKHOUSE_READER_PASSWORD
+
           chmod +x migrate.sh
           ./migrate.sh
 

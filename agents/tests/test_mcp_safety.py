@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import pytest
 
+from trimbin_agents.config import settings
 from trimbin_agents.tools.clickhouse_mcp import (
+    ReaderMissing,
     ClickHouseMCP,
     UnsafeQuery,
     assert_read_only,
@@ -108,10 +110,57 @@ class TestLimits:
 
 
 class TestServerEnvironment:
-    def test_write_access_is_disabled_explicitly(self) -> None:
+    """What the MCP server process is started with.
+
+    The important assertion is the one about *which user*. This file's first
+    version tested only the write flags, beside a module comment claiming a
+    read-only database user was the primary defence — there was no such user and
+    no test asked for one, so the claim went unchallenged for weeks.
+    """
+
+    @staticmethod
+    def _with_reader(monkeypatch):
+        monkeypatch.setattr(settings, "clickhouse_reader_user", "trimbin_reader")
+        monkeypatch.setattr(settings, "clickhouse_reader_password", "secret")
+        monkeypatch.setattr(settings, "clickhouse_user", "default")
+        monkeypatch.setattr(settings, "clickhouse_password", "admin-secret")
+
+    def test_write_access_is_disabled_explicitly(self, monkeypatch) -> None:
         """Set rather than left to the default. A default is someone else's
         decision and can change between versions; this one is ours and is
         visible in the diff when it changes."""
+        self._with_reader(monkeypatch)
         env = server_env()
         assert env["CLICKHOUSE_ALLOW_WRITE_ACCESS"] == "false"
         assert env["CLICKHOUSE_ALLOW_DROP"] == "false"
+
+    def test_it_connects_as_the_reader_not_the_admin(self, monkeypatch) -> None:
+        """The boundary. Everything else in this module is a courtesy."""
+        self._with_reader(monkeypatch)
+        env = server_env()
+        assert env["CLICKHOUSE_USER"] == "trimbin_reader"
+        assert env["CLICKHOUSE_PASSWORD"] == "secret"
+
+    def test_the_admin_password_never_appears(self, monkeypatch) -> None:
+        """A read-only user sharing the admin credential is a label, not a
+        boundary."""
+        self._with_reader(monkeypatch)
+        assert "admin-secret" not in server_env().values()
+
+    def test_no_reader_means_no_server(self, monkeypatch) -> None:
+        """Refusing is the point. Falling back to the admin connection would
+        give a model-written statement write access, silently — which is how the
+        previous version of this module came to claim a protection it did not
+        have."""
+        monkeypatch.setattr(settings, "clickhouse_reader_user", "")
+        monkeypatch.setattr(settings, "clickhouse_reader_password", "")
+
+        with pytest.raises(ReaderMissing):
+            server_env()
+
+    def test_half_a_credential_is_no_credential(self, monkeypatch) -> None:
+        monkeypatch.setattr(settings, "clickhouse_reader_user", "trimbin_reader")
+        monkeypatch.setattr(settings, "clickhouse_reader_password", "")
+
+        with pytest.raises(ReaderMissing):
+            server_env()

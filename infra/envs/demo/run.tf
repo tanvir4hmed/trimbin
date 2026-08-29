@@ -194,6 +194,23 @@ resource "google_cloud_run_v2_service" "api" {
         }
       }
 
+      # The credentials MCP connects with. A separate user with SELECT and
+      # nothing else, so a statement a model wrote cannot do anything a reader
+      # could not — enforced by the server rather than by a pattern match.
+      env {
+        name  = "TRIMBIN_CLICKHOUSE_READER_USER"
+        value = "trimbin_reader"
+      }
+      env {
+        name = "TRIMBIN_CLICKHOUSE_READER_PASSWORD"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.clickhouse_reader_password.secret_id
+            version = "latest"
+          }
+        }
+      }
+
       # Liveness only, and deliberately not touching the database: a check that
       # fails when a dependency is slow takes the service down for a problem it
       # could have survived.

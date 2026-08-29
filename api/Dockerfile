@@ -47,12 +47,36 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
+# uv, for uvx — how the official mcp-clickhouse server is launched.
+#
+# Copied from the published image rather than installed by piping a script from
+# the internet: a build step that curls and executes runs whatever that URL
+# serves on the day, which is not a thing to do in an image holding database
+# credentials.
+COPY --from=ghcr.io/astral-sh/uv:0.5 /uv /uvx /usr/local/bin/
+
+# A cache outside the runtime user's home, so it can be populated at build time
+# and read afterwards. A comment cannot live inside a multi-line ENV — Docker
+# treats the whole thing as one instruction — hence this sitting above it.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=8080
+    PORT=8080 \
+    UV_CACHE_DIR=/opt/uv-cache
+
+# mcp-clickhouse, fetched now rather than on the first search. uvx would
+# otherwise download it inside the request that needs it, on a service that
+# scales to zero — so the first person to ask a question waits for an install.
+#
+# `|| true` because --help exiting non-zero is not a build failure; the point of
+# the line is the download it leaves behind.
+RUN mkdir -p /opt/uv-cache \
+    && uvx mcp-clickhouse --help >/dev/null 2>&1 || true
 
 # Never root. A compromised process should not be able to write to its own image.
-RUN useradd --create-home --shell /usr/sbin/nologin trimbin
+# The cache is handed over with it, or every invocation re-downloads.
+RUN useradd --create-home --shell /usr/sbin/nologin trimbin \
+    && chown -R trimbin:trimbin /opt/uv-cache
+
 WORKDIR /app
 
 COPY --from=build /install /usr/local

@@ -19,6 +19,9 @@ dependencies = [
     "google-genai>=1.0.0",
     "pydantic>=2.9.0",
     "pydantic-settings>=2.5.0",
+    # The MCP client. Every search reaches ClickHouse through the official
+    # mcp-clickhouse server, which this speaks to over stdio.
+    "mcp>=1.0.0",
 ]
 
 [project.optional-dependencies]

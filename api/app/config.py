@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     clickhouse_host: str = ""
     clickhouse_port: int = 8443
     clickhouse_user: str = "default"
+
+    # What MCP connects as. A separate user with SELECT and nothing else, so a
+    # statement a model wrote cannot do anything a reader could not — enforced
+    # at the server, not by a pattern match on the way in.
+    clickhouse_reader_user: str = ""
+    clickhouse_reader_password: str = ""
     clickhouse_password: str = ""
 
     # ---- storage ----------------------------------------------------------

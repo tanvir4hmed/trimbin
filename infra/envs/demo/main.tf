@@ -203,6 +203,49 @@ resource "google_secret_manager_secret_version" "clickhouse_password" {
 }
 
 # ---------------------------------------------------------------------------
+# The read-only database user.
+#
+# The MCP server hands model-written statements to ClickHouse, and the track
+# requires it at runtime. What makes that safe is not the keyword regex in the
+# wrapper — a regex over SQL is a filter, not a boundary — but a user that
+# cannot write whatever statement arrives.
+#
+# The password is generated here and never leaves Secret Manager. It is a
+# different credential from the admin one on purpose: sharing them would make
+# the read-only user a label rather than a boundary.
+# ---------------------------------------------------------------------------
+
+resource "random_password" "clickhouse_reader" {
+  length  = 32
+  special = false # ClickHouse takes it in a URL and a connection string
+}
+
+resource "google_secret_manager_secret" "clickhouse_reader_password" {
+  secret_id = "${local.name}-clickhouse-reader-password"
+  labels    = local.labels
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "clickhouse_reader_password" {
+  secret      = google_secret_manager_secret.clickhouse_reader_password.id
+  secret_data = random_password.clickhouse_reader.result
+}
+
+resource "google_secret_manager_secret_iam_member" "api_clickhouse_reader" {
+  secret_id = google_secret_manager_secret.clickhouse_reader_password.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.api.email}"
+}
+
+output "clickhouse_reader_secret" {
+  value       = google_secret_manager_secret.clickhouse_reader_password.secret_id
+  description = "Secret Manager id holding the read-only ClickHouse password."
+}
+
+# ---------------------------------------------------------------------------
 # Pub/Sub — the workflow spine.
 #
 # A shoot day is 200 clips and an hour of work with failures in the middle.

@@ -146,6 +146,14 @@ resource "google_cloud_run_v2_service" "worker" {
         }
       }
 
+      # The worker does not search, but it shares this image with the API and a
+      # container that cannot start because half its configuration is missing is
+      # a worse failure than an unused variable.
+      env {
+        name  = "TRIMBIN_CLICKHOUSE_READER_USER"
+        value = "trimbin_reader"
+      }
+
       startup_probe {
         http_get {
           path = "/health"

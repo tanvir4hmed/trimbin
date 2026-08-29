@@ -1,19 +1,30 @@
-"""The ClickHouse MCP client, read-only by contract.
+"""The ClickHouse MCP client, read-only for real this time.
 
-`CLICKHOUSE_ALLOW_WRITE_ACCESS` stays false and this module never sets it. A
-language model with write access to a production database is one prompt injection
-away from a destructive query, and the input here is a question typed by a person
-plus footage a camera was pointed at — both untrusted by definition.
+Every search an editor runs goes through the official `mcp-clickhouse` server,
+which is how the ClickHouse track requires the database to be used at runtime.
 
-Writes go through the typed service layer instead, where a schema decides what is
-legal. The requirement to use MCP at runtime is met the way it should be: every
-search an editor runs goes through this.
+This file once opened with the same claim and did not earn it. It said a
+read-only database user was the primary defence and the keyword regex below was
+a convenience; there was no read-only user, the connection was the admin one,
+and the regex was the only thing between a model-written statement and the
+production archive. A regex over SQL is a filter, not a boundary — a subquery, a
+comment splicing a keyword, a function whose name contains a forbidden word are
+all ordinary SQL and none of them are what the pattern was written for.
 
-Defence in depth, because a read-only server is one flag away from not being one:
+The user now exists. `trimbin_reader` holds SELECT on ten named objects and
+nothing else, under a profile with `readonly = 1 CONST` — const so it cannot be
+turned off mid-session, which is the difference between a setting and a
+guarantee. See `clickhouse/migrations/011_readonly_user.sql`.
 
-  * the connection is opened with a read-only user
-  * the statement is checked before it is sent
-  * the scope filter is applied by us, not asked for in the prompt
+So the layers, in the order they actually stop something:
+
+  1. the server refuses anything but SELECT, whatever statement arrives
+  2. the grant limits which objects a SELECT can even name
+  3. the scope filter is appended by us and never asked for in the prompt
+  4. the regex rejects the obvious before it costs a round trip
+
+Only the first two are boundaries. The other two are courtesies, and this file
+now says which is which.
 """
 
 from __future__ import annotations
@@ -21,6 +32,8 @@ from __future__ import annotations
 import logging
 import re
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
 
@@ -28,23 +41,13 @@ from ..config import settings
 
 log = logging.getLogger(__name__)
 
-# Rejected before anything reaches the server.
+# Rejected before anything reaches the server — the fourth layer, and the least
+# important one.
 #
-# This comment used to say the read-only database user was the primary defence
-# and that these patterns merely produced a legible error. There is no read-only
-# user: the connection is the admin one, and this regex was the only thing
-# between a model and the production archive.
-#
-# A regex over SQL is a filter, not a boundary. A subquery, a comment splicing a
-# keyword, a function whose name contains a forbidden word — all ordinary SQL,
-# none of it what the pattern was written for.
-#
-# So nothing in the product sends model-written SQL any more. Retrieval runs
-# through api/app/services/search.py, where the query shape is fixed and the
-# model supplies only parameters. This wrapper is kept for exploratory use by a
-# person at a terminal, which is a different threat model entirely, and it
-# should not be wired to a route without a genuinely read-only user existing
-# first.
+# Its job is a legible error and a saved round trip, not safety. The reader user
+# and its grants are what actually stop a write; this catches the obvious cases
+# early so the log says "DROP is not permitted" rather than surfacing a
+# permissions failure three layers down.
 _FORBIDDEN = re.compile(
     r"\b(INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER|CREATE|GRANT|REVOKE|ATTACH|DETACH|OPTIMIZE|SYSTEM)\b",
     re.IGNORECASE,
@@ -181,18 +184,60 @@ def _rows_from(result: Any) -> list[dict[str, Any]]:
     return [r for r in content if isinstance(r, dict)] if isinstance(content, list) else []
 
 
+class ReaderMissing(RuntimeError):
+    """No read-only user is configured, so MCP will not be started.
+
+    Refusing is the point. Falling back to the admin credentials would give a
+    model-written statement write access to the archive, and it would do so
+    silently — which is how the previous version of this file came to claim a
+    protection that did not exist.
+    """
+
+
 def server_env() -> dict[str, str]:
     """Environment for the MCP server process.
 
-    The write flags are set to false explicitly rather than left to the default.
-    A default is a decision someone else made and can change; this one is ours
-    and is visible in the code.
+    Connects as `trimbin_reader`, never as the admin user. The write flags are
+    set false explicitly rather than left to a default: a default is a decision
+    somebody else made and can change, and this one is ours and visible.
     """
+    if not (settings.clickhouse_reader_user and settings.clickhouse_reader_password):
+        raise ReaderMissing(
+            "TRIMBIN_CLICKHOUSE_READER_USER/PASSWORD are unset. MCP is not "
+            "started without them — the admin connection is not a fallback."
+        )
+
     return {
-        "CLICKHOUSE_HOST": settings.clickhouse_url,
-        "CLICKHOUSE_USER": settings.clickhouse_user,
-        "CLICKHOUSE_PASSWORD": settings.clickhouse_password,
+        "CLICKHOUSE_HOST": settings.clickhouse_host,
+        "CLICKHOUSE_PORT": str(settings.clickhouse_port),
+        "CLICKHOUSE_SECURE": "true",
+        "CLICKHOUSE_USER": settings.clickhouse_reader_user,
+        "CLICKHOUSE_PASSWORD": settings.clickhouse_reader_password,
         "CLICKHOUSE_ALLOW_WRITE_ACCESS": "false",
         "CLICKHOUSE_ALLOW_DROP": "false",
         "CLICKHOUSE_MCP_QUERY_TIMEOUT": str(QUERY_TIMEOUT_S),
     }
+
+
+@asynccontextmanager
+async def session() -> AsyncIterator[ClickHouseMCP]:
+    """Start the official mcp-clickhouse server and talk to it over stdio.
+
+    Per request rather than held open. The API scales to zero and a subprocess
+    owned by an instance that may be stopped mid-query is a leak with a delay on
+    it; starting one costs a few hundred milliseconds against a search that
+    already waits on a model.
+    """
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+
+    params = StdioServerParameters(
+        command="uvx",
+        args=["--quiet", "mcp-clickhouse"],
+        env=server_env(),
+    )
+
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as mcp:
+            await mcp.initialize()
+            yield ClickHouseMCP(session=mcp)

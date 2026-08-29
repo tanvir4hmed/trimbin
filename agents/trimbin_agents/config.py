@@ -97,6 +97,15 @@ class Settings(BaseSettings):
 
     # ---- clickhouse -------------------------------------------------------
     clickhouse_url: str = ""
+    clickhouse_host: str = ""
+    clickhouse_port: int = 8443
+
+    # What MCP connects as. Never the admin user: a statement a model wrote
+    # should not be able to do anything a reader could not, and that has to be
+    # enforced by the server rather than by the pattern match in
+    # tools/clickhouse_mcp.py.
+    clickhouse_reader_user: str = ""
+    clickhouse_reader_password: str = ""
     clickhouse_user: str = "default"
     clickhouse_password: str = ""
 

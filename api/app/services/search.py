@@ -13,15 +13,33 @@ about anything anyone wrote. Weakest of the three and used accordingly; the
 misplacement eval showed that within one production every clip resembles every
 other, so this narrows and never decides.
 
-The query shape is fixed here and the model supplies only parameters. That is a
-departure from the plan, which had the Archivist writing SQL through MCP — see
-`contracts/search.py` for why, and for the comment that turned out to name a
-protection nobody had built.
+Two things are true at once here and it is worth separating them.
+
+**The statement is built by us**, from parameters the model chose. The model does
+not write SQL. That was a response to finding the MCP wrapper's safety check
+resting on a keyword regex beside a comment claiming a read-only user existed —
+it did not.
+
+**The statement is executed through the official `mcp-clickhouse` server**, as
+the ClickHouse track requires the database to be used at runtime, and the
+read-only user the comment described now exists: SELECT on ten named objects,
+under a profile with `readonly = 1 CONST`.
+
+Those are different questions. Who composes the statement is about correctness —
+a fixed shape answers the questions people ask and cannot be talked into
+answering others. Who executes it, and as whom, is about blast radius. Doing
+both properly costs nothing and the earlier version did neither.
+
+The direct client remains as a fallback for one case: the MCP subprocess failing
+to start. A search that cannot run should say so, but a search that falls back
+to a path with the same guarantees is better than an error page — and the
+guarantees are the same because the statement was already ours.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from .analytics import client
@@ -144,9 +162,43 @@ async def run(
         LIMIT {{limit:UInt16}}
     """
 
-    ch = await client()
+    rows, elapsed_ms = await _execute(sql, params, project_id)
+    return rows, _readable(sql), elapsed_ms
+
+
+async def _execute(
+    sql: str, params: dict[str, Any], project_id: int
+) -> tuple[list[dict], int]:
+    """Run the statement through MCP, falling back to the direct client.
+
+    MCP first, because that is how this project is required to reach ClickHouse
+    at runtime and because the reader user it connects as is a real boundary.
+    The direct client is used only when the subprocess will not start.
+
+    The fallback is honest rather than convenient: the statement is identical
+    and was composed here either way, so nothing about what runs changes — only
+    which connection carries it. It is logged, because a deployment silently
+    never using MCP is exactly the kind of thing that goes unnoticed for weeks.
+    """
     import time
 
+    started = time.perf_counter()
+
+    try:
+        from trimbin_agents.tools.clickhouse_mcp import ReaderMissing, session
+
+        async with session() as mcp:
+            outcome = await mcp.run_query(_interpolated(sql, params), project_id)
+        elapsed_ms = int((time.perf_counter() - started) * 1000)
+        log.info("search via MCP: %d rows in %dms", len(outcome.rows), elapsed_ms)
+        return outcome.rows, elapsed_ms
+
+    except ReaderMissing as exc:
+        log.error("MCP not started: %s", exc)
+    except Exception:
+        log.exception("MCP query failed; falling back to the direct client")
+
+    ch = await client()
     started = time.perf_counter()
     result = await ch.query(sql, parameters=params)
     elapsed_ms = int((time.perf_counter() - started) * 1000)
@@ -154,9 +206,34 @@ async def run(
     rows = [
         dict(zip(result.column_names, row, strict=True)) for row in result.result_rows
     ]
-    log.info("search returned %d rows in %dms", len(rows), elapsed_ms)
+    log.info("search via the direct client: %d rows in %dms", len(rows), elapsed_ms)
+    return rows, elapsed_ms
 
-    return rows, _readable(sql), elapsed_ms
+
+def _interpolated(sql: str, params: dict[str, Any]) -> str:
+    """Substitute our own parameters, because MCP takes a statement not a binding.
+
+    Safe only because every value here was produced by us or validated by a
+    pydantic contract before it arrived: integers are cast, enums come from a
+    closed taxonomy, and the one free-text field is escaped below.
+
+    That is a narrower claim than "this escapes SQL properly", and the narrowness
+    is the point. Nothing arbitrary reaches this function.
+    """
+    out = sql
+    for name, value in params.items():
+        if isinstance(value, bool):
+            literal = "1" if value else "0"
+        elif isinstance(value, int | float):
+            literal = str(value)
+        elif isinstance(value, list):
+            literal = "[" + ",".join(str(float(v)) for v in value) + "]"
+        else:
+            literal = "'" + str(value).replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+        # The placeholder carries its type, e.g. {text:String}.
+        out = re.sub(r"\{" + re.escape(name) + r":[A-Za-z0-9()]+\}", literal, out)
+    return out
 
 
 async def widen(project_id: int, plan: dict[str, Any]) -> tuple[list[dict], str, int]:
