@@ -121,3 +121,18 @@ output "team_passes_secret" {
   description = "gcloud secrets versions access latest --secret=<this>"
   value       = google_secret_manager_secret.team_passes.secret_id
 }
+
+# The deployer reads the guest password too.
+#
+# Not a widening worth worrying about: this value is printed on the sign-in form
+# by design. The build needs it because NEXT_PUBLIC_* is inlined into the bundle
+# at build time rather than read at runtime, and without this grant the build
+# silently produced an empty one — the form worked and simply never filled
+# itself in, which is the failure mode that looks like nothing happening.
+#
+# The team passwords are deliberately not granted here. Those are credentials.
+resource "google_secret_manager_secret_iam_member" "deployer_guest_pass" {
+  secret_id = google_secret_manager_secret.guest_pass.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:trimbin-deployer@${var.project_id}.iam.gserviceaccount.com"
+}

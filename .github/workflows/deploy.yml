@@ -142,6 +142,12 @@ jobs:
             --secret="trimbin-guest-pass" \
             --project="${{ secrets.GCP_PROJECT_ID }}" 2>/dev/null || echo "")
 
+          if [ -z "$GUEST_PASS" ]; then
+            echo "::warning::guest pass unreadable - the sign-in form will not fill itself in"
+          else
+            echo "guest pass read (${#GUEST_PASS} chars)"
+          fi
+
           docker build \
             --build-arg NEXT_PUBLIC_OAUTH_CLIENT_ID="${{ secrets.OAUTH_CLIENT_ID }}" \
             --build-arg NEXT_PUBLIC_TRIAL_PASS="$GUEST_PASS" \
