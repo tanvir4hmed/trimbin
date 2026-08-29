@@ -215,7 +215,17 @@ async def current_principal(request: Request) -> Principal:
     # Tried before Google rather than after, because a Google verification is a
     # network call and failing one on every pass-issued request would put a
     # round trip in front of every action a guest takes.
-    if "." in token and not token.startswith("ey"):
+    #
+    # Told apart by segment count: a JWT is header, payload and signature; ours
+    # is payload and signature, because there is no algorithm to negotiate when
+    # only one side ever signs.
+    #
+    # The first version tested `not token.startswith("ey")`, on the belief that
+    # only a JWT begins that way. Both do — base64 of a JSON object starting
+    # `{"` is `ey` whatever follows — so every pass token was skipped here and
+    # then rejected by Google, and a sign-in that returned a perfectly good
+    # token produced a caller the API considered anonymous.
+    if token.count(".") == 1:
         try:
             session = sessions.verify(token)
         except sessions.NotConfigured:

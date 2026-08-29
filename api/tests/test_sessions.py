@@ -200,3 +200,65 @@ class TestWhatTheInterfaceIsTold:
         rendered = str(sessions.available())
         assert GUEST not in rendered
         assert "lead-code-xyz" not in rendered
+
+
+class TestTheTokenReachesThePrincipal:
+    """Minting a good token and then not accepting it.
+
+    The gap this closes was invisible from either side: `/auth/pass` returned a
+    correctly signed token with the right role, and `/me` said the caller was
+    anonymous. Nothing errored anywhere.
+
+    The cause was the test that decided which kind of token had arrived —
+    `not token.startswith("ey")`, on the belief that only a JWT begins that way.
+    Both do: base64 of a JSON object starting `{"` is `ey` whatever follows. So
+    every pass token was handed to Google's verifier, which correctly refused it.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_minted_token_is_accepted(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from app import auth
+
+        monkeypatch.setattr(auth.settings, "session_secret", SECRET)
+        monkeypatch.setattr(auth.settings, "guest_pass", GUEST)
+        monkeypatch.setattr(auth.settings, "team_passes", TEAM)
+
+        token = sessions.mint(sessions.redeem(members.LEAD_EDITOR, "lead-code-xyz"))
+
+        class Req:
+            headers = {"Authorization": f"Bearer {token}"}
+
+        principal = await auth.current_principal(Req())
+        assert principal.email == members.LEAD_EDITOR
+        assert principal.role == "lead"
+
+    def test_our_token_looks_like_a_jwt_at_the_front(self) -> None:
+        """The specific assumption that was wrong, pinned so nobody re-derives
+        it. If this ever stops being true the discriminator can go back to a
+        prefix — but it will not, because both formats are base64 of JSON."""
+        token = sessions.mint(sessions.redeem("Alex", GUEST))
+        assert token.startswith("ey")
+
+    def test_our_token_has_two_segments_and_a_jwt_has_three(self) -> None:
+        """What is actually load-bearing."""
+        assert sessions.mint(sessions.redeem("Alex", GUEST)).count(".") == 1
+
+    @pytest.mark.asyncio
+    async def test_a_three_segment_token_is_left_for_google(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Ours must not try to verify a JWT, or a real Google sign-in would be
+        refused by the wrong verifier once an OAuth client exists."""
+        from app import auth
+
+        monkeypatch.setattr(auth.settings, "session_secret", SECRET)
+        monkeypatch.setattr(auth.settings, "oauth_client_id", "")
+
+        class Req:
+            headers = {"Authorization": "Bearer eyJhbGc.eyJlbWFpbA.c2ln"}
+
+        # No OAuth client configured, so it falls through to anonymous rather
+        # than being mistaken for one of ours.
+        assert (await auth.current_principal(Req())).is_anonymous
