@@ -134,8 +134,17 @@ jobs:
         working-directory: web
         run: |
           IMAGE="${{ steps.tf.outputs.registry }}/web"
+
+          # Terraform generated the guest password; the sign-in form shows it,
+          # so it has to reach the bundle at build time. Empty is survivable —
+          # the form still works, it just does not fill itself in.
+          GUEST_PASS=$(gcloud secrets versions access latest \
+            --secret="trimbin-guest-pass" \
+            --project="${{ secrets.GCP_PROJECT_ID }}" 2>/dev/null || echo "")
+
           docker build \
             --build-arg NEXT_PUBLIC_OAUTH_CLIENT_ID="${{ secrets.OAUTH_CLIENT_ID }}" \
+            --build-arg NEXT_PUBLIC_TRIAL_PASS="$GUEST_PASS" \
             -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" .
           docker push "$IMAGE:${{ github.sha }}"
           docker push "$IMAGE:latest"

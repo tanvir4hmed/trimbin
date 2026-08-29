@@ -24,6 +24,7 @@ from .routes import (
     review,
     scenes,
     session,
+    structure,
     uploads,
 )
 from .services import analytics
@@ -66,7 +67,7 @@ app.add_middleware(
     # each would make four ways to say the same thing. It was missing when those
     # routes were added, and the failure would have been a CORS preflight
     # rejection in the browser with a working endpoint behind it.
-    allow_methods=["GET", "POST", "PUT"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -76,6 +77,7 @@ app.include_router(dashboard.router)
 app.include_router(uploads.router)
 app.include_router(review.router)
 app.include_router(scenes.router)
+app.include_router(structure.router)
 app.include_router(projects.router)
 app.include_router(maintenance.router)
 app.include_router(ask.router)

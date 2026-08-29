@@ -83,11 +83,8 @@ export default function ShotBrief({
         <>
           {brief.is_empty ? (
             <p className="hint">
-              Nothing here. The comparison works without it — it notices that a
-              take stops mid-sentence by seeing the others finish. Written down,
-              it can check against what was planned instead of against the
-              majority, which is the only way to catch a shot where every take
-              drifted the same way.
+              Optional. With it, the panel checks against intent rather than
+              against the majority.
             </p>
           ) : (
             <dl className="brief-fields">
@@ -207,9 +204,7 @@ export default function ShotBrief({
           </label>
 
           <p className="hint small">
-            Saving does not re-run the comparison — that costs a model call, and
-            a description typed one field at a time would spend it on every
-            keystroke. Press <em>Compare again</em> when you are ready.
+            Press <em>Compare again</em> for the panel to use this.
           </p>
 
           <div className="brief-actions">

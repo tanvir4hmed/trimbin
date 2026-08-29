@@ -21,8 +21,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import AskArchive from "@/components/AskArchive";
 import SceneTree from "@/components/SceneTree";
 import ShotDetail from "@/components/ShotDetail";
+import Structure from "@/components/Structure";
 import Upload from "@/components/Upload";
-import type { Me, Project, Tree } from "@/lib/api";
+import type { Me, PlannedScene, Project, Tree } from "@/lib/api";
 import { ApiError, api } from "@/lib/api";
 
 export default function ProjectPage({
@@ -42,6 +43,7 @@ export default function ProjectPage({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [plan, setPlan] = useState<PlannedScene[]>([]);
 
   const [camera, setCamera] = useState("");
   const [shootDay, setShootDay] = useState("");
@@ -117,13 +119,21 @@ export default function ProjectPage({
   // Asked rather than worked out. A page that decides whether to draw the
   // upload button by comparing an address against a list is a second
   // implementation of the permission rules, and the two will disagree.
+  const loadPlan = useCallback(() => {
+    void api
+      .plan(projectId)
+      .then((p) => setPlan(p.scenes))
+      .catch(() => setPlan([]));
+  }, [projectId]);
+
   useEffect(() => {
     void api.me().then(setMe).catch(() => setMe(null));
     void api
       .project(projectId)
       .then(setProject)
       .catch(() => setProject(null));
-  }, [projectId]);
+    loadPlan();
+  }, [projectId, loadPlan]);
 
   const teamEmails = useMemo(
     () =>
@@ -199,13 +209,9 @@ export default function ProjectPage({
             </button>
           ) : (
             me?.signed_in && (
-              // Drawn and disabled, with the reason. A missing button is a
-              // question; a disabled one with a sentence beside it is an answer.
               <span className="hint small">
-                You can comment here and overrule any call. Uploading is for the
-                editors who own this project —{" "}
-                <Link href="/projects">make your own</Link> to work on your
-                footage.
+                Read and comment only. <Link href="/dashboard">Make a project</Link>{" "}
+                to upload.
               </span>
             )
           )}
@@ -213,7 +219,22 @@ export default function ProjectPage({
       </header>
 
       {uploading && canUpload && (
-        <Upload projectId={projectId} onFinished={() => void load()} />
+        <>
+          <Structure
+            projectId={projectId}
+            scenes={plan}
+            canEdit={canCurate}
+            onChanged={loadPlan}
+          />
+          <Upload
+            projectId={projectId}
+            plan={plan}
+            onFinished={() => {
+              void load();
+              loadPlan();
+            }}
+          />
+        </>
       )}
 
       {!empty && (
@@ -291,18 +312,24 @@ export default function ProjectPage({
       {empty ? (
         <div className="empty-project">
           <h2>{filtered ? "Nothing matches those filters" : "Nothing here yet"}</h2>
-          {!filtered && (
-            <p>
-              Drop a folder of takes to begin. Every clip is measured, read and
-              compared against the others of its own shot.
-            </p>
-          )}
-          {!canUpload && !filtered && (
-            <p className="hint">
-              You are looking at this project without being able to upload into
-              it. Everything else — comments, overrides, running the comparison —
-              is open to you.
-            </p>
+          {!filtered && <p>Drop a shoot folder to begin.</p>}
+          {!filtered && canUpload && !uploading && (
+            <>
+              <Structure
+                projectId={projectId}
+                scenes={plan}
+                canEdit={canCurate}
+                onChanged={loadPlan}
+              />
+              <Upload
+                projectId={projectId}
+                plan={plan}
+                onFinished={() => {
+                  void load();
+                  loadPlan();
+                }}
+              />
+            </>
           )}
         </div>
       ) : (

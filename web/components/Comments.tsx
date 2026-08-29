@@ -156,8 +156,7 @@ export default function Comments({
 
       {shown.length === 0 ? (
         <p className="hint">
-          Nothing said about this shot yet.
-          {canComment && " Pause a take and leave a note where it happened."}
+          No notes.{canComment && " Pause a take to anchor one to a moment."}
         </p>
       ) : (
         <ul className="comment-list">

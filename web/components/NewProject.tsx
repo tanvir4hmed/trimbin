@@ -89,10 +89,8 @@ export default function NewProject({
 
       {isGuest && (
         <p className="np-limits">
-          A guest project takes {limits.scenes} scenes, up to{" "}
-          {limits.takes_per_shot} takes a shot, and clips up to{" "}
-          {limits.clip_seconds} seconds. It is kept for {limits.retention_days}{" "}
-          days. You can own {limits.projects}.
+          {limits.projects} projects · {limits.scenes} scenes · {limits.takes_per_shot}{" "}
+          takes a shot · {limits.clip_seconds}s clips · kept {limits.retention_days} days
         </p>
       )}
 

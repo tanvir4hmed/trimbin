@@ -23,7 +23,8 @@ import { api } from "@/lib/api";
 import { Identity, currentIdentity, signOut } from "@/lib/auth";
 
 const LINKS = [
-  { href: "/dashboard", label: "Dashboard" },
+  { href: "/dashboard", label: "Work" },
+  { href: "/review", label: "Review" },
   { href: "/projects", label: "Projects" },
   { href: "/archive", label: "Archive" },
   { href: "/accuracy", label: "Accuracy" },

@@ -55,6 +55,12 @@ class Job:
     started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     finished_at: datetime | None = None
     opened_by: str = ""
+    # Where the uploader said this footage belongs. Zero means they did not say
+    # and the slate decides.
+    target_scene: int = 0
+    target_shot: int = 0
+    # One entry per clip: what happened to it, and where it landed.
+    items: list[dict] = field(default_factory=list)
 
 
 async def open_job(
@@ -62,6 +68,8 @@ async def open_job(
     kind: str,
     total_items: int,
     opened_by: str,
+    target_scene: int = 0,
+    target_shot: int = 0,
 ) -> UUID:
     """Create the record before any work starts.
 
@@ -80,6 +88,9 @@ async def open_job(
         "started_at": datetime.now(UTC),
         "finished_at": None,
         "opened_by": opened_by,
+        "target_scene": target_scene,
+        "target_shot": target_shot,
+        "items": [],
     })
     log.info("job %s opened: %s, %d items", job_id, kind, total_items)
     return job_id
@@ -102,6 +113,9 @@ async def get_job(job_id: UUID) -> Job | None:
         started_at=d.get("started_at") or datetime.now(UTC),
         finished_at=d.get("finished_at"),
         opened_by=d.get("opened_by", ""),
+        target_scene=int(d.get("target_scene", 0) or 0),
+        target_shot=int(d.get("target_shot", 0) or 0),
+        items=d.get("items", []),
     )
 
 
@@ -181,6 +195,37 @@ async def record_progress(job_id: UUID, clip_id: UUID, ok: bool, reason: str = "
         )
 
 
+async def record_placement(
+    job_id: UUID,
+    clip_id: UUID,
+    filename: str,
+    scene: int,
+    shot: int,
+    take_no: int,
+    slate_raw: str,
+    confident: bool,
+    mismatch: str = "",
+) -> None:
+    """Where one clip ended up, and whether that is where it was sent.
+
+    Written per clip so the upload screen can show the grouping as it forms
+    rather than only a count. `mismatch` is empty when the slate agreed with the
+    declared target, or when nothing was declared.
+    """
+    await db().collection(COLLECTION).document(str(job_id)).update({
+        "items": firestore.ArrayUnion([{
+            "clip_id": str(clip_id),
+            "filename": filename,
+            "scene": scene,
+            "shot": shot,
+            "take_no": take_no,
+            "slate_raw": slate_raw[:120],
+            "confident": bool(confident),
+            "mismatch": mismatch,
+        }])
+    })
+
+
 async def abandon(job_id: UUID, reason: str) -> None:
     """Close a job that failed before any work could be queued.
 
@@ -211,7 +256,14 @@ async def close_empty(job_id: UUID) -> None:
     log.info("job %s closed with nothing to process", job_id)
 
 
-async def enqueue_ingest(job_id: UUID, project_id: int, clip_ids: list[UUID]) -> None:
+async def enqueue_ingest(
+    job_id: UUID,
+    project_id: int,
+    clip_ids: list[UUID],
+    filenames: dict[str, str] | None = None,
+    target_scene: int = 0,
+    target_shot: int = 0,
+) -> None:
     """One message per clip.
 
     Per clip rather than per batch so a single unreadable file cannot take the
@@ -232,6 +284,11 @@ async def enqueue_ingest(job_id: UUID, project_id: int, clip_ids: list[UUID]) ->
             job_id=str(job_id),
             clip_id=str(clip_id),
             project_id=str(project_id),
+            # Pub/Sub attributes are strings. Zero means "not declared", which
+            # the worker reads as "the slate decides".
+            target_scene=str(target_scene),
+            target_shot=str(target_shot),
+            filename=(filenames or {}).get(str(clip_id), "")[:180],
         )
 
     log.info("queued %d clips for job %s, project %d", len(clip_ids), job_id, project_id)

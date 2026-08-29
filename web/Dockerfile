@@ -20,6 +20,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ARG NEXT_PUBLIC_OAUTH_CLIENT_ID=""
 ENV NEXT_PUBLIC_OAUTH_CLIENT_ID=$NEXT_PUBLIC_OAUTH_CLIENT_ID
 
+# The guest password, shown on the sign-in form. Shared deliberately so
+# anyone can try the product: a guest reads, comments and overrules, and can
+# neither upload into our productions nor run the panel.
+ARG NEXT_PUBLIC_TRIAL_PASS=""
+ENV NEXT_PUBLIC_TRIAL_PASS=$NEXT_PUBLIC_TRIAL_PASS
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build

@@ -43,9 +43,8 @@ export default function Home() {
       <section className="door-inner">
         <h1>Which take, and why.</h1>
         <p className="lede">
-          Post-production triage for an editing company. Every take is measured,
-          compared against the others of its own shot, and the reason is kept —
-          so the question two years from now has an answer.
+          Post-production triage. Every take measured, compared within its shot,
+          and the reason kept.
         </p>
 
         <div className="door-actions">
@@ -56,21 +55,14 @@ export default function Home() {
           )}
         </div>
 
-        <p className="door-note">
-          A guest sign-in gets you a real workspace: your own projects, your own
-          footage, the same interface the editors here use. In our productions
-          you can read everything, comment on any shot, and overrule any take we
-          chose — you just cannot run the panel or upload into them.
-        </p>
-
         <p className="door-links">
-          <Link href="/project/1">Look around without signing in</Link>
+          <Link href="/project/1">Look without signing in</Link>
           <span aria-hidden>·</span>
-          <Link href="/about">What this is</Link>
+          <Link href="/about">About</Link>
           <span aria-hidden>·</span>
-          <Link href="/guide">How to use it</Link>
+          <Link href="/guide">Guide</Link>
           <span aria-hidden>·</span>
-          <Link href="/accuracy">How often it is right</Link>
+          <Link href="/accuracy">Accuracy</Link>
         </p>
       </section>
     </main>

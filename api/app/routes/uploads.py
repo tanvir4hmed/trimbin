@@ -40,6 +40,10 @@ _SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]")
 class UploadRequest(BaseModel):
     project_id: int
     filenames: list[str] = Field(min_length=1, max_length=500)
+    # Where this footage belongs, if the uploader says. Absent means read the
+    # slates and group by what they say.
+    scene: int = Field(default=0, ge=0)
+    shot: int = Field(default=0, ge=0)
 
     @field_validator("filenames")
     @classmethod
@@ -74,6 +78,9 @@ class UploadGrant(BaseModel):
 class UploadComplete(BaseModel):
     job_id: UUID
     clip_ids: list[UUID]
+    # So the upload screen can name a file rather than a uuid when something
+    # goes wrong with it.
+    filenames_by_clip: dict[str, str] | None = None
 
 
 @router.post("/grant", response_model=UploadGrant)
@@ -104,6 +111,8 @@ async def grant_upload(
         kind="ingest",
         total_items=len(request.filenames),
         opened_by=principal.email or "",
+        target_scene=request.scene,
+        target_shot=request.shot,
     )
 
     # The job exists now, so a failure from here on has to close it. Otherwise
@@ -189,7 +198,12 @@ async def complete_upload(
         await jobs.close_empty(body.job_id)
     else:
         await jobs.enqueue_ingest(
-            job_id=body.job_id, project_id=job.project_id, clip_ids=confirmed
+            job_id=body.job_id,
+            project_id=job.project_id,
+            clip_ids=confirmed,
+            filenames=body.filenames_by_clip or {},
+            target_scene=job.target_scene,
+            target_shot=job.target_shot,
         )
 
     return {
@@ -204,25 +218,66 @@ async def job_status(
     job_id: UUID,
     principal: Annotated[Principal, Depends(current_principal)],
 ) -> dict:
-    """Progress for an editor who walked away and came back.
+    """Progress, and where the footage landed.
 
-    Failures are reported alongside progress rather than hidden. Four clips that
-    could not be processed is information; a batch that quietly reports success
-    while missing four clips is a bug the editor discovers weeks later in the
-    edit, which is the worst possible time.
+    Polled by the upload screen while the workers run, so an editor can see the
+    grouping form rather than reload the page and guess. Failures are reported
+    alongside progress: four clips that could not be processed is information,
+    and a batch quietly reporting success while missing four is a bug found
+    weeks later in the edit.
     """
     job = await jobs.get_job(job_id)
     if job is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such job")
     await principal.assert_can_read(job.project_id)
 
+    # Grouped as the upload screen shows it: one row per shot the footage
+    # landed in, flagged where the slate could not be read or disagreed with
+    # where the clip was sent.
+    groups: dict[tuple[int, int], dict] = {}
+    for item in job.items:
+        key = (int(item.get("scene", 0)), int(item.get("shot", 0)))
+        group = groups.setdefault(key, {
+            "scene": key[0],
+            "shot": key[1],
+            "takes": 0,
+            "unread_slates": 0,
+            "mismatches": [],
+        })
+        group["takes"] += 1
+        if not item.get("confident"):
+            group["unread_slates"] += 1
+        if item.get("mismatch"):
+            group["mismatches"].append({
+                "filename": item.get("filename", ""),
+                "detail": item.get("mismatch", ""),
+                "slate_raw": item.get("slate_raw", ""),
+            })
+
+    for group in groups.values():
+        if group["mismatches"]:
+            group["status"] = "mismatch"
+        elif group["unread_slates"]:
+            group["status"] = "unread"
+        else:
+            group["status"] = "clean"
+
+    done = job.state in ("finished", "abandoned")
     return {
         "job_id": str(job.job_id),
         "state": job.state,
+        "done": done,
         "total": job.total_items,
         "completed": job.completed_items,
         "failed": job.failed_items,
         "failures": job.failures[:20],
+        "target": (
+            {"scene": job.target_scene, "shot": job.target_shot}
+            if job.target_scene
+            else None
+        ),
+        "groups": sorted(groups.values(), key=lambda g: (g["scene"], g["shot"])),
+        "needs_a_look": sum(1 for g in groups.values() if g["status"] != "clean"),
         "started_at": job.started_at.isoformat(),
         "finished_at": job.finished_at.isoformat() if job.finished_at else None,
     }

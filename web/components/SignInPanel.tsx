@@ -25,6 +25,10 @@ interface Options {
   password: boolean;
 }
 
+/** Published on purpose so anyone can try the product. A guest can read, comment
+ *  and overrule; they cannot upload into our productions or run the panel. */
+const TRIAL_PASS = process.env.NEXT_PUBLIC_TRIAL_PASS ?? "";
+
 export default function SignInPanel({
   onSignedIn,
 }: {
@@ -100,7 +104,7 @@ export default function SignInPanel({
               value={username}
               maxLength={80}
               autoComplete="username"
-              placeholder="your name, or your editor address"
+              placeholder="your name"
               onChange={(e) => setUsername(e.target.value)}
             />
           </label>
@@ -125,15 +129,20 @@ export default function SignInPanel({
 
           {error && <p className="error small">{error}</p>}
 
-          {/* Said before they type it, not after they lose work. For a guest the
-              username is the identity: it is what the archive records against
-              every call they make, and typing the same one tomorrow is what
-              brings them back to their own projects. */}
-          <p className="hint small">
-            Signing in as a guest? Your username is your identity here — every
-            decision you make is recorded against it, and typing the same one
-            tomorrow brings you back to your own projects.
-          </p>
+          {/* The trial credentials, on the form. A demonstration whose password
+              is somewhere else is a demonstration nobody reaches. */}
+          {TRIAL_PASS && (
+            <button
+              type="button"
+              className="try-it"
+              onClick={() => {
+                setUsername(username || "Guest");
+                setPassword(TRIAL_PASS);
+              }}
+            >
+              Try it — fills in a guest login
+            </button>
+          )}
         </form>
       )}
     </div>

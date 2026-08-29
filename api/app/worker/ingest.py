@@ -35,7 +35,55 @@ class Rejected(Exception):
         self.reason = reason
 
 
-async def process(job_id: UUID, clip_id: UUID, project_id: int) -> None:
+def place(
+    target_scene: int,
+    target_shot: int,
+    read_scene: int,
+    read_shot: int,
+    confident: bool,
+) -> tuple[int, int, str]:
+    """Where the clip goes, and whether anything disagreed.
+
+    The declared target wins. A person who dropped footage into shot 12C meant
+    12C, and moving it because a slate was misread is the one mistake that
+    silently scatters a shoot day.
+
+    But a disagreement is reported. A clip sent to 12C whose slate reads 15B is
+    usually a file from the wrong folder, and saying so at upload is the whole
+    difference between catching it now and finding it in the cut.
+
+    Only a confident reading contradicts a target. An unreadable board is not
+    evidence of anything.
+    """
+    if not target_scene:
+        return read_scene, read_shot, ""
+
+    # A scene named without a shot means "this scene, and the slate sorts the
+    # shots" — which is how a day of coverage on one scene actually arrives.
+    # Reading a zero as shot number zero would file the whole day as ungrouped.
+    shot = target_shot or read_shot
+
+    if confident and read_scene:
+        declared = (target_scene, target_shot) if target_shot else (target_scene,)
+        actual = (read_scene, read_shot) if target_shot else (read_scene,)
+        if declared != actual:
+            return (
+                target_scene,
+                shot,
+                f"slate reads scene {read_scene} shot {read_shot}",
+            )
+
+    return target_scene, shot, ""
+
+
+async def process(
+    job_id: UUID,
+    clip_id: UUID,
+    project_id: int,
+    target_scene: int = 0,
+    target_shot: int = 0,
+    filename: str = "",
+) -> None:
     """One clip, start to finish.
 
     Measurement runs before encoding, which is the largest saving in the whole
@@ -101,17 +149,26 @@ async def process(job_id: UUID, clip_id: UUID, project_id: int) -> None:
             source, work, clip_id, measurements.duration_s
         )
 
+        scene, shot, mismatch = place(
+            target_scene,
+            target_shot,
+            identity.group_id,
+            identity.subgroup_id,
+            bool(identity.slate_confident),
+        )
+        if mismatch:
+            log.warning(
+                "clip %s sent to %d/%d but %s", clip_id, target_scene, target_shot, mismatch
+            )
+
         # How many takes of this shot are already here.
         #
-        # Only knowable now: which shot a clip belongs to is what the slate read
-        # decides, and that has just happened. A guest project that has already
-        # had its five takes of 12A keeps the clip as a rejected row rather than
-        # dropping it, so the person sees the limit they were told about instead
-        # of a file that went nowhere.
-        if limits.takes_per_shot and identity.subgroup_id:
-            held = await quota.takes_in_shot(
-                project_id, identity.group_id, identity.subgroup_id
-            )
+        # Only knowable now: which shot a clip belongs to is decided just above.
+        # A guest project that already has its five takes of 12A keeps the clip
+        # as a rejected row rather than dropping it, so the person sees the
+        # limit they were told about instead of a file that went nowhere.
+        if limits.takes_per_shot and shot:
+            held = await quota.takes_in_shot(project_id, scene, shot)
             if held >= limits.takes_per_shot:
                 await clips.write_unusable(
                     project_id=project_id,
@@ -144,8 +201,8 @@ async def process(job_id: UUID, clip_id: UUID, project_id: int) -> None:
             measurements=measurements,
             proxy_uri=storage.proxy_url(f"{prefix}/proxy/index.m3u8"),
             sprite_uri=storage.proxy_url(f"{prefix}/sprite.jpg"),
-            group_id=identity.group_id,
-            subgroup_id=identity.subgroup_id,
+            group_id=scene,
+            subgroup_id=shot,
             take_no=identity.take_no,
             slate_confident=identity.slate_confident,
             slate_raw=identity.slate_raw,
@@ -153,6 +210,17 @@ async def process(job_id: UUID, clip_id: UUID, project_id: int) -> None:
             embedding=identity.embedding,
         )
 
+    await jobs.record_placement(
+        job_id=job_id,
+        clip_id=clip_id,
+        filename=filename,
+        scene=scene,
+        shot=shot,
+        take_no=identity.take_no,
+        slate_raw=identity.slate_raw,
+        confident=bool(identity.slate_confident),
+        mismatch=mismatch,
+    )
     log.info("clip %s: done", clip_id)
 
 
@@ -168,13 +236,16 @@ async def handle_message(attributes: dict[str, str]) -> bool:
     """
     job_id = UUID(attributes["job_id"])
     clip_id = UUID(attributes["clip_id"])
+    target_scene = int(attributes.get("target_scene", "0") or 0)
+    target_shot = int(attributes.get("target_shot", "0") or 0)
+    filename = attributes.get("filename", "")
     # No default. A missing project id used to become 0, which sent the download
     # to a prefix that cannot exist and produced "not found in storage" — a
     # message that blames the upload for a fault in the queue.
     project_id = int(attributes["project_id"])
 
     try:
-        await process(job_id, clip_id, project_id)
+        await process(job_id, clip_id, project_id, target_scene, target_shot, filename)
         await jobs.record_progress(job_id, clip_id, ok=True)
         return True
 

@@ -199,6 +199,49 @@ export interface Project {
   progress_pct?: number | null;
 }
 
+export interface PlannedShot {
+  shot: number;
+  slug: string;
+  description: string;
+}
+
+export interface PlannedScene {
+  scene: number;
+  heading: string;
+  shots: PlannedShot[];
+}
+
+export interface Plan {
+  project_id: number;
+  scenes: PlannedScene[];
+  next_scene: number;
+}
+
+/** One shot the footage landed in, as the upload screen shows it. */
+export interface UploadGroup {
+  scene: number;
+  shot: number;
+  takes: number;
+  unread_slates: number;
+  mismatches: { filename: string; detail: string; slate_raw: string }[];
+  status: "clean" | "unread" | "mismatch";
+}
+
+export interface JobStatus {
+  job_id: string;
+  state: string;
+  done: boolean;
+  total: number;
+  completed: number;
+  failed: number;
+  failures: { clip_id: string; reason: string }[];
+  target: { scene: number; shot: number } | null;
+  groups: UploadGroup[];
+  needs_a_look: number;
+  started_at: string;
+  finished_at: string | null;
+}
+
 export interface Limits {
   projects: number;
   scenes: number;
@@ -652,7 +695,11 @@ export const api = {
   guestLimits: () =>
     request<Limits & { note: string }>("/public/limits"),
 
-  grantUpload: (projectId: number, filenames: string[]) =>
+  grantUpload: (
+    projectId: number,
+    filenames: string[],
+    target?: { scene: number; shot: number },
+  ) =>
     request<{
       job_id: string;
       tickets: {
@@ -664,24 +711,59 @@ export const api = {
       expires_in_s: number;
     }>("/uploads/grant", {
       method: "POST",
-      body: JSON.stringify({ project_id: projectId, filenames }),
+      body: JSON.stringify({
+        project_id: projectId,
+        filenames,
+        scene: target?.scene ?? 0,
+        shot: target?.shot ?? 0,
+      }),
     }),
 
-  completeUpload: (jobId: string, clipIds: string[]) =>
+  completeUpload: (
+    jobId: string,
+    clipIds: string[],
+    filenamesByClip: Record<string, string> = {},
+  ) =>
     request<{ status: string; queued: string; missing: string }>(
       "/uploads/complete",
-      { method: "POST", body: JSON.stringify({ job_id: jobId, clip_ids: clipIds }) },
+      {
+        method: "POST",
+        body: JSON.stringify({
+          job_id: jobId,
+          clip_ids: clipIds,
+          filenames_by_clip: filenamesByClip,
+        }),
+      },
     ),
 
-  jobStatus: (jobId: string) =>
-    request<{
-      job_id: string;
-      state: string;
-      total: number;
-      completed: number;
-      failed: number;
-      failures: { clip_id: string; reason: string }[];
-    }>(`/uploads/jobs/${jobId}`),
+  jobStatus: (jobId: string) => request<JobStatus>(`/uploads/jobs/${jobId}`),
+
+  /** The scenes and shots somebody declared, before any footage exists. */
+  plan: (projectId: number) => request<Plan>(`/structure/${projectId}`),
+
+  addScene: (projectId: number, scene: number, heading: string) =>
+    request<PlannedScene>(`/structure/${projectId}/scenes`, {
+      method: "POST",
+      body: JSON.stringify({ scene, heading }),
+    }),
+
+  addShot: (
+    projectId: number,
+    scene: number,
+    shot: number,
+    slug: string,
+    description: string,
+  ) =>
+    request<PlannedScene>(`/structure/${projectId}/scenes/${scene}/shots`, {
+      method: "POST",
+      body: JSON.stringify({ shot, slug, description }),
+    }),
+
+  removeShot: (projectId: number, scene: number, shot: number) =>
+    request<PlannedScene>(
+      `/structure/${projectId}/scenes/${scene}/shots/${shot}`,
+      { method: "DELETE" },
+    ),
 
   /** Questions worth asking, so an empty box is not a blank page. */
   suggestions: (projectId: number) =>
