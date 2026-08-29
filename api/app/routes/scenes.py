@@ -128,17 +128,22 @@ async def _findings_for_scene(project_id: int, scene_id: int) -> list[dict]:
     ch = await client()
     result = await ch.query(
         """
-        SELECT toString(d.clip_id), c.take_no, code, start_s, end_s
+        SELECT toString(d.clip_id), c.take_no, code, start_s, end_s, severity
         FROM (
             SELECT clip_id, subgroup_id,
-                   argMax(finding_codes, decided_at)    AS codes,
-                   argMax(finding_starts_s, decided_at) AS starts,
-                   argMax(finding_ends_s, decided_at)   AS ends
+                   argMax(finding_codes, decided_at)      AS codes,
+                   argMax(finding_starts_s, decided_at)   AS starts,
+                   argMax(finding_ends_s, decided_at)     AS ends,
+                   argMax(finding_severities, decided_at) AS sevs
             FROM decisions
             WHERE project_id = {p:UInt32} AND group_id = {g:UInt32}
             GROUP BY clip_id, subgroup_id
         ) AS d
-        ARRAY JOIN codes AS code, starts AS start_s, ends AS end_s
+        -- LEFT ARRAY JOIN, because severities is empty on every row written
+        -- before it was stored and a plain ARRAY JOIN over unequal arrays drops
+        -- the whole row. Losing a finding is worse than losing its colour.
+        LEFT ARRAY JOIN codes AS code, starts AS start_s, ends AS end_s,
+                        arrayResize(sevs, length(codes), '') AS severity
         LEFT JOIN clips AS c ON c.clip_id = d.clip_id AND c.project_id = {p:UInt32}
         ORDER BY d.subgroup_id, c.take_no
         """,
@@ -152,10 +157,14 @@ async def _findings_for_scene(project_id: int, scene_id: int) -> list[dict]:
             "start_s": float(r[3]),
             "end_s": float(r[4]),
             "detail": "",
-            # The archive stores severity on the code's taxonomy rather than per
-            # row. Everything below "blocking" reads as something to look at,
-            # which is the right default for a marker somebody will scan past.
-            "severity": "blocking" if str(r[2]).endswith(".blocking") else "attention",
+            # What the panel actually said, or nothing.
+            #
+            # This used to read `code.endswith(".blocking")`, which is a guess
+            # dressed as a rule: `continuity.blocking` is a note about where an
+            # actor stands, and every one of them went into Resolve as a red
+            # marker meaning the take was unusable. Severity is a judgement, and
+            # a judgement is either recorded or absent.
+            "severity": r[5] or "",
         }
         for r in result.result_rows
     ]

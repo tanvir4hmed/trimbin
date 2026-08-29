@@ -137,13 +137,19 @@ MARKER_COLUMNS = [
 
 # Resolve's own colour vocabulary. Blue for something to know, yellow for
 # something to look at, red for something that will stop delivery — the same
-# three levels the findings already carry, so an editor does not have to learn a
-# second severity scale.
+# three levels the findings carry, so an editor does not have to learn a second
+# severity scale.
+#
+# The empty key is a real member. Rows written before severity was stored have
+# none, and they get Cyan: visibly a marker, visibly not a claim about how bad
+# it is. Folding them into Yellow would be inventing a level, which is the
+# mistake this map replaced.
 _COLOUR = {
     "blocking": "Red",
     "attention": "Yellow",
     "note": "Blue",
     "comment": "Green",
+    "": "Cyan",
 }
 
 
@@ -181,15 +187,22 @@ def markers(
         if placed is None:
             continue
         in_tc, out_tc, duration_tc = placed
-        severity = str(finding.get("severity", "attention"))
+        severity = str(finding.get("severity") or "")
         writer.writerow({
             "Marker Name": str(finding.get("code", "finding")),
             "Description": str(finding.get("detail", "")),
             "In": in_tc,
             "Out": out_tc,
             "Duration": duration_tc,
-            "Marker Type": _COLOUR.get(severity, "Yellow"),
-            "Notes": f"take {finding.get('take_no', '')} · {severity}",
+            "Marker Type": _COLOUR.get(severity, "Cyan"),
+            # "severity not recorded" rather than a blank, so an editor reading
+            # the column knows the difference between a level we left out and a
+            # level we thought was low.
+            "Notes": (
+                f"take {finding.get('take_no', '')} · {severity}"
+                if severity
+                else f"take {finding.get('take_no', '')} · severity not recorded"
+            ),
         })
 
     for note in notes:

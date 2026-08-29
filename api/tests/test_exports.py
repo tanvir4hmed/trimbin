@@ -171,6 +171,46 @@ class TestMarkers:
         )
         assert "Red" in csv_text
 
+    def test_a_severity_nobody_recorded_is_not_dressed_as_one(self) -> None:
+        """The bug this column exists to close.
+
+        The exporter used to derive severity from the code: anything ending in
+        `.blocking` was red. `continuity.blocking` is a note about where an actor
+        stands, so every one of them arrived in Resolve as a red marker meaning
+        the take could not be used — a guess, wearing the shape of a judgement.
+
+        Cyan is the fourth state: visibly a marker, visibly not a claim.
+        """
+        csv_text = exports.markers(
+            self.ENTRIES,
+            [{
+                "clip_id": "aaa", "start_s": 3.0, "end_s": 4.0,
+                "code": "continuity.blocking", "severity": "",
+            }],
+            [],
+            fps=24,
+        )
+        row = csv_text.splitlines()[1]
+        assert "Cyan" in row
+        assert "Red" not in row
+        assert "severity not recorded" in row
+
+    def test_a_code_that_sounds_severe_is_not_treated_as_severe(self) -> None:
+        """Named separately because it is the specific failure, and a test that
+        only checks the empty case would pass again if somebody re-added the
+        suffix rule for codes that "obviously" mean blocking."""
+        csv_text = exports.markers(
+            self.ENTRIES,
+            [{
+                "clip_id": "aaa", "start_s": 3.0, "end_s": 4.0,
+                "code": "continuity.blocking", "severity": "note",
+            }],
+            [],
+            fps=24,
+        )
+        assert "Blue" in csv_text
+        assert "Red" not in csv_text
+
     def test_a_comment_arrives_as_a_marker_too(self) -> None:
         """Frame.io's most-used feature is exactly this. Notes that cannot reach
         the timeline become a second place to look, and a second place to look is

@@ -670,7 +670,9 @@ function TakeRow({
                         <span className="at">
                           {anchored ? seconds(at) : "throughout"}
                         </span>
-                        <span className="code">{f.code}</span>
+                        <span className={`code sev-${f.severity || "unrecorded"}`}>
+                          {f.code}
+                        </span>
                         {f.detail && <span className="detail">{f.detail}</span>}
                       </button>
                     </li>
@@ -816,7 +818,7 @@ function SafeRangeBar({
             <button
               key={`${f.code}-${i}`}
               type="button"
-              className={`mark sev-${f.severity ?? "attention"}`}
+              className={`mark sev-${f.severity || "unrecorded"}`}
               style={{ left: pct(at), width: pct(Math.max(to - at, total * 0.004)) }}
               onClick={() => onSeek(at)}
               title={`${f.code} at ${seconds(at)}`}

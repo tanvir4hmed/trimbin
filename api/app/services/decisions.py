@@ -28,7 +28,7 @@ _COLUMNS = [
     "project_id", "group_id", "subgroup_id", "clip_id", "decided_at",
     "outcome", "score", "margin",
     "reason", "reason_code",
-    "finding_codes", "finding_starts_s", "finding_ends_s",
+    "finding_codes", "finding_starts_s", "finding_ends_s", "finding_severities",
     "decided_by", "actor_id",
     "model_id", "prompt_version", "bracket_round", "panel_convened", "run_hash",
     "in_point_s", "out_point_s",
@@ -90,12 +90,12 @@ async def record(
     now = datetime.now(UTC)
     rows = []
     for v in verdicts:
-        codes, starts, ends = _findings(v.get("findings", []))
+        codes, starts, ends, severities = _findings(v.get("findings", []))
         rows.append([
             project_id, group_id, subgroup_id, UUID(str(v["clip_id"])), now,
             v["outcome"], float(v.get("score", 0.0)), float(v.get("margin", 0.0)),
             v.get("reason", "")[:400], _code_value(v.get("reason_code", "")),
-            codes, starts, ends,
+            codes, starts, ends, severities,
             decided_by, actor_id,
             model_id, prompt_version, bracket_round, 1 if panel_convened else 0, key,
             float(v.get("in_point_s", 0.0)), float(v.get("out_point_s", 0.0)),
@@ -113,8 +113,10 @@ async def record(
     return len(rows)
 
 
-def _findings(findings: list) -> tuple[list[str], list[float], list[float]]:
-    """Flatten findings into three parallel arrays.
+def _findings(
+    findings: list,
+) -> tuple[list[str], list[float], list[float], list[str]]:
+    """Flatten findings into four parallel arrays.
 
     Parallel arrays rather than a nested type because ClickHouse reads columns,
     and the common query — every clip carrying a given code — touches one array
@@ -128,6 +130,7 @@ def _findings(findings: list) -> tuple[list[str], list[float], list[float]]:
     codes: list[str] = []
     starts: list[float] = []
     ends: list[float] = []
+    severities: list[str] = []
 
     for f in findings:
         code = _attr(f, "code")
@@ -157,7 +160,22 @@ def _findings(findings: list) -> tuple[list[str], list[float], list[float]]:
         starts.append(round(start, 2))
         ends.append(round(end, 2))
 
-    return codes, starts, ends
+        # How bad the panel said it was, kept rather than reconstructed later.
+        #
+        # This was dropped for months and nothing noticed, because the one
+        # screen that read findings back coloured them all alike. It surfaced
+        # the moment they became timeline markers: the exporter had to say which
+        # of a hundred notes an editor should stop for, had no severity, and
+        # guessed from the code's name. `continuity.blocking` is a note about
+        # where an actor stands, and every one of them arrived in Resolve as a
+        # red marker meaning the take was unusable.
+        #
+        # Absent stays absent. A default of "attention" here would be the same
+        # guess one layer down, and a level nobody chose is worth less than an
+        # absence said out loud.
+        severities.append(_code_value(_attr(f, "severity") or ""))
+
+    return codes, starts, ends, severities
 
 
 def _span(finding) -> tuple[float, float]:

@@ -63,6 +63,30 @@ class Override(BaseModel):
         return cleaned
 
 
+def _findings_from(codes, starts, ends, severities) -> list[dict]:
+    """Zip the parallel arrays back into objects.
+
+    Parallel arrays are how the column store reads them quickly; this is how an
+    interface consumes them. Written once because it is now four arrays in two
+    queries, and a fourth added to one of them and not the other is the kind of
+    mistake that shows up as a colour rather than as an error.
+
+    `severities` is empty on rows written before it was stored. Zipped as an
+    empty string rather than defaulted to a level, because a level nobody chose
+    reads exactly like one somebody did.
+    """
+    severities = list(severities or [])
+    return [
+        {
+            "code": code,
+            "start_s": float(start),
+            "end_s": float(end),
+            "severity": severities[i] if i < len(severities) else "",
+        }
+        for i, (code, start, end) in enumerate(zip(codes, starts, ends, strict=True))
+    ]
+
+
 @router.get("/{project_id}/pending")
 async def pending(
     project_id: int,
@@ -134,6 +158,7 @@ async def verdicts(
         SELECT d.clip_id, c.take_no, d.outcome, d.score, d.margin,
                d.reason, d.reason_code,
                d.finding_codes, d.finding_starts_s, d.finding_ends_s,
+               d.finding_severities,
                d.in_point_s, d.out_point_s,
                d.decided_by, d.actor_id, d.model_id, d.prompt_version,
                d.panel_convened, d.decided_at,
@@ -164,34 +189,31 @@ async def verdicts(
             # Zipped back into objects here rather than stored that way. The
             # arrays are how ClickHouse reads them quickly; this is how an
             # interface consumes them.
-            "findings": [
-                {"code": c, "start_s": float(a), "end_s": float(b)}
-                for c, a, b in zip(r[7], r[8], r[9], strict=True)
-            ],
+            "findings": _findings_from(r[7], r[8], r[9], r[10]),
             # The single span an assembly would use.
-            "usable_from_s": round(float(r[10]), 2),
-            "usable_to_s": round(float(r[11]), 2),
-            "decided_by": r[12],
-            "actor": r[13],
-            "model_id": r[14],
-            "prompt_version": r[15],
-            "panel_convened": bool(r[16]),
-            "decided_at": r[17].isoformat() if r[17] else None,
-            "proxy_uri": r[18],
-            "sprite_uri": r[19],
+            "usable_from_s": round(float(r[11]), 2),
+            "usable_to_s": round(float(r[12]), 2),
+            "decided_by": r[13],
+            "actor": r[14],
+            "model_id": r[15],
+            "prompt_version": r[16],
+            "panel_convened": bool(r[17]),
+            "decided_at": r[18].isoformat() if r[18] else None,
+            "proxy_uri": r[19],
+            "sprite_uri": r[20],
             # Per axis, never one opaque number. An editor who disagrees needs
             # to see which criterion produced the answer.
-            "criteria": dict(zip(r[20], [round(float(s), 3) for s in r[21]], strict=True)),
+            "criteria": dict(zip(r[21], [round(float(s), 3) for s in r[22]], strict=True)),
             # Every usable stretch, not only the longest. A take with a problem
             # in the middle has two, and offering one would discard the other.
             "safe_ranges": [
                 {"start_s": float(a), "end_s": float(b)}
-                for a, b in zip(r[22], r[23], strict=True)
+                for a, b in zip(r[23], r[24], strict=True)
             ],
-            "trim_reasons": list(r[24]),
-            "duration_s": round(int(r[25] or 0) / 1000, 2),
-            "camera": r[26] or "",
-            "captured_at": r[27].isoformat() if r[27] else None,
+            "trim_reasons": list(r[25]),
+            "duration_s": round(int(r[26] or 0) / 1000, 2),
+            "camera": r[27] or "",
+            "captured_at": r[28].isoformat() if r[28] else None,
         })
 
     if not takes:
@@ -449,6 +471,7 @@ async def _verdicts_for(project_id: int, group_id: int, subgroup_id: int) -> lis
         """
         SELECT clip_id, outcome, score,
                finding_codes, finding_starts_s, finding_ends_s,
+               finding_severities,
                criterion_names, criterion_scores,
                safe_starts_s, safe_ends_s, trim_reasons,
                in_point_s, out_point_s
@@ -466,17 +489,14 @@ async def _verdicts_for(project_id: int, group_id: int, subgroup_id: int) -> lis
             "clip_id": str(r[0]),
             "outcome": r[1],
             "score": float(r[2]),
-            "findings": [
-                {"code": c, "start_s": float(a), "end_s": float(b)}
-                for c, a, b in zip(r[3], r[4], r[5], strict=True)
-            ],
-            "criterion_names": list(r[6]),
-            "criterion_scores": [float(x) for x in r[7]],
-            "safe_starts_s": [float(x) for x in r[8]],
-            "safe_ends_s": [float(x) for x in r[9]],
-            "trim_reasons": list(r[10]),
-            "in_point_s": float(r[11]),
-            "out_point_s": float(r[12]),
+            "findings": _findings_from(r[3], r[4], r[5], r[6]),
+            "criterion_names": list(r[7]),
+            "criterion_scores": [float(x) for x in r[8]],
+            "safe_starts_s": [float(x) for x in r[9]],
+            "safe_ends_s": [float(x) for x in r[10]],
+            "trim_reasons": list(r[11]),
+            "in_point_s": float(r[12]),
+            "out_point_s": float(r[13]),
         }
         for r in result.result_rows
     ]

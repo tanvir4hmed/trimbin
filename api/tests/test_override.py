@@ -149,6 +149,86 @@ class TestWhatGetsWritten:
         assert by_id[other]["reason"] != "the pause before the line lands"
 
 
+class TestSeveritySurvivesTheWrite:
+    """How bad a finding is, kept rather than reconstructed.
+
+    The panel has always produced a severity and the writer dropped it. That was
+    survivable while findings were only read back into one screen, which colours
+    them all alike, and stopped being survivable the moment they became timeline
+    markers: the exporter had to say which of a hundred notes to stop for, had
+    nothing to go on, and guessed from the code's name.
+
+    The guess was `code.endswith(".blocking")`. `continuity.blocking` is a note
+    about where an actor stands, so every one of them arrived in Resolve as a
+    red marker meaning the take could not be used.
+    """
+
+    def test_the_panels_severity_is_kept(self) -> None:
+        from trimbin_agents.contracts.base import (
+            Finding,
+            FindingCode,
+            Severity,
+            TimeRange,
+        )
+
+        from app.services.decisions import _findings
+
+        _, _, _, severities = _findings([
+            Finding(
+                code=FindingCode.CONTINUITY_BLOCKING,
+                detail="she crosses left instead of right",
+                severity=Severity.NOTE,
+                where=TimeRange(start_s=2.0, end_s=4.0),
+            )
+        ])
+        # A note, because that is what the panel said — not "blocking", which is
+        # what the code happens to be called.
+        assert severities == ["note"]
+
+    def test_a_blocking_severity_is_kept_too(self) -> None:
+        from trimbin_agents.contracts.base import (
+            Finding,
+            FindingCode,
+            Severity,
+            TimeRange,
+        )
+
+        from app.services.decisions import _findings
+
+        _, _, _, severities = _findings([
+            Finding(
+                code=FindingCode.FRAMES_DROPPED,
+                detail="3 dropped frames",
+                severity=Severity.BLOCKING,
+                where=TimeRange(start_s=0.0, end_s=10.0),
+            )
+        ])
+        assert severities == ["blocking"]
+
+    def test_the_enums_value_is_written_not_its_repr(self) -> None:
+        """The same trap the codes fell into. From Python 3.11 a `str, Enum`
+        member stringifies to `Severity.BLOCKING`, which matches nothing."""
+        from trimbin_agents.contracts.base import (
+            Finding,
+            FindingCode,
+            Severity,
+            TimeRange,
+        )
+
+        from app.services.decisions import _findings
+
+        _, _, _, severities = _findings([
+            Finding(
+                code=FindingCode.FOCUS_LOST,
+                detail="focus goes",
+                severity=Severity.ATTENTION,
+                where=TimeRange(start_s=1.0, end_s=2.0),
+            )
+        ])
+        assert severities == ["attention"]
+        assert "Severity." not in severities[0]
+
+
 class TestTimecodesSurviveTheWrite:
     """The bug that made every finding in the archive say "throughout".
 
@@ -167,7 +247,7 @@ class TestTimecodesSurviveTheWrite:
     def test_a_flat_finding_keeps_its_span(self) -> None:
         from app.services.decisions import _findings
 
-        codes, starts, ends = _findings(
+        codes, starts, ends, _ = _findings(
             [{"code": "stability.shake", "start_s": 4.2, "end_s": 7.8}]
         )
         assert (codes, starts, ends) == (["stability.shake"], [4.2], [7.8])
@@ -188,8 +268,9 @@ class TestTimecodesSurviveTheWrite:
             severity=Severity.ATTENTION,
             where=TimeRange(start_s=12.0, end_s=14.0),
         )
-        codes, starts, ends = _findings([f])
+        codes, starts, ends, severities = _findings([f])
         assert (codes, starts, ends) == (["continuity.prop"], [12.0], [14.0])
+        assert severities == ["attention"]
 
     def test_a_finding_with_no_span_at_all_is_still_written(self) -> None:
         """Zero-zero here means "we do not know", which review widens to the
@@ -197,9 +278,12 @@ class TestTimecodesSurviveTheWrite:
         worse than losing its timecode."""
         from app.services.decisions import _findings
 
-        codes, starts, ends = _findings([{"code": "performance.note"}])
+        codes, starts, ends, severities = _findings([{"code": "performance.note"}])
         assert codes == ["performance.note"]
         assert (starts, ends) == ([0.0], [0.0])
+        # And no severity, said as an empty string rather than as a level. A
+        # default of "attention" here would be a judgement nobody made.
+        assert severities == [""]
 
     def test_both_shapes_in_one_batch(self) -> None:
         """review._merge_findings emits exactly this: ffmpeg's flat findings
@@ -222,7 +306,12 @@ class TestTimecodesSurviveTheWrite:
                 where=TimeRange(start_s=28.0, end_s=30.0),
             ),
         ]
-        codes, starts, ends = _findings(mixed)
+        codes, starts, ends, severities = _findings(mixed)
         assert codes == ["focus.lost", "dialogue.incomplete"]
         assert starts == [6.0, 28.0]
         assert ends == [12.0, 30.0]
+        # ffmpeg's flat finding carries no severity; the panel's does. Both are
+        # written, and the arrays stay the same length as the codes — a shorter
+        # one would silently shift every colour by a row.
+        assert severities == ["", "blocking"]
+        assert len(severities) == len(codes)

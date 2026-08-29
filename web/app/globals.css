@@ -797,6 +797,17 @@ tbody tr:last-child td {
 }
 .range-bar .mark.sev-blocking { background: #b04a3a; }
 .range-bar .mark.sev-note { background: var(--low); opacity: 0.5; }
+/* No severity recorded — which is a fourth state, not a low one. Hatched
+   rather than coloured, so it reads as "we did not say" instead of as a level
+   somebody chose. Findings written before severity was stored land here. */
+.range-bar .mark.sev-unrecorded {
+  background: repeating-linear-gradient(
+    45deg, var(--low) 0 3px, transparent 3px 6px);
+  opacity: 0.6;
+}
+.findings .code.sev-blocking { color: var(--rust); }
+.findings .code.sev-note { color: var(--low); }
+.findings .code.sev-unrecorded { color: var(--faint); font-style: italic; }
 .nothing-usable {
   position: absolute;
   inset: 0;

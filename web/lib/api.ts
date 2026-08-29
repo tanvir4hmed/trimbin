@@ -14,7 +14,15 @@
 
 import { currentToken } from "./auth";
 
-export type Severity = "note" | "attention" | "blocking";
+/**
+ * How bad a finding is — and the empty string, which is not a level.
+ *
+ * Rows written before severity was stored carry no level. That is a fourth
+ * state and the interface keeps it distinct: a finding drawn as "attention"
+ * because nothing was recorded looks exactly like one a panel judged, and the
+ * whole argument of this system is that a judgement is either made or absent.
+ */
+export type Severity = "note" | "attention" | "blocking" | "";
 
 export type Role = "lead" | "editor" | "guest";
 
