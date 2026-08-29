@@ -346,6 +346,35 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  /** What a visitor may do without an account, from the API that enforces it. */
+  sandboxLimits: () =>
+    request<{
+      project_id: number;
+      max_clips: number;
+      max_seconds: number;
+      max_per_ip_per_day: number;
+      retention_hours: number;
+      note: string;
+    }>("/public/sandbox"),
+
+  grantUpload: (projectId: number, filenames: string[]) =>
+    request<{
+      job_id: string;
+      tickets: { clip_id: string; filename: string; upload_url: string }[];
+      expires_in_s: number;
+    }>("/uploads/grant", {
+      method: "POST",
+      body: JSON.stringify({ project_id: projectId, filenames }),
+    }),
+
+  completeUpload: (jobId: string, clipIds: string[]) =>
+    request<{ status: string; queued: string; missing: string }>(
+      "/uploads/complete",
+      { method: "POST", body: JSON.stringify({ job_id: jobId, clip_ids: clipIds }) },
+    ),
+
+  jobStatus: (jobId: string) => request<unknown>(`/uploads/jobs/${jobId}`),
+
   accuracy: () => request<AccuracySummary>("/public/accuracy"),
   scale: () => request<Scale>("/public/scale"),
 };

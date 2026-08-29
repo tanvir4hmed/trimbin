@@ -18,11 +18,11 @@ from datetime import timedelta
 from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, field_validator
 
-from ..auth import Principal, require_member
-from ..services import jobs, storage
+from ..auth import Principal, current_principal
+from ..services import jobs, sandbox, storage
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/uploads", tags=["uploads"])
@@ -77,21 +77,33 @@ class UploadComplete(BaseModel):
 @router.post("/grant", response_model=UploadGrant)
 async def grant_upload(
     request: UploadRequest,
-    principal: Annotated[Principal, Depends(require_member)],
+    http: Request,
+    principal: Annotated[Principal, Depends(current_principal)],
 ) -> UploadGrant:
     """Hand back one signed URL per file, and open a job to track the batch.
 
     The job exists before a single byte moves, because the editor is going to
     close the tab. Without something durable to come back to, a long ingest is
     indistinguishable from one that silently died.
+
+    current_principal rather than require_member, so the sandbox can be used by
+    someone with no account — which is the point of it. assert_can_write already
+    knows which projects allow that; demanding an identity here as well would
+    have put the decision in two places, and one of them would eventually be
+    wrong.
     """
     await principal.assert_can_write(request.project_id)
+
+    # The sandbox is an open door to a paid model and a video encoder. Checked
+    # before the job is opened, so a refused visitor leaves nothing behind.
+    if sandbox.is_sandbox(request.project_id):
+        await sandbox.check_and_count(http, len(request.filenames))
 
     job_id = await jobs.open_job(
         project_id=request.project_id,
         kind="ingest",
         total_items=len(request.filenames),
-        opened_by=principal.email,
+        opened_by=principal.email or f"visitor:{sandbox.caller_ip(http)}",
     )
 
     # The job exists now, so a failure from here on has to close it. Otherwise
@@ -114,7 +126,15 @@ async def grant_upload(
                     upload_url=await storage.signed_upload_url(
                         object_path,
                         ttl=SIGNED_URL_TTL,
-                        max_bytes=MAX_CLIP_BYTES,
+                        # A byte cap is the only limit enforceable before
+                        # anything arrives. Length is checked after measurement,
+                        # because only ffmpeg can tell thirty seconds from three
+                        # minutes at a low bitrate.
+                        max_bytes=(
+                            sandbox.MAX_SANDBOX_BYTES
+                            if sandbox.is_sandbox(request.project_id)
+                            else MAX_CLIP_BYTES
+                        ),
                     ),
                     storage_uri=storage.originals_uri(object_path),
                 )
@@ -135,7 +155,7 @@ async def grant_upload(
 @router.post("/complete", status_code=status.HTTP_202_ACCEPTED)
 async def complete_upload(
     body: UploadComplete,
-    principal: Annotated[Principal, Depends(require_member)],
+    principal: Annotated[Principal, Depends(current_principal)],
 ) -> dict[str, str]:
     """Queue the clips that actually arrived.
 
@@ -181,7 +201,7 @@ async def complete_upload(
 @router.get("/jobs/{job_id}")
 async def job_status(
     job_id: UUID,
-    principal: Annotated[Principal, Depends(require_member)],
+    principal: Annotated[Principal, Depends(current_principal)],
 ) -> dict:
     """Progress for an editor who walked away and came back.
 

@@ -140,6 +140,29 @@ async def accuracy_per_project(response: Response) -> dict[str, Any]:
     }
 
 
+@router.get("/sandbox")
+async def sandbox_limits(response: Response) -> dict[str, Any]:
+    """What a visitor may do without an account.
+
+    Published rather than hard-coded into the page, so the numbers a visitor is
+    shown and the numbers the API enforces are the same numbers. Two copies
+    would drift, and the drift shows up as a person being refused for exceeding
+    a limit the page told them they were within.
+    """
+    _cached(response)
+    return {
+        "project_id": settings.sandbox_project_id,
+        "max_clips": settings.sandbox_max_clips,
+        "max_seconds": settings.sandbox_max_seconds,
+        "max_per_ip_per_day": settings.sandbox_max_per_ip_per_day,
+        "retention_hours": settings.sandbox_retention_hours,
+        "note": (
+            "No account needed. Everything uploaded here is deleted within "
+            f"{settings.sandbox_retention_hours} hours."
+        ),
+    }
+
+
 @router.get("/scale")
 async def scale(response: Response) -> dict[str, Any]:
     """What the archive holds, real and generated counted apart.

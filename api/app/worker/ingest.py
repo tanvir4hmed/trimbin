@@ -17,7 +17,7 @@ from pathlib import Path
 from uuid import UUID
 
 from ..config import settings
-from ..services import clips, identify, jobs, storage
+from ..services import clips, identify, jobs, sandbox, storage
 from ..services.ffmpeg_ops import UnusableClip, analyse, build_proxy, build_sprite
 
 log = logging.getLogger(__name__)
@@ -57,6 +57,24 @@ async def process(job_id: UUID, clip_id: UUID, project_id: int) -> None:
 
         log.info("clip %s: measuring", clip_id)
         measurements = await analyse(source)
+
+        # Length is a sandbox rule and cannot be known before measuring. Checked
+        # here rather than at upload, and recorded as a rejection with a reason
+        # so the visitor sees the limit rather than a clip that vanished.
+        if sandbox.is_sandbox(project_id) and sandbox.clip_is_too_long(
+            measurements.duration_s
+        ):
+            await clips.write_unusable(
+                project_id=project_id,
+                clip_id=clip_id,
+                object_path=object_path,
+                measurements=measurements,
+                reason="sandbox.too_long",
+            )
+            raise Rejected(
+                f"The sandbox takes clips up to {settings.sandbox_max_seconds} "
+                f"seconds; this one is {measurements.duration_s:.0f}."
+            )
 
         usable, reason = measurements.is_usable()
         if not usable:

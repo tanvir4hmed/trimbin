@@ -157,6 +157,28 @@ def download(object_path: str, destination) -> None:
     )
 
 
+def delete_clip(project_id: int, clip_id: str) -> None:
+    """Remove a clip's original and its proxy tree.
+
+    Both buckets, because they are two halves of one thing: an original with no
+    proxy cannot be watched and a proxy with no original cannot be re-encoded.
+    Deleting one and keeping the other leaves something that is neither footage
+    nor absence.
+
+    Missing objects are not an error. A sweep that has already half-run, or a
+    clip rejected before it was ever encoded, both leave gaps — and failing on
+    them would stop the sweep at the first one.
+    """
+    prefix = f"p{project_id}/{clip_id}"
+
+    for bucket_name in (settings.originals_bucket, settings.proxies_bucket):
+        bucket = client().bucket(bucket_name)
+        for blob in bucket.list_blobs(prefix=f"{prefix}/"):
+            blob.delete()
+
+    log.info("removed clip %s from storage", clip_id)
+
+
 def download_proxy_window(object_prefix: str, destination, seconds: float) -> bool:
     """Fetch enough proxy segments to cover the opening of a take.
 

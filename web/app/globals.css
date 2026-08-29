@@ -959,3 +959,49 @@ button.primary:disabled {
 .stat-note {
   margin-top: 4px;
 }
+
+/* The visitor upload. Limits stated before anything is chosen, because being
+   told at the end that three was the maximum wastes the person's time. */
+.sandbox {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 22px;
+  margin: 28px 0;
+}
+.sandbox h2 { margin: 0 0 6px; }
+.sandbox input[type="file"] {
+  display: block;
+  margin: 14px 0 10px;
+  font: inherit;
+  font-size: 13px;
+}
+.chosen {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+.chosen li { padding: 3px 0; }
+
+.upload-progress .bar {
+  height: 6px;
+  background: var(--line-soft);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 12px 0 6px;
+}
+.upload-progress .bar > div {
+  height: 100%;
+  background: var(--ink);
+  transition: width 0.2s linear;
+}
+
+.upload-done p { font-size: 13px; }
+.rejections {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+  font-size: 12.5px;
+  color: var(--warn, #b04a3a);
+}
+.rejections li { padding: 2px 0; }

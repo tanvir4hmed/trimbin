@@ -40,6 +40,7 @@ export default function RootLayout({
             <Link href="/">Overview</Link>
             <Link href="/accuracy">Accuracy</Link>
             <Link href="/project/1">Workspace</Link>
+            <Link href="/sandbox">Try it</Link>
             <Link href="/demo">Status</Link>
           </div>
           {/* Appears only once there is something to sign in for, and renders
