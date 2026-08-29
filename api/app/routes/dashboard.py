@@ -79,6 +79,21 @@ async def dashboard(
             "name": p.name,
             "is_public": p.is_public,
             "you_are_owner": (principal.email or "").lower() == p.owner_email.lower(),
+            # Whether this one is theirs to work, which is the difference
+            # between their own projects and ours on the same screen. The card
+            # fills in a type that promises this field, and a card missing it
+            # reads as "false" everywhere it is used.
+            "you_can_upload": bool(
+                principal.email
+                and (
+                    principal.email.lower() == p.owner_email.lower()
+                    or principal.email.lower() in {m.lower() for m in p.member_emails}
+                    or (
+                        members.is_staff(principal.email)
+                        and members.is_staff(p.owner_email)
+                    )
+                )
+            ),
             "created_at": p.created_at.isoformat(),
             "members": len(p.member_emails) + 1,
             "scenes": stats["scenes"] if stats else 0,

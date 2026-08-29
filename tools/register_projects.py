@@ -83,13 +83,29 @@ async def main() -> int:
         if snapshot.exists:
             existing = snapshot.to_dict() or {}
             missing = [e for e in EDITORS if e not in existing.get("member_emails", [])]
-            if not missing:
-                print(f"  {spec['id']}  already registered, membership unchanged")
+
+            # The name too, not only the membership.
+            #
+            # Renaming project 2 here did nothing for a week: the script created
+            # a document or added people to one, and never reconciled anything
+            # else. So "Visitor sandbox" stayed on a dashboard belonging to a
+            # product with no sandbox in it, which is the kind of stale label
+            # that makes a reader distrust everything beside it.
+            renamed = existing.get("name") != spec["name"]
+
+            if not missing and not renamed:
+                print(f"  {spec['id']}  already registered, unchanged")
                 continue
-            print(f"  {spec['id']}  adding {', '.join(missing)}")
-            if not args.dry_run:
-                for email in missing:
-                    await projects.add_member(spec["id"], email)
+
+            if renamed:
+                print(f"  {spec['id']}  rename: {existing.get('name')!r} -> {spec['name']!r}")
+                if not args.dry_run:
+                    await doc.update({"name": spec["name"]})
+            if missing:
+                print(f"  {spec['id']}  adding {', '.join(missing)}")
+                if not args.dry_run:
+                    for email in missing:
+                        await projects.add_member(spec["id"], email)
             changed += 1
             continue
 
