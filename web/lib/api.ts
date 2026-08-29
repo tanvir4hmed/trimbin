@@ -360,7 +360,12 @@ export const api = {
   grantUpload: (projectId: number, filenames: string[]) =>
     request<{
       job_id: string;
-      tickets: { clip_id: string; filename: string; upload_url: string }[];
+      tickets: {
+        clip_id: string;
+        filename: string;
+        upload_url: string;
+        headers: Record<string, string>;
+      }[];
       expires_in_s: number;
     }>("/uploads/grant", {
       method: "POST",

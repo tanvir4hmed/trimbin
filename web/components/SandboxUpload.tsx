@@ -25,6 +25,8 @@ interface Ticket {
   clip_id: string;
   filename: string;
   upload_url: string;
+  /** Signed, so omitting one is a 400 that does not say which. */
+  headers: Record<string, string>;
 }
 
 type Stage = "idle" | "granting" | "uploading" | "queued" | "processing" | "done" | "failed";
@@ -131,8 +133,11 @@ export default function SandboxUpload({
       const arrived: string[] = [];
       for (let i = 0; i < tickets.length; i++) {
         const file = chosen.find((f) => f.name === tickets[i].filename) ?? chosen[i];
-        const ok = await put(tickets[i].upload_url, file, (fraction) =>
-          setProgress((i + fraction) / tickets.length),
+        const ok = await put(
+          tickets[i].upload_url,
+          tickets[i].headers,
+          file,
+          (fraction) => setProgress((i + fraction) / tickets.length),
         );
         if (ok) arrived.push(tickets[i].clip_id);
       }
@@ -286,13 +291,18 @@ export default function SandboxUpload({
  */
 function put(
   url: string,
+  headers: Record<string, string>,
   file: File,
   onProgress: (fraction: number) => void,
 ): Promise<boolean> {
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
-    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    // Exactly what the API said, not what seems reasonable. These are part of
+    // the signature and Cloud Storage rejects the request if any is missing.
+    for (const [name, value] of Object.entries(headers)) {
+      xhr.setRequestHeader(name, value);
+    }
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress(e.loaded / e.total);
     };

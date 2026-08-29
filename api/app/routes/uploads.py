@@ -61,6 +61,9 @@ class UploadTicket(BaseModel):
     filename: str
     upload_url: str
     storage_uri: str
+    # Part of the signature, not advice. Cloud Storage refuses a PUT that omits
+    # a signed header and does not say which one is missing.
+    headers: dict[str, str]
 
 
 class UploadGrant(BaseModel):
@@ -119,23 +122,26 @@ async def grant_upload(
             safe = _SAFE_NAME.sub("_", filename)[-120:]
             object_path = f"p{request.project_id}/{clip_id}/{safe}"
 
+            url, headers = await storage.signed_upload_url(
+                object_path,
+                ttl=SIGNED_URL_TTL,
+                # A byte cap is the only limit enforceable before anything
+                # arrives. Length is checked after measurement, because only
+                # ffmpeg can tell thirty seconds from three minutes at a low
+                # bitrate.
+                max_bytes=(
+                    sandbox.MAX_SANDBOX_BYTES
+                    if sandbox.is_sandbox(request.project_id)
+                    else MAX_CLIP_BYTES
+                ),
+            )
+
             tickets.append(
                 UploadTicket(
                     clip_id=clip_id,
                     filename=filename,
-                    upload_url=await storage.signed_upload_url(
-                        object_path,
-                        ttl=SIGNED_URL_TTL,
-                        # A byte cap is the only limit enforceable before
-                        # anything arrives. Length is checked after measurement,
-                        # because only ffmpeg can tell thirty seconds from three
-                        # minutes at a low bitrate.
-                        max_bytes=(
-                            sandbox.MAX_SANDBOX_BYTES
-                            if sandbox.is_sandbox(request.project_id)
-                            else MAX_CLIP_BYTES
-                        ),
-                    ),
+                    upload_url=url,
+                    headers=headers,
                     storage_uri=storage.originals_uri(object_path),
                 )
             )

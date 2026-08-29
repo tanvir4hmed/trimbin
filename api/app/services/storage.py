@@ -94,16 +94,26 @@ async def signed_upload_url(
     object_path: str,
     ttl: timedelta,
     max_bytes: int,
-) -> str:
-    """A URL the browser can PUT to, and nothing else.
+) -> tuple[str, dict[str, str]]:
+    """A URL the browser can PUT to, and the headers it must send with it.
 
     Scoped to one object, one method, and one content length. A signed URL is a
     capability handed to an untrusted client, so it grants exactly the write it
     was issued for and expires.
-    """
-    blob = client().bucket(settings.originals_bucket).blob(object_path)
 
-    return blob.generate_signed_url(
+    The headers are returned rather than documented because they are part of the
+    signature: Cloud Storage rejects a request that omits a signed header, with
+    a 400 that says nothing about which one. Returning the exact set means a
+    client cannot get it wrong by forgetting — which is how the first real
+    visitor upload failed, and it would have failed identically in the browser.
+    """
+    required = {
+        "Content-Type": "application/octet-stream",
+        "x-goog-content-length-range": f"0,{max_bytes}",
+    }
+
+    blob = client().bucket(settings.originals_bucket).blob(object_path)
+    url = blob.generate_signed_url(
         version="v4",
         expiration=ttl,
         method="PUT",
@@ -111,6 +121,7 @@ async def signed_upload_url(
         headers={"x-goog-content-length-range": f"0,{max_bytes}"},
         **_signer(),
     )
+    return url, required
 
 
 async def confirm_uploads(
