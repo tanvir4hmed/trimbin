@@ -380,6 +380,23 @@ export const api = {
 
   jobStatus: (jobId: string) => request<unknown>(`/uploads/jobs/${jobId}`),
 
+  /** Questions worth asking, so an empty box is not a blank page. */
+  suggestions: (projectId: number) =>
+    request<{ suggestions: string[] }>(`/ask/${projectId}/suggestions`),
+
+  /**
+   * A question in plain language.
+   *
+   * The reply carries the SQL that ran. A result somebody can check is worth
+   * more than one they have to trust, and that is the argument this whole
+   * system rests on.
+   */
+  ask: (projectId: number, question: string) =>
+    request<unknown>(`/ask/${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ question }),
+    }),
+
   accuracy: () => request<AccuracySummary>("/public/accuracy"),
   scale: () => request<Scale>("/public/scale"),
 };

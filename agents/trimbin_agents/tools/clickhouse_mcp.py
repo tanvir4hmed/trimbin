@@ -28,9 +28,23 @@ from ..config import settings
 
 log = logging.getLogger(__name__)
 
-# Rejected before anything reaches the server. Not the primary defence — the
-# read-only user is — but the one that produces a legible error instead of a
-# permissions failure three layers down.
+# Rejected before anything reaches the server.
+#
+# This comment used to say the read-only database user was the primary defence
+# and that these patterns merely produced a legible error. There is no read-only
+# user: the connection is the admin one, and this regex was the only thing
+# between a model and the production archive.
+#
+# A regex over SQL is a filter, not a boundary. A subquery, a comment splicing a
+# keyword, a function whose name contains a forbidden word — all ordinary SQL,
+# none of it what the pattern was written for.
+#
+# So nothing in the product sends model-written SQL any more. Retrieval runs
+# through api/app/services/search.py, where the query shape is fixed and the
+# model supplies only parameters. This wrapper is kept for exploratory use by a
+# person at a terminal, which is a different threat model entirely, and it
+# should not be wired to a route without a genuinely read-only user existing
+# first.
 _FORBIDDEN = re.compile(
     r"\b(INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER|CREATE|GRANT|REVOKE|ATTACH|DETACH|OPTIMIZE|SYSTEM)\b",
     re.IGNORECASE,

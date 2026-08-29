@@ -10,6 +10,7 @@
 
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import AskArchive from "@/components/AskArchive";
 import SceneTree from "@/components/SceneTree";
 import ShotDetail from "@/components/ShotDetail";
 import type { Project, Tree } from "@/lib/api";
@@ -125,6 +126,13 @@ export default function ProjectPage({
           </>
         )}
       </div>
+
+      {!empty && (
+        <AskArchive
+          projectId={projectId}
+          onOpen={(scene, setup) => setSelected({ scene, setup })}
+        />
+      )}
 
       {empty ? (
         <div className="empty-project">
