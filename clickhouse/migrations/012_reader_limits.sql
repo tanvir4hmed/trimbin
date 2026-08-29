@@ -18,7 +18,10 @@
 -- The application caps what comes back at 100 rows (search.HARD_LIMIT) and the
 -- MCP wrapper appends its own LIMIT. This is the outer wall, not the fence.
 
-CREATE OR REPLACE SETTINGS PROFILE trimbin_reader_profile
+-- ALTER, not CREATE OR REPLACE: ClickHouse does not accept the latter for a
+-- settings profile, and the parse error names the position rather than the
+-- unsupported form. The profile is created in 011; this changes it.
+ALTER SETTINGS PROFILE trimbin_reader_profile
 SETTINGS
     readonly = 1 CONST,
     max_execution_time = 30 CONST,
