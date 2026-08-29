@@ -38,14 +38,29 @@ class Principal:
         return self.email is None
 
     async def assert_can_read(self, project_id: int) -> None:
-        """Reading is allowed for members, and for anyone on the public projects.
+        """Reading is allowed for members, and for anyone on a public project.
 
-        The demo and the sandbox are open on purpose: a judge with three minutes
-        will not create an account, and asking them to is the difference between
-        being evaluated and being skipped.
+        Public projects are open on purpose: a judge with three minutes will not
+        create an account, and asking them to is the difference between being
+        evaluated and being skipped.
+
+        The demo and sandbox ids come from config and cannot be changed by
+        anything a user does. Beyond those, the project's own `is_public` flag
+        decides — otherwise the flag would be a field that says one thing while
+        the code does another, which is how the two most recent bugs in this
+        system started.
+
+        Read only. Whether a public project accepts writes is a separate
+        question with a separate answer below, because the flag governs who may
+        look and never who may change.
         """
         if project_id in (settings.demo_project_id, settings.sandbox_project_id):
             return
+
+        project = await projects.get(project_id)
+        if project is not None and project.is_public:
+            return
+
         await self._assert_member(project_id)
 
     async def assert_can_write(self, project_id: int) -> None:

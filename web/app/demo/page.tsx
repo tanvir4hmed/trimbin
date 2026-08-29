@@ -56,26 +56,58 @@ export default async function DemoPage() {
       </section>
 
       <section>
-        <h2>Built, but not yet running end to end</h2>
+        <h2>Running on real footage</h2>
         <p>
-          The four agents, their prompts and their contracts are written and unit
-          tested. They have not yet been run against real footage through a live
-          model, so nothing on this site claims they have.
+          Twelve takes from a published, openly licensed dataset have been
+          through the whole pipeline: measured with ffmpeg, read for a slate,
+          embedded, encoded, and compared by the panel.{" "}
+          <Link href="/project/1">Open the workspace</Link> and look at any
+          setup — every take is there with its reasons, including the ones that
+          were not chosen.
         </p>
         <ul>
-          <li>Slate reading and take grouping</li>
-          <li>The comparison panel and its supervising editor</li>
-          <li>Assembly, in and out points, EDL and streaming playlist</li>
-          <li>Natural-language retrieval over the archive</li>
+          <li>
+            <strong>Upload, end to end.</strong> A clip uploaded to a signed URL
+            is measured, encoded and playing through the CDN without anyone
+            touching it.
+          </li>
+          <li>
+            <strong>Slate reading.</strong> A board on the front of a clip
+            becomes a scene, shot and take number. No board is said to be no
+            board, and the take is left ungrouped rather than guessed at.
+          </li>
+          <li>
+            <strong>The panel.</strong> Three specialists and a chief, on the
+            footage. It found what measurement could not: a take that stops
+            mid-sentence, a whip pan that breaks eye-trace, a wall crossing the
+            foreground.
+          </li>
         </ul>
+        <p className="dim small">
+          Every setup so far has come back below the review margin and been
+          flagged for a person. That is the correct answer, not a failure to
+          produce one: twelve competently shot takes have nothing technical
+          separating them, and a system that manufactured a confident winner
+          from that would be lying.
+        </p>
       </section>
 
       <section>
-        <h2>Not built</h2>
+        <h2>Not built, or not yet earned</h2>
         <ul>
-          <li>Upload for anyone but us</li>
-          <li>The editor dashboard — review queue and assembly playback</li>
-          <li>Sign-in, project switching, director notes</li>
+          <li>
+            <strong>Any accuracy figure.</strong> The number stays null. It can
+            only come from editors overriding the system, and none has yet —
+            the dataset ships an empty annotation template, so there is no
+            ground truth to score against either.
+          </li>
+          <li>The assembled cut, and EDL export</li>
+          <li>Natural-language retrieval over the archive</li>
+          <li>Upload from the browser for anyone but us</li>
+          <li>
+            Sign-in on this deployment, pending one console step for an OAuth
+            client
+          </li>
         </ul>
         <p className="dim small">
           Listing these is deliberate. A demo page that quietly omits what is

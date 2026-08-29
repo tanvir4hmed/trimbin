@@ -7,6 +7,8 @@
  * boundary two languages meet.
  */
 
+import { currentToken } from "./auth";
+
 export type Severity = "note" | "attention" | "blocking";
 
 export type ReviewReason =
@@ -29,21 +31,82 @@ export interface TimeRange {
  */
 export interface Finding {
   code: string;
-  detail: string;
-  severity: Severity;
-  where?: TimeRange | null;
+  /** 0-0 means the finding applies to the whole take rather than a moment. */
+  start_s: number;
+  end_s: number;
+  detail?: string;
+  severity?: Severity;
+  /** Whether ffmpeg measured this or a specialist observed it. */
+  source?: "measured" | "observed";
 }
 
+/**
+ * One take, as the archive returns it.
+ *
+ * `criteria` is a map rather than fixed fields because the axis list will grow —
+ * continuity is one axis today and will probably become several — and a typed
+ * record per axis means a schema change on both sides for each new one.
+ */
 export interface Take {
   clip_id: string;
   take_no: number;
-  duration_s: number;
+  outcome: "selected" | "runner_up" | "not_selected" | "unusable";
   score: number;
+  margin: number;
   reason: string;
+  reason_code: string;
   findings: Finding[];
-  playlist_uri: string;
+  criteria: Record<string, number>;
+  /** Every usable stretch. A take with a fault in the middle has two. */
+  safe_ranges: TimeRange[];
+  /** Codes that removed time, so a trim is never a mystery. */
+  trim_reasons: string[];
+  /** The single span an assembly would use. */
+  usable_from_s: number;
+  usable_to_s: number;
+  duration_s: number;
+  proxy_uri: string;
   sprite_uri: string;
-  is_selected: boolean;
+  decided_by: "agent" | "human";
+  actor: string;
+  model_id: string;
+  prompt_version: string;
+  panel_convened: boolean;
+  decided_at: string | null;
+}
+
+export interface Verdicts {
+  project_id: number;
+  scene: number;
+  setup: number;
+  takes: Take[];
+  recommended: string | null;
+}
+
+export type SetupStatus =
+  | "too_few_takes"
+  | "not_judged"
+  | "needs_review"
+  | "decided"
+  | "confirmed";
+
+export interface SetupNode {
+  setup: number;
+  label: string;
+  takes: number;
+  unusable: number;
+  status: SetupStatus;
+  margin: number;
+}
+
+export interface SceneNode {
+  scene: number;
+  setups: SetupNode[];
+}
+
+export interface Tree {
+  project_id: number;
+  scenes: SceneNode[];
 }
 
 export interface ReviewItem {
@@ -61,12 +124,11 @@ export interface ReviewItem {
 export interface Project {
   project_id: number;
   name: string;
-  genre: string;
-  clips: number;
-  shots: number;
-  /** The number that matters on the projects screen: how much needs a person. */
-  awaiting_review: number;
-  updated_at: string;
+  owner_email: string;
+  member_emails: string[];
+  is_public: boolean;
+  created_at: string;
+  you_are_owner: boolean;
 }
 
 export interface AccuracySummary {
@@ -173,9 +235,18 @@ class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // The token is attached here rather than at each call site. A route that
+  // forgets it does not fail loudly — it 401s, and the page shows an empty
+  // state that looks like "no data" rather than "not signed in".
+  const token = currentToken();
+
   const response = await fetch(`${BASE}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
   });
 
   if (!response.ok) {
@@ -188,39 +259,73 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(detail ?? `Request failed (${response.status})`, response.status);
   }
 
+  // 204 and friends. Parsing an empty body throws, and the throw arrives at the
+  // caller looking like the request failed when it succeeded.
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
 export const api = {
-  projects: () => request<Project[]>("/projects"),
+  /** Projects this person can open. */
+  projects: () =>
+    request<{ you: string; projects: Project[] }>("/projects"),
 
-  reviewQueue: (projectId: number) =>
-    request<ReviewItem[]>(`/projects/${projectId}/review`),
+  createProject: (name: string) =>
+    request<Project>("/projects", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
 
-  cut: (projectId: number) => request<Cut>(`/projects/${projectId}/cut`),
+  addMember: (projectId: number, email: string) =>
+    request<{ status: string; email: string }>(
+      `/projects/${projectId}/members`,
+      { method: "POST", body: JSON.stringify({ email }) },
+    ),
+
+  /** Every scene and setup, with enough to draw the tree. One request. */
+  tree: (projectId: number) => request<Tree>(`/review/${projectId}`),
+
+  /** Setups with takes and no verdict yet. */
+  pending: (projectId: number) =>
+    request<{ pending: { scene: number; setup: number; takes: number }[] }>(
+      `/review/${projectId}/pending`,
+    ),
+
+  /** What was decided about one setup, and why — every take, not only the winner. */
+  verdicts: (projectId: number, scene: number, setup: number) =>
+    request<Verdicts>(`/review/${projectId}/${scene}/${setup}`),
+
+  /** Ask the panel to judge a setup. Spends money; hence a POST. */
+  judge: (projectId: number, scene: number, setup: number) =>
+    request<{ status: string; margin?: number; needs_review?: boolean; rationale?: string }>(
+      `/review/${projectId}/${scene}/${setup}`,
+      { method: "POST" },
+    ),
 
   /**
-   * Record an override.
+   * Record an editor's choice.
    *
    * The reason is required by the API, not merely encouraged. An override
    * without one is the moment the archive was supposed to capture, arriving
    * empty — and it is the only record anywhere of a human editorial judgement.
+   *
+   * Confirming the panel is recorded too. "The editor agreed" is evidence;
+   * silence is not.
    */
-  override: (
+  select: (
     projectId: number,
-    subgroupId: number,
-    clipId: string,
-    reason: string,
+    scene: number,
+    setup: number,
+    body: { clip_id: string; reason: string; in_point_s?: number; out_point_s?: number },
   ) =>
-    request<{ ok: true }>(`/projects/${projectId}/shots/${subgroupId}/select`, {
+    request<{
+      status: string;
+      agreed_with_panel: boolean;
+      previously_recommended: string | null;
+      now_selected: string;
+    }>(`/review/${projectId}/${scene}/${setup}/select`, {
       method: "POST",
-      body: JSON.stringify({ clip_id: clipId, reason }),
-    }),
-
-  ask: (projectId: number, question: string) =>
-    request<QueryResult>(`/projects/${projectId}/ask`, {
-      method: "POST",
-      body: JSON.stringify({ question }),
+      body: JSON.stringify(body),
     }),
 
   accuracy: () => request<AccuracySummary>("/public/accuracy"),

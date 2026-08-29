@@ -39,7 +39,8 @@ export default function RootLayout({
           <div className="nav">
             <Link href="/">Overview</Link>
             <Link href="/accuracy">Accuracy</Link>
-            <Link href="/demo">Demo project</Link>
+            <Link href="/project/1">Workspace</Link>
+            <Link href="/demo">Status</Link>
           </div>
           {/* Appears only once there is something to sign in for, and renders
               nothing at all on a deployment without an OAuth client. */}

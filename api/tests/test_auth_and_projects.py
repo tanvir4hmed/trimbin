@@ -22,6 +22,28 @@ from app import auth
 from app.auth import Principal
 
 
+class FakeProject:
+    """Only the fields the access checks read."""
+
+    def __init__(self, project_id: int, is_public: bool):
+        self.project_id = project_id
+        self.is_public = is_public
+        self.owner_email = "owner@example.com"
+        self.member_emails: list[str] = []
+
+
+async def _public_project(project_id: int):
+    return FakeProject(project_id, is_public=True)
+
+
+async def _private_project(project_id: int):
+    return FakeProject(project_id, is_public=False)
+
+
+async def _no_such_project(project_id: int):
+    return None
+
+
 class FakeRequest:
     def __init__(self, header: str | None = None):
         self.headers = {"Authorization": header} if header else {}
@@ -106,9 +128,36 @@ class TestReadAccess:
     async def test_a_private_project_is_not(self, monkeypatch) -> None:
         monkeypatch.setattr(auth.settings, "demo_project_id", 1)
         monkeypatch.setattr(auth.settings, "sandbox_project_id", 2)
+        monkeypatch.setattr(auth.projects, "get", _no_such_project)
         with pytest.raises(HTTPException) as raised:
             await Principal(email=None).assert_can_read(7)
         assert raised.value.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_a_project_that_says_it_is_public_is_readable(self, monkeypatch) -> None:
+        """The flag has to mean something, or it is a field that says one thing
+        while the code does another — which is how the last two bugs here
+        started. Read only: whether a public project accepts writes is a
+        separate question with a separate answer."""
+        monkeypatch.setattr(auth.settings, "demo_project_id", 1)
+        monkeypatch.setattr(auth.settings, "sandbox_project_id", 2)
+        monkeypatch.setattr(auth.projects, "get", _public_project)
+
+        await Principal(email=None).assert_can_read(3)
+
+    @pytest.mark.asyncio
+    async def test_public_does_not_mean_writable(self, monkeypatch) -> None:
+        monkeypatch.setattr(auth.settings, "demo_project_id", 1)
+        monkeypatch.setattr(auth.settings, "sandbox_project_id", 2)
+        monkeypatch.setattr(auth.projects, "get", _public_project)
+
+        async def not_a_member(project_id, email):
+            return False
+
+        monkeypatch.setattr(auth.projects, "is_member", not_a_member)
+
+        with pytest.raises(HTTPException):
+            await Principal(email="stranger@example.com").assert_can_write(3)
 
     @pytest.mark.asyncio
     async def test_a_non_member_is_told_it_does_not_exist(self, monkeypatch) -> None:
@@ -116,6 +165,7 @@ class TestReadAccess:
         to enumerate every project on the system."""
         monkeypatch.setattr(auth.settings, "demo_project_id", 1)
         monkeypatch.setattr(auth.settings, "sandbox_project_id", 2)
+        monkeypatch.setattr(auth.projects, "get", _private_project)
 
         async def not_a_member(project_id, email):
             return False
