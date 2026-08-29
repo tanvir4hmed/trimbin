@@ -9,9 +9,16 @@
  * here does not read; they look for the way in.
  *
  * So: one screen, two buttons, and everything that was here moved to /about
- * where it can be read by anyone who wants it. A signed-in person never sees
- * this page at all — they are already working, and the front door of a tool you
- * use every day should be the tool.
+ * where it can be read by anyone who wants it. A signed-in person is sent
+ * straight to their work — the front door of a tool you use every day should
+ * be the tool.
+ *
+ * The door is rendered unconditionally, not held back until the session check
+ * finishes. Holding it back is the obvious way to avoid showing it to somebody
+ * who is already signed in, and it costs far more than it saves: effects run
+ * after paint, so the page ships as an empty element and anything without
+ * JavaScript — a crawler, a preview card, a slow connection mid-load — gets a
+ * blank page. A signed-in person sees this for the length of one frame instead.
  */
 
 import Link from "next/link";
@@ -21,28 +28,20 @@ import { CLIENT_ID, currentIdentity, renderSignInButton } from "@/lib/auth";
 
 export default function Home() {
   const router = useRouter();
-  const [checked, setChecked] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const buttonRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (currentIdentity()) {
+      setLeaving(true);
       router.replace("/dashboard");
-      return;
     }
-    setChecked(true);
   }, [router]);
 
   useEffect(() => {
-    if (!checked || !buttonRef.current) return;
+    if (leaving || !buttonRef.current) return;
     void renderSignInButton(buttonRef.current, () => router.push("/dashboard"));
-  }, [checked, router]);
-
-  if (!checked) {
-    // Nothing rather than a flash of the door for somebody who is already
-    // inside. The redirect lands within a frame; a marketing page appearing
-    // first would read as being signed out.
-    return <main className="door" />;
-  }
+  }, [leaving, router]);
 
   return (
     <main className="door">
@@ -55,7 +54,9 @@ export default function Home() {
         </p>
 
         <div className="door-actions">
-          {CLIENT_ID ? (
+          {leaving ? (
+            <p className="waiting">Taking you to your work…</p>
+          ) : CLIENT_ID ? (
             <div className="signin big" ref={buttonRef} />
           ) : (
             <p className="hint">
