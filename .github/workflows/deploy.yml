@@ -184,16 +184,24 @@ jobs:
           curl --fail --silent --show-error --max-time 60 "$URL/me" \
             | jq -e '.role == "guest" and .can_read == true'
 
-          # The scene assembly and its exports. A stringout that answers and an
-          # EDL that does not is a scene an editor can watch and cannot use.
-          curl --fail --silent --show-error --max-time 120 "$URL/scenes/1" \
-            | jq -e 'has("entries")'
+          # The scene assembly and its exports. Two different routes, and the
+          # first version of this check confused them: /scenes/1 lists a
+          # project's scenes, /scenes/1/<n> is the stringout for one of them.
+          SCENE=$(curl --fail --silent --show-error --max-time 120 "$URL/scenes/1" \
+            | jq -r '.scenes[0] // empty')
 
-          SCENE=$(curl --fail --silent --max-time 60 "$URL/scenes/1" | jq -r '.scenes[0] // empty')
           if [ -n "$SCENE" ]; then
+            echo "  stringout for scene $SCENE"
+            curl --fail --silent --show-error --max-time 120 "$URL/scenes/1/$SCENE" \
+              | jq -e 'has("entries")' > /dev/null
+
+            # A stringout that answers and an EDL that does not is a scene an
+            # editor can watch and cannot use.
             curl --fail --silent --show-error --max-time 120 \
               "$URL/scenes/1/$SCENE/edl" | head -1 | grep -q '^TITLE:'
             echo "  EDL export answers."
+          else
+            echo "  project 1 has no scenes to assemble; skipping the stringout check." >&2
           fi
 
           # The track requires ClickHouse to be reached through mcp-clickhouse at
