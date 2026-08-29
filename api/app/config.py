@@ -47,6 +47,16 @@ class Settings(BaseSettings):
     model_location: str = "global"
     embedding_model: str = "gemini-embedding-2"
 
+    # ---- scheduled maintenance --------------------------------------------
+    # Who may call /maintenance/*.
+    #
+    # This service is public — the demo pages need it to be — so Cloud Run lets
+    # everybody reach those paths and enforces nothing there. The application is
+    # the only thing that can tell the scheduler from a stranger, which is why
+    # the token is verified rather than merely required.
+    scheduler_service_account: str = ""
+    scheduler_audience: str = ""
+
     # ---- identity ---------------------------------------------------------
     # Google verifies the token's signature and issuer regardless; naming the
     # audience is what stops a token minted for a different application from

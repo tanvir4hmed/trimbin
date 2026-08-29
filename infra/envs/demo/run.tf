@@ -165,6 +165,18 @@ resource "google_cloud_run_v2_service" "api" {
         value = var.oauth_client_id
       }
 
+      # Who may call /maintenance/*. This service is public, so Cloud Run lets
+      # everyone reach those paths and the application is the only thing that
+      # can tell the scheduler from a stranger.
+      env {
+        name  = "TRIMBIN_SCHEDULER_SERVICE_ACCOUNT"
+        value = google_service_account.scheduler.email
+      }
+      env {
+        name  = "TRIMBIN_SCHEDULER_AUDIENCE"
+        value = google_cloud_run_v2_service.api.uri
+      }
+
       # Injected at start, never baked into the image and never in an env file
       # on disk.
       env {

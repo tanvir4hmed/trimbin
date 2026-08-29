@@ -11,6 +11,8 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Header, HTTPException, status
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token
 
 from ..config import settings
 from ..services import sandbox, storage
@@ -19,10 +21,53 @@ from ..services.analytics import client
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/maintenance", tags=["maintenance"])
 
+_request_adapter = google_requests.Request()
+
+
+def _is_the_scheduler(authorization: str | None) -> bool:
+    """Whether this request really came from our Cloud Scheduler job.
+
+    Checked here, not by Cloud Run, and the difference is the point. The API
+    service carries an allUsers invoker binding because the public pages need
+    one — so Cloud Run lets everybody through and enforces nothing on this path.
+
+    An earlier version of this route said the opposite in a comment and accepted
+    any request carrying any Authorization header. That is not a check; it is a
+    check-shaped thing, and the comment made it look deliberate.
+
+    So the token is verified properly: signature, issuer, audience, and then
+    that the email inside it is the scheduler's own service account. Anything
+    less accepts a token minted for something else entirely.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        return False
+
+    expected = settings.scheduler_service_account.lower()
+    if not expected:
+        # Nothing to compare against. Refuse rather than guess: a maintenance
+        # route that runs for whoever asks is worse than one that never runs.
+        log.error("TRIMBIN_SCHEDULER_SERVICE_ACCOUNT is unset; refusing.")
+        return False
+
+    token = authorization.removeprefix("Bearer ").strip()
+    try:
+        claims = id_token.verify_oauth2_token(
+            token, _request_adapter, audience=settings.scheduler_audience or None
+        )
+    except ValueError as exc:
+        log.warning("rejected a maintenance token: %s", exc)
+        return False
+
+    caller = (claims.get("email") or "").lower()
+    if caller != expected:
+        log.warning("maintenance called by %s, which is not the scheduler", caller)
+        return False
+
+    return True
+
 
 @router.post("/sandbox-retention")
 async def sweep_sandbox(
-    x_cloudscheduler: str | None = Header(default=None),
     authorization: str | None = Header(default=None),
 ) -> dict:
     """Delete visitor footage past its keep-by date.
@@ -34,15 +79,8 @@ async def sweep_sandbox(
     Both the objects and the rows go. Leaving the rows would make the archive
     claim clips it cannot play; leaving the objects would mean paying to store
     footage nothing points at any more.
-
-    Authorised by Cloud Run rather than here: the service allows only the
-    scheduler's service account to invoke this path, which is checked before the
-    container sees the request. The header below is a second, weaker signal used
-    only to make an accidental call from a browser obvious in the logs.
     """
-    if not (x_cloudscheduler or authorization):
-        # Not a security boundary — see above. A human poking this by hand
-        # should be told they are somewhere they did not mean to be.
+    if not _is_the_scheduler(authorization):
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
             "This route is called on a schedule, not by hand.",
