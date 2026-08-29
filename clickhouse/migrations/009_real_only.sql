@@ -15,6 +15,14 @@
 --
 -- So: nothing that produces a published number reads the base tables. The base
 -- tables stay for the scale demonstration, which is honest about being one.
+--
+-- One thing to know before adding a column to `clips` or `decisions`:
+-- ClickHouse resolves the star below once, when the view is created. These
+-- views do not grow a column because the table did, and a query against the new
+-- column fails with `Unknown expression identifier` naming the column — which
+-- sends whoever reads it to the wrong file. Any migration that adds a column
+-- must drop and recreate the views that star that table, in the same file.
+-- 014 does this and says so.
 
 CREATE VIEW IF NOT EXISTS real_decisions AS
 SELECT * FROM decisions WHERE project_id < 900000;

@@ -16,6 +16,35 @@ ALTER TABLE clips
     COMMENT 'A, B, C — as written on the slate. Empty means single-camera or unread.';
 
 
+-- The views over clips have to be rebuilt, and this is not optional.
+--
+-- `real_clips` is `SELECT * FROM clips`, and ClickHouse resolves that star once,
+-- at creation. The view therefore carries the column list as it stood in
+-- migration 009 and does not grow a `camera` column merely because the table
+-- did. The first deploy of this file failed exactly here, with
+-- `Unknown expression identifier 'camera'` from a view that was reading a table
+-- which plainly has one.
+--
+-- So: any migration that adds a column to `clips` must also recreate every view
+-- that stars it, in the same file. Leaving it to a later migration means a
+-- window where the application queries a column the view cannot see, and the
+-- error names the column rather than the view — which sends whoever is reading
+-- it to the wrong file.
+--
+-- The definitions below are unchanged from 009. They are repeated rather than
+-- referenced because a view is a definition and there is nothing else to point
+-- at; DROP then CREATE is idempotent and there is no data to migrate.
+DROP VIEW IF EXISTS real_clips;
+CREATE VIEW real_clips AS
+SELECT * FROM clips WHERE project_id < 900000;
+
+DROP VIEW IF EXISTS synthetic_clips;
+CREATE VIEW synthetic_clips AS
+SELECT * FROM clips WHERE project_id >= 900000;
+
+GRANT SELECT ON real_clips TO trimbin_reader;
+
+
 -- What the archive can be asked about a shoot day.
 --
 -- A view rather than a query in the application, because this is exactly the
