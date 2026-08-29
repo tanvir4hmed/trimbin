@@ -106,7 +106,17 @@ export function AccuracyDashboard() {
   }
 
   const measured = evaluation.state === "measured";
-  const hasEditorialData = accuracy.shots_total > 0;
+  // Two different things, and conflating them printed "null%".
+  //
+  // Shots exist as soon as the panel has judged anything. A *confident*
+  // decision is one where the gap to the runner-up was wide enough that no
+  // person was asked — and accuracy is only defined over those. Four shots all
+  // flagged for review produce a shots_total of four and an accuracy of null,
+  // which the old check read as "there is data" and then rendered as a
+  // percentage of nothing.
+  const hasConfidentDecisions = accuracy.confident_decisions > 0;
+  const hasFlaggedShots = accuracy.flagged_for_review > 0;
+  const hasAnyJudgement = accuracy.shots_total > 0;
 
   return (
     <div className="dashboard">
@@ -195,28 +205,52 @@ export function AccuracyDashboard() {
 
       <section>
         <h2>Do editors agree with it?</h2>
-        {hasEditorialData ? (
+        {hasConfidentDecisions || hasFlaggedShots ? (
           <>
             <div className="split">
               <Panel
                 label="Confident calls that stood"
-                value={`${accuracy.decision_accuracy_pct}%`}
-                detail={`${fmt(accuracy.confident_decisions)} decisions`}
-                note="The system was sure and nobody disagreed."
-                tone="good"
+                // An em dash, not "null%". A percentage of nothing is not a
+                // small inaccuracy — it is a number where there is no number,
+                // and the whole argument of this page is that it does not do
+                // that.
+                value={
+                  accuracy.decision_accuracy_pct === null
+                    ? "—"
+                    : `${accuracy.decision_accuracy_pct}%`
+                }
+                detail={
+                  hasConfidentDecisions
+                    ? `${fmt(accuracy.confident_decisions)} decisions`
+                    : "no confident decision yet"
+                }
+                note={
+                  hasConfidentDecisions
+                    ? "The system was sure and nobody disagreed."
+                    : "Every shot so far was too close to call, so all of them went to a person."
+                }
+                tone={hasConfidentDecisions ? "good" : undefined}
               />
               <Panel
                 label="Confident calls overturned"
-                value={fmt(accuracy.confident_overturned)}
+                value={hasConfidentDecisions ? fmt(accuracy.confident_overturned) : "—"}
                 detail="the system was sure and an editor disagreed"
                 note="The honest error signal."
                 tone="warn"
               />
               <Panel
                 label="Flagged calls changed"
-                value={`${accuracy.flagged_changed_pct}%`}
+                value={
+                  accuracy.flagged_changed_pct === null || !hasFlaggedShots
+                    ? "—"
+                    : `${accuracy.flagged_changed_pct}%`
+                }
                 detail={`of ${fmt(accuracy.flagged_for_review)} sent for review`}
-                note="High is success. These went to a person on purpose."
+                note={
+                  accuracy.flagged_changed_pct === 0 && hasFlaggedShots
+                    ? "Nobody has looked at these yet."
+                    : "High is success. These went to a person on purpose."
+                }
               />
             </div>
             <aside className="explainer">
@@ -232,10 +266,12 @@ export function AccuracyDashboard() {
           </>
         ) : (
           <p className="not-run">
-            No editorial decisions have been recorded yet, so there is nothing to
-            report. This figure requires editors working on real footage and
-            overriding the system where they disagree; it cannot be simulated,
-            and a number here that came from anywhere else would be worthless.
+            {hasAnyJudgement
+              ? "Shots have been judged, but none confidently enough to be right or wrong about yet."
+              : "Nothing has been judged yet, so there is nothing to report."}{" "}
+            This figure requires editors working on real footage and overriding
+            the system where they disagree. It cannot be simulated, and a number
+            here that came from anywhere else would be worthless.
           </p>
         )}
       </section>
@@ -261,13 +297,34 @@ export function AccuracyDashboard() {
           </p>
         )}
 
-        <h3 style={{ marginTop: 30 }}>Generated, for scale</h3>
-        <div className="stats">
-          <Stat label="Productions" value={fmt(corpus.synthetic.productions)} />
-          <Stat label="Clips" value={fmt(corpus.synthetic.clips)} />
-          <Stat label="Hours" value={fmt(corpus.synthetic.footage_hours)} />
-        </div>
-        <p className="dim small">{corpus.synthetic.purpose}</p>
+        {/*
+          Behind a disclosure, not beside the real counts.
+
+          It was sitting directly under them, and three hundred thousand
+          generated clips next to sixteen real ones reads as the size of the
+          system however it is labelled — the first thing a reader takes from a
+          page is its largest number. It has one honest job, which is showing
+          the queries stay fast, and that job is done by someone who opened it
+          on purpose.
+        */}
+        <details className="generated">
+          <summary>
+            Generated rows, for query performance — not footage anyone shot
+          </summary>
+          <div className="stats" style={{ marginTop: 14 }}>
+            <Stat label="Productions" value={fmt(corpus.synthetic.productions)} />
+            <Stat label="Clips" value={fmt(corpus.synthetic.clips)} />
+            <Stat label="Hours" value={fmt(corpus.synthetic.footage_hours)} />
+          </div>
+          <p className="dim small">{corpus.synthetic.purpose}</p>
+          <p className="dim small">
+            Nothing here was shot, measured or judged. It exists so the archive
+            can be asked a question over three hundred thousand decisions and
+            answer in milliseconds, which sixteen real clips cannot demonstrate.
+            Every figure elsewhere on this site reads a view these rows cannot
+            enter.
+          </p>
+        </details>
       </section>
 
       <footer className="caveat">

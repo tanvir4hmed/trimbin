@@ -1101,3 +1101,22 @@ button.primary:disabled {
   word-break: break-word;
   color: var(--low);
 }
+
+/* The generated corpus, closed by default.
+   Its numbers are two orders of magnitude larger than the real ones, and the
+   first thing anyone takes from a page is its biggest number — however it is
+   labelled. Opened on purpose, it says what it is; left closed, it does not
+   compete with the counts that describe actual work. */
+.generated {
+  margin-top: 28px;
+  border-top: 1px solid var(--line, rgba(0,0,0,.1));
+  padding-top: 16px;
+}
+.generated > summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--low);
+  list-style: revert;
+}
+.generated > summary:hover { color: var(--ink); }
+.generated[open] > summary { margin-bottom: 4px; }

@@ -38,13 +38,14 @@ from ..contracts.base import ClipRef, Confidence, Finding, Provenance, ReasonCod
 
 log = logging.getLogger(__name__)
 
+# v3: timecodes are required rather than encouraged.
 # v2: the specialists are given a closed list of finding codes.
 #
 # The version has to move with the prompt or the archive cannot be read back.
 # Rows stamped analyst/v1 carry invented codes; rows stamped v2 carry taxonomy
 # ones, and a query that treats them alike is comparing two different
 # vocabularies while believing it is comparing takes.
-PROMPT_VERSION = "analyst/v2"
+PROMPT_VERSION = "analyst/v3"
 _HERE = Path(__file__).parent
 
 TECHNICAL = (_HERE / "prompt_technical_v1.md").read_text(encoding="utf-8")

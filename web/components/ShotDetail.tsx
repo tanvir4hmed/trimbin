@@ -380,8 +380,10 @@ function TakeRow({
               {[...take.findings]
                 .sort((a, b) => a.start_s - b.start_s)
                 .map((f, i) => {
-                  // A finding with no span applies to the whole take — real,
-                  // and not something to seek to.
+                  // A finding with no span applies to the whole take. That is
+                  // still somewhere to go — the top — and making it clickable
+                  // costs nothing while a dead row costs the reader a moment
+                  // working out why this one does not respond.
                   const anchored = f.end_s > f.start_s;
                   const at = f.start_s;
                   return (
@@ -389,9 +391,12 @@ function TakeRow({
                       <button
                         type="button"
                         className="finding"
-                        onClick={() => anchored && seekTo(at)}
-                        disabled={!anchored}
-                        title={anchored ? "Play from here" : "Applies to the whole take"}
+                        onClick={() => seekTo(anchored ? at : 0)}
+                        title={
+                          anchored
+                            ? "Play from here"
+                            : "Applies to the whole take — plays from the start"
+                        }
                       >
                         <span className="at">
                           {anchored ? seconds(at) : "throughout"}
