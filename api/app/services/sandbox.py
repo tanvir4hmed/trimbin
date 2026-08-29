@@ -82,12 +82,19 @@ async def check_and_count(request: Request, clips: int) -> None:
     allowance = settings.sandbox_max_per_ip_per_day
 
     @firestore.async_transactional
-    async def count(transaction) -> int:
+    async def count(transaction) -> tuple[bool, int]:
         snapshot = await ref.get(transaction=transaction)
         used = (snapshot.to_dict() or {}).get("clips", 0) if snapshot.exists else 0
 
-        if used + clips > allowance:
-            return used
+        # Returns the decision, not a number to be re-interpreted.
+        #
+        # This previously returned the count and let the caller work out whether
+        # it meant "allowed" — which it got wrong: on refusal it returned the
+        # *old* total, the caller compared that against the allowance, found it
+        # under, and let the upload through. The quota did not hold at all, and
+        # nothing said so because both paths returned a plausible integer.
+        if not within_quota(used, clips, allowance):
+            return False, used
 
         transaction.set(
             ref,
@@ -99,18 +106,29 @@ async def check_and_count(request: Request, clips: int) -> None:
                 "expires_at": datetime.now(UTC) + timedelta(days=2),
             },
         )
-        return used + clips
+        return True, used + clips
 
-    total = await count(db().transaction())
+    allowed, used = await count(db().transaction())
 
-    if total > allowance or total == 0 and clips > 0:
-        log.info("sandbox quota reached for %s", ip)
+    if not allowed:
+        log.info("sandbox quota reached for %s (%d of %d used)", ip, used, allowance)
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
-            f"The sandbox allows {allowance} clips a day from one address, and "
-            f"you have used them. It resets at midnight UTC. Signing in removes "
-            f"the limit.",
+            f"The sandbox allows {allowance} clips a day from one address and "
+            f"you have used {used}. It resets at midnight UTC. Signing in "
+            f"removes the limit.",
         )
+
+
+def within_quota(used: int, requested: int, allowance: int) -> bool:
+    """Whether this many more clips fit in what is left today.
+
+    A function rather than an expression inside the transaction, so it can be
+    tested without a database. The bug it replaced was a decision encoded as an
+    integer and decoded wrongly a few lines later; a boolean cannot be
+    misread.
+    """
+    return used + requested <= allowance
 
 
 def clip_is_too_long(duration_s: float) -> bool:

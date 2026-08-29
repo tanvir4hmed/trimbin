@@ -132,3 +132,45 @@ class TestTheLimitsAreActuallySet:
         """A visitor's footage is theirs. Keeping it because deleting is work
         would be the wrong default for material uploaded to try a demo."""
         assert 1 <= settings.sandbox_retention_hours <= 72
+
+
+class TestTheDailyQuota:
+    """The decision the quota actually turns on.
+
+    It shipped broken and the test suite could not see it: the transaction
+    returned a count and the caller re-interpreted it, and on refusal it
+    returned the *old* total — which was under the allowance, so the upload went
+    through. Both paths returned a plausible integer, so nothing looked wrong
+    anywhere.
+
+    The rule is now a boolean, and these are the cases it has to get right.
+    """
+
+    ALLOWANCE = 3
+
+    def test_a_first_visit_fits(self) -> None:
+        assert sandbox.within_quota(0, 1, self.ALLOWANCE)
+
+    def test_using_the_whole_allowance_at_once_fits(self) -> None:
+        assert sandbox.within_quota(0, self.ALLOWANCE, self.ALLOWANCE)
+
+    def test_exactly_finishing_the_allowance_fits(self) -> None:
+        """Two used, one left, one asked for. Refusing here would mean the last
+        clip of an allowance can never be spent."""
+        assert sandbox.within_quota(2, 1, self.ALLOWANCE)
+
+    def test_one_over_does_not(self) -> None:
+        assert not sandbox.within_quota(2, 2, self.ALLOWANCE)
+
+    def test_the_case_that_shipped_broken(self) -> None:
+        """One clip already used, three more requested. Four is over three, and
+        the deployed version allowed it."""
+        assert not sandbox.within_quota(1, 3, self.ALLOWANCE)
+
+    def test_nothing_left_means_nothing_more(self) -> None:
+        assert not sandbox.within_quota(self.ALLOWANCE, 1, self.ALLOWANCE)
+
+    def test_asking_for_nothing_is_always_fine(self) -> None:
+        """Not a real request, but a rule that says otherwise would make an
+        empty batch a quota error."""
+        assert sandbox.within_quota(self.ALLOWANCE, 0, self.ALLOWANCE)
