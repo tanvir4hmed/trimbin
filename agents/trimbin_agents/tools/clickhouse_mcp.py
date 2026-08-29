@@ -165,23 +165,44 @@ class ClickHouseMCP:
 def _rows_from(result: Any) -> list[dict[str, Any]]:
     """Unwrap whatever shape the MCP response arrived in.
 
-    Tolerant on purpose: the transport is not the interesting part, and a
-    structural surprise here should not read as a failed search.
+    Tolerant on purpose — the transport is not the interesting part. But an
+    unrecognised shape is logged rather than swallowed, because the first
+    version returned an empty list for it and an empty list is indistinguishable
+    from "nothing matched". A search that silently answers "no results" because
+    a parser missed is the exact failure this system is built against.
     """
-    content = getattr(result, "content", result)
-    if isinstance(content, list) and content and hasattr(content[0], "text"):
-        import json
+    import json
 
+    content = getattr(result, "structuredContent", None)
+    if content is None:
+        content = getattr(result, "content", result)
+
+    # A list of content blocks, each carrying text. The usual shape.
+    if isinstance(content, list) and content and hasattr(content[0], "text"):
+        text = content[0].text
         try:
-            parsed = json.loads(content[0].text)
+            content = json.loads(text)
         except (ValueError, AttributeError):
+            log.warning("MCP returned text that is not JSON: %r", text[:300])
             return []
-        content = parsed
 
     if isinstance(content, dict):
-        content = content.get("rows", content.get("data", []))
+        for key in ("rows", "data", "result", "records"):
+            if key in content:
+                content = content[key]
+                break
+        else:
+            # A single row as an object is still a row.
+            return [content] if content else []
 
-    return [r for r in content if isinstance(r, dict)] if isinstance(content, list) else []
+    if not isinstance(content, list):
+        log.warning("MCP returned an unexpected shape: %r", str(content)[:300])
+        return []
+
+    rows = [r for r in content if isinstance(r, dict)]
+    if content and not rows:
+        log.warning("MCP rows were not objects: %r", str(content[:2])[:300])
+    return rows
 
 
 class ReaderMissing(RuntimeError):
