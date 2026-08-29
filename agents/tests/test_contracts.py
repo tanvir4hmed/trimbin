@@ -128,13 +128,33 @@ class TestFindings:
         assert finding.where is not None
         assert finding.where.duration_s() == pytest.approx(3.6)
 
-    def test_findings_may_apply_to_a_whole_clip(self) -> None:
+    def test_a_whole_clip_fault_is_said_as_the_whole_clip(self) -> None:
+        """Not omitted. `where` used to be optional and the panel almost never
+        filled it in, so every finding arrived as "throughout" — nothing to
+        click, and no way to tell a fault that really did run the whole take
+        from one nobody bothered to locate.
+
+        The interface still shows the two differently. The difference is that
+        this one is now an answer rather than a gap."""
         finding = Finding(
             code="exposure.under",
             detail="1.8 stops below the group median throughout",
             severity=Severity.NOTE,
+            where=TimeRange(start_s=0.0, end_s=12.0),
         )
-        assert finding.where is None
+        assert finding.where.start_s == 0.0
+        assert finding.where.end_s == 12.0
+
+    def test_a_finding_without_a_span_is_refused(self) -> None:
+        """Asking the prompt nicely was not enough — it said "anchor findings
+        where you can" and the model mostly could not be bothered. A required
+        field is asked once, by the schema, every time."""
+        with pytest.raises(ValidationError):
+            Finding(
+                code="exposure.under",
+                detail="darker than the group",
+                severity=Severity.NOTE,
+            )
 
 
 class TestClosedVocabularies:
@@ -154,6 +174,7 @@ class TestClosedVocabularies:
                 code="hair.style_mismatch",  # what the model actually wrote
                 detail="Hair differs from the other takes",
                 severity=Severity.ATTENTION,
+                where=TimeRange(start_s=0.0, end_s=10.0),
             )
 
     def test_the_taxonomy_covers_what_the_panel_reached_for(self) -> None:
@@ -167,13 +188,20 @@ class TestClosedVocabularies:
             FindingCode.CAMERA_UNMOTIVATED_MOVE,
             FindingCode.DIALOGUE_INCOMPLETE,
         ):
-            assert Finding(code=wanted, detail="x", severity=Severity.NOTE).code is wanted
+            assert Finding(
+                code=wanted, detail="x", severity=Severity.NOTE,
+                where=TimeRange(start_s=0.0, end_s=5.0),
+            ).code is wanted
 
     def test_an_unnameable_observation_has_somewhere_to_go(self) -> None:
         """Better than forcing a wrong code onto a true observation. A rising
         count of these is a signal the list needs an entry, not noise."""
-        f = Finding(code=FindingCode.OTHER, detail="Something none of these name",
-                    severity=Severity.NOTE)
+        f = Finding(
+            code=FindingCode.OTHER,
+            detail="Something none of these name",
+            severity=Severity.NOTE,
+            where=TimeRange(start_s=0.0, end_s=5.0),
+        )
         assert f.code is FindingCode.OTHER
 
     def test_a_shake_and_an_outlier_stay_different_things(self) -> None:

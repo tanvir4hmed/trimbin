@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from ..auth import Principal, current_principal, require_member
 from ..services import decisions as decisions_service
+from ..services import shots
 from ..services import review as review_service
 from ..services.analytics import client
 
@@ -446,3 +447,63 @@ def _status(takes: int, has_verdict: bool, reviewed: bool, margin: float) -> str
     if margin < _review_margin():
         return "needs_review"
     return "decided"
+
+
+class ShotBrief(BaseModel):
+    """What a shot was meant to be, as a person types it.
+
+    Every field optional. A production that fills none of this in gets exactly
+    what it gets today — a system that needs paperwork before it is useful is a
+    system nobody opens on a Friday.
+    """
+
+    slug: str = Field(default="", max_length=40, description="What the slate says: 12A")
+    heading: str = Field(default="", max_length=200, description="INT. APARTMENT - NIGHT")
+    action: str = Field(default="", max_length=2000, description="What happens, from the script")
+    line: str = Field(default="", max_length=500, description="The dialogue, if there is any")
+    notes: str = Field(default="", max_length=1000, description="Continuity: props, wardrobe")
+    look: str = Field(default="", max_length=60, description="handheld, locked off, dolly in")
+
+
+@router.get("/{project_id}/{group_id}/{subgroup_id}/brief")
+async def read_brief(
+    project_id: int,
+    group_id: int,
+    subgroup_id: int,
+    principal: Annotated[Principal, Depends(current_principal)],
+) -> dict:
+    """The shot's description. Readable by anyone who can read the project."""
+    await principal.assert_can_read(project_id)
+    shot = await shots.get(project_id, group_id, subgroup_id)
+    return {**shot.as_dict(), "is_empty": shot.is_empty}
+
+
+@router.put("/{project_id}/{group_id}/{subgroup_id}/brief")
+async def write_brief(
+    project_id: int,
+    group_id: int,
+    subgroup_id: int,
+    body: ShotBrief,
+    principal: Annotated[Principal, Depends(require_member)],
+) -> dict:
+    """Describe a shot, so the panel checks against intent rather than majority.
+
+    Does not re-judge on its own. Comparing takes costs a model call per shot,
+    and a description typed one field at a time would spend it on every
+    keystroke — the editor presses compare when they are ready.
+    """
+    await principal.assert_can_write(project_id)
+
+    shot = await shots.put(
+        project_id, group_id, subgroup_id,
+        body.model_dump(), author=principal.email or "",
+    )
+    return {
+        **shot.as_dict(),
+        "is_empty": shot.is_empty,
+        "note": (
+            "Saved. Run the comparison again for the panel to use it."
+            if not shot.is_empty
+            else "Cleared."
+        ),
+    }

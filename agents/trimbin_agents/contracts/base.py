@@ -23,7 +23,7 @@ from datetime import datetime
 from enum import Enum
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class Strict(BaseModel):
@@ -189,7 +189,34 @@ class TimeRange(Strict):
     """A span within a single clip, in seconds from its start."""
 
     start_s: float = Field(ge=0)
-    end_s: float = Field(ge=0)
+    end_s: float = Field(
+        ge=0,
+        description=(
+            "End, in seconds. For something that runs the whole take, the "
+            "clip's length — not zero."
+        ),
+    )
+
+    # Deliberately not `gt=0`, and deliberately not validated to have length.
+    #
+    # Two attempts got here. Making `where` required got the field filled in and
+    # nothing else: the model answered 0 to 0 for every finding, which satisfies
+    # a schema asking for presence and tells an editor nothing. Presence was
+    # never the thing worth requiring.
+    #
+    # Then `gt=0` — which Vertex refuses outright, because its response schema
+    # has no exclusiveMinimum, and the whole specialist call fails with an error
+    # about the schema rather than about the answer.
+    #
+    # So the shape stays permissive and the meaning is restored where the
+    # information exists. A zero-length span means "throughout", and only the
+    # caller knows how long the take is; services/review.py widens it to the
+    # clip. Being liberal in what is accepted and strict about what is stored is
+    # the arrangement that survives a model that will not do arithmetic.
+
+    def is_empty(self) -> bool:
+        """No length. Means "throughout" and needs a duration to become useful."""
+        return self.end_s <= self.start_s
 
     def duration_s(self) -> float:
         return self.end_s - self.start_s
@@ -209,9 +236,13 @@ class Finding(Strict):
     )
     detail: str = Field(max_length=200)
     severity: Severity
-    where: TimeRange | None = Field(
-        default=None,
-        description="Omitted when the finding applies to the whole clip.",
+    where: TimeRange = Field(
+        description=(
+            "Where in the clip, in seconds. Required.\n\n"
+            "A fault that genuinely runs the whole take is given as the whole "
+            "take — start 0, end the clip's length — not omitted. Those are "
+            "different answers and the interface shows them differently."
+        )
     )
 
 

@@ -34,7 +34,15 @@ from ..contracts.analysis import (
     SpecialistReport,
     TakeVerdict,
 )
-from ..contracts.base import ClipRef, Confidence, Finding, Provenance, ReasonCode, Severity
+from ..contracts.base import (
+    ClipRef,
+    Confidence,
+    Finding,
+    Provenance,
+    ReasonCode,
+    Severity,
+    TimeRange,
+)
 
 log = logging.getLogger(__name__)
 
@@ -164,9 +172,18 @@ class AnalystAgent:
         request: AnalysisRequest,
     ) -> list[SpecialistReport]:
         try:
+            # The briefing goes before the prompt, not after: the specialist
+            # should know what it is looking at before it is told what to look
+            # for. After the instructions it reads as an afterthought, and a
+            # model treats it like one.
+            contents: list = [*parts]
+            if request.briefing:
+                contents.append(request.briefing)
+            contents += [prompt, _describe_takes(request)]
+
             response = await self._client.aio.models.generate_content(
                 model=settings.analyst_model,
-                contents=[*parts, prompt, _describe_takes(request)],
+                contents=contents,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_schema=list[SpecialistReport],
@@ -194,6 +211,7 @@ class AnalystAgent:
                 model=settings.analyst_model,
                 contents=[
                     CHIEF,
+                    *( [request.briefing] if request.briefing else [] ),
                     _describe_takes(request),
                     _render_reports(reports),
                 ],
@@ -350,12 +368,20 @@ def _technical_report(request: AnalysisRequest) -> list[SpecialistReport]:
         m = request.measurements[clip.clip_id]
         findings: list[Finding] = []
 
+        # Every finding here is a comparison against the group — "darkest take",
+        # "most movement" — so it genuinely applies from the first frame to the
+        # last. Said as the whole clip rather than omitted, because the schema
+        # now requires a span and because "throughout" is a real answer that
+        # reads differently in the interface from "at 4.2s".
+        whole = TimeRange(start_s=0.0, end_s=m.duration_s)
+
         if m.motion_rel >= OUTLIER_RATIO:
             findings.append(
                 Finding(
                     code="stability.outlier",
                     detail=f"most camera movement in this group, {m.motion_rel:.1f}x the median",
                     severity=Severity.NOTE,
+                                    where=whole,
                 )
             )
         if m.exposure_rel <= 1 / OUTLIER_RATIO:
@@ -364,6 +390,7 @@ def _technical_report(request: AnalysisRequest) -> list[SpecialistReport]:
                     code="exposure.under",
                     detail=f"darkest take in this group, {m.exposure_rel:.2f} of the median",
                     severity=Severity.NOTE,
+                                    where=whole,
                 )
             )
         # The bright end matters more, not less: a dark image can be lifted in
@@ -374,6 +401,7 @@ def _technical_report(request: AnalysisRequest) -> list[SpecialistReport]:
                     code="exposure.over",
                     detail=f"brightest take in this group, {m.exposure_rel:.1f}x the median",
                     severity=Severity.ATTENTION,
+                                    where=whole,
                 )
             )
         if m.clipping_pct > 5:
@@ -382,6 +410,7 @@ def _technical_report(request: AnalysisRequest) -> list[SpecialistReport]:
                     code="exposure.clipped",
                     detail=f"{m.clipping_pct:.1f}% of frames clipped",
                     severity=Severity.ATTENTION,
+                                    where=whole,
                 )
             )
         if m.sharpness_rel <= 1 / OUTLIER_RATIO:
@@ -390,6 +419,7 @@ def _technical_report(request: AnalysisRequest) -> list[SpecialistReport]:
                     code="focus.soft",
                     detail=f"softest take in this group, {m.sharpness_rel:.2f} of the median",
                     severity=Severity.ATTENTION,
+                                    where=whole,
                 )
             )
         if m.dropped_frames:
@@ -398,6 +428,7 @@ def _technical_report(request: AnalysisRequest) -> list[SpecialistReport]:
                     code="frames.dropped",
                     detail=f"{m.dropped_frames} dropped frames",
                     severity=Severity.BLOCKING,
+                                    where=whole,
                 )
             )
 

@@ -190,13 +190,28 @@ class TestSpans:
         span = result.selections[0].span
         assert span.end_s - span.start_s >= MIN_USABLE_S or span.start_s == 0.0
 
-    def test_a_span_must_have_duration(self) -> None:
-        with pytest.raises(ValidationError, match="positive duration"):
-            Selection(
-                group_id=12, subgroup_id=3, clip_id=uuid4(), take_no=1,
-                span=TimeRange(start_s=5.0, end_s=5.0),
-                reason="…", score=0.9, margin=0.4,
-            )
+    def test_a_zero_length_span_says_so(self) -> None:
+        """Accepted, not refused, and it means "throughout".
+
+        Refusing it was the second attempt and it broke the call outright:
+        `gt=0` becomes exclusiveMinimum in the response schema, which Vertex
+        does not accept, so the specialist failed with an error about the schema
+        rather than about the answer.
+
+        The model cannot do better than this on its own — it never sees the
+        clip's duration. So the shape stays permissive and the meaning is
+        restored by the caller, which knows."""
+        assert TimeRange(start_s=5.0, end_s=5.0).is_empty()
+
+    def test_a_real_span_is_not_empty(self) -> None:
+        assert not TimeRange(start_s=4.2, end_s=7.8).is_empty()
+
+    def test_a_whole_take_is_a_real_span(self) -> None:
+        """Zero to the clip's length is the answer for something that runs
+        throughout — an answer, not the absence of one."""
+        whole = TimeRange(start_s=0.0, end_s=70.0)
+        assert not whole.is_empty()
+        assert whole.duration_s() == 70.0
 
 
 class TestReviewReasons:
@@ -232,6 +247,7 @@ class TestReviewReasons:
                     code="frames.dropped",
                     detail="3 dropped frames",
                     severity=Severity.BLOCKING,
+                    where=TimeRange(start_s=0.0, end_s=10.0),
                 )
             ],
         )

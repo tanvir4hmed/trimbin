@@ -89,6 +89,23 @@ class AnalysisRequest(Strict):
             "how findings are worded; never overrides what was measured."
         ),
     )
+    briefing: str = Field(
+        default="",
+        max_length=4000,
+        description=(
+            "What the shot was meant to be, if the production said: the slug "
+            "line, the action, the dialogue, the script supervisor's continuity "
+            "notes.\n\n"
+            "Optional, and empty is the normal case. Where it exists it changes "
+            "what the panel checks rather than what it concludes — completeness "
+            "stops being inferred from majority and becomes a comparison against "
+            "intent, which matters most on the shot where every take drifted the "
+            "same way and the majority is wrong.\n\n"
+            "Written by a person, so it is untrusted input reaching a prompt. It "
+            "is rendered with its own guardrail by services/shots.py rather than "
+            "interpolated raw."
+        ),
+    )
 
 
 class AnalysisResult(Strict):

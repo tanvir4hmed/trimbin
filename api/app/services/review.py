@@ -22,6 +22,7 @@ from uuid import UUID
 
 from . import clips as clips_service
 from . import criteria
+from . import shots as shots_service
 from . import decisions as decisions_service
 from . import ranges as ranges_service
 from . import storage
@@ -126,6 +127,8 @@ async def judge(
     from trimbin_agents.contracts.analysis import AnalysisRequest, Measurements
     from trimbin_agents.contracts.base import ClipRef
 
+    shot_meta = await shots_service.get(project_id, group_id, subgroup_id)
+
     request = AnalysisRequest(
         clips=[
             ClipRef(
@@ -137,6 +140,11 @@ async def judge(
             )
             for t in takes
         ],
+        # What the production said this shot was for, if anything. Empty is the
+        # normal case and costs nothing; where it exists it turns "different
+        # from the others" into "different from what was planned", which is the
+        # only way to catch a shot where every take drifted together.
+        briefing=shots_service.briefing(shot_meta),
         measurements={
             t["clip_id"]: Measurements(
                 exposure_rel=t["exposure_rel"],
@@ -329,7 +337,7 @@ def _as_rows(result, takes: list[dict]) -> list[dict]:
         # and what the panel observed. They are the same kind of thing to
         # everything downstream, and an editor does not care which found the
         # boom in shot.
-        findings = _merge_findings(take.get("findings", []), v.findings)
+        findings = _merge_findings(take.get("findings", []), v.findings, duration)
 
         scores = criteria.score_take(take, findings)
         ranges, trims = ranges_service.safe_ranges(duration, findings)
@@ -356,7 +364,7 @@ def _as_rows(result, takes: list[dict]) -> list[dict]:
     return rows
 
 
-def _merge_findings(measured: list[dict], observed) -> list[dict]:
+def _merge_findings(measured: list[dict], observed, duration_s: float) -> list[dict]:
     """One list from two sources, each keeping its provenance.
 
     Measured findings come from ffmpeg and carry a span it detected. Observed
@@ -372,6 +380,16 @@ def _merge_findings(measured: list[dict], observed) -> list[dict]:
     for f in observed:
         where = getattr(f, "where", None)
         code = getattr(f, "code", "")
+        start = float(getattr(where, "start_s", 0.0) or 0.0) if where else 0.0
+        end = float(getattr(where, "end_s", 0.0) or 0.0) if where else 0.0
+
+        # A span with no length means "throughout" — and the model has no way to
+        # know how long the take is, because it never sees a duration. Widening
+        # it here is the difference between a row that seeks somewhere and a row
+        # that says "throughout" and does nothing when clicked.
+        if end <= start:
+            start, end = 0.0, duration_s
+
         out.append({
             # The enum's value, not its repr. Everything downstream matches on
             # the taxonomy string, and a class name matches nothing — silently,
@@ -379,8 +397,8 @@ def _merge_findings(measured: list[dict], observed) -> list[dict]:
             "code": getattr(code, "value", code),
             "detail": getattr(f, "detail", ""),
             "severity": getattr(getattr(f, "severity", None), "value", "attention"),
-            "start_s": getattr(where, "start_s", 0.0) if where else 0.0,
-            "end_s": getattr(where, "end_s", 0.0) if where else 0.0,
+            "start_s": start,
+            "end_s": end,
             "source": "observed",
         })
 

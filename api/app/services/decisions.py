@@ -133,17 +133,50 @@ def _findings(findings: list) -> tuple[list[str], list[float], list[float]]:
         code = _attr(f, "code")
         if not code:
             continue
-        where = _attr(f, "where")
+
         # .value, not str(). From Python 3.11 a `str, Enum` member stringifies
         # to "FindingCode.CONTINUITY_BLOCKING" rather than to its value, so the
         # archive filled with class names — which match no query, and none of
         # the scoring tables either. The scores came out perfect for every take
         # because nothing recognised anything.
         codes.append(_code_value(code))
-        starts.append(round(float(_attr(where, "start_s") or 0.0), 2))
-        ends.append(round(float(_attr(where, "end_s") or 0.0), 2))
+
+        # Two shapes arrive here and only one was handled.
+        #
+        # A contract Finding nests its span in `where`. Everything upstream of
+        # this — review._merge_findings, an override posted as JSON — passes it
+        # flat, as start_s and end_s. Reading only `where` found nothing on the
+        # flat shape and wrote 0.0, so *every* timecode in the decisions table
+        # has been zero since this was written.
+        #
+        # It cost a long detour: the prompt was rewritten to demand timecodes,
+        # the schema was made to require them, and the model was in fact
+        # supplying them the whole time. Nothing was wrong upstream. The rows
+        # were being flattened on the way in.
+        start, end = _span(f)
+        starts.append(round(start, 2))
+        ends.append(round(end, 2))
 
     return codes, starts, ends
+
+
+def _span(finding) -> tuple[float, float]:
+    """The finding's timecodes, whichever shape it arrived in.
+
+    Nested under `where` on a contract object; flat on a dict. Both are
+    legitimate — one comes from an agent, the other from a route — and a writer
+    that understands only one silently drops the other's data.
+    """
+    where = _attr(finding, "where")
+    if where is not None:
+        return (
+            float(_attr(where, "start_s") or 0.0),
+            float(_attr(where, "end_s") or 0.0),
+        )
+    return (
+        float(_attr(finding, "start_s") or 0.0),
+        float(_attr(finding, "end_s") or 0.0),
+    )
 
 
 def _code_value(code) -> str:

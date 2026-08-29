@@ -147,3 +147,82 @@ class TestWhatGetsWritten:
         by_id = {r["clip_id"]: r for r in rows}
         assert by_id[chosen]["reason"] == "the pause before the line lands"
         assert by_id[other]["reason"] != "the pause before the line lands"
+
+
+class TestTimecodesSurviveTheWrite:
+    """The bug that made every finding in the archive say "throughout".
+
+    Two shapes reach the writer. A contract Finding nests its span under
+    `where`; review._merge_findings and a human override pass it flat, as
+    start_s and end_s. The writer read only `where`, found nothing on the flat
+    shape, and wrote 0.0.
+
+    So every timecode in the decisions table was zero from the day it was
+    written — and it looked like a model problem. The prompt was rewritten to
+    demand spans, the schema was made to require them, and Vertex rejected the
+    stricter schema outright. None of that was the cause. The model had been
+    supplying them all along and they were being flattened on the way in.
+    """
+
+    def test_a_flat_finding_keeps_its_span(self) -> None:
+        from app.services.decisions import _findings
+
+        codes, starts, ends = _findings(
+            [{"code": "stability.shake", "start_s": 4.2, "end_s": 7.8}]
+        )
+        assert (codes, starts, ends) == (["stability.shake"], [4.2], [7.8])
+
+    def test_a_nested_finding_keeps_its_span(self) -> None:
+        from trimbin_agents.contracts.base import (
+            FindingCode,
+            Finding,
+            Severity,
+            TimeRange,
+        )
+
+        from app.services.decisions import _findings
+
+        f = Finding(
+            code=FindingCode.CONTINUITY_PROP,
+            detail="cup in the other hand",
+            severity=Severity.ATTENTION,
+            where=TimeRange(start_s=12.0, end_s=14.0),
+        )
+        codes, starts, ends = _findings([f])
+        assert (codes, starts, ends) == (["continuity.prop"], [12.0], [14.0])
+
+    def test_a_finding_with_no_span_at_all_is_still_written(self) -> None:
+        """Zero-zero here means "we do not know", which review widens to the
+        whole take before it gets this far. Losing the row entirely would be
+        worse than losing its timecode."""
+        from app.services.decisions import _findings
+
+        codes, starts, ends = _findings([{"code": "performance.note"}])
+        assert codes == ["performance.note"]
+        assert (starts, ends) == ([0.0], [0.0])
+
+    def test_both_shapes_in_one_batch(self) -> None:
+        """review._merge_findings emits exactly this: ffmpeg's flat findings
+        beside the panel's contract objects, in one list."""
+        from trimbin_agents.contracts.base import (
+            FindingCode,
+            Finding,
+            Severity,
+            TimeRange,
+        )
+
+        from app.services.decisions import _findings
+
+        mixed = [
+            {"code": "focus.lost", "start_s": 6.0, "end_s": 12.0},
+            Finding(
+                code=FindingCode.DIALOGUE_INCOMPLETE,
+                detail="stops mid-line",
+                severity=Severity.BLOCKING,
+                where=TimeRange(start_s=28.0, end_s=30.0),
+            ),
+        ]
+        codes, starts, ends = _findings(mixed)
+        assert codes == ["focus.lost", "dialogue.incomplete"]
+        assert starts == [6.0, 28.0]
+        assert ends == [12.0, 30.0]
