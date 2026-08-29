@@ -229,12 +229,19 @@ class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /** True when the archive was merely asleep. A different sentence entirely. */
+    readonly waking = false,
   ) {
     super(message);
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+/** How long to wait before trying again while the archive gets up. */
+const WAKE_RETRY_MS = 12_000;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function request<T>(path: string, init?: RequestInit, retriedWake = false): Promise<T> {
   // The token is attached here rather than at each call site. A route that
   // forgets it does not fail loudly — it 401s, and the page shows an empty
   // state that looks like "no data" rather than "not signed in".
@@ -252,11 +259,22 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     // Prefer the server's explanation. A generic failure message leaves the
     // person with nothing to act on, and the API already knows what went wrong.
-    const detail = await response
-      .json()
-      .then((body) => body?.detail as string | undefined)
-      .catch(() => undefined);
-    throw new ApiError(detail ?? `Request failed (${response.status})`, response.status);
+    const body = await response.json().catch(() => undefined);
+    const detail = body?.detail as string | undefined;
+
+    // A sleeping database is a wait, not a failure. One quiet retry covers the
+    // common case — the person arrived first and the service is getting up —
+    // and only a second failure is worth telling them about.
+    if (response.status === 503 && body?.waking && !retriedWake) {
+      await sleep(WAKE_RETRY_MS);
+      return request<T>(path, init, true);
+    }
+
+    throw new ApiError(
+      detail ?? `Request failed (${response.status})`,
+      response.status,
+      Boolean(body?.waking),
+    );
   }
 
   // 204 and friends. Parsing an empty body throws, and the throw arrives at the

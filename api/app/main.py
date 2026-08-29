@@ -61,6 +61,31 @@ app.include_router(review.router)
 app.include_router(projects.router)
 
 
+@app.exception_handler(analytics.Waking)
+async def waking(request: Request, exc: analytics.Waking) -> JSONResponse:
+    """A cold database is a wait, not a fault.
+
+    503 with Retry-After rather than 500, so the difference reaches the client
+    as something it can act on. The interface then says "this can take a
+    moment" instead of "something went wrong" — which matters because the
+    person who sees this most often is the one who arrived first, and telling
+    them the system is broken when it is merely asleep is how a working demo
+    reads as a broken one.
+    """
+    log.info("archive still waking on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=503,
+        headers={"Retry-After": "20"},
+        content={
+            "detail": (
+                "The archive is waking up — it sleeps when nobody is using it. "
+                "This takes about half a minute."
+            ),
+            "waking": True,
+        },
+    )
+
+
 @app.exception_handler(Exception)
 async def unhandled(request: Request, exc: Exception) -> JSONResponse:
     """Log the detail, return a sentence.

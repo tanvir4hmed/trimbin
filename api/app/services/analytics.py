@@ -25,9 +25,22 @@ log = logging.getLogger(__name__)
 _client: AsyncClient | None = None
 
 
+class Waking(Exception):
+    """The database is asleep and has not finished getting up.
+
+    Distinct from a failure, and the distinction is the whole point. A visitor
+    who arrives first after a quiet period has done nothing wrong, and telling
+    them "something went wrong on our side" for a wait they simply have to sit
+    through is the stuck-spinner failure this interface was written to avoid.
+    """
+
+
 async def client() -> AsyncClient:
     global _client
-    if _client is None:
+    if _client is not None:
+        return _client
+
+    try:
         _client = await clickhouse_connect.get_async_client(
             host=settings.clickhouse_host,
             port=settings.clickhouse_port,
@@ -35,18 +48,30 @@ async def client() -> AsyncClient:
             password=settings.clickhouse_password,
             secure=True,
             query_limit=0,
-            # Generous on connect, tight on query.
-            #
-            # The service idles to keep costs down, and waking one takes tens of
-            # seconds. That cost lands entirely on the first visitor after a
-            # quiet period — which, for a demo nobody is hammering, is most
-            # visitors. Timing out there would show an error to someone whose
-            # only problem was arriving first.
-            #
-            # Once awake, a slow query is a real fault and should surface as one.
             connect_timeout=90,
-            send_receive_timeout=30,
+            # Generous on both, because the wait is not where the old comment
+            # assumed it was.
+            #
+            # The service idles to keep costs down and takes tens of seconds to
+            # wake. That happens during the client's own first statement — a
+            # `SELECT version()` — which is governed by this timeout and not by
+            # connect_timeout. Thirty seconds here meant the very first request
+            # after a quiet period returned a 500 while the database was doing
+            # exactly what it was configured to do.
+            #
+            # The cost of the generous value is that a genuinely slow query now
+            # waits longer before failing. That is the better trade: a slow
+            # query is rare and a cold start is most visits.
+            send_receive_timeout=150,
         )
+    except Exception as exc:
+        # Leave nothing half-built. A client that failed to initialise is not
+        # usable, and caching it would make one cold start into a permanent
+        # outage until the instance is replaced.
+        _client = None
+        log.warning("could not reach the archive: %s", exc)
+        raise Waking("The archive is waking up.") from exc
+
     return _client
 
 

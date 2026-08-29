@@ -204,3 +204,65 @@ class TestHealth:
         """A health check that fails when a dependency is slow takes the service
         down for a problem it could have survived."""
         assert client.get("/public/health").json() == {"status": "ok"}
+
+
+class TestTheArchiveWaking:
+    """A sleeping database is a wait, not a fault.
+
+    The service idles to keep costs down and takes tens of seconds to get up.
+    That wait lands on the client's own first statement, not on the TCP connect,
+    so a generous connect_timeout beside a tight read timeout — which is what
+    this had — turns the most common visit into a 500.
+
+    The person who sees this is the one who arrived first. Telling them the
+    system is broken when it is merely asleep is how a working demo reads as a
+    broken one.
+    """
+
+    def test_a_cold_archive_is_a_503_not_a_500(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async def asleep() -> dict:
+            raise analytics.Waking("The archive is waking up.")
+
+        monkeypatch.setattr(analytics, "accuracy_summary", asleep)
+
+        response = client.get("/public/accuracy")
+        assert response.status_code == 503
+
+    def test_it_says_to_come_back_and_when(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Retry-After so a client can wait the right amount rather than either
+        hammering or giving up."""
+
+        async def asleep() -> dict:
+            raise analytics.Waking("The archive is waking up.")
+
+        monkeypatch.setattr(analytics, "accuracy_summary", asleep)
+
+        response = client.get("/public/accuracy")
+        assert response.headers.get("Retry-After")
+        assert response.json()["waking"] is True
+
+    def test_a_real_fault_is_still_a_500(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The distinction only helps if it stays a distinction. A broken query
+        dressed as "waking" would be a bug nobody ever investigates.
+
+        Its own client, because TestClient re-raises server exceptions by
+        default and never reaches the handler under test. Production has no such
+        shortcut.
+        """
+
+        async def broken() -> dict:
+            raise RuntimeError("column does not exist")
+
+        monkeypatch.setattr(analytics, "accuracy_summary", broken)
+
+        with TestClient(app, raise_server_exceptions=False) as unshielded:
+            response = unshielded.get("/public/accuracy")
+
+        assert response.status_code == 500
+        assert "waking" not in response.text.lower()

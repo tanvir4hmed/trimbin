@@ -56,6 +56,10 @@ export default function ProjectPage({
         setError("Sign in to open this project.");
       } else if (e instanceof ApiError && e.status === 404) {
         setError("No such project.");
+      } else if (e instanceof ApiError && e.waking) {
+        setError(
+          "The archive is still waking up. It sleeps when nobody is using it.",
+        );
       } else {
         setError(e instanceof Error ? e.message : "Could not load this project.");
       }

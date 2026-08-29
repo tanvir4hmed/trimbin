@@ -99,6 +99,11 @@ export default function ShotDetail({
         // obvious next action, and showing it as a failure hides that.
         setData(null);
         setError(null);
+      } else if (e instanceof ApiError && e.waking) {
+        // Named, so the reader knows to wait rather than to give up.
+        setError(
+          "The archive is still waking up. It sleeps when nobody is using it.",
+        );
       } else {
         setError(e instanceof Error ? e.message : "Could not load this shot.");
       }
