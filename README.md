@@ -167,11 +167,18 @@ Four decisions worth naming.
 failures in the middle. Agents answer questions; they are the wrong shape for driving a
 long batch. The worker is a plain Pub/Sub consumer that scales to zero.
 
-**Nothing writes SQL but us.** Retrieval runs on a fixed query shape with the model
-choosing only parameters. The `mcp-clickhouse` wrapper exists in the tree and is
-deliberately *not* wired to a route: its safety check was a keyword regex, and a regex over
-SQL is a filter rather than a boundary. It should not reach a route until a genuinely
-read-only database user exists.
+**Nothing writes SQL but us — and nothing runs it as an admin.** Two separate
+questions, and the first version of this got both wrong at once.
+
+Retrieval runs on a fixed query shape with the model choosing only parameters, so the
+statement is always ours. It executes through the official `mcp-clickhouse` server, as the
+ClickHouse track requires the database to be used at runtime, connecting as
+`trimbin_reader` — SELECT on ten named objects, under a profile with `readonly = 1 CONST`.
+
+That user is new. The wrapper opened for weeks with a comment naming a read-only database
+user as its primary defence and there was none: the connection was the admin one and a
+keyword regex was the only thing in the way. A regex over SQL is a filter, not a boundary.
+Every deploy now proves the reader can read and cannot write before anything ships.
 
 **The panel watches proxies, not originals.** That is fairness before cost — proxies are
 encoded to one contract, so a model comparing them is comparing footage rather than being
@@ -190,7 +197,7 @@ signal this system has about its own quality.
 | Models | Gemini 3.6 Flash (video, long context) via Vertex AI, **global endpoint** |
 | Embeddings | `gemini-embedding-2`, 768 dimensions, natively multimodal |
 | Agent framework | None. The `google-genai` SDK directly, with pydantic response schemas. |
-| Analytics store | ClickHouse Cloud — clips, decisions, embeddings, HNSW vector index |
+| Analytics store | ClickHouse Cloud — clips, decisions, embeddings; reached at runtime through the official `mcp-clickhouse` server |
 | Mutable store | Firestore — projects, members, jobs, sandbox quotas |
 | Media | Cloud Storage + Cloud CDN, uniform HLS proxies |
 | Measurement | ffmpeg filter graph, one decode, two branches |
