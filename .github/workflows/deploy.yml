@@ -176,4 +176,20 @@ jobs:
           curl --fail --silent --show-error --max-time 60 "$WEB/" > /dev/null
           curl --fail --silent --show-error --max-time 120 "$WEB/accuracy" > /dev/null
 
+          # The track requires ClickHouse to be reached through mcp-clickhouse at
+          # runtime, and a missing dependency makes that fail silently — the
+          # search still answers, from the direct client, with the reason in a
+          # stack trace nobody reads. So ask, then check which path served it.
+          echo "Checking the search reaches ClickHouse through MCP..."
+          curl --fail --silent --show-error --max-time 240             -X POST "$URL/ask/1"             -H "Content-Type: application/json"             -d '{"question":"Which takes were rejected for continuity?"}'             > /dev/null
+
+          sleep 10
+          if gcloud logging read               'resource.labels.service_name="'"${{ env.SERVICE }}"'" AND textPayload:"via MCP"'               --project="${{ secrets.GCP_PROJECT_ID }}" --limit=1 --freshness=5m               --format="value(textPayload)" | grep -q "via MCP"; then
+            echo "  search served through mcp-clickhouse."
+          else
+            echo "  search did NOT go through MCP — it fell back." >&2
+            gcloud logging read               'resource.labels.service_name="'"${{ env.SERVICE }}"'" AND severity>=WARNING'               --project="${{ secrets.GCP_PROJECT_ID }}" --limit=3 --freshness=5m               --format="value(textPayload)" >&2
+            exit 1
+          fi
+
           echo "Smoke test passed."

@@ -34,8 +34,21 @@ RUN pip install --prefix=/install --no-cache-dir \
 # list to keep in step — drift there would show up as the worker measuring
 # differently from the eval harness.
 COPY agents/ ./agents/
+# --no-deps, then the agents' own dependencies named here.
+#
+# The manifest is the source of truth for what the agents import, but installing
+# it with dependencies resolved would drag in whatever transitively arrives and
+# make the image size a surprise. Naming them keeps both properties: the list is
+# short enough to read, and adding one is a visible change.
+#
+# It is also a list that can drift. It did: `mcp` was added to the manifest and
+# not here, the image built cleanly, and every search fell back to the direct
+# client with the reason buried in a stack trace. The smoke test now asks the
+# question that catches it.
 RUN pip install --prefix=/install --no-cache-dir --no-deps ./agents \
-    && pip install --prefix=/install --no-cache-dir "google-genai>=1.0.0"
+    && pip install --prefix=/install --no-cache-dir \
+        "google-genai>=1.0.0" \
+        "mcp>=1.0.0"
 
 
 FROM python:3.12-slim
