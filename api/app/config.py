@@ -69,6 +69,28 @@ class Settings(BaseSettings):
     # being accepted here.
     oauth_client_id: str = ""
 
+    # The second way in, because the first one needs a console.
+    #
+    # An OAuth client cannot be created by any API, so a deployment without that
+    # one manual step had every screen behind a door nobody could open. A pass
+    # is a code somebody types; the API signs a session token of its own with the
+    # secret below and verifies it on the way back in.
+    #
+    # No default, and nothing is minted or trusted without it. A signing secret
+    # with a fallback value is a signing secret everybody has.
+    session_secret: str = ""
+
+    # One code, shared deliberately - with a judge, in a submission. It grants
+    # the guest role and nothing more, which is safe because of what a guest can
+    # do rather than because of who holds the code: every guest action is
+    # additive, attributed and reversible.
+    guest_pass: str = ""
+
+    # `email:code` pairs, one per editor, so the archive records who actually
+    # decided something. One shared code would have been less work and would
+    # have made every override say "one of the three of us".
+    team_passes: str = ""
+
     # ---- access -----------------------------------------------------------
     # Membership by email, which is all a small team needs. A permissions matrix
     # is real work for a real product and would earn nothing here.

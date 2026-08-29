@@ -118,16 +118,20 @@ async def judge(
 ) -> dict:
     """Compare every take of one shot and record the verdicts.
 
-    Uploading is restricted; asking the system to think about footage that is
-    already here is not. A guest looking at our archive can run the comparison
-    again and watch it reach the same answer, which is a considerably better
-    demonstration than a screenshot of one.
+    For the editors who own the production. This was open to anyone signed in
+    for about an hour, on the reasoning that watching the panel reach the same
+    answer twice is a better demonstration than a screenshot — which is true,
+    and beside the point: it is a model call on somebody else's footage, paid
+    for by them, and it rewrites the verdicts every other reader is looking at.
+
+    A guest gets the demonstration by disagreeing with the answer instead, which
+    is the more interesting half anyway.
 
     Synchronous. A shot is a handful of takes and the fast path answers in
     seconds; queueing it would add a job to poll for an answer that has usually
     already arrived.
     """
-    await principal.assert_can_comment(project_id)
+    await principal.assert_can_curate(project_id)
 
     try:
         return await review_service.judge(project_id, group_id, subgroup_id, force=force)
@@ -347,6 +351,11 @@ async def undo(
 
     Only human decisions are undone. Rolling back the panel would mean rolling
     back to nothing, and re-running the comparison is what that button is for.
+
+    Anyone who can choose a take can put one back, including a guest — an undo
+    they cannot perform would mean a guest whose only mistake was pressing the
+    wrong row has no way to correct it, and asking an editor to clean up after
+    every visitor is worse than the risk.
     """
     await principal.assert_can_comment(project_id)
 
@@ -768,7 +777,7 @@ async def write_brief(
     and a description typed one field at a time would spend it on every
     keystroke — the editor presses compare when they are ready.
     """
-    await principal.assert_can_comment(project_id)
+    await principal.assert_can_curate(project_id)
 
     shot = await shots.put(
         project_id, group_id, subgroup_id,
@@ -795,7 +804,12 @@ async def circle_take(
 ) -> dict:
     """Record which take the room circled.
 
-    This never changes a verdict and is never shown to the panel. Feeding it in
+    An editor's record of what happened on the day, so it is theirs to write. A
+    guest inventing a circle on our footage would be inventing evidence — this is
+    the one field here that claims something about the world rather than about
+    the software.
+
+    It never changes a verdict and is never shown to the panel. Feeding it in
     would be the end of the measurement: a model told which take a human liked
     agrees with the human, and the agreement would then be reported as an
     independent confirmation of a judgement it was handed.
@@ -804,7 +818,7 @@ async def circle_take(
     circle and the measurements disagree goes to the top of the queue, because
     that is the shot where a person adds the most.
     """
-    await principal.assert_can_comment(project_id)
+    await principal.assert_can_curate(project_id)
     shot = await shots.circle(
         project_id, group_id, subgroup_id, body.take_no, principal.email or ""
     )
@@ -821,12 +835,11 @@ async def assign_shot(
 ) -> dict:
     """Put a name on a shot, or take one off.
 
-    Anybody who can comment can assign, including to themselves and including to
-    somebody else. A permission gate here would mean the lead editor is the only
-    person who can pick up a shot, which is how a queue stops moving on a Friday
-    afternoon.
+    Any editor on the production, to themselves or to somebody else. Restricting
+    it to the lead would be how a queue stops moving on a Friday afternoon;
+    opening it to guests would let a stranger reassign our work.
     """
-    await principal.assert_can_comment(project_id)
+    await principal.assert_can_curate(project_id)
     shot = await shots.assign(project_id, group_id, subgroup_id, body.assignee)
     return {**shot.as_dict(), "is_empty": shot.is_empty}
 
@@ -845,7 +858,7 @@ async def set_shot_state(
     questions and the tree shows both: derived says how sure the system is, set
     says whether anybody is still working on it.
     """
-    await principal.assert_can_comment(project_id)
+    await principal.assert_can_curate(project_id)
     shot = await shots.set_state(
         project_id, group_id, subgroup_id, body.state, principal.email or ""
     )

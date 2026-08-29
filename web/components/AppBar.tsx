@@ -16,16 +16,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import SignInPanel from "@/components/SignInPanel";
 import type { Me } from "@/lib/api";
 import { api } from "@/lib/api";
-import {
-  CLIENT_ID,
-  Identity,
-  currentIdentity,
-  renderSignInButton,
-  signOut,
-} from "@/lib/auth";
+import { Identity, currentIdentity, signOut } from "@/lib/auth";
 
 const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
@@ -39,7 +34,7 @@ export default function AppBar() {
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [me, setMe] = useState<Me | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const buttonRef = useRef<HTMLDivElement>(null);
+  const [signingIn, setSigningIn] = useState(false);
 
   // Read the stored session on mount rather than during render. sessionStorage
   // does not exist while Next renders on the server, and reaching for it there
@@ -62,14 +57,12 @@ export default function AppBar() {
     void loadMe();
   }, [identity, loadMe]);
 
+  // Close the menus when the route changes. A panel that survives navigation
+  // covers the page somebody just asked for.
   useEffect(() => {
-    if (identity || !buttonRef.current) return;
-    void renderSignInButton(buttonRef.current, (who) => setIdentity(who));
-  }, [identity]);
-
-  // Close the overflow menu when the route changes. A menu that survives
-  // navigation covers the page somebody just asked for.
-  useEffect(() => setMenuOpen(false), [pathname]);
+    setMenuOpen(false);
+    setSigningIn(false);
+  }, [pathname]);
 
   const active = (href: string) =>
     pathname === href || pathname.startsWith(`${href}/`);
@@ -140,11 +133,27 @@ export default function AppBar() {
           )}
         </div>
 
-        {!identity && CLIENT_ID && <div className="signin" ref={buttonRef} />}
-        {!identity && !CLIENT_ID && (
-          // Said plainly rather than shown as a button that cannot work.
-          // See docs/oauth-client.md — the one value Terraform cannot create.
-          <span className="hint small">Sign-in is not configured here.</span>
+        {!identity && (
+          <div className="overflow">
+            <button
+              type="button"
+              className="primary small"
+              onClick={() => setSigningIn((v) => !v)}
+              aria-expanded={signingIn}
+            >
+              Sign in
+            </button>
+            {signingIn && (
+              <div className="overflow-menu wide">
+                <SignInPanel
+                  onSignedIn={(who) => {
+                    setIdentity(who);
+                    setSigningIn(false);
+                  }}
+                />
+              </div>
+            )}
+          </div>
         )}
 
         {identity && (

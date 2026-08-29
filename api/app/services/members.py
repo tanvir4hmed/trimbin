@@ -123,13 +123,19 @@ def capabilities(email: str | None) -> dict:
     Principal, not here.
     """
     role = role_of(email)
+    staff = role in ("lead", "editor")
     return {
         "role": role,
         "signed_in": bool(email),
         "can_read": True,
+        # In our productions. Inside a project somebody owns they can do all of
+        # it, which needs a project id and is answered by Principal.
         "can_comment": bool(email),
         "can_override": bool(email),
-        "can_upload_to_team_projects": role in ("lead", "editor"),
+        # Running the panel, describing a shot, recording a circle, assigning,
+        # setting a state. The editors' work on the editors' footage.
+        "can_curate_team_projects": staff,
+        "can_upload_to_team_projects": staff,
         "can_create_own_project": bool(email),
         "can_add_members": role == "lead",
         "can_supersede": role == "lead",

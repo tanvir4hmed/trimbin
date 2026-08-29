@@ -18,8 +18,12 @@ export interface Identity {
   email: string;
   name: string;
   picture: string;
-  /** Seconds since epoch. Google issues these for about an hour. */
+  /** Seconds since epoch. Google issues these for about an hour; ours last a
+   *  working day. */
   expires_at: number;
+  /** Present on a token this API minted. Cosmetic — the API re-derives the role
+   *  from the roster on every request and never trusts what the page believed. */
+  role?: string;
 }
 
 interface GoogleCredentialResponse {
@@ -38,10 +42,18 @@ let cached: { token: string; identity: Identity } | null = null;
  * page uses this to draw a name and know when to ask for a new token; every
  * answer that matters comes from the API, which verifies the signature properly
  * and does not care what the page believed.
+ *
+ * Two token shapes reach this. Google's is a JWT — header, payload, signature —
+ * with the claims in the middle. Ours is payload and signature, with the claims
+ * first, because there is no algorithm to negotiate when only one side ever
+ * signs. Reading the middle of a two-part token gets the signature, which
+ * base64-decodes to bytes that are not JSON, and the whole sign-in then fails
+ * as "could not read that token" with nothing wrong anywhere.
  */
 function claimsOf(token: string): Identity | null {
+  const parts = token.split(".");
+  const payload = parts.length >= 3 ? parts[1] : parts[0];
   try {
-    const payload = token.split(".")[1];
     const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
     const c = JSON.parse(json);
     if (!c.email) return null;
@@ -50,10 +62,47 @@ function claimsOf(token: string): Identity | null {
       name: c.name ?? c.email,
       picture: c.picture ?? "",
       expires_at: Number(c.exp ?? 0),
+      role: c.role,
     };
   } catch {
     return null;
   }
+}
+
+/**
+ * Sign in with a username and a password.
+ *
+ * This exists because an OAuth client can only be created by hand in a console,
+ * and until somebody does that Google Sign-In cannot work at all. A deployment
+ * with no second door is a deployment where the dashboard, the queue, every
+ * override and every comment are built, shipped and unreachable.
+ *
+ * The token comes back signed by our own API and is held exactly like Google's:
+ * in memory and in sessionStorage, never in localStorage. These are credentials
+ * with somebody's unreleased footage behind them, and a token that survives
+ * closing the tab survives somebody walking away from a shared edit suite.
+ */
+export async function signInWithPass(
+  username: string,
+  password: string,
+): Promise<Identity> {
+  const response = await fetch("/api/auth/pass", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => undefined);
+    throw new Error(
+      (body?.detail as string) ?? "That username and password did not match.",
+    );
+  }
+
+  const body = await response.json();
+  const identity = store(body.token as string);
+  if (!identity) throw new Error("The server sent a token this page cannot read.");
+  return identity;
 }
 
 function store(token: string): Identity | null {

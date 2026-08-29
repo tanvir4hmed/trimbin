@@ -86,6 +86,7 @@ export default function ShotDetail({
   scene,
   shot,
   canComment,
+  canCurate,
   you,
   teamEmails,
   onDecided,
@@ -93,8 +94,14 @@ export default function ShotDetail({
   projectId: number;
   scene: number;
   shot: number;
-  /** Anyone signed in, on anything they can read. Not membership. */
+  /** Say something, or choose a different take. Anyone signed in, on anything
+   *  they can read — including a guest on our productions, which is the whole
+   *  demonstration. */
   canComment: boolean;
+  /** Run the panel, describe the shot, record a circle, assign it, set its
+   *  state. The editors' work on the editors' footage; a guest gets all of it
+   *  inside a project they made. */
+  canCurate: boolean;
   you: string;
   teamEmails: string[];
   onDecided?: () => void;
@@ -200,7 +207,7 @@ export default function ShotDetail({
           Scene {scene} · {label}
         </h2>
         <p>No comparison has been run for this shot yet.</p>
-        {canComment ? (
+        {canCurate ? (
           <>
             <button type="button" onClick={() => void judge()} disabled={saving}>
               {saving ? "Comparing…" : "Compare the takes"}
@@ -208,7 +215,11 @@ export default function ShotDetail({
             {note && <p className="waiting">{note}</p>}
           </>
         ) : (
-          <p className="hint">Sign in to run it.</p>
+          <p className="hint">
+            {canComment
+              ? "Only the editors who own this project can run the comparison."
+              : "Sign in to take part."}
+          </p>
         )}
         {brief && (
           <ShotBrief
@@ -216,7 +227,7 @@ export default function ShotDetail({
             scene={scene}
             shot={shot}
             brief={brief}
-            canEdit={canComment}
+            canEdit={canCurate}
             onSaved={setBrief}
           />
         )}
@@ -255,7 +266,7 @@ export default function ShotDetail({
             value={data.assignee}
             you={you}
             options={teamEmails}
-            disabled={!canComment}
+            disabled={!canCurate}
             onChanged={(b) => {
               setBrief(b);
               setData({ ...data, assignee: b.assignee });
@@ -267,7 +278,7 @@ export default function ShotDetail({
             scene={scene}
             shot={shot}
             value={data.state}
-            disabled={!canComment}
+            disabled={!canCurate}
             onChanged={(b) => {
               setBrief(b);
               setData({ ...data, state: b.state });
@@ -305,6 +316,7 @@ export default function ShotDetail({
               setOpen(open === take.clip_id ? null : take.clip_id)
             }
             canEdit={canComment}
+            canCurate={canCurate}
             onNoteAt={(at) => setCommentAt({ clipId: take.clip_id, at })}
             onCircle={async () => {
               setSaving(true);
@@ -347,7 +359,7 @@ export default function ShotDetail({
       </ol>
 
       <div className="shot-footer">
-        {canComment && (
+        {canCurate && (
           <button
             type="button"
             className="ghost"
@@ -377,7 +389,7 @@ export default function ShotDetail({
           scene={scene}
           shot={shot}
           brief={brief}
-          canEdit={canComment}
+          canEdit={canCurate}
           onSaved={setBrief}
         />
       )}
@@ -560,6 +572,7 @@ function TakeRow({
   expanded,
   onToggle,
   canEdit,
+  canCurate,
   onChoose,
   onCircle,
   onNoteAt,
@@ -570,6 +583,7 @@ function TakeRow({
   expanded: boolean;
   onToggle: () => void;
   canEdit: boolean;
+  canCurate: boolean;
   onChoose: (reason: string) => Promise<void>;
   onCircle: () => Promise<void>;
   onNoteAt: (at: number) => void;
@@ -706,18 +720,25 @@ function TakeRow({
                 Note at{" "}
                 {seconds(Math.max(0, video.current?.currentTime ?? 0))}
               </button>
-              <button
-                type="button"
-                className={isCircled ? "ghost small on" : "ghost small"}
-                onClick={() => void onCircle()}
-                title={
-                  isCircled
-                    ? "Remove the circle"
-                    : "Record that the director circled this take on the day"
-                }
-              >
-                {isCircled ? "◎ circled" : "Mark as circled"}
-              </button>
+              {/* The one field here that claims something about the world
+                  rather than about the software — what happened in the room on
+                  the day. A guest inventing one on our footage would be
+                  inventing evidence, so it belongs to the editors who were
+                  there. */}
+              {canCurate && (
+                <button
+                  type="button"
+                  className={isCircled ? "ghost small on" : "ghost small"}
+                  onClick={() => void onCircle()}
+                  title={
+                    isCircled
+                      ? "Remove the circle"
+                      : "Record that the director circled this take on the day"
+                  }
+                >
+                  {isCircled ? "◎ circled" : "Mark as circled"}
+                </button>
+              )}
             </div>
           )}
 

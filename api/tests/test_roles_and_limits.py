@@ -245,3 +245,93 @@ class TestTheMaintenanceRouteIsClosed:
 
         monkeypatch.setattr(maintenance.id_token, "verify_oauth2_token", reject)
         assert not maintenance._is_the_scheduler("Bearer stale")
+
+
+class TestCuratingIsNotCommenting:
+    """The line a guest may not cross in our productions.
+
+    A guest may read everything, say anything, and overrule any call we made —
+    that last one is the whole demonstration. What they may not do is *run* the
+    production: spend a model call on our footage, rewrite what a shot was meant
+    to be, record what the director circled, put somebody's name on a shot, or
+    declare it approved.
+
+    Those are the editors' work on the editors' material. Inside a project a
+    guest created, they are the editor and may do all of it.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_guest_may_not_curate_a_company_project(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from fastapi import HTTPException
+
+        from app import auth
+
+        async def company_project(project_id):
+            return type(
+                "P", (), {
+                    "project_id": project_id,
+                    "is_public": True,
+                    "owner_email": members.LEAD_EDITOR,
+                    "member_emails": [],
+                },
+            )()
+
+        monkeypatch.setattr(auth.projects, "get", company_project)
+
+        with pytest.raises(HTTPException) as raised:
+            await auth.Principal(email="a-judge@example.com").assert_can_curate(1)
+        assert raised.value.status_code == 403
+        # The refusal has to name what they *can* do, or it reads as a wall.
+        assert "overrule" in raised.value.detail.lower()
+
+    @pytest.mark.asyncio
+    async def test_a_guest_curates_their_own_project(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from app import auth
+
+        async def their_project(project_id):
+            return type(
+                "P", (), {
+                    "project_id": project_id,
+                    "is_public": False,
+                    "owner_email": "a-judge@example.com",
+                    "member_emails": [],
+                },
+            )()
+
+        monkeypatch.setattr(auth.projects, "get", their_project)
+        await auth.Principal(email="a-judge@example.com").assert_can_curate(9)
+
+    @pytest.mark.asyncio
+    async def test_an_editor_curates_a_company_project(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from app import auth
+
+        async def company_project(project_id):
+            return type(
+                "P", (), {
+                    "project_id": project_id,
+                    "is_public": True,
+                    "owner_email": members.LEAD_EDITOR,
+                    "member_emails": [],
+                },
+            )()
+
+        monkeypatch.setattr(auth.projects, "get", company_project)
+        await auth.Principal(email=next(iter(members.EDITORS))).assert_can_curate(1)
+
+    def test_the_interface_is_told_the_narrower_right(self) -> None:
+        """Told rather than inferred. A page that works this out by comparing
+        addresses is a second implementation of the rule, and the two disagree —
+        the failure being a button drawn and then refused."""
+        guest = members.capabilities("a-judge@example.com")
+        assert guest["can_override"]
+        assert guest["can_comment"]
+        assert not guest["can_curate_team_projects"]
+
+        editor = members.capabilities(next(iter(members.EDITORS)))
+        assert editor["can_curate_team_projects"]

@@ -58,7 +58,10 @@ async def dashboard(
     one round trip instead of four, and the slowest of the four is what a person
     would have waited for.
     """
-    mine = await projects.for_member(principal.email or "")
+    # Everything they can open, not only what they belong to. A guest belongs
+    # to nothing, and the first version showed them an empty desk on a
+    # deployment holding three productions they are explicitly allowed to work.
+    mine = await projects.visible_to(principal.email or "")
     ids = [p.project_id for p in mine]
     names = {p.project_id: p.name for p in mine}
 

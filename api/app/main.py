@@ -23,6 +23,7 @@ from .routes import (
     public,
     review,
     scenes,
+    session,
     uploads,
 )
 from .services import analytics
@@ -70,6 +71,7 @@ app.add_middleware(
 )
 
 app.include_router(public.router)
+app.include_router(session.router)
 app.include_router(dashboard.router)
 app.include_router(uploads.router)
 app.include_router(review.router)

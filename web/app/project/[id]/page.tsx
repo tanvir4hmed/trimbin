@@ -134,7 +134,12 @@ export default function ProjectPage({
   );
 
   const canComment = Boolean(me?.signed_in);
-  const canUpload = Boolean(project?.you_can_upload);
+  // Running the panel, describing a shot, circling, assigning, statusing.
+  // The same predicate the API uses for uploading, and told by the API rather
+  // than worked out here — a page that decides this by comparing addresses is a
+  // second implementation of the rules, and the two will disagree.
+  const canCurate = Boolean(project?.you_can_upload);
+  const canUpload = canCurate;
 
   if (loading) {
     return (
@@ -322,6 +327,7 @@ export default function ProjectPage({
                 scene={selected.scene}
                 shot={selected.shot}
                 canComment={canComment}
+                canCurate={canCurate}
                 you={me?.email ?? ""}
                 teamEmails={teamEmails}
                 onDecided={() => void load()}

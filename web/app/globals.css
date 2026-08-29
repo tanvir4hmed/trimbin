@@ -1760,3 +1760,60 @@ select {
   .stringout-list li > button { grid-template-columns: 1fr; gap: 2px; }
   .so-by, .so-length { text-align: left; }
 }
+
+/* ---------- signing in ---------- */
+
+/* One panel, both doors. It exists at all because an OAuth client is the one
+   thing in this system that no API can create, and a deployment without a
+   second way in is a deployment where every screen behind sign-in shipped and
+   stayed unreachable. */
+.signin-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: stretch;
+  width: 100%;
+  max-width: 340px;
+  margin: 0 auto;
+}
+.signin-panel .or {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.pass-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+.pass-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--low);
+}
+.pass-form input {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 9px 11px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+.pass-form .hint { margin: 2px 0 0; }
+
+.overflow-menu.wide {
+  min-width: 320px;
+  padding: 16px;
+}
+
+.primary.small {
+  font-size: 13px;
+  padding: 6px 12px;
+}

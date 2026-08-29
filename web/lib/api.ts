@@ -222,6 +222,9 @@ export interface Me {
   can_read: boolean;
   can_comment: boolean;
   can_override: boolean;
+  /** Running the panel, describing a shot, circling, assigning, statusing —
+   *  in *our* productions. Inside a project you own you can do all of it. */
+  can_curate_team_projects: boolean;
   can_upload_to_team_projects: boolean;
   can_create_own_project: boolean;
   can_add_members: boolean;
@@ -464,6 +467,16 @@ async function request<T>(path: string, init?: RequestInit, retriedWake = false)
 export const api = {
   /** Who is asking, and what they may do. Works signed out, and answers truthfully. */
   me: () => request<Me>("/me"),
+
+  /**
+   * Which ways in this deployment has.
+   *
+   * Asked before a sign-in screen is drawn. Offering Google where there is no
+   * OAuth client draws a button that does nothing; hiding the password form
+   * where there is one leaves a door nobody finds.
+   */
+  authOptions: () =>
+    request<{ google: boolean; password: boolean }>("/auth/options"),
 
   /** The queue, the project cards, and what the team did while you were away. */
   dashboard: () => request<Dashboard>("/dashboard"),

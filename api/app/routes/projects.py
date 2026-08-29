@@ -98,7 +98,7 @@ async def mine(
     project rather than one per row, and it is optional because the project
     switcher in the header wants names and nothing else.
     """
-    found = await projects.for_member(principal.email or "")
+    found = await projects.visible_to(principal.email or "")
     rows = [_as_dict(p, principal.email) for p in found]
 
     if detail and found:
@@ -182,9 +182,21 @@ async def one(
     if project.is_public and principal.is_anonymous:
         # A stranger reading the demo has no business seeing who is on the team.
         # The footage and the reasoning are the public part; the crew list is not.
+        #
+        # Redacted by emptying the fields, never by omitting them. Omitting them
+        # was the first version and it took the workspace down: the page spreads
+        # `member_emails` to build the assignee list, `...undefined` throws, and
+        # the whole route died as "a client-side exception has occurred" — with
+        # nothing in the API logs, because the API had answered 200.
+        #
+        # A response whose shape changes with who is asking is a response every
+        # caller has to special-case, and the one that forgets is the one nobody
+        # tests, because it only breaks for signed-out visitors.
         return {
             "project_id": project.project_id,
             "name": project.name,
+            "owner_email": "",
+            "member_emails": [],
             "is_public": True,
             "created_at": project.created_at.isoformat(),
             "you_are_owner": False,

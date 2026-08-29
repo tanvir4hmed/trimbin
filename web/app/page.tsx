@@ -23,13 +23,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { CLIENT_ID, currentIdentity, renderSignInButton } from "@/lib/auth";
+import { useEffect, useState } from "react";
+import SignInPanel from "@/components/SignInPanel";
+import { currentIdentity } from "@/lib/auth";
 
 export default function Home() {
   const router = useRouter();
   const [leaving, setLeaving] = useState(false);
-  const buttonRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (currentIdentity()) {
@@ -37,11 +37,6 @@ export default function Home() {
       router.replace("/dashboard");
     }
   }, [router]);
-
-  useEffect(() => {
-    if (leaving || !buttonRef.current) return;
-    void renderSignInButton(buttonRef.current, () => router.push("/dashboard"));
-  }, [leaving, router]);
 
   return (
     <main className="door">
@@ -56,27 +51,21 @@ export default function Home() {
         <div className="door-actions">
           {leaving ? (
             <p className="waiting">Taking you to your work…</p>
-          ) : CLIENT_ID ? (
-            <div className="signin big" ref={buttonRef} />
           ) : (
-            <p className="hint">
-              Sign-in is not configured on this deployment. See
-              docs/oauth-client.md.
-            </p>
+            <SignInPanel onSignedIn={() => router.push("/dashboard")} />
           )}
-          <Link href="/project/1" className="ghost">
-            Look around a real project
-          </Link>
         </div>
 
         <p className="door-note">
-          Sign in with any Google account and you get a real workspace: your own
-          projects, your own footage, the same interface the editors here use.
-          In our productions you can read everything, comment, and overrule any
-          call we made.
+          A guest sign-in gets you a real workspace: your own projects, your own
+          footage, the same interface the editors here use. In our productions
+          you can read everything, comment on any shot, and overrule any take we
+          chose — you just cannot run the panel or upload into them.
         </p>
 
         <p className="door-links">
+          <Link href="/project/1">Look around without signing in</Link>
+          <span aria-hidden>·</span>
           <Link href="/about">What this is</Link>
           <span aria-hidden>·</span>
           <Link href="/guide">How to use it</Link>

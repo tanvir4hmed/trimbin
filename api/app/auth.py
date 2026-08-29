@@ -29,7 +29,7 @@ from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
 
 from .config import settings
-from .services import members, projects
+from .services import members, projects, sessions
 
 log = logging.getLogger(__name__)
 
@@ -96,7 +96,54 @@ class Principal:
             raise _unauthorised()
         await self.assert_can_read(project_id)
 
-    # -- putting footage in -------------------------------------------------
+    # -- running the production ---------------------------------------------
+
+    async def _owns_the_work(self, project_id: int) -> bool:
+        """Whether this is their production to run.
+
+        The owner, anyone they added, or an editor on a production the company
+        owns — so a new editor is not locked out of an archive they were hired
+        to work on for want of a membership row.
+        """
+        project = await projects.get(project_id)
+        if project is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "No such project.")
+
+        email = (self.email or "").lower()
+        if email == project.owner_email.lower():
+            return True
+        if email in {m.lower() for m in project.member_emails}:
+            return True
+        return bool(self.is_staff and members.is_staff(project.owner_email))
+
+    async def assert_can_curate(self, project_id: int) -> None:
+        """Running the panel, describing a shot, circling, assigning, statusing.
+
+        This is the line between a guest and an editor, and it took a correction
+        to place. A guest in our productions may read everything, say anything,
+        and overrule any call we made — that last one is the whole demonstration.
+        What they may not do is *run* the production: spend a model call on our
+        footage, rewrite what a shot was meant to be, record what the director
+        circled, put somebody's name on a shot, or declare it approved.
+
+        Those are the editors' work on the editors' material. In a project a
+        guest created, they are the editor and may do all of it.
+
+        Deliberately the same predicate as uploading, with different wording.
+        Two predicates that must agree is a bug with a comment on it.
+        """
+        if self.is_anonymous:
+            raise _unauthorised()
+        if await self._owns_the_work(project_id):
+            return
+
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "You can read this project, comment on any shot, and overrule any "
+            "take it chose. Running the comparison and editing a shot's details "
+            "are for the editors who own it — make your own project to do that "
+            "with your footage.",
+        )
 
     async def assert_can_upload(self, project_id: int) -> None:
         """Footage goes into our productions from the company only.
@@ -108,21 +155,7 @@ class Principal:
         """
         if self.is_anonymous:
             raise _unauthorised()
-
-        project = await projects.get(project_id)
-        if project is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "No such project.")
-
-        email = (self.email or "").lower()
-        if email == project.owner_email.lower():
-            return
-        if email in {m.lower() for m in project.member_emails}:
-            return
-
-        # A company production the roster can reach without an explicit
-        # membership row, so a new editor is not locked out of the archive they
-        # were hired to work on.
-        if self.is_staff and members.is_staff(project.owner_email):
+        if await self._owns_the_work(project_id):
             return
 
         raise HTTPException(
@@ -172,6 +205,27 @@ async def current_principal(request: Request) -> Principal:
         return Principal(email=None)
 
     token = header.removeprefix("Bearer ").strip()
+
+    # Our own session token first.
+    #
+    # Cheap — one HMAC, no network — and it is the only way in on a deployment
+    # without an OAuth client, which is the state this one was in while every
+    # screen sat behind a door nobody could open.
+    #
+    # Tried before Google rather than after, because a Google verification is a
+    # network call and failing one on every pass-issued request would put a
+    # round trip in front of every action a guest takes.
+    if "." in token and not token.startswith("ey"):
+        try:
+            session = sessions.verify(token)
+        except sessions.NotConfigured:
+            # Said once, loudly, rather than swallowed into an anonymous
+            # principal. A deployment that cannot verify its own tokens is a
+            # configuration mistake, not a visitor problem.
+            log.error("TRIMBIN_SESSION_SECRET is unset; refusing pass sign-in.")
+            session = None
+        if session is not None:
+            return Principal(email=session.email)
 
     if not settings.oauth_client_id:
         # Fail closed, not open.

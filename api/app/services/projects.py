@@ -134,6 +134,43 @@ async def for_member(email: str) -> list[Project]:
     )
 
 
+async def visible_to(email: str) -> list[Project]:
+    """Everything this person can open, not only what they belong to.
+
+    `for_member` answers "whose work is this", and the dashboard was built on it
+    — which was wrong for the role most people arrive in. A guest belongs to
+    nothing, so they signed in and were shown an empty screen with a queue of
+    nought, on a deployment holding three public productions they are explicitly
+    allowed to read, comment on and overrule.
+
+    So: membership, plus every public project. The distinction between them does
+    not disappear — `you_can_upload` still says which are somebody else's — but
+    it stops being the difference between having a product and having a blank
+    page.
+    """
+    mine = await for_member(email)
+    seen = {p.project_id for p in mine}
+
+    public: list[Project] = []
+    async for snapshot in (
+        jobs.db().collection(COLLECTION).where("is_public", "==", True).stream()
+    ):
+        try:
+            project_id = int(snapshot.id)
+        except ValueError:
+            continue
+        if project_id in seen:
+            continue
+        found = await get(project_id)
+        if found is not None:
+            public.append(found)
+
+    # Theirs first, then ours. A person opens the thing they are working on, and
+    # a dashboard that leads with somebody else's production reads as a
+    # directory rather than as a desk.
+    return mine + sorted(public, key=lambda p: p.project_id)
+
+
 def is_public_project(project_id: int) -> bool:
     """Open to a reader with no account.
 

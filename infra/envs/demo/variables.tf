@@ -64,3 +64,20 @@ variable "oauth_client_id" {
   default     = ""
   sensitive   = false # a client ID is public by design; the secret is the secret
 }
+
+# The company, as Terraform needs to know it: one pass is generated per address.
+#
+# Duplicated from services/members.py, which is the source of truth for what
+# each of them may do. Two lists is a real cost and the alternative is worse —
+# Terraform cannot import Python, and a pass generated for somebody the roster
+# does not know would sign them in as a guest, silently, which is the confusing
+# kind of wrong.
+variable "editor_emails" {
+  description = "Addresses that get a team pass. Must match services/members.py."
+  type        = list(string)
+  default = [
+    "tanvir4hmed@gmail.com",
+    "dipon778@gmail.com",
+    "mohidewan10@gmail.com",
+  ]
+}

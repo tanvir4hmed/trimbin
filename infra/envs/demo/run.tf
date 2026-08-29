@@ -211,6 +211,43 @@ resource "google_cloud_run_v2_service" "api" {
         }
       }
 
+      # The second way in.
+      #
+      # Google Sign-In needs an OAuth client, which is the one thing here that no
+      # API can create. Without these three the application is built, deployed
+      # and unreachable — which is exactly the state it was in.
+      #
+      # Generated in passes.tf, never in git, read at start like every other
+      # secret. Nothing is minted or trusted without the signing secret, so an
+      # unset value disables the pass door rather than opening it.
+      env {
+        name = "TRIMBIN_SESSION_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.session_secret.secret_id
+            version = "latest"
+          }
+        }
+      }
+      env {
+        name = "TRIMBIN_GUEST_PASS"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.guest_pass.secret_id
+            version = "latest"
+          }
+        }
+      }
+      env {
+        name = "TRIMBIN_TEAM_PASSES"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.team_passes.secret_id
+            version = "latest"
+          }
+        }
+      }
+
       # Liveness only, and deliberately not touching the database: a check that
       # fails when a dependency is slow takes the service down for a problem it
       # could have survived.
