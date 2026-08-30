@@ -1914,3 +1914,56 @@ kbd{font-family:var(--mono);font-size:10.5px;background:var(--surface-2);border:
 
 .try-it{background:none;border:1px dashed var(--line);border-radius:7px;padding:8px 11px;color:var(--amber);font:inherit;font-size:12.5px;cursor:pointer}
 .try-it:hover{border-color:var(--amber)}
+
+/* ---------- in and out handles ---------- */
+
+/* The panel trims to what it can measure. An editor routinely wants two seconds
+   less at the top for something no measurement sees, and dragging is how that
+   is said. What the handles set travels with the override. */
+.range-bar { position: relative; }
+.trimmed-out {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, .45);
+  pointer-events: none;
+}
+.range-bar .handle {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 11px;
+  margin-left: -5px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: var(--amber);
+  cursor: ew-resize;
+  touch-action: none;
+  z-index: 3;
+}
+.range-bar .handle::after {
+  content: "";
+  position: absolute;
+  inset: 0 4px;
+  border-left: 1px solid rgba(0, 0, 0, .35);
+  border-right: 1px solid rgba(0, 0, 0, .35);
+}
+.range-bar .handle:hover,
+.range-bar .handle:focus-visible { background: #f0b954; }
+
+.range-key {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 9px 0 4px;
+  font-size: 11.5px;
+  color: var(--low);
+}
+.range-key .rk { display: flex; gap: 5px; align-items: baseline; }
+.range-key .rk b { color: var(--ink); font-weight: 500; }
+.range-key .shuttle { color: var(--amber); }
+.range-key .hint { margin-left: auto; color: var(--faint); }
+
+.player:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }

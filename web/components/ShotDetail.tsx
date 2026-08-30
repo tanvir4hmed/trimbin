@@ -334,12 +334,15 @@ export default function ShotDetail({
                 setSaving(false);
               }
             }}
-            onChoose={async (reason) => {
+            onChoose={async (reason, span) => {
               setSaving(true);
               try {
                 const result = await api.select(projectId, scene, shot, {
                   clip_id: take.clip_id,
                   reason,
+                  ...(span
+                    ? { in_point_s: span.from, out_point_s: span.to }
+                    : {}),
                 });
                 setNote(
                   result.agreed_with_panel
@@ -584,12 +587,21 @@ function TakeRow({
   onToggle: () => void;
   canEdit: boolean;
   canCurate: boolean;
-  onChoose: (reason: string) => Promise<void>;
+  onChoose: (reason: string, span?: { from: number; to: number }) => Promise<void>;
   onCircle: () => Promise<void>;
   onNoteAt: (at: number) => void;
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const [reason, setReason] = useState("");
+
+  // Starts where the panel put it, so doing nothing keeps its answer.
+  const [span, setSpan] = useState({
+    from: take.usable_from_s,
+    to: take.usable_to_s > take.usable_from_s ? take.usable_to_s : take.duration_s,
+  });
+  const narrowed =
+    Math.abs(span.from - take.usable_from_s) > 0.05 ||
+    Math.abs(span.to - (take.usable_to_s || take.duration_s)) > 0.05;
 
   /** Seek and play. The whole point of a timecoded finding. */
   const seekTo = (at: number) => {
@@ -599,6 +611,43 @@ function TakeRow({
     void el.play().catch(() => {
       /* Autoplay refused. The seek still happened, which is the useful half. */
     });
+  };
+
+  /**
+   * J, K, L and the arrow keys, on the player.
+   *
+   * The transport every editor already has in their hands: K stops, L plays and
+   * doubles on each press, J does the same backwards, and the arrows step a
+   * frame. Assumed 24fps for the step — the archive does not record the
+   * original rate, and a quarter-frame either way is below what anyone can see
+   * at this scale.
+   */
+  const transport = (e: React.KeyboardEvent<HTMLVideoElement>) => {
+    const el = video.current;
+    if (!el) return;
+    const key = e.key.toLowerCase();
+
+    if (key === "k") {
+      e.preventDefault();
+      el.pause();
+      el.playbackRate = 1;
+    } else if (key === "l") {
+      e.preventDefault();
+      el.playbackRate = el.paused ? 1 : Math.min(8, el.playbackRate * 2);
+      void el.play().catch(() => {});
+    } else if (key === "j") {
+      e.preventDefault();
+      // No negative playbackRate in any browser worth targeting, so J steps
+      // back rather than pretending to reverse-play.
+      el.pause();
+      el.currentTime = Math.max(0, el.currentTime - 1);
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      el.currentTime = Math.max(0, el.currentTime - 1 / 24);
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      el.currentTime = Math.min(take.duration_s, el.currentTime + 1 / 24);
+    }
   };
 
   const trimmed = take.trim_reasons
@@ -646,6 +695,8 @@ function TakeRow({
             controls
             preload="metadata"
             playsInline
+            tabIndex={0}
+            onKeyDown={transport}
             poster={take.sprite_uri || undefined}
           >
             <source src={take.proxy_uri} type="application/vnd.apple.mpegurl" />
@@ -654,7 +705,56 @@ function TakeRow({
             This browser cannot play HLS without a player library.
           </video>
 
-          <SafeRangeBar take={take} onSeek={seekTo} />
+          <SafeRangeBar
+            take={take}
+            onSeek={seekTo}
+            span={canEdit ? span : undefined}
+            onSpan={
+              canEdit
+                ? (from, to) => {
+                    setSpan({ from, to });
+                    const el = video.current;
+                    if (el) el.currentTime = from;
+                  }
+                : undefined
+            }
+          />
+
+          <div className="range-key">
+            <span className="rk">
+              in <b className="mono">{seconds(span.from)}</b>
+            </span>
+            <span className="rk">
+              out <b className="mono">{seconds(span.to)}</b>
+            </span>
+            <span className="rk">
+              {seconds(Math.max(0, span.to - span.from))} used
+            </span>
+            {canEdit && (
+              <span className="rk shuttle">
+                {narrowed ? (
+                  <button
+                    type="button"
+                    className="linkish"
+                    onClick={() =>
+                      setSpan({
+                        from: take.usable_from_s,
+                        to: take.usable_to_s || take.duration_s,
+                      })
+                    }
+                  >
+                    reset
+                  </button>
+                ) : (
+                  <>drag the handles to narrow</>
+                )}
+              </span>
+            )}
+            <span className="rk hint">
+              <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> shuttle · <kbd>←</kbd>
+              <kbd>→</kbd> frame
+            </span>
+          </div>
 
           {trimmed && <p className="trimmed">Shortened because {trimmed}.</p>}
 
@@ -768,7 +868,7 @@ function TakeRow({
                 type="button"
                 className="primary"
                 disabled={reason.trim().length < 3}
-                onClick={() => void onChoose(reason.trim())}
+                onClick={() => void onChoose(reason.trim(), narrowed ? span : undefined)}
               >
                 Use take {take.take_no}
               </button>
@@ -781,7 +881,14 @@ function TakeRow({
               <button
                 type="button"
                 className="primary"
-                onClick={() => void onChoose("confirmed the recommendation")}
+                onClick={() =>
+                  void onChoose(
+                    narrowed
+                      ? "confirmed the recommendation, narrowed the range"
+                      : "confirmed the recommendation",
+                    narrowed ? span : undefined,
+                  )
+                }
               >
                 Confirm take {take.take_no}
               </button>
@@ -803,19 +910,71 @@ function TakeRow({
  * Clickable along its length, because once the shape of the take is visible the
  * next thing anyone wants is to jump into it.
  */
+/**
+ * The take as a bar, and the two handles that narrow it.
+ *
+ * Reading the safe range is half of it; the other half is disagreeing with it.
+ * The panel trims to what it can measure — a slate at the head, a jolt in the
+ * middle — and an editor routinely wants two seconds less at the top because of
+ * something no measurement sees. Dragging is how that is said.
+ *
+ * The handles start where the panel put them, so doing nothing keeps its
+ * answer. What they set travels with the override as in and out points, which
+ * the API has always accepted and nothing has ever sent.
+ */
 function SafeRangeBar({
   take,
   onSeek,
+  span,
+  onSpan,
 }: {
   take: Take;
   onSeek: (at: number) => void;
+  span?: { from: number; to: number };
+  onSpan?: (from: number, to: number) => void;
 }) {
   const total = take.duration_s || 1;
   const pct = (v: number) => `${Math.min(100, Math.max(0, (v / total) * 100))}%`;
+  const bar = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState<"from" | "to" | null>(null);
+
+  const at = (clientX: number): number => {
+    const box = bar.current?.getBoundingClientRect();
+    if (!box || box.width === 0) return 0;
+    return Math.min(total, Math.max(0, ((clientX - box.left) / box.width) * total));
+  };
+
+  useEffect(() => {
+    if (!dragging || !span || !onSpan) return;
+
+    const move = (e: PointerEvent) => {
+      const value = at(e.clientX);
+      // A quarter second of daylight between them. Handles that can cross
+      // produce an out point before the in point, which every reader of an EDL
+      // interprets differently and none of them usefully.
+      if (dragging === "from") onSpan(Math.min(value, span.to - 0.25), span.to);
+      else onSpan(span.from, Math.max(value, span.from + 0.25));
+    };
+    const up = () => setDragging(null);
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, [dragging, span, onSpan, total]);
+
+  const nudge = (which: "from" | "to", by: number) => {
+    if (!span || !onSpan) return;
+    if (which === "from") onSpan(Math.min(Math.max(0, span.from + by), span.to - 0.25), span.to);
+    else onSpan(span.from, Math.max(Math.min(total, span.to + by), span.from + 0.25));
+  };
 
   return (
     <div
       className="range-bar"
+      ref={bar}
       role="group"
       aria-label={`Usable parts of take ${take.take_no}`}
     >
@@ -846,6 +1005,39 @@ function SafeRangeBar({
             />
           );
         })}
+
+      {span && onSpan && (
+        <>
+          <span
+            className="trimmed-out"
+            style={{ left: 0, width: pct(span.from) }}
+            aria-hidden
+          />
+          <span
+            className="trimmed-out"
+            style={{ left: pct(span.to), width: pct(total - span.to) }}
+            aria-hidden
+          />
+          {(["from", "to"] as const).map((which) => (
+            <button
+              key={which}
+              type="button"
+              className={`handle ${which}`}
+              style={{ left: pct(span[which]) }}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                setDragging(which);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowLeft") nudge(which, -0.25);
+                if (e.key === "ArrowRight") nudge(which, 0.25);
+              }}
+              aria-label={`${which === "from" ? "In" : "Out"} point, ${seconds(span[which])}`}
+              title={`${which === "from" ? "In" : "Out"} ${seconds(span[which])} — drag, or arrow keys`}
+            />
+          ))}
+        </>
+      )}
 
       {take.safe_ranges.length === 0 && (
         <span className="nothing-usable">Nothing usable in this take</span>
