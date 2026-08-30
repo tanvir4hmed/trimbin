@@ -27,6 +27,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Comments from "@/components/Comments";
+import Player, { PlayerHandle } from "@/components/Player";
 import ShotBrief from "@/components/ShotBrief";
 import type { Brief, ShotState, Take, Verdicts } from "@/lib/api";
 import { ApiError, api } from "@/lib/api";
@@ -591,7 +592,7 @@ function TakeRow({
   onCircle: () => Promise<void>;
   onNoteAt: (at: number) => void;
 }) {
-  const video = useRef<HTMLVideoElement>(null);
+  const player = useRef<PlayerHandle>(null);
   const [reason, setReason] = useState("");
 
   // Starts where the panel put it, so doing nothing keeps its answer.
@@ -604,14 +605,7 @@ function TakeRow({
     Math.abs(span.to - (take.usable_to_s || take.duration_s)) > 0.05;
 
   /** Seek and play. The whole point of a timecoded finding. */
-  const seekTo = (at: number) => {
-    const el = video.current;
-    if (!el) return;
-    el.currentTime = Math.max(0, at);
-    void el.play().catch(() => {
-      /* Autoplay refused. The seek still happened, which is the useful half. */
-    });
-  };
+  const seekTo = (at: number) => player.current?.seek(at, true);
 
   /**
    * J, K, L and the arrow keys, on the player.
@@ -622,8 +616,8 @@ function TakeRow({
    * original rate, and a quarter-frame either way is below what anyone can see
    * at this scale.
    */
-  const transport = (e: React.KeyboardEvent<HTMLVideoElement>) => {
-    const el = video.current;
+  const transport = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const el = player.current?.element();
     if (!el) return;
     const key = e.key.toLowerCase();
 
@@ -689,21 +683,16 @@ function TakeRow({
 
       {expanded && (
         <div className="take-body">
-          <video
-            ref={video}
-            className="player"
-            controls
-            preload="metadata"
-            playsInline
-            tabIndex={0}
-            onKeyDown={transport}
-            poster={take.sprite_uri || undefined}
-          >
-            <source src={take.proxy_uri} type="application/vnd.apple.mpegurl" />
-            {/* Safari plays HLS natively; everywhere else needs a player
-                library. Said plainly rather than shown as a black rectangle. */}
-            This browser cannot play HLS without a player library.
-          </video>
+          {/* Wrapped so the transport keys work wherever the focus is inside
+              the take, not only on the element itself. */}
+          <div onKeyDown={transport} role="group" aria-label="Player">
+            <Player
+              ref={player}
+              className="player"
+              src={take.proxy_uri}
+              poster={take.sprite_uri}
+            />
+          </div>
 
           <SafeRangeBar
             take={take}
@@ -713,8 +702,7 @@ function TakeRow({
               canEdit
                 ? (from, to) => {
                     setSpan({ from, to });
-                    const el = video.current;
-                    if (el) el.currentTime = from;
+                    player.current?.seek(from);
                   }
                 : undefined
             }
@@ -814,11 +802,10 @@ function TakeRow({
                 type="button"
                 className="ghost small"
                 onClick={() =>
-                  onNoteAt(Math.max(0, video.current?.currentTime ?? 0))
+                  onNoteAt(Math.max(0, player.current?.element()?.currentTime ?? 0))
                 }
               >
-                Note at{" "}
-                {seconds(Math.max(0, video.current?.currentTime ?? 0))}
+                Note here
               </button>
               {/* The one field here that claims something about the world
                   rather than about the software — what happened in the room on

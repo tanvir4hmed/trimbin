@@ -19,6 +19,36 @@ const THUMBS = [
   "linear-gradient(135deg,#332a30,#17140f)",
 ];
 
+/** The verb as a person would say it. */
+function say(verb: string, quantity: number): string {
+  switch (verb) {
+    case "uploaded":
+      return `uploaded ${quantity} clip${quantity === 1 ? "" : "s"}`;
+    case "compared":
+      return `compared ${quantity} take${quantity === 1 ? "" : "s"}`;
+    case "chose":
+      return `chose take ${quantity}`;
+    case "confirmed":
+      return `confirmed take ${quantity}`;
+    case "undid":
+      return "undid a change";
+    case "commented":
+      return "left a note";
+    case "described":
+      return "described a shot";
+    case "circled":
+      return "recorded the circled take";
+    case "assigned":
+      return "assigned a shot";
+    case "set_state":
+      return "set the state";
+    case "planned":
+      return "added to the shot list";
+    default:
+      return verb;
+  }
+}
+
 function ago(iso: string | null): string {
   if (!iso) return "";
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -153,22 +183,29 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {data.recent.length > 0 && (
+      {data.activity.length > 0 && (
         <section className="block">
-          <div className="sect">Recent decisions</div>
+          <div className="sect">Activity</div>
           <ul className="activity">
-            {data.recent.slice(0, 6).map((r, i) => (
+            {data.activity.slice(0, 12).map((a, i) => (
               <li key={i}>
-                <Link href={`/project/${r.project_id}?scene=${r.scene}&shot=${r.shot}`}>
-                  <span className="who">
-                    {r.decided_by === "human" ? r.actor.split("@")[0] : "Panel"}
-                  </span>{" "}
-                  <span className="what">take {r.take_no}</span>{" "}
+                <Link
+                  href={
+                    a.shot
+                      ? `/project/${a.project_id}?scene=${a.scene}&shot=${a.shot}`
+                      : `/project/${a.project_id}`
+                  }
+                >
+                  <span className="who">{a.actor.split("@")[0]}</span>{" "}
+                  <span className="what">{say(a.verb, a.quantity)}</span>{" "}
                   <span className="where">
-                    {r.project_name} · scene {r.scene}, shot {r.shot}
+                    {a.project_name}
+                    {a.scene ? ` · scene ${a.scene}` : ""}
+                    {a.shot ? `, shot ${a.shot}` : ""}
                   </span>
+                  {a.detail && <span className="why">{a.detail}</span>}
                 </Link>
-                <span className="ago">{ago(r.decided_at)}</span>
+                <span className="ago">{ago(a.at)}</span>
               </li>
             ))}
           </ul>

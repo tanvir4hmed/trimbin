@@ -1967,3 +1967,42 @@ kbd{font-family:var(--mono);font-size:10.5px;background:var(--surface-2);border:
 .range-key .hint { margin-left: auto; color: var(--faint); }
 
 .player:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+/* ---------- credentials, shown on purpose ---------- */
+
+.creds{display:flex;gap:20px;margin:14px 0 0;flex-wrap:wrap;justify-content:center}
+.creds>div{display:flex;gap:7px;align-items:baseline}
+.creds dt{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.creds dd{margin:0;font-size:13px;color:var(--amber);user-select:all}
+.under-door{border-top:1px solid var(--line-soft);padding-top:14px}
+.trial{border-top:1px solid var(--line-soft);padding-top:12px;margin-top:4px;display:flex;flex-direction:column;gap:10px;align-items:center}
+
+.with-reveal{position:relative;display:block}
+.with-reveal input{width:100%;padding-right:52px}
+.reveal{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--low);font:inherit;font-size:11.5px;cursor:pointer}
+.reveal:hover{color:var(--amber)}
+
+/* ---------- scene modes ---------- */
+
+.mode-bar{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:16px 0 14px;padding-bottom:14px;border-bottom:1px solid var(--line-soft)}
+.modes{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.mode{background:none;border:none;color:var(--mid);font:inherit;font-size:13px;padding:7px 14px;cursor:pointer}
+.mode.on{background:var(--amber-soft);color:var(--amber)}
+.mode-bar .hint{flex:1;min-width:220px}
+
+.now-playing{display:flex;gap:14px;align-items:baseline;margin-top:10px;font-size:13px}
+.np-slug{font-weight:600}
+.np-take{color:var(--low)}
+.np-time{margin-left:auto;color:var(--faint);font-size:12px}
+
+/* One block per cut, coloured by shot, so an alternation looks like one. */
+.cutline{display:flex;gap:2px;height:9px;margin-top:11px}
+.cut{border:none;padding:0;border-radius:2px;cursor:pointer;opacity:.5;min-width:3px}
+.cut:hover{opacity:.85}
+.cut.on{opacity:1;box-shadow:0 0 0 1px var(--ink)}
+.cut.shot-0{background:var(--amber)}
+.cut.shot-1{background:var(--blue)}
+.cut.shot-2{background:var(--green)}
+.cut.shot-3{background:var(--violet)}
+.cut.shot-4{background:var(--rust)}
+.cut.shot-5{background:var(--mid)}

@@ -27,6 +27,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
 from ..auth import Principal, current_principal, require_signed_in
+from ..services import activity
 from ..services import comments as comments_service
 from ..services import decisions as decisions_service
 from ..services import members
@@ -134,7 +135,15 @@ async def judge(
     await principal.assert_can_curate(project_id)
 
     try:
-        return await review_service.judge(project_id, group_id, subgroup_id, force=force)
+        result = await review_service.judge(project_id, group_id, subgroup_id, force=force)
+        await activity.record(
+            project_id, principal.email or "", "compared",
+            detail=f"scene {group_id} shot {subgroup_id}",
+            scene=group_id, shot=subgroup_id,
+            quantity=int(result.get("takes", 0)),
+            actor_role=members.role_of(principal.email),
+        )
+        return result
     except review_service.NotReady as exc:
         # 409, not 400. The request is well formed and will succeed later —
         # a 400 would tell the caller to change something they cannot change.
@@ -324,6 +333,17 @@ async def override(
         "confirmed" if agreed else "overrode to", chosen[:8],
     )
 
+    take_no = next(
+        (v.get("take_no", 0) for v in verdicts_now if v["clip_id"] == chosen), 0
+    )
+    await activity.record(
+        project_id, principal.email or "",
+        "confirmed" if agreed else "chose",
+        detail=body.reason,
+        scene=group_id, shot=subgroup_id, quantity=int(take_no or 0),
+        actor_role=members.role_of(principal.email),
+    )
+
     return {
         "status": "recorded",
         "agreed_with_panel": agreed,
@@ -418,6 +438,12 @@ async def undo(
     log.info(
         "project %d scene %d shot %d: %s undid a change back to %s",
         project_id, group_id, subgroup_id, principal.email, restore_to[:8],
+    )
+    await activity.record(
+        project_id, principal.email or "", "undid",
+        detail=f"scene {group_id} shot {subgroup_id}",
+        scene=group_id, shot=subgroup_id,
+        actor_role=members.role_of(principal.email),
     )
     return {
         "status": "undone",
@@ -783,6 +809,12 @@ async def write_brief(
         project_id, group_id, subgroup_id,
         body.model_dump(), author=principal.email or "",
     )
+    await activity.record(
+        project_id, principal.email or "", "described",
+        detail=body.slug or f"scene {group_id} shot {subgroup_id}",
+        scene=group_id, shot=subgroup_id,
+        actor_role=members.role_of(principal.email),
+    )
     return {
         **shot.as_dict(),
         "is_empty": shot.is_empty,
@@ -822,6 +854,12 @@ async def circle_take(
     shot = await shots.circle(
         project_id, group_id, subgroup_id, body.take_no, principal.email or ""
     )
+    await activity.record(
+        project_id, principal.email or "", "circled",
+        detail=f"take {body.take_no}" if body.take_no else "cleared the circle",
+        scene=group_id, shot=subgroup_id, quantity=body.take_no,
+        actor_role=members.role_of(principal.email),
+    )
     return {**shot.as_dict(), "is_empty": shot.is_empty}
 
 
@@ -841,6 +879,12 @@ async def assign_shot(
     """
     await principal.assert_can_curate(project_id)
     shot = await shots.assign(project_id, group_id, subgroup_id, body.assignee)
+    await activity.record(
+        project_id, principal.email or "", "assigned",
+        detail=body.assignee or "nobody",
+        scene=group_id, shot=subgroup_id,
+        actor_role=members.role_of(principal.email),
+    )
     return {**shot.as_dict(), "is_empty": shot.is_empty}
 
 
@@ -861,6 +905,12 @@ async def set_shot_state(
     await principal.assert_can_curate(project_id)
     shot = await shots.set_state(
         project_id, group_id, subgroup_id, body.state, principal.email or ""
+    )
+    await activity.record(
+        project_id, principal.email or "", "set_state",
+        detail=body.state or "unset",
+        scene=group_id, shot=subgroup_id,
+        actor_role=members.role_of(principal.email),
     )
     return {**shot.as_dict(), "is_empty": shot.is_empty}
 
@@ -923,6 +973,12 @@ async def add_comment(
     and reversible; the reasons for gating uploads do not apply to it.
     """
     await principal.assert_can_comment(project_id)
+    await activity.record(
+        project_id, principal.email or "", "commented",
+        detail=body.body,
+        scene=group_id, shot=subgroup_id,
+        actor_role=members.role_of(principal.email),
+    )
     try:
         return await comments_service.add(
             project_id=project_id,

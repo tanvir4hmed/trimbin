@@ -27,6 +27,8 @@ import { useEffect, useState } from "react";
 import SignInPanel from "@/components/SignInPanel";
 import { currentIdentity } from "@/lib/auth";
 
+const TRIAL_PASS = process.env.NEXT_PUBLIC_TRIAL_PASS ?? "";
+
 export default function Home() {
   const router = useRouter();
   const [leaving, setLeaving] = useState(false);
@@ -54,6 +56,19 @@ export default function Home() {
             <SignInPanel onSignedIn={() => router.push("/dashboard")} />
           )}
         </div>
+
+        {TRIAL_PASS && (
+          <dl className="creds under-door">
+            <div>
+              <dt>Guest user</dt>
+              <dd className="mono">Guest</dd>
+            </div>
+            <div>
+              <dt>Password</dt>
+              <dd className="mono">{TRIAL_PASS}</dd>
+            </div>
+          </dl>
+        )}
 
         <p className="door-links">
           <Link href="/project/1">Look without signing in</Link>

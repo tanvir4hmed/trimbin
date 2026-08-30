@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
 from ..auth import Principal, current_principal, require_signed_in
-from ..services import jobs, quota, storage
+from ..services import activity, jobs, members, quota, storage
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/uploads", tags=["uploads"])
@@ -205,6 +205,18 @@ async def complete_upload(
             target_scene=job.target_scene,
             target_shot=job.target_shot,
         )
+
+    await activity.record(
+        job.project_id, principal.email or "", "uploaded",
+        detail=(
+            f"scene {job.target_scene} shot {job.target_shot}"
+            if job.target_scene
+            else "slates decide"
+        ),
+        scene=job.target_scene, shot=job.target_shot,
+        quantity=len(confirmed),
+        actor_role=members.role_of(principal.email),
+    )
 
     return {
         "status": "queued",

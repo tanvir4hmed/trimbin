@@ -37,18 +37,16 @@ resource "google_secret_manager_secret_version" "session_secret" {
   secret_data = random_password.session_secret.result
 }
 
-# The guest pass. One code, meant to be handed out — to a judge, in a
-# submission, to anyone we want looking at this.
+# The guest password.
 #
-# It is safe to share because of what a guest can do rather than because of who
-# holds it: every guest action is additive, attributed and reversible, and a
-# guest cannot put footage into our productions. Long and random anyway, because
-# a short code invites the guessing this is not built to withstand.
-resource "random_password" "guest_pass" {
-  length  = 20
-  special = false
-}
-
+# Printed on the sign-in form and meant to be handed out — to a judge, in a
+# submission, to anyone we want looking at this. It is therefore not a secret,
+# and generating twenty random characters only made it hard to type off a
+# screen.
+#
+# What makes it safe is what a guest can do, not who holds it: every guest
+# action is additive, attributed and reversible, they cannot put footage into
+# our productions, and they cannot run the panel on our footage.
 resource "google_secret_manager_secret" "guest_pass" {
   secret_id = "${local.name}-guest-pass"
   replication {
@@ -58,7 +56,7 @@ resource "google_secret_manager_secret" "guest_pass" {
 
 resource "google_secret_manager_secret_version" "guest_pass" {
   secret      = google_secret_manager_secret.guest_pass.id
-  secret_data = random_password.guest_pass.result
+  secret_data = var.guest_password
 }
 
 # One code per editor, so the archive records who actually decided something.

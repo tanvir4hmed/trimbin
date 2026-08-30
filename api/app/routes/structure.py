@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from ..auth import Principal, current_principal, require_signed_in
-from ..services import structure
+from ..services import activity, members, structure
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/structure", tags=["structure"])
@@ -57,6 +57,12 @@ async def add_scene(
 ) -> dict:
     await principal.assert_can_curate(project_id)
     scene = await structure.add_scene(project_id, body.scene, body.heading)
+    await activity.record(
+        project_id, principal.email or "", "planned",
+        detail=f"scene {body.scene}" + (f" — {body.heading}" if body.heading else ""),
+        scene=body.scene,
+        actor_role=members.role_of(principal.email),
+    )
     return scene.as_dict()
 
 
@@ -70,6 +76,12 @@ async def add_shot(
     await principal.assert_can_curate(project_id)
     updated = await structure.add_shot(
         project_id, scene, body.shot, body.slug, body.description
+    )
+    await activity.record(
+        project_id, principal.email or "", "planned",
+        detail=body.slug or f"scene {scene} shot {body.shot}",
+        scene=scene, shot=body.shot,
+        actor_role=members.role_of(principal.email),
     )
     return updated.as_dict()
 
@@ -108,3 +120,17 @@ async def remove_shot(
 
     updated = await structure.remove_shot(project_id, scene, shot)
     return updated.as_dict()
+
+
+@router.get("/{project_id}/activity")
+async def project_activity(
+    project_id: int,
+    principal: Annotated[Principal, Depends(current_principal)],
+    limit: int = 40,
+) -> dict:
+    """Who did what on this production, newest first."""
+    await principal.assert_can_read(project_id)
+    return {
+        "project_id": project_id,
+        "activity": await activity.for_project(project_id, limit=min(limit, 200)),
+    }

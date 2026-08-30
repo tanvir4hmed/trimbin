@@ -1,36 +1,107 @@
 "use client";
 
 /**
- * The scene, assembled — a **stringout**.
+ * The scene, played two ways.
  *
- * That is the word a cutting room uses, and it matters: this is not a screen we
- * invented. A stringout is what an assistant editor hands the editor — every
- * shot of the scene, in order, one take each, so it can be watched as a scene
- * instead of as a bin of ninety files. It is the actual deliverable of the job
- * this software does, and it was the screen the product was missing.
+ * **Full takes** is a stringout: every shot in order, one take each, its whole
+ * usable range. It is what an assistant editor hands the editor and it is the
+ * honest artefact — but on a scene with two angles and a minute of each, it
+ * plays as two long clips rather than as a scene.
  *
- * It plays what the team decided, not what the panel recommended. An editor
- * override is the newest decision; a stringout showing the machine's picks after
- * a person changed them would be a report about the machine rather than a view
- * of the scene.
- *
- * It is not an edit. Nothing here decides where a cut goes, how long a shot
- * holds, or which angle a moment belongs to — those are story questions and the
- * system has no standing to answer them. A stringout is what an editor cuts
- * *from*.
+ * **Rough cut** interleaves them: a few seconds of each shot in turn, round
+ * robin, until every shot's usable range is spent. Two angles become A-B-A-B and
+ * read as coverage. Nothing about it is an editorial decision — the cuts are a
+ * fixed length and fall wherever the clock does — and the screen says so,
+ * because a mechanical alternation presented as an edit would be a lie about the
+ * one thing this system refuses to claim.
  */
 
-import { use, useCallback, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import type { Stringout } from "@/lib/api";
+import Player, { PlayerHandle } from "@/components/Player";
+import type { Stringout, StringoutEntry } from "@/lib/api";
 import { ApiError, api } from "@/lib/api";
 
 const FRAME_RATES = [23.976, 24, 25, 29.97, 30, 50, 60];
+const CUT_LENGTHS = [3, 5, 8, 12];
+
+interface Segment {
+  key: string;
+  clip_id: string;
+  proxy_uri: string;
+  sprite_uri: string;
+  slug: string;
+  shot: number;
+  take_no: number;
+  from: number;
+  to: number;
+  reason: string;
+  needs_review: boolean;
+}
 
 function clock(total: number): string {
   const m = Math.floor(total / 60);
   const s = Math.floor(total % 60);
   return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+/** Every shot in order, whole. */
+function fullTakes(entries: StringoutEntry[]): Segment[] {
+  return entries.map((e, i) => ({
+    key: `${e.clip_id}-${i}`,
+    clip_id: e.clip_id,
+    proxy_uri: e.proxy_uri,
+    sprite_uri: e.sprite_uri,
+    slug: e.slug,
+    shot: e.shot,
+    take_no: e.take_no,
+    from: e.start_s,
+    to: e.end_s,
+    reason: e.reason,
+    needs_review: e.needs_review,
+  }));
+}
+
+/**
+ * A few seconds of each shot in turn, until every shot is spent.
+ *
+ * Round robin rather than random, so the pattern is predictable and a viewer can
+ * tell what they are looking at. A shot whose usable range runs out drops out of
+ * the rotation instead of repeating, which is why the last stretch of a scene
+ * with uneven coverage is whichever angle had the most left.
+ */
+function roughCut(entries: StringoutEntry[], cut: number): Segment[] {
+  const cursors = entries.map((e) => e.start_s);
+  const segments: Segment[] = [];
+  let n = 0;
+
+  for (let guard = 0; guard < 500; guard++) {
+    let moved = false;
+    entries.forEach((e, i) => {
+      const from = cursors[i];
+      // Under half a second left is not a cut, it is a flash frame.
+      if (from >= e.end_s - 0.5) return;
+      const to = Math.min(e.end_s, from + cut);
+      segments.push({
+        key: `${e.clip_id}-${n++}`,
+        clip_id: e.clip_id,
+        proxy_uri: e.proxy_uri,
+        sprite_uri: e.sprite_uri,
+        slug: e.slug,
+        shot: e.shot,
+        take_no: e.take_no,
+        from,
+        to,
+        reason: e.reason,
+        needs_review: e.needs_review,
+      });
+      cursors[i] = to;
+      moved = true;
+    });
+    if (!moved) break;
+  }
+
+  return segments;
 }
 
 export default function ScenePage({
@@ -45,10 +116,12 @@ export default function ScenePage({
   const [data, setData] = useState<Stringout | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState<"takes" | "rough">("rough");
+  const [cut, setCut] = useState(5);
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [fps, setFps] = useState(24);
-  const video = useRef<HTMLVideoElement>(null);
+  const player = useRef<PlayerHandle>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,11 +129,13 @@ export default function ScenePage({
       setData(await api.stringout(projectId, sceneId));
       setError(null);
     } catch (e) {
-      if (e instanceof ApiError && e.waking) {
-        setError("The archive is still waking up.");
-      } else {
-        setError(e instanceof Error ? e.message : "Could not load this scene.");
-      }
+      setError(
+        e instanceof ApiError && e.waking
+          ? "The archive is waking up."
+          : e instanceof Error
+            ? e.message
+            : "Could not load this scene.",
+      );
     } finally {
       setLoading(false);
     }
@@ -70,41 +145,51 @@ export default function ScenePage({
     void load();
   }, [load]);
 
-  const entry = data?.entries[index];
+  const segments = useMemo(() => {
+    if (!data) return [];
+    return mode === "rough" ? roughCut(data.entries, cut) : fullTakes(data.entries);
+  }, [data, mode, cut]);
 
-  // Seek to the shot's in-point whenever the shot changes. The archive holds an
-  // in and an out per take; playing from zero would put the slate back in the
-  // assembly, which is the thing the trim exists to remove.
+  // Changing mode restarts, because segment 7 of a stringout and segment 7 of a
+  // rough cut are different moments in the scene.
+  useEffect(() => setIndex(0), [mode, cut]);
+
+  const segment = segments[index];
+
+  const seekToStart = useCallback(() => {
+    if (segment) player.current?.seek(segment.from, playing);
+  }, [segment, playing]);
+
+  // A new segment on the same clip is a seek; a new clip is a load, and the
+  // seek has to wait for it.
   useEffect(() => {
-    const el = video.current;
-    if (!el || !entry) return;
-    el.currentTime = entry.start_s;
-    if (playing) void el.play().catch(() => setPlaying(false));
-  }, [entry, playing]);
+    seekToStart();
+  }, [seekToStart]);
 
-  // Stop at the out-point and roll on. Without this the player runs into the
-  // tail of the take — the beat before somebody calls cut — and the assembly
-  // reads as sloppy rather than as assembled.
-  const onTime = () => {
-    const el = video.current;
-    if (!el || !entry) return;
-    if (el.currentTime >= entry.end_s) {
-      if (data && index < data.entries.length - 1) {
-        setIndex((i) => i + 1);
-      } else {
-        el.pause();
+  const onTime = (t: number) => {
+    if (!segment) return;
+    if (t >= segment.to - 0.03) {
+      if (index < segments.length - 1) setIndex((i) => i + 1);
+      else {
+        player.current?.element()?.pause();
         setPlaying(false);
       }
     }
   };
 
-  if (loading) {
-    return (
-      <main className="shell">
-        <p className="waiting">Loading — the archive may be waking up.</p>
-      </main>
-    );
-  }
+  const toggle = () => {
+    const el = player.current?.element();
+    if (!el) return;
+    if (playing) {
+      el.pause();
+      setPlaying(false);
+    } else {
+      setPlaying(true);
+      void el.play().catch(() => setPlaying(false));
+    }
+  };
+
+  if (loading) return <main className="shell"><p className="waiting">Loading.</p></main>;
 
   if (error) {
     return (
@@ -130,6 +215,10 @@ export default function ScenePage({
     );
   }
 
+  const elapsed = segments
+    .slice(0, index)
+    .reduce((n, s) => n + (s.to - s.from), 0);
+
   return (
     <main className="shell stringout">
       <div className="crumbs">
@@ -140,8 +229,8 @@ export default function ScenePage({
         <div>
           <h1>Scene {sceneId}</h1>
           <p className="dim">
-            {data.shots} shot{data.shots === 1 ? "" : "s"} ·{" "}
-            {clock(data.duration_s)} · assembled from the takes that stand
+            {data.shots} shot{data.shots === 1 ? "" : "s"} · {clock(data.duration_s)} ·{" "}
+            {segments.length} cut{segments.length === 1 ? "" : "s"}
           </p>
         </div>
         <div className="export-tools">
@@ -149,68 +238,80 @@ export default function ScenePage({
             <span>Frame rate</span>
             <select value={fps} onChange={(e) => setFps(Number(e.target.value))}>
               {FRAME_RATES.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
+                <option key={r} value={r}>{r}</option>
               ))}
             </select>
           </label>
-          <a className="ghost" href={api.edlUrl(projectId, sceneId, fps)}>
-            EDL
-          </a>
-          <a className="ghost" href={api.markersUrl(projectId, sceneId, fps)}>
-            Markers
-          </a>
+          <a className="ghost" href={api.edlUrl(projectId, sceneId, fps)}>EDL</a>
+          <a className="ghost" href={api.markersUrl(projectId, sceneId, fps)}>Markers</a>
         </div>
       </header>
 
-      {/* Said before anyone exports rather than discovered in a conform. Nothing
-          in the archive records what the original was shot at — the proxies are
-          normalised on the way in — so the rate is declared, not measured. */}
-      <p className="hint small">
-        The frame rate above is written into the EDL header. Nothing here
-        measured it: set it to what the production shot at.
-      </p>
+      <div className="mode-bar">
+        <div className="modes">
+          <button
+            type="button"
+            className={mode === "rough" ? "mode on" : "mode"}
+            onClick={() => setMode("rough")}
+          >
+            Rough cut
+          </button>
+          <button
+            type="button"
+            className={mode === "takes" ? "mode on" : "mode"}
+            onClick={() => setMode("takes")}
+          >
+            Full takes
+          </button>
+        </div>
+
+        {mode === "rough" && (
+          <label className="picker">
+            <span>Cut every</span>
+            <select value={cut} onChange={(e) => setCut(Number(e.target.value))}>
+              {CUT_LENGTHS.map((c) => (
+                <option key={c} value={c}>{c}s</option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        <span className="hint small">
+          {mode === "rough"
+            ? "Cuts between the shots on a fixed clock. Not an editorial decision — a way to watch the coverage as a scene."
+            : "Every shot in order, whole. This is the stringout the EDL exports."}
+        </span>
+      </div>
 
       {(data.unresolved > 0 || data.disagreements > 0) && (
         <p className="disagreement">
-          {data.unresolved > 0 && (
-            <>
-              {data.unresolved} shot{data.unresolved === 1 ? "" : "s"} here
-              {data.unresolved === 1 ? " is" : " are"} still a close call nobody
-              has confirmed.
-            </>
-          )}
-          {data.disagreements > 0 && (
-            <>
-              {" "}
-              {data.disagreements} use{data.disagreements === 1 ? "s" : ""} a
-              take the director did not circle.
-            </>
-          )}{" "}
-          Worth watching before this goes anywhere.
+          {data.unresolved > 0 && `${data.unresolved} unconfirmed. `}
+          {data.disagreements > 0 &&
+            `${data.disagreements} use a take the director did not circle.`}
         </p>
       )}
 
       <div className="stringout-player">
-        <video
-          ref={video}
+        <Player
+          ref={player}
           className="player big"
-          controls
-          playsInline
-          preload="metadata"
-          poster={entry?.sprite_uri || undefined}
+          src={segment?.proxy_uri ?? ""}
+          poster={segment?.sprite_uri}
           onTimeUpdate={onTime}
+          onReady={seekToStart}
           onEnded={() => {
-            if (data && index < data.entries.length - 1) setIndex((i) => i + 1);
+            if (index < segments.length - 1) setIndex((i) => i + 1);
             else setPlaying(false);
           }}
-        >
-          {entry && (
-            <source src={entry.proxy_uri} type="application/vnd.apple.mpegurl" />
-          )}
-          This browser cannot play HLS without a player library.
-        </video>
+        />
+
+        <div className="now-playing">
+          <span className="np-slug">{segment?.slug}</span>
+          <span className="np-take">take {segment?.take_no}</span>
+          <span className="np-time mono">
+            {clock(elapsed)} / {clock(data.duration_s)}
+          </span>
+        </div>
 
         <div className="stringout-transport">
           <button
@@ -219,49 +320,52 @@ export default function ScenePage({
             onClick={() => setIndex((i) => Math.max(0, i - 1))}
             disabled={index === 0}
           >
-            ← previous shot
+            ← previous
           </button>
-          <button
-            type="button"
-            className="primary"
-            onClick={() => {
-              setPlaying((p) => !p);
-              const el = video.current;
-              if (!el) return;
-              if (playing) el.pause();
-              else void el.play().catch(() => setPlaying(false));
-            }}
-          >
+          <button type="button" className="primary" onClick={toggle}>
             {playing ? "Pause" : "Play the scene"}
           </button>
           <button
             type="button"
             className="ghost"
-            onClick={() =>
-              setIndex((i) => Math.min(data.entries.length - 1, i + 1))
-            }
-            disabled={index >= data.entries.length - 1}
+            onClick={() => setIndex((i) => Math.min(segments.length - 1, i + 1))}
+            disabled={index >= segments.length - 1}
           >
-            next shot →
+            next →
           </button>
+        </div>
+
+        {/* The shape of the assembly: one block per cut, coloured by shot, so
+            an alternation is visible as an alternation. */}
+        <div className="cutline">
+          {segments.map((s, i) => (
+            <button
+              key={s.key}
+              type="button"
+              className={`cut shot-${s.shot % 6}${i === index ? " on" : ""}`}
+              style={{ flexGrow: Math.max(0.4, s.to - s.from) }}
+              onClick={() => setIndex(i)}
+              title={`${s.slug} · take ${s.take_no} · ${clock(s.to - s.from)}`}
+            />
+          ))}
         </div>
       </div>
 
       <ol className="stringout-list">
-        {data.entries.map((e, i) => (
-          <li
-            key={e.clip_id}
-            className={`${i === index ? "current" : ""}${e.needs_review ? " unsettled" : ""}`}
-          >
-            <button type="button" onClick={() => setIndex(i)}>
+        {data.entries.map((e) => (
+          <li key={e.clip_id} className={e.needs_review ? "unsettled" : ""}>
+            <button
+              type="button"
+              onClick={() => {
+                const first = segments.findIndex((s) => s.clip_id === e.clip_id);
+                if (first >= 0) setIndex(first);
+              }}
+            >
               <span className="so-slug">{e.slug}</span>
               <span className="so-take">
                 take {e.take_no}
                 {e.differs_from_circle && (
-                  <span
-                    className="circle differs"
-                    title={`The director circled take ${e.circled_take}`}
-                  >
+                  <span className="circle differs" title={`Director circled take ${e.circled_take}`}>
                     ◎{e.circled_take}
                   </span>
                 )}

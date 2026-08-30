@@ -315,6 +315,19 @@ export interface RecentNote {
   created_at: string;
 }
 
+export interface Activity {
+  project_id: number;
+  project_name?: string;
+  at: string | null;
+  actor: string;
+  actor_role: string;
+  verb: string;
+  detail: string;
+  quantity: number;
+  scene: number;
+  shot: number;
+}
+
 export interface Dashboard {
   you: string;
   role: Role;
@@ -332,6 +345,7 @@ export interface Dashboard {
   })[];
   recent: RecentDecision[];
   notes: RecentNote[];
+  activity: Activity[];
   limits: Limits;
 }
 
@@ -740,6 +754,10 @@ export const api = {
 
   /** The scenes and shots somebody declared, before any footage exists. */
   plan: (projectId: number) => request<Plan>(`/structure/${projectId}`),
+
+  /** Who did what on one production, newest first. */
+  activity: (projectId: number) =>
+    request<{ activity: Activity[] }>(`/structure/${projectId}/activity`),
 
   addScene: (projectId: number, scene: number, heading: string) =>
     request<PlannedScene>(`/structure/${projectId}/scenes`, {

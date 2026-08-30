@@ -42,6 +42,14 @@ export default function AppBar() {
   // makes the first paint disagree with the second.
   useEffect(() => {
     setIdentity(currentIdentity());
+    const refresh = () => setIdentity(currentIdentity());
+    // Signing in or out anywhere — this tab or another — redraws the bar.
+    window.addEventListener("trimbin:auth", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener("trimbin:auth", refresh);
+      window.removeEventListener("storage", refresh);
+    };
   }, []);
 
   const loadMe = useCallback(async () => {

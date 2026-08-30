@@ -6,10 +6,17 @@
  * URI and no client secret: there is no server-side exchange, and a secret in a
  * page that anyone can view source on would not be one.
  *
- * The token lives in memory and in sessionStorage — not localStorage. A token
- * that survives closing the tab is a token that survives someone walking away
- * from a shared edit suite, and these are hour-long credentials with somebody's
- * unreleased footage behind them.
+ * The token lives in memory and in localStorage.
+ *
+ * sessionStorage was the first choice, on the reasoning that a token surviving a
+ * closed tab also survives somebody walking away from a shared edit suite. That
+ * reasoning cost more than it bought: sessionStorage is per-tab, so opening any
+ * link in a new tab landed on a signed-out page, and the product read as one
+ * that loses your session at random.
+ *
+ * The expiry is the control that actually matters, and it is enforced on every
+ * read here and again on the server. Twelve hours, and a sign-out button that
+ * clears it.
  */
 
 const TOKEN_KEY = "trimbin.id_token";
@@ -77,10 +84,7 @@ function claimsOf(token: string): Identity | null {
  * with no second door is a deployment where the dashboard, the queue, every
  * override and every comment are built, shipped and unreachable.
  *
- * The token comes back signed by our own API and is held exactly like Google's:
- * in memory and in sessionStorage, never in localStorage. These are credentials
- * with somebody's unreleased footage behind them, and a token that survives
- * closing the tab survives somebody walking away from a shared edit suite.
+ * The token comes back signed by our own API and is held exactly like Google's.
  */
 export async function signInWithPass(
   username: string,
@@ -102,6 +106,7 @@ export async function signInWithPass(
   const body = await response.json();
   const identity = store(body.token as string);
   if (!identity) throw new Error("The server sent a token this page cannot read.");
+  announce();
   return identity;
 }
 
@@ -110,10 +115,10 @@ function store(token: string): Identity | null {
   if (!identity) return null;
   cached = { token, identity };
   try {
-    sessionStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(TOKEN_KEY, token);
   } catch {
-    // Private browsing, or storage disabled. Sign-in still works for this
-    // page load; it just will not survive a refresh.
+    // Private browsing, or storage disabled. Sign-in still works for this page
+    // load; it just will not survive a refresh.
   }
   return identity;
 }
@@ -123,7 +128,10 @@ export function currentIdentity(): Identity | null {
   if (!cached) {
     let saved: string | null = null;
     try {
-      saved = sessionStorage.getItem(TOKEN_KEY);
+      saved = localStorage.getItem(TOKEN_KEY);
+      // Anything left in the old place still counts, so nobody signed in
+      // yesterday is signed out by this change.
+      if (!saved) saved = sessionStorage.getItem(TOKEN_KEY);
     } catch {
       saved = null;
     }
@@ -144,12 +152,35 @@ export function currentToken(): string | null {
   return currentIdentity() ? cached!.token : null;
 }
 
+/**
+ * Tell the rest of the page that who is signed in has changed.
+ *
+ * The bar and every screen read the identity once on mount. Without a signal,
+ * signing in from a panel in the header left the page it was drawn over still
+ * showing its signed-out shape until a navigation.
+ */
+export function announce(): void {
+  try {
+    window.dispatchEvent(new CustomEvent("trimbin:auth"));
+  } catch {
+    /* not a browser */
+  }
+}
+
 export function signOut(): void {
   cached = null;
   try {
+    localStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(TOKEN_KEY);
   } catch {
     /* nothing to clear */
+  }
+  try {
+    // Other tabs of the same application, so signing out signs out everywhere
+    // rather than only where the button was pressed.
+    window.dispatchEvent(new CustomEvent("trimbin:auth"));
+  } catch {
+    /* not a browser */
   }
 }
 

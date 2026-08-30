@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends
 
 from ..auth import Principal, current_principal, require_signed_in
 from ..config import settings
+from ..services import activity
 from ..services import dashboard as dashboard_service
 from ..services import members, projects
 
@@ -67,6 +68,7 @@ async def dashboard(
 
     built = await dashboard_service.for_projects(ids, principal.email or "")
     recent = await dashboard_service.recent_decisions(ids)
+    happened = await activity.for_projects(ids)
     notes = await dashboard_service.recent_notes(ids)
 
     cards = []
@@ -116,5 +118,8 @@ async def dashboard(
         "projects": sorted(cards, key=lambda c: (-(c["waiting"] or 0), c["name"])),
         "recent": [{**r, "project_name": names.get(r["project_id"], "")} for r in recent],
         "notes": [{**n, "project_name": names.get(n["project_id"], "")} for n in notes],
+        "activity": [
+            {**a, "project_name": names.get(a["project_id"], "")} for a in happened
+        ],
         "limits": members.limits_for(principal.email).as_dict(),
     }

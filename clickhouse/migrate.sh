@@ -73,14 +73,14 @@ fi
 
 echo -n "Verifying… "
 count=$(curl --silent --fail --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}" \
-    --data-binary "SELECT count() FROM system.tables WHERE database = currentDatabase() AND name IN ('clips','decisions','comments','supersessions','current_selection','mv_current_selection','review_queue','accuracy_summary','real_clips','real_decisions','real_comments','accuracy_by_project','project_corpus','shoot_days')" \
+    --data-binary "SELECT count() FROM system.tables WHERE database = currentDatabase() AND name IN ('clips','decisions','comments','supersessions','current_selection','mv_current_selection','review_queue','accuracy_summary','real_clips','real_decisions','real_comments','accuracy_by_project','project_corpus','shoot_days','activity','real_activity')" \
     "${CLICKHOUSE_URL}/")
 
-if [[ "$count" -ne 14 ]]; then
-    echo "expected 14 objects, found ${count}" >&2
+if [[ "$count" -ne 16 ]]; then
+    echo "expected 16 objects, found ${count}" >&2
     exit 1
 fi
-echo "${count}/14 objects present."
+echo "${count}/16 objects present."
 
 echo -n "Camera column... "
 camera=$(curl --silent --fail --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}" \

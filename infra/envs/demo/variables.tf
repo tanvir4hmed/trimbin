@@ -65,6 +65,17 @@ variable "oauth_client_id" {
   sensitive   = false # a client ID is public by design; the secret is the secret
 }
 
+# The guest password, shown on the sign-in form.
+#
+# Deliberately readable and deliberately in git: it is displayed to every
+# visitor, so hiding it would be theatre. The editors' passwords are generated
+# and never leave Secret Manager.
+variable "guest_password" {
+  description = "Shown on the sign-in form. Not a secret."
+  type        = string
+  default     = "guest12345"
+}
+
 # The company, as Terraform needs to know it: one pass is generated per address.
 #
 # Duplicated from services/members.py, which is the source of truth for what
