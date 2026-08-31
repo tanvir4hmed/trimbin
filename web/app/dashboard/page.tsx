@@ -6,11 +6,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 import NewProject from "@/components/NewProject";
-import type { Dashboard } from "@/lib/api";
-import { ApiError, api } from "@/lib/api";
+import { ApiError } from "@/lib/api";
 import { currentIdentity } from "@/lib/auth";
+import { useDashboard } from "@/lib/queries";
 
 const THUMBS = [
   "linear-gradient(135deg,#3a3226,#17140f)",
@@ -62,47 +62,32 @@ function ago(iso: string | null): string {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [data, setData] = useState<Dashboard | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const query = useDashboard();
+  const data = query.data;
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      setData(await api.dashboard());
-      setError(null);
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 401) {
-        router.replace("/");
-        return;
-      }
-      setError(
-        e instanceof ApiError && e.waking
-          ? "The archive is waking up."
-          : e instanceof Error
-            ? e.message
-            : "Could not load your work.",
-      );
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    if (!currentIdentity()) router.replace("/");
   }, [router]);
 
   useEffect(() => {
-    if (!currentIdentity()) {
+    if (query.error instanceof ApiError && query.error.status === 401) {
       router.replace("/");
-      return;
     }
-    void load();
-  }, [load, router]);
+  }, [query.error, router]);
 
-  if (loading) return <main className="shell"><p className="waiting">Loading.</p></main>;
+  if (query.isPending) {
+    return <main className="shell"><p className="waiting">Loading.</p></main>;
+  }
 
-  if (error) {
+  if (query.isError) {
     return (
       <main className="shell">
-        <p className="error">{error}</p>
-        <button type="button" className="ghost" onClick={() => void load()}>
+        <p className="error">
+          {query.error instanceof ApiError && query.error.waking
+            ? "The archive is waking up."
+            : "Could not load your work."}
+        </p>
+        <button type="button" className="ghost" onClick={() => void query.refetch()}>
           Try again
         </button>
       </main>

@@ -340,6 +340,37 @@ export const api = {
   me: () => request<Me>("/me"),
 
   /**
+   * The workspace in one answer: the project, the tree, the shot plan and the
+   * caller's capabilities.
+   *
+   * It was four requests, each with its own loading state and its own opinion
+   * about who you are, assembled by the browser with the last one winning.
+   */
+  projectScreen: (
+    projectId: number,
+    filters?: { scene?: number; camera?: string; shoot_day?: string; assignee?: string },
+  ) => {
+    const q = new URLSearchParams();
+    if (filters?.scene !== undefined) q.set("scene", String(filters.scene));
+    if (filters?.camera) q.set("camera", filters.camera);
+    if (filters?.shoot_day) q.set("shoot_day", filters.shoot_day);
+    if (filters?.assignee) q.set("assignee", filters.assignee);
+    const query = q.toString();
+    return request<ProjectScreen>(
+      `/screens/project/${projectId}${query ? `?${query}` : ""}`,
+    );
+  },
+
+  /**
+   * The cockpit in one answer: verdicts, brief and notes.
+   *
+   * `verdicts` is null for a shot nothing has compared — a normal state, not a
+   * 404 the page has to catch and reinterpret as "press compare".
+   */
+  shotScreen: (projectId: number, scene: number, shot: number) =>
+    request<ShotScreen>(`/screens/shot/${projectId}/${scene}/${shot}`),
+
+  /**
    * Which ways in this deployment has.
    *
    * Asked before a sign-in screen is drawn. Offering Google where there is no
@@ -431,6 +462,10 @@ export const api = {
       now_selected: string;
     }>(`/review/${projectId}/${scene}/${shot}/select`, {
       method: "POST",
+      // A retry of a dropped request must not land in the archive as a second
+      // editorial decision. The key is per attempt, so a genuine second choice
+      // by the same person is still a second command.
+      headers: { "Idempotency-Key": crypto.randomUUID() },
       body: JSON.stringify(body),
     }),
 
@@ -449,32 +484,59 @@ export const api = {
     scene: number,
     shot: number,
     body: Partial<Pick<Brief, "slug" | "heading" | "action" | "line" | "notes" | "look">>,
+    rev?: number,
   ) =>
     request<Brief>(`/review/${projectId}/${scene}/${shot}/brief`, {
       method: "PUT",
       body: JSON.stringify({
         slug: "", heading: "", action: "", line: "", notes: "", look: "",
         ...body,
+        rev,
       }),
     }),
 
-  /** The take the room circled. Zero clears it. Never shown to the panel. */
-  circle: (projectId: number, scene: number, shot: number, take_no: number) =>
+  /**
+   * The four edits to a shot, each carrying the revision it was shown.
+   *
+   * A stale `rev` is a 409 rather than a silent overwrite of whoever edited it
+   * meanwhile. Omitting it is accepted by the server and means "I did not
+   * look" — which is the right default for a client that has just deployed and
+   * has not reloaded.
+   */
+  circle: (
+    projectId: number,
+    scene: number,
+    shot: number,
+    take_no: number,
+    rev?: number,
+  ) =>
     request<Brief>(`/review/${projectId}/${scene}/${shot}/circle`, {
       method: "PUT",
-      body: JSON.stringify({ take_no }),
+      body: JSON.stringify({ take_no, rev }),
     }),
 
-  assign: (projectId: number, scene: number, shot: number, assignee: string) =>
+  assign: (
+    projectId: number,
+    scene: number,
+    shot: number,
+    assignee: string,
+    rev?: number,
+  ) =>
     request<Brief>(`/review/${projectId}/${scene}/${shot}/assignee`, {
       method: "PUT",
-      body: JSON.stringify({ assignee }),
+      body: JSON.stringify({ assignee, rev }),
     }),
 
-  setState: (projectId: number, scene: number, shot: number, state: ShotState) =>
+  setState: (
+    projectId: number,
+    scene: number,
+    shot: number,
+    state: ShotState,
+    rev?: number,
+  ) =>
     request<Brief>(`/review/${projectId}/${scene}/${shot}/state`, {
       method: "PUT",
-      body: JSON.stringify({ state }),
+      body: JSON.stringify({ state, rev }),
     }),
 
   comments: (projectId: number, scene: number, shot: number) =>

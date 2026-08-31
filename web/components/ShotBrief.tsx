@@ -21,7 +21,6 @@
 
 import { useState } from "react";
 import type { Brief } from "@/lib/api";
-import { api } from "@/lib/api";
 
 export default function ShotBrief({
   projectId,
@@ -29,14 +28,22 @@ export default function ShotBrief({
   shot,
   brief,
   canEdit,
-  onSaved,
+  onSave,
 }: {
   projectId: number;
   scene: number;
   shot: number;
   brief: Brief;
   canEdit: boolean;
-  onSaved: (brief: Brief) => void;
+  /** Saving belongs to the caller, which owns the cache the save invalidates. */
+  onSave: (fields: {
+    slug: string;
+    heading: string;
+    action: string;
+    line: string;
+    notes: string;
+    look: string;
+  }) => Promise<unknown>;
 }) {
   const [open, setOpen] = useState(!brief.is_empty);
   const [editing, setEditing] = useState(false);
@@ -54,10 +61,9 @@ export default function ShotBrief({
   const save = async () => {
     setBusy(true);
     try {
-      const saved = await api.saveBrief(projectId, scene, shot, form);
-      onSaved(saved);
+      await onSave(form);
       setEditing(false);
-      setNote(saved.note ?? null);
+      setNote("Saved. Press Compare again for the panel to use it.");
     } catch (e) {
       setNote(e instanceof Error ? e.message : "Could not save that.");
     } finally {

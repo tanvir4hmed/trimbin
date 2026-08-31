@@ -10,9 +10,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import type { QueueItem, Verdicts } from "@/lib/api";
+import Player from "@/components/Player";
+import type { Verdicts } from "@/lib/api";
 import { ApiError, api } from "@/lib/api";
 import { currentIdentity } from "@/lib/auth";
+import { useChooseTake, useDashboard } from "@/lib/queries";
 
 const REASONS = [
   "better performance",
@@ -23,38 +25,26 @@ const REASONS = [
 
 export default function ReviewPage() {
   const router = useRouter();
-  const [queue, setQueue] = useState<QueueItem[]>([]);
   const [at, setAt] = useState(0);
   const [verdicts, setVerdicts] = useState<Verdicts | null>(null);
   const [reason, setReason] = useState("");
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const found = await api.dashboard();
-      setQueue(found.queue);
-      setError(null);
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 401) {
-        router.replace("/");
-        return;
-      }
-      setError(e instanceof Error ? e.message : "Could not load the queue.");
-    } finally {
-      setLoading(false);
-    }
+  // The same cache entry the dashboard reads. A choice made here invalidates
+  // it, so the count behind this screen is right by the time you go back.
+  const dashboard = useDashboard();
+  const queue = dashboard.data?.queue ?? [];
+  const loading = dashboard.isPending;
+
+  useEffect(() => {
+    if (!currentIdentity()) router.replace("/");
   }, [router]);
 
   useEffect(() => {
-    if (!currentIdentity()) {
+    if (dashboard.error instanceof ApiError && dashboard.error.status === 401) {
       router.replace("/");
-      return;
     }
-    void load();
-  }, [load, router]);
+  }, [dashboard.error, router]);
 
   const item = queue[at];
 
@@ -73,23 +63,26 @@ export default function ReviewPage() {
   const ranked = verdicts ? [...verdicts.takes].sort((a, b) => b.score - a.score) : [];
   const top = ranked.slice(0, 2);
 
+  // The mutation is keyed to whichever shot is on screen, so its invalidation
+  // names the right entry.
+  const chooseTake = useChooseTake(
+    item?.project_id ?? 0,
+    item?.scene ?? 0,
+    item?.shot ?? 0,
+  );
+  const busy = chooseTake.isPending;
+
   const choose = useCallback(
     async (clipId: string, why: string) => {
       if (!item || why.trim().length < 3) return;
-      setBusy(true);
       try {
-        await api.select(item.project_id, item.scene, item.shot, {
-          clip_id: clipId,
-          reason: why.trim(),
-        });
+        await chooseTake.mutateAsync({ clip_id: clipId, reason: why.trim() });
         setAt((n) => n + 1);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not record that.");
-      } finally {
-        setBusy(false);
       }
     },
-    [item],
+    [item, chooseTake],
   );
 
   // 1 and 2 pick, S skips. An editor working a queue does not reach for a mouse.
@@ -166,15 +159,7 @@ export default function ReviewPage() {
           <div className="compare">
             {top.map((t, i) => (
               <div key={t.clip_id} className={i === 0 ? "cand rec" : "cand"}>
-                <video
-                  className="cvid"
-                  controls
-                  preload="metadata"
-                  playsInline
-                  poster={t.sprite_uri || undefined}
-                >
-                  <source src={t.proxy_uri} type="application/vnd.apple.mpegurl" />
-                </video>
+                <Player className="cvid" src={t.proxy_uri} poster={t.sprite_uri} />
                 <div className="chead">
                   <span className="cbadge">
                     <kbd>{i + 1}</kbd> Take {t.take_no}

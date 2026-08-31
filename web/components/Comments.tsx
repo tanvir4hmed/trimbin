@@ -15,9 +15,9 @@
  * the same reason an override does: the disagreement is the data.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import type { Comment } from "@/lib/api";
-import { api } from "@/lib/api";
+import { useComment } from "@/lib/queries";
 
 function seconds(value: number): string {
   const m = Math.floor(value / 60);
@@ -41,6 +41,7 @@ export default function Comments({
   scene,
   shot,
   canComment,
+  comments,
   takes,
   pending,
   onConsumedPending,
@@ -49,35 +50,23 @@ export default function Comments({
   scene: number;
   shot: number;
   canComment: boolean;
+  /** Handed down from the shot screen rather than fetched again. It arrived in
+   *  the same request as the verdicts; asking for it a second time made the
+   *  notes appear a beat after the takes. */
+  comments: Comment[];
   takes: { clip_id: string; take_no: number }[];
   /** A timecode handed over from the player, so "note at 0:04" lands here. */
   pending: { clipId: string; at: number } | null;
   onConsumedPending: () => void;
 }) {
-  const [comments, setComments] = useState<Comment[]>([]);
   const [body, setBody] = useState("");
   const [anchor, setAnchor] = useState<{ clipId: string; at: number } | null>(null);
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyBody, setReplyBody] = useState("");
-  const [busy, setBusy] = useState(false);
   const [showResolved, setShowResolved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      const found = await api.comments(projectId, scene, shot);
-      setComments(found.comments);
-      setError(null);
-    } catch {
-      // A shot with no comments and a shot whose comments failed to load look
-      // the same to a reader, so the second one says so.
-      setError("Could not load the notes on this shot.");
-    }
-  }, [projectId, scene, shot]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { add, resolve } = useComment(projectId, scene, shot);
 
   // A timecode arriving from the player fills the box and focuses it. The note
   // is the point; the timecode is a convenience that should not become a step.
@@ -90,9 +79,8 @@ export default function Comments({
 
   const post = async () => {
     if (body.trim().length === 0) return;
-    setBusy(true);
     try {
-      await api.comment(projectId, scene, shot, {
+      await add.mutateAsync({
         body: body.trim(),
         clip_id: anchor?.clipId ?? null,
         at_s: anchor?.at ?? 0,
@@ -100,29 +88,19 @@ export default function Comments({
       });
       setBody("");
       setAnchor(null);
-      await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save that note.");
-    } finally {
-      setBusy(false);
     }
   };
 
   const reply = async (parentId: string) => {
     if (replyBody.trim().length === 0) return;
-    setBusy(true);
     try {
-      await api.comment(projectId, scene, shot, {
-        body: replyBody.trim(),
-        parent_id: parentId,
-      });
+      await add.mutateAsync({ body: replyBody.trim(), parent_id: parentId });
       setReplyBody("");
       setReplyTo(null);
-      await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not reply.");
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -200,10 +178,7 @@ export default function Comments({
                     <button
                       type="button"
                       className="linkish"
-                      onClick={async () => {
-                        await api.resolveComment(projectId, scene, shot, c.comment_id);
-                        await load();
-                      }}
+                      onClick={() => void resolve.mutateAsync(c.comment_id)}
                     >
                       mark dealt with
                     </button>
@@ -227,7 +202,7 @@ export default function Comments({
                   <button
                     type="button"
                     className="ghost small"
-                    disabled={busy || replyBody.trim().length === 0}
+                    disabled={add.isPending || replyBody.trim().length === 0}
                     onClick={() => void reply(c.comment_id)}
                   >
                     Send
@@ -269,10 +244,10 @@ export default function Comments({
           <button
             type="button"
             className="primary"
-            disabled={busy || body.trim().length === 0}
+            disabled={add.isPending || body.trim().length === 0}
             onClick={() => void post()}
           >
-            {busy ? "Saving…" : "Leave the note"}
+            {add.isPending ? "Saving…" : "Leave the note"}
           </button>
         </div>
       ) : (

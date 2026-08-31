@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import AppBar from "@/components/AppBar";
+import Providers from "@/components/Providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -28,10 +29,13 @@ export default function RootLayout({
         />
       </head>
       <body>
-        {/* One bar, both states. A visitor who signs in finds the same product
-            with more of it available, rather than being moved to another one. */}
-        <AppBar />
-        {children}
+        <Providers>
+          {/* One bar, both states. A visitor who signs in finds the same
+              product with more of it available, rather than being moved to
+              another one. */}
+          <AppBar />
+          {children}
+        </Providers>
       </body>
     </html>
   );

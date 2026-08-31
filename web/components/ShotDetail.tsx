@@ -25,12 +25,20 @@
  * beside the verdict instead, where a person can weigh both.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Comments from "@/components/Comments";
 import Player, { PlayerHandle } from "@/components/Player";
 import ShotBrief from "@/components/ShotBrief";
-import type { Brief, ShotState, Take, Verdicts } from "@/lib/api";
-import { ApiError, api } from "@/lib/api";
+import type { Brief, ShotState, Take } from "@/lib/api";
+import { ApiError } from "@/lib/api";
+import {
+  conflictMessage,
+  useJudge,
+  useShotEdits,
+  useShotScreen,
+  useUndo,
+  useChooseTake,
+} from "@/lib/queries";
 
 /** Offered as one-tap chips because a free-text box gets skipped.
  *
@@ -90,7 +98,6 @@ export default function ShotDetail({
   canCurate,
   you,
   teamEmails,
-  onDecided,
 }: {
   projectId: number;
   scene: number;
@@ -105,81 +112,69 @@ export default function ShotDetail({
   canCurate: boolean;
   you: string;
   teamEmails: string[];
-  onDecided?: () => void;
 }) {
-  const [data, setData] = useState<Verdicts | null>(null);
-  const [brief, setBrief] = useState<Brief | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [commentAt, setCommentAt] = useState<{ clipId: string; at: number } | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [found, description] = await Promise.all([
-        api.verdicts(projectId, scene, shot).catch((e) => {
-          if (e instanceof ApiError && e.status === 404) return null;
-          throw e;
-        }),
-        api.brief(projectId, scene, shot).catch(() => null),
-      ]);
-      setData(found);
-      setBrief(description);
-      setOpen(found?.recommended ?? found?.takes[0]?.clip_id ?? null);
-    } catch (e) {
-      if (e instanceof ApiError && e.waking) {
-        // Named, so the reader knows to wait rather than to give up.
-        setError(
-          "The archive is still waking up. It sleeps when nobody is using it.",
-        );
-      } else {
-        setError(e instanceof Error ? e.message : "Could not load this shot.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId, scene, shot]);
+  // One request for the whole screen, from the cache every other screen reads.
+  // Every mutation below invalidates it, which is why the dashboard count moves
+  // when a take is chosen here.
+  const screen = useShotScreen(projectId, scene, shot);
+  const data = screen.data?.verdicts ?? null;
+  const brief = screen.data?.brief ?? null;
 
+  const chooseTake = useChooseTake(projectId, scene, shot);
+  const judgeShot = useJudge(projectId, scene, shot);
+  const undoChange = useUndo(projectId, scene, shot);
+  const edits = useShotEdits(projectId, scene, shot, brief ?? undefined);
+
+  // The recommended take opens by default, and only until somebody picks
+  // another. Deriving it every render would slam an expanded row shut whenever
+  // the cache refreshed underneath.
   useEffect(() => {
-    void load();
-  }, [load]);
+    setOpen((current) =>
+      current ?? data?.recommended ?? data?.takes[0]?.clip_id ?? null,
+    );
+  }, [data]);
+
+  const saving =
+    chooseTake.isPending ||
+    judgeShot.isPending ||
+    undoChange.isPending ||
+    edits.circle.isPending ||
+    edits.assign.isPending ||
+    edits.setState.isPending;
 
   const judge = async () => {
-    setSaving(true);
     setNote("Comparing the takes. This can take a minute — the panel watches them.");
     try {
-      await api.judge(projectId, scene, shot);
-      await load();
-      onDecided?.();
+      await judgeShot.mutateAsync();
       setNote(null);
     } catch (e) {
       setNote(e instanceof Error ? e.message : "Could not run the comparison.");
-    } finally {
-      setSaving(false);
     }
   };
 
   const undo = async () => {
-    setSaving(true);
     try {
-      await api.undo(projectId, scene, shot);
+      await undoChange.mutateAsync();
       setNote("Put back. The change is still in the archive — nothing was deleted.");
-      await load();
-      onDecided?.();
     } catch (e) {
       setNote(e instanceof Error ? e.message : "Could not undo that.");
-    } finally {
-      setSaving(false);
     }
   };
 
+  /** A stale edit is refused rather than allowed to overwrite. */
+  const report = (e: unknown) =>
+    setNote(
+      conflictMessage(e) ??
+        (e instanceof Error ? e.message : "Could not record that."),
+    );
+
   const label = brief?.slug || `Shot ${shot}`;
 
-  if (loading) {
+  if (screen.isPending) {
     return (
       <div className="shot-detail">
         {/* Named rather than a bare spinner. The database idles to save credit
@@ -190,11 +185,16 @@ export default function ShotDetail({
     );
   }
 
-  if (error) {
+  if (screen.isError) {
+    const waking = screen.error instanceof ApiError && screen.error.waking;
     return (
       <div className="shot-detail">
-        <p className="error">{error}</p>
-        <button type="button" onClick={() => void load()}>
+        <p className="error">
+          {waking
+            ? "The archive is still waking up. It sleeps when nobody is using it."
+            : "Could not load this shot."}
+        </p>
+        <button type="button" onClick={() => void screen.refetch()}>
           Try again
         </button>
       </div>
@@ -229,7 +229,7 @@ export default function ShotDetail({
             shot={shot}
             brief={brief}
             canEdit={canCurate}
-            onSaved={setBrief}
+            onSave={(fields) => edits.saveBrief.mutateAsync(fields)}
           />
         )}
       </div>
@@ -261,30 +261,16 @@ export default function ShotDetail({
 
         <div className="shot-actions">
           <Assignment
-            projectId={projectId}
-            scene={scene}
-            shot={shot}
             value={data.assignee}
             you={you}
             options={teamEmails}
             disabled={!canCurate}
-            onChanged={(b) => {
-              setBrief(b);
-              setData({ ...data, assignee: b.assignee });
-              onDecided?.();
-            }}
+            onChange={(value) => edits.assign.mutateAsync(value).catch(report)}
           />
           <StatePicker
-            projectId={projectId}
-            scene={scene}
-            shot={shot}
             value={data.state}
             disabled={!canCurate}
-            onChanged={(b) => {
-              setBrief(b);
-              setData({ ...data, state: b.state });
-              onDecided?.();
-            }}
+            onChange={(value) => edits.setState.mutateAsync(value).catch(report)}
           />
         </div>
       </header>
@@ -319,43 +305,26 @@ export default function ShotDetail({
             canEdit={canComment}
             canCurate={canCurate}
             onNoteAt={(at) => setCommentAt({ clipId: take.clip_id, at })}
-            onCircle={async () => {
-              setSaving(true);
-              try {
-                const updated = await api.circle(
-                  projectId, scene, shot,
-                  data.circled_take === take.take_no ? 0 : take.take_no,
-                );
-                setBrief(updated);
-                await load();
-                onDecided?.();
-              } catch (e) {
-                setNote(e instanceof Error ? e.message : "Could not record that.");
-              } finally {
-                setSaving(false);
-              }
-            }}
+            onCircle={() =>
+              edits.circle
+                .mutateAsync(data.circled_take === take.take_no ? 0 : take.take_no)
+                .then(() => undefined)
+                .catch(report)
+            }
             onChoose={async (reason, span) => {
-              setSaving(true);
               try {
-                const result = await api.select(projectId, scene, shot, {
+                const result = await chooseTake.mutateAsync({
                   clip_id: take.clip_id,
                   reason,
-                  ...(span
-                    ? { in_point_s: span.from, out_point_s: span.to }
-                    : {}),
+                  ...(span ? { in_point_s: span.from, out_point_s: span.to } : {}),
                 });
                 setNote(
                   result.agreed_with_panel
                     ? "Recorded — you agreed with the panel."
                     : "Recorded — your choice replaces the panel's.",
                 );
-                await load();
-                onDecided?.();
               } catch (e) {
-                setNote(e instanceof Error ? e.message : "Could not record that.");
-              } finally {
-                setSaving(false);
+                report(e);
               }
             }}
           />
@@ -394,7 +363,7 @@ export default function ShotDetail({
           shot={shot}
           brief={brief}
           canEdit={canCurate}
-          onSaved={setBrief}
+          onSave={(fields) => edits.saveBrief.mutateAsync(fields)}
         />
       )}
 
@@ -403,6 +372,7 @@ export default function ShotDetail({
         scene={scene}
         shot={shot}
         canComment={canComment}
+        comments={screen.data?.comments ?? []}
         takes={data.takes.map((t) => ({ clip_id: t.clip_id, take_no: t.take_no }))}
         pending={commentAt}
         onConsumedPending={() => setCommentAt(null)}
@@ -415,23 +385,17 @@ export default function ShotDetail({
  * themselves — a gate here would make the lead editor the only person who can
  * pick up a shot, which is how a queue stops moving on a Friday afternoon. */
 function Assignment({
-  projectId,
-  scene,
-  shot,
   value,
   you,
   options,
   disabled,
-  onChanged,
+  onChange,
 }: {
-  projectId: number;
-  scene: number;
-  shot: number;
   value: string;
   you: string;
   options: string[];
   disabled: boolean;
-  onChanged: (brief: Brief) => void;
+  onChange: (assignee: string) => void;
 }) {
   const people = useMemo(() => {
     const set = new Set(options.filter(Boolean));
@@ -446,9 +410,7 @@ function Assignment({
       <select
         value={value}
         disabled={disabled}
-        onChange={async (e) => {
-          onChanged(await api.assign(projectId, scene, shot, e.target.value));
-        }}
+        onChange={(e) => onChange(e.target.value)}
       >
         <option value="">unclaimed</option>
         {people.map((p) => (
@@ -467,19 +429,13 @@ function Assignment({
  * this says whether anybody is still working on it, and only the second one is
  * asked at a standup. */
 function StatePicker({
-  projectId,
-  scene,
-  shot,
   value,
   disabled,
-  onChanged,
+  onChange,
 }: {
-  projectId: number;
-  scene: number;
-  shot: number;
   value: ShotState;
   disabled: boolean;
-  onChanged: (brief: Brief) => void;
+  onChange: (state: ShotState) => void;
 }) {
   return (
     <label className="picker">
@@ -487,11 +443,7 @@ function StatePicker({
       <select
         value={value}
         disabled={disabled}
-        onChange={async (e) => {
-          onChanged(
-            await api.setState(projectId, scene, shot, e.target.value as ShotState),
-          );
-        }}
+        onChange={(e) => onChange(e.target.value as ShotState)}
       >
         {STATE_LABELS.map((s) => (
           <option key={s.value} value={s.value}>
