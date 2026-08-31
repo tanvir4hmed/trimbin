@@ -1,4 +1,4 @@
-﻿"""Typed contracts for every agent boundary.
+"""Typed contracts for every agent boundary.
 
 Import from here rather than from the submodules, so the set of things that may
 cross between agents stays visible in one place.
@@ -12,13 +12,13 @@ from .analysis import (
     TakeVerdict,
 )
 from .base import (
-    FindingCode,
-    ReasonCode,
     Actor,
     ClipRef,
     Confidence,
     Finding,
+    FindingCode,
     Provenance,
+    ReasonCode,
     Severity,
     Strict,
     TimeRange,

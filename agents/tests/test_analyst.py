@@ -39,9 +39,7 @@ def _measurements(**overrides) -> Measurements:
 def _request(*takes: Measurements) -> AnalysisRequest:
     clips, measurements = [], {}
     for i, m in enumerate(takes, start=1):
-        clip = ClipRef(
-            clip_id=uuid4(), project_id=1, group_id=12, subgroup_id=3, take_no=i
-        )
+        clip = ClipRef(clip_id=uuid4(), project_id=1, group_id=12, subgroup_id=3, take_no=i)
         clips.append(clip)
         measurements[clip.clip_id] = m
     return AnalysisRequest(clips=clips, measurements=measurements)
@@ -62,9 +60,21 @@ class TestScoring:
         assert all(s == 1.0 for s in scores)
 
     def test_the_outlier_within_a_dark_scene_is_still_found(self) -> None:
+        """The other half of the pair above. Seven dark takes are a night scene;
+        one take darker than the other six is an accident, and the ratio finds
+        it precisely because it is measured against them.
+
+        This built a request and never looked at it — the assertion only scored
+        one take in isolation, which is the case the previous test covers. It
+        ranks the group now, which is what the name claims.
+        """
         darker = _measurements(exposure_rel=0.4)
         request = _request(_measurements(), _measurements(), darker)
-        assert _score(darker) < 1.0
+
+        scores = [_score(request.measurements[c.clip_id]) for c in request.clips]
+        assert scores[-1] < 1.0
+        assert scores[-1] == min(scores)
+        assert all(s == 1.0 for s in scores[:-1])
 
     def test_dropped_frames_are_heavily_penalised(self) -> None:
         """Unlike darkness or shake, a dropped frame is never an artistic

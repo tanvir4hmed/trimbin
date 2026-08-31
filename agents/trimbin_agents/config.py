@@ -48,7 +48,10 @@ class Settings(BaseSettings):
     )
     embedding_model: str = Field(
         default="gemini-embedding-2",
-        description="Natively multimodal, so clips are compared on how they look rather than on prose about them.",
+        description=(
+            "Natively multimodal, so clips are compared on how they look "
+            "rather than on prose about them."
+        ),
     )
     embedding_dimensions: int = 768
 

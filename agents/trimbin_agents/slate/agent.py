@@ -81,7 +81,9 @@ class SlateAgent:
         try:
             reading, source, confidence = await self._read_board(clip_head)
         except Unreadable:
-            reading, source, confidence = SlateReading(), GroupingSource.TIMECODE, Confidence.UNCERTAIN
+            reading = SlateReading()
+            source = GroupingSource.TIMECODE
+            confidence = Confidence.UNCERTAIN
 
         if source is GroupingSource.SLATE:
             group_id, subgroup_id, take_no = _parse_reading(reading)
@@ -101,7 +103,9 @@ class SlateAgent:
             prompt_version=PROMPT_VERSION,
         )
 
-    async def _read_board(self, clip_head: bytes) -> tuple[SlateReading, GroupingSource, Confidence]:
+    async def _read_board(
+        self, clip_head: bytes
+    ) -> tuple[SlateReading, GroupingSource, Confidence]:
         try:
             response = await self._client.aio.models.generate_content(
                 model=settings.slate_model,
@@ -121,7 +125,7 @@ class SlateAgent:
                     temperature=0.0,
                 ),
             )
-        except Exception as exc:  # noqa: BLE001 — the caller decides whether to retry
+        except Exception as exc:
             raise AgentFailure(f"slate read failed: {exc}") from exc
 
         reading = SlateReading.model_validate_json(response.text)
@@ -267,7 +271,7 @@ def _typical_similarity(members: list[list[float]]) -> float:
         return 0.0
 
     scores = sorted(
-        _cosine(member, _centroid(members[:i] + members[i + 1:]))
+        _cosine(member, _centroid(members[:i] + members[i + 1 :]))
         for i, member in enumerate(members)
     )
     mid = len(scores) // 2

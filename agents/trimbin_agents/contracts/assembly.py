@@ -24,9 +24,9 @@ class ReviewReason(str, Enum):
     of problem is waiting.
     """
 
-    NARROW_MARGIN = "narrow_margin"      # takes are technically equivalent
-    NO_WINNER = "no_winner"              # nothing was good enough
-    BLOCKING_FINDING = "blocking"        # the best take still has a problem
+    NARROW_MARGIN = "narrow_margin"  # takes are technically equivalent
+    NO_WINNER = "no_winner"  # nothing was good enough
+    BLOCKING_FINDING = "blocking"  # the best take still has a problem
     INFERRED_GROUPING = "inferred_grouping"  # the grouping itself may be wrong
 
 

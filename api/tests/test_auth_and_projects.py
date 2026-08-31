@@ -66,9 +66,7 @@ class TestAudienceVerification:
         assert principal.is_anonymous
 
     @pytest.mark.asyncio
-    async def test_a_configured_client_id_is_passed_to_the_verifier(
-        self, monkeypatch
-    ) -> None:
+    async def test_a_configured_client_id_is_passed_to_the_verifier(self, monkeypatch) -> None:
         """The audience is the whole point of the check."""
         monkeypatch.setattr(
             auth.settings, "oauth_client_id", "our-client.apps.googleusercontent.com"
@@ -91,7 +89,8 @@ class TestAudienceVerification:
         someone who does not own it."""
         monkeypatch.setattr(auth.settings, "oauth_client_id", "our-client")
         monkeypatch.setattr(
-            auth.id_token, "verify_oauth2_token",
+            auth.id_token,
+            "verify_oauth2_token",
             lambda *a, **k: {"email": "someone@example.com", "email_verified": False},
         )
         principal = await auth.current_principal(FakeRequest("Bearer good"))
@@ -189,9 +188,7 @@ class TestCommentingAndOverruling:
     """
 
     @pytest.mark.asyncio
-    async def test_a_guest_may_overrule_us_on_a_public_project(
-        self, monkeypatch
-    ) -> None:
+    async def test_a_guest_may_overrule_us_on_a_public_project(self, monkeypatch) -> None:
         monkeypatch.setattr(auth.settings, "demo_project_id", 1)
         monkeypatch.setattr(auth.projects, "get", _public_project)
 
@@ -242,9 +239,7 @@ class TestUploading:
     """
 
     @pytest.mark.asyncio
-    async def test_a_guest_may_not_upload_into_a_company_project(
-        self, monkeypatch
-    ) -> None:
+    async def test_a_guest_may_not_upload_into_a_company_project(self, monkeypatch) -> None:
         async def company_project(project_id):
             project = FakeProject(project_id, is_public=True)
             project.owner_email = members.LEAD_EDITOR
@@ -273,9 +268,7 @@ class TestUploading:
         await Principal(email="a-judge@example.com").assert_can_upload(9)
 
     @pytest.mark.asyncio
-    async def test_an_editor_uploads_into_a_company_project(
-        self, monkeypatch
-    ) -> None:
+    async def test_an_editor_uploads_into_a_company_project(self, monkeypatch) -> None:
         """Membership rows are not the only route in. A new editor on the roster
         should not be locked out of the archive they were hired to work on."""
 
@@ -288,9 +281,7 @@ class TestUploading:
         await Principal(email=next(iter(members.EDITORS))).assert_can_upload(1)
 
     @pytest.mark.asyncio
-    async def test_an_editor_may_not_upload_into_a_strangers_project(
-        self, monkeypatch
-    ) -> None:
+    async def test_an_editor_may_not_upload_into_a_strangers_project(self, monkeypatch) -> None:
         """Being on the roster is not being on everything. A guest project is
         somebody else's work."""
 
@@ -305,9 +296,7 @@ class TestUploading:
             await Principal(email=next(iter(members.EDITORS))).assert_can_upload(9)
 
     @pytest.mark.asyncio
-    async def test_an_anonymous_visitor_may_not_upload_anywhere(
-        self, monkeypatch
-    ) -> None:
+    async def test_an_anonymous_visitor_may_not_upload_anywhere(self, monkeypatch) -> None:
         with pytest.raises(HTTPException) as raised:
             await Principal(email=None).assert_can_upload(1)
         assert raised.value.status_code == 401

@@ -120,8 +120,11 @@ async def read_slate(source: Path, work: Path, clip_id: UUID, project_id: int) -
     identity.camera = camera_from_slate(result.reading.raw)
     log.info(
         "clip %s: board reads %r -> scene %d, shot %d, take %d",
-        clip_id, result.reading.raw.replace("\n", " / "),
-        result.group_id, result.subgroup_id, result.take_no,
+        clip_id,
+        result.reading.raw.replace("\n", " / "),
+        result.group_id,
+        result.subgroup_id,
+        result.take_no,
     )
     return identity
 
@@ -170,12 +173,8 @@ async def embed(source: Path, work: Path, clip_id: UUID, duration_s: float) -> l
         for frame in frames:
             response = await client.aio.models.embed_content(
                 model=settings.embedding_model,
-                contents=[
-                    types.Part.from_bytes(data=frame.read_bytes(), mime_type="image/jpeg")
-                ],
-                config=types.EmbedContentConfig(
-                    output_dimensionality=_EMBEDDING_DIMENSIONS
-                ),
+                contents=[types.Part.from_bytes(data=frame.read_bytes(), mime_type="image/jpeg")],
+                config=types.EmbedContentConfig(output_dimensionality=_EMBEDDING_DIMENSIONS),
             )
             vectors.append(response.embeddings[0].values)
     except Exception:

@@ -17,7 +17,7 @@ from pydantic import ValidationError
 
 from trimbin_agents.assembly.agent import MIN_USABLE_S, AssemblyAgent
 from trimbin_agents.contracts.analysis import AnalysisResult, TakeVerdict
-from trimbin_agents.contracts.assembly import AssemblyResult, ReviewItem, ReviewReason, Selection
+from trimbin_agents.contracts.assembly import AssemblyResult, ReviewItem, ReviewReason
 from trimbin_agents.contracts.base import (
     Confidence,
     Finding,
@@ -85,8 +85,11 @@ class TestUnusableShots:
         analysis = analysis.model_copy(update={"winner_id": None})
 
         result = AssemblyAgent().assemble(
-            project_id=1, group_id=12, analyses=[analysis],
-            durations={}, take_numbers={},
+            project_id=1,
+            group_id=12,
+            analyses=[analysis],
+            durations={},
+            take_numbers={},
         )
 
         assert not result.selections
@@ -98,20 +101,28 @@ class TestUnusableShots:
         notification rather than something they can act on."""
         analysis = _analysis().model_copy(update={"winner_id": None})
         result = AssemblyAgent().assemble(
-            project_id=1, group_id=12, analyses=[analysis],
-            durations={}, take_numbers={},
+            project_id=1,
+            group_id=12,
+            analyses=[analysis],
+            durations={},
+            take_numbers={},
         )
         assert result.review[0].candidates
 
     def test_the_contract_rejects_an_unusable_shot_with_nothing_to_open(self) -> None:
         with pytest.raises(ValidationError, match="no candidates"):
             AssemblyResult(
-                project_id=1, group_id=12, selections=[],
+                project_id=1,
+                group_id=12,
+                selections=[],
                 review=[
                     ReviewItem(
-                        group_id=12, subgroup_id=3,
+                        group_id=12,
+                        subgroup_id=3,
                         reason=ReviewReason.NO_WINNER,
-                        detail="nothing usable", margin=0.0, candidates=[],
+                        detail="nothing usable",
+                        margin=0.0,
+                        candidates=[],
                     )
                 ],
                 provenance=_provenance(),
@@ -124,9 +135,11 @@ class TestSpans:
         in, a clapperboard appears in the middle of the assembled film."""
         winner = uuid4()
         result = AssemblyAgent().assemble(
-            project_id=1, group_id=12,
+            project_id=1,
+            group_id=12,
             analyses=[_analysis(winner=winner)],
-            durations={winner: 30.0}, take_numbers={winner: 4},
+            durations={winner: 30.0},
+            take_numbers={winner: 4},
         )
         span = result.selections[0].span
         assert span.start_s > 0
@@ -149,8 +162,11 @@ class TestSpans:
             ],
         )
         result = AssemblyAgent().assemble(
-            project_id=1, group_id=12, analyses=[analysis],
-            durations={winner: 30.0}, take_numbers={winner: 4},
+            project_id=1,
+            group_id=12,
+            analyses=[analysis],
+            durations={winner: 30.0},
+            take_numbers={winner: 4},
         )
         span = result.selections[0].span
         # The longer side of the problem, not the shorter.
@@ -173,8 +189,11 @@ class TestSpans:
             ],
         )
         result = AssemblyAgent().assemble(
-            project_id=1, group_id=12, analyses=[analysis],
-            durations={winner: 30.0}, take_numbers={winner: 4},
+            project_id=1,
+            group_id=12,
+            analyses=[analysis],
+            durations={winner: 30.0},
+            take_numbers={winner: 4},
         )
         assert result.selections[0].span.start_s < 4.0
 
@@ -183,9 +202,11 @@ class TestSpans:
         whole thing to a person than to emit something unusable."""
         winner = uuid4()
         result = AssemblyAgent().assemble(
-            project_id=1, group_id=12,
+            project_id=1,
+            group_id=12,
             analyses=[_analysis(winner=winner)],
-            durations={winner: 2.0}, take_numbers={winner: 1},
+            durations={winner: 2.0},
+            take_numbers={winner: 1},
         )
         span = result.selections[0].span
         assert span.end_s - span.start_s >= MIN_USABLE_S or span.start_s == 0.0
@@ -218,9 +239,11 @@ class TestReviewReasons:
     def test_a_narrow_margin_asks_for_a_person(self) -> None:
         winner = uuid4()
         result = AssemblyAgent().assemble(
-            project_id=1, group_id=12,
+            project_id=1,
+            group_id=12,
             analyses=[_analysis(winner=winner, margin=0.03)],
-            durations={winner: 30.0}, take_numbers={winner: 4},
+            durations={winner: 30.0},
+            take_numbers={winner: 4},
         )
         assert result.review[0].reason is ReviewReason.NARROW_MARGIN
 
@@ -228,9 +251,11 @@ class TestReviewReasons:
         """The product's central claim: most shots need no attention at all."""
         winner = uuid4()
         result = AssemblyAgent().assemble(
-            project_id=1, group_id=12,
+            project_id=1,
+            group_id=12,
             analyses=[_analysis(winner=winner, margin=0.5)],
-            durations={winner: 30.0}, take_numbers={winner: 4},
+            durations={winner: 30.0},
+            take_numbers={winner: 4},
         )
         assert not result.review
         assert result.auto_decided == 1
@@ -252,8 +277,11 @@ class TestReviewReasons:
             ],
         )
         result = AssemblyAgent().assemble(
-            project_id=1, group_id=12, analyses=[analysis],
-            durations={winner: 30.0}, take_numbers={winner: 4},
+            project_id=1,
+            group_id=12,
+            analyses=[analysis],
+            durations={winner: 30.0},
+            take_numbers={winner: 4},
         )
         assert result.review[0].reason is ReviewReason.BLOCKING_FINDING
 
@@ -262,9 +290,11 @@ class TestReviewReasons:
         confident answer to the wrong question."""
         winner = uuid4()
         result = AssemblyAgent().assemble(
-            project_id=1, group_id=12,
+            project_id=1,
+            group_id=12,
             analyses=[_analysis(subgroup_id=7, winner=winner, margin=0.6)],
-            durations={winner: 30.0}, take_numbers={winner: 4},
+            durations={winner: 30.0},
+            take_numbers={winner: 4},
             inferred_groupings={7},
         )
         assert result.review[0].reason is ReviewReason.INFERRED_GROUPING
@@ -279,7 +309,9 @@ class TestReviewReasons:
             _analysis(subgroup_id=3, winner=winners[2], margin=0.07),
         ]
         result = AssemblyAgent().assemble(
-            project_id=1, group_id=12, analyses=analyses,
+            project_id=1,
+            group_id=12,
+            analyses=analyses,
             durations={w: 30.0 for w in winners},
             take_numbers={w: 1 for w in winners},
         )

@@ -57,11 +57,11 @@ class Shot:
     shot: int
 
     slug: str = ""
-    heading: str = ""       # INT. APARTMENT — NIGHT
-    action: str = ""        # what happens, from the script
-    line: str = ""          # the dialogue, if the shot has any
-    notes: str = ""         # script supervisor: props, wardrobe, continuity
-    look: str = ""          # declared intent: "handheld", "locked off"
+    heading: str = ""  # INT. APARTMENT — NIGHT
+    action: str = ""  # what happens, from the script
+    line: str = ""  # the dialogue, if the shot has any
+    notes: str = ""  # script supervisor: props, wardrobe, continuity
+    look: str = ""  # declared intent: "handheld", "locked off"
 
     # -- what the set already decided ---------------------------------------
     # The take the director or DoP circled on the day. This is the strongest
@@ -82,7 +82,7 @@ class Shot:
     # What a person says the state is, alongside the state the system derives.
     # They answer different questions: derived says "how sure is the system",
     # set says "is this work finished". At a standup only the second is asked.
-    state: str = ""         # "", needs_review, in_progress, approved
+    state: str = ""  # "", needs_review, in_progress, approved
     state_by: str = ""
     state_at: datetime | None = None
 
@@ -210,9 +210,7 @@ async def put(
     return await get(project_id, scene, shot)
 
 
-async def circle(
-    project_id: int, scene: int, shot: int, take_no: int, author: str
-) -> Shot:
+async def circle(project_id: int, scene: int, shot: int, take_no: int, author: str) -> Shot:
     """Record the take the director circled on the day. Zero clears it.
 
     A take number rather than a clip id, because that is what the script
@@ -252,9 +250,7 @@ async def assign(project_id: int, scene: int, shot: int, assignee: str) -> Shot:
     return await get(project_id, scene, shot)
 
 
-async def set_state(
-    project_id: int, scene: int, shot: int, state: str, author: str
-) -> Shot:
+async def set_state(project_id: int, scene: int, shot: int, state: str, author: str) -> Shot:
     """What a person says the state of this work is.
 
     Deliberately separate from the status the tree derives. Derived status
@@ -312,9 +308,7 @@ async def for_projects(project_ids: list[int]) -> dict[tuple[int, int, int], Sho
 
     for i in range(0, len(project_ids), 30):
         batch = project_ids[i : i + 30]
-        async for snapshot in (
-            db().collection(COLLECTION).where("project_id", "in", batch).stream()
-        ):
+        async for snapshot in db().collection(COLLECTION).where("project_id", "in", batch).stream():
             d = snapshot.to_dict() or {}
             pid = int(d.get("project_id", 0))
             scene, shot = int(d.get("scene", 0)), int(d.get("shot", 0))

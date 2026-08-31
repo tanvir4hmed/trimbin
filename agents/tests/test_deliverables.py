@@ -69,7 +69,8 @@ class TestEdl:
         """Source timecodes say where material sits in the take; record
         timecodes say where it lands in the sequence. Confusing them produces a
         file that opens cleanly and conforms to the wrong frames."""
-        a, b = _selection(subgroup_id=1, start=2.0, end=6.0), _selection(subgroup_id=2, start=0.0, end=5.0)
+        a = _selection(subgroup_id=1, start=2.0, end=6.0)
+        b = _selection(subgroup_id=2, start=0.0, end=5.0)
         media = {**_media(a), **_media(b)}
 
         edl = build_edl("Scene 12", [a, b], media)

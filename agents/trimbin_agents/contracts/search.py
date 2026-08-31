@@ -98,8 +98,15 @@ class SearchPlan(Strict):
         question into a search" produce the same object and mean different
         things to the person waiting.
         """
-        return not any((
-            self.text, self.semantic, self.scene is not None,
-            self.setup is not None, self.take is not None,
-            self.outcome, self.decided_by, self.finding,
-        ))
+        return not any(
+            (
+                self.text,
+                self.semantic,
+                self.scene is not None,
+                self.setup is not None,
+                self.take is not None,
+                self.outcome,
+                self.decided_by,
+                self.finding,
+            )
+        )

@@ -60,9 +60,23 @@ HARD_LIMIT = 100
 # It has to match the SELECT below. A mismatch mislabels every column, which is
 # worse than an error, so the test suite asserts the two agree.
 _COLUMNS = [
-    "clip_id", "scene", "setup", "take_no", "outcome", "reason", "reason_code",
-    "decided_by", "actor", "score", "finding_codes", "finding_starts_s",
-    "duration_s", "proxy_uri", "usable_from_s", "usable_to_s", "relevance",
+    "clip_id",
+    "scene",
+    "setup",
+    "take_no",
+    "outcome",
+    "reason",
+    "reason_code",
+    "decided_by",
+    "actor",
+    "score",
+    "finding_codes",
+    "finding_starts_s",
+    "duration_s",
+    "proxy_uri",
+    "usable_from_s",
+    "usable_to_s",
+    "relevance",
 ]
 
 # How much a semantic match is worth beside an exact one.
@@ -132,8 +146,7 @@ async def run(
     score_parts = []
     if text:
         score_parts.append(
-            f"{TEXT_WEIGHT} * "
-            "(positionCaseInsensitive(d.reason, {text:String}) > 0 ? 1 : 0.6)"
+            f"{TEXT_WEIGHT} * (positionCaseInsensitive(d.reason, {{text:String}}) > 0 ? 1 : 0.6)"
         )
     if embedding:
         score_parts.append(
@@ -143,9 +156,7 @@ async def run(
 
     score = " + ".join(score_parts) if score_parts else "1"
 
-    order = "relevance DESC, d.decided_at " + (
-        "DESC" if plan.get("newest_first", True) else "ASC"
-    )
+    order = "relevance DESC, d.decided_at " + ("DESC" if plan.get("newest_first", True) else "ASC")
     limit = min(int(plan.get("limit", 20)), HARD_LIMIT)
     params["limit"] = limit
 
@@ -171,7 +182,7 @@ async def run(
         FROM decisions AS d
         INNER JOIN clips AS c
             ON c.clip_id = d.clip_id AND c.project_id = d.project_id
-        WHERE {' AND '.join(conditions)}
+        WHERE {" AND ".join(conditions)}
         ORDER BY {order}
         LIMIT 1 BY d.clip_id
         LIMIT {{limit:UInt16}}
@@ -181,9 +192,7 @@ async def run(
     return rows, _readable(sql), elapsed_ms
 
 
-async def _execute(
-    sql: str, params: dict[str, Any], project_id: int
-) -> tuple[list[dict], int]:
+async def _execute(sql: str, params: dict[str, Any], project_id: int) -> tuple[list[dict], int]:
     """Run the statement through MCP, falling back to the direct client.
 
     MCP first, because that is how this project is required to reach ClickHouse
@@ -203,9 +212,7 @@ async def _execute(
         from trimbin_agents.tools.clickhouse_mcp import ReaderMissing, session
 
         async with session() as mcp:
-            outcome = await mcp.run_query(
-                _interpolated(sql, params), project_id, columns=_COLUMNS
-            )
+            outcome = await mcp.run_query(_interpolated(sql, params), project_id, columns=_COLUMNS)
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         log.info("search via MCP: %d rows in %dms", len(outcome.rows), elapsed_ms)
         return outcome.rows, elapsed_ms
@@ -220,9 +227,7 @@ async def _execute(
     result = await ch.query(sql, parameters=params)
     elapsed_ms = int((time.perf_counter() - started) * 1000)
 
-    rows = [
-        dict(zip(result.column_names, row, strict=True)) for row in result.result_rows
-    ]
+    rows = [dict(zip(result.column_names, row, strict=True)) for row in result.result_rows]
     log.info("search via the direct client: %d rows in %dms", len(rows), elapsed_ms)
     return rows, elapsed_ms
 

@@ -61,6 +61,7 @@ class TestDeclaredTarget:
         _, _, mismatch = place(12, 3, 12, 5, True)
         assert mismatch
 
+
 class TestASceneWithoutAShot:
     """A day of coverage on one scene arrives exactly this way: the editor names
     the scene, and the slates sort the shots inside it.

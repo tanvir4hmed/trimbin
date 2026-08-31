@@ -145,9 +145,7 @@ async def process(
         # editor can use, while a take lost to a model timeout is gone.
         log.info("clip %s: reading the slate", clip_id)
         identity = await identify.read_slate(source, work, clip_id, project_id)
-        identity.embedding = await identify.embed(
-            source, work, clip_id, measurements.duration_s
-        )
+        identity.embedding = await identify.embed(source, work, clip_id, measurements.duration_s)
 
         scene, shot, mismatch = place(
             target_scene,
@@ -178,8 +176,7 @@ async def process(
                     reason="guest.too_many_takes",
                 )
                 raise Rejected(
-                    f"This shot already has {held} takes, which is the limit "
-                    f"for a guest project."
+                    f"This shot already has {held} takes, which is the limit for a guest project."
                 )
 
         log.info("clip %s: encoding proxy", clip_id)

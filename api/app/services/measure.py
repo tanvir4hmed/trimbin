@@ -194,12 +194,19 @@ async def _run(
 async def probe(source: Path) -> dict:
     """Container and stream metadata. Cheap, and it tells us whether to bother."""
     _require_ffmpeg()
-    code, out, err = await _run([
-        "ffprobe", "-v", "error",
-        "-print_format", "json",
-        "-show_format", "-show_streams",
-        str(source),
-    ], timeout_s=60)
+    code, out, err = await _run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-print_format",
+            "json",
+            "-show_format",
+            "-show_streams",
+            str(source),
+        ],
+        timeout_s=60,
+    )
     if code != 0:
         raise RuntimeError(f"ffprobe failed: {err.strip()[:300]}")
     return json.loads(out)

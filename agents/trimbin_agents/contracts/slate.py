@@ -25,10 +25,10 @@ from .base import ClipRef, Confidence, Strict
 class GroupingSource(str, Enum):
     """How the take's place in the shoot was established."""
 
-    SLATE = "slate"          # read off the board
-    TIMECODE = "timecode"    # inferred from capture time and framing
-    FILENAME = "filename"    # inferred from a naming convention
-    MANUAL = "manual"        # a person said so, and a person outranks all of these
+    SLATE = "slate"  # read off the board
+    TIMECODE = "timecode"  # inferred from capture time and framing
+    FILENAME = "filename"  # inferred from a naming convention
+    MANUAL = "manual"  # a person said so, and a person outranks all of these
 
 
 class SlateRequest(Strict):

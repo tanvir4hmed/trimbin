@@ -212,9 +212,7 @@ class TestTheMaintenanceRouteIsClosed:
         )
         assert not maintenance._is_the_scheduler("Bearer good-but-wrong")
 
-    def test_the_scheduler_itself_is_accepted(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_the_scheduler_itself_is_accepted(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from app.routes import maintenance
 
         monkeypatch.setattr(
@@ -229,9 +227,7 @@ class TestTheMaintenanceRouteIsClosed:
         )
         assert maintenance._is_the_scheduler("Bearer ours")
 
-    def test_a_token_that_does_not_verify_is_refused(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_a_token_that_does_not_verify_is_refused(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from app.routes import maintenance
 
         monkeypatch.setattr(
@@ -270,7 +266,9 @@ class TestCuratingIsNotCommenting:
 
         async def company_project(project_id):
             return type(
-                "P", (), {
+                "P",
+                (),
+                {
                     "project_id": project_id,
                     "is_public": True,
                     "owner_email": members.LEAD_EDITOR,
@@ -287,14 +285,14 @@ class TestCuratingIsNotCommenting:
         assert "overrule" in raised.value.detail.lower()
 
     @pytest.mark.asyncio
-    async def test_a_guest_curates_their_own_project(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_a_guest_curates_their_own_project(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from app import auth
 
         async def their_project(project_id):
             return type(
-                "P", (), {
+                "P",
+                (),
+                {
                     "project_id": project_id,
                     "is_public": False,
                     "owner_email": "a-judge@example.com",
@@ -313,7 +311,9 @@ class TestCuratingIsNotCommenting:
 
         async def company_project(project_id):
             return type(
-                "P", (), {
+                "P",
+                (),
+                {
                     "project_id": project_id,
                     "is_public": True,
                     "owner_email": members.LEAD_EDITOR,

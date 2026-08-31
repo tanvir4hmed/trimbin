@@ -293,6 +293,3 @@ def _queue_rank(item: Waiting, viewer: str) -> tuple:
     if item.reason.startswith("director circled"):
         urgency = 0
     return (mine, urgency, item.margin, item.project_id, item.scene, item.shot)
-
-
-

@@ -34,13 +34,15 @@ log = logging.getLogger(__name__)
 # What is here has one thing in common — the footage carries no usable image or
 # no usable line at all during the span. Frozen, black, out of focus, or the
 # board still in shot.
-SUBTRACTED = frozenset({
-    "clip.black",
-    "frames.frozen",
-    "focus.lost",
-    "slate.present",
-    "action.pre_roll",
-})
+SUBTRACTED = frozenset(
+    {
+        "clip.black",
+        "frames.frozen",
+        "focus.lost",
+        "slate.present",
+        "action.pre_roll",
+    }
+)
 
 # Findings the panel observed that also remove time.
 #
@@ -49,11 +51,13 @@ SUBTRACTED = frozenset({
 # boom entered frame is an observation that can be wrong. Both are subtracted,
 # but a range built only from model findings is marked as such so an editor
 # knows which claim they are trusting.
-OBSERVED_SUBTRACTED = frozenset({
-    "frame.boom_visible",
-    "frame.crew_visible",
-    "frame.subject_exits",
-})
+OBSERVED_SUBTRACTED = frozenset(
+    {
+        "frame.boom_visible",
+        "frame.crew_visible",
+        "frame.subject_exits",
+    }
+)
 
 # Spans shorter than this are not worth cutting around.
 #

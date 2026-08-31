@@ -79,7 +79,9 @@ class AssemblyAgent:
 
         log.info(
             "scene %d: %d selected, %d for review",
-            group_id, len(selections), len(review),
+            group_id,
+            len(selections),
+            len(review),
         )
 
         return AssemblyResult(
@@ -105,9 +107,7 @@ class AssemblyAgent:
         if analysis.winner_id is None:
             return None
 
-        winner = next(
-            (v for v in analysis.verdicts if v.clip_id == analysis.winner_id), None
-        )
+        winner = next((v for v in analysis.verdicts if v.clip_id == analysis.winner_id), None)
         if winner is None:
             return None
 
@@ -166,9 +166,7 @@ class AssemblyAgent:
         return TimeRange(start_s=start, end_s=end)
 
     @staticmethod
-    def _longest_clear_run(
-        start: float, end: float, problems: list[TimeRange]
-    ) -> TimeRange | None:
+    def _longest_clear_run(start: float, end: float, problems: list[TimeRange]) -> TimeRange | None:
         gaps: list[TimeRange] = []
         cursor = start
 
@@ -197,8 +195,7 @@ class AssemblyAgent:
         that actually needs them.
         """
         candidates = [
-            v.clip_id
-            for v in sorted(analysis.verdicts, key=lambda v: v.score, reverse=True)[:3]
+            v.clip_id for v in sorted(analysis.verdicts, key=lambda v: v.score, reverse=True)[:3]
         ]
 
         blocking = [f for f in selection.findings if f.severity is Severity.BLOCKING]

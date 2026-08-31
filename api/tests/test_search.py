@@ -72,7 +72,7 @@ class TestEveryQueryIsScopedToOneProject:
         assert params["project_id"] == 7
 
     def test_an_empty_plan_still_scopes(self) -> None:
-        """"Show me everything" means everything in *this* project."""
+        """ "Show me everything" means everything in *this* project."""
         sql, params = sql_for({"text": "", "scene": None, "outcome": None})
         assert "project_id" in sql
         assert params["project_id"] == 7
@@ -241,7 +241,7 @@ class TestThePlanTheModelFillsIn:
             SearchPlan(finding="hair.style_mismatch")
 
     def test_an_empty_plan_knows_it_is_empty(self) -> None:
-        """"Show me everything" and "I could not turn that into a search"
+        """ "Show me everything" and "I could not turn that into a search"
         produce the same object and mean different things to the person
         waiting."""
         from trimbin_agents.contracts.search import SearchPlan

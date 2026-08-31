@@ -69,18 +69,13 @@ def _as_dict(project, viewer_email: str | None) -> dict:
         # Told rather than inferred. A client that works out whether to show the
         # "add member" button by comparing strings will get it wrong the first
         # time an address differs in case.
-        "you_are_owner": bool(
-            viewer_email and viewer_email.lower() == project.owner_email.lower()
-        ),
+        "you_are_owner": bool(viewer_email and viewer_email.lower() == project.owner_email.lower()),
         "you_can_upload": bool(
             viewer_email
             and (
                 viewer_email.lower() == project.owner_email.lower()
                 or viewer_email.lower() in {m.lower() for m in project.member_emails}
-                or (
-                    members.is_staff(viewer_email)
-                    and members.is_staff(project.owner_email)
-                )
+                or (members.is_staff(viewer_email) and members.is_staff(project.owner_email))
             )
         ),
     }
@@ -135,10 +130,7 @@ async def create(
     """
     limits = members.limits_for(principal.email)
     existing = await projects.for_member(principal.email or "")
-    owned = [
-        p for p in existing
-        if p.owner_email.lower() == (principal.email or "").lower()
-    ]
+    owned = [p for p in existing if p.owner_email.lower() == (principal.email or "").lower()]
 
     if len(owned) >= limits.projects:
         raise HTTPException(
@@ -156,7 +148,9 @@ async def create(
     project_id = await projects.create(name=body.name, owner_email=principal.email or "")
     log.info(
         "project %d created by %s (%s)",
-        project_id, principal.email, members.role_of(principal.email),
+        project_id,
+        principal.email,
+        members.role_of(principal.email),
     )
 
     project = await projects.get(project_id)

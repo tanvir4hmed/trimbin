@@ -52,9 +52,7 @@ def test_a_local_key_file_signs_locally(credentials):
     """A key file needs no IAM call, so asking for one would add a network
     round trip and a permission requirement to every upload for nothing."""
     credentials(
-        FakeCredentials(
-            signer=object(), signer_email="dev@trimbin.iam.gserviceaccount.com"
-        )
+        FakeCredentials(signer=object(), signer_email="dev@trimbin.iam.gserviceaccount.com")
     )
     assert storage._signer() == {}
 
@@ -72,9 +70,7 @@ def test_an_expired_token_is_refreshed_first(credentials):
     """The token is being handed to IAM as proof of identity. A stale one is
     rejected there, and the error names the signature rather than the token."""
     creds = credentials(
-        FakeCredentials(
-            email="trimbin-api@trimbin.iam.gserviceaccount.com", valid=False
-        )
+        FakeCredentials(email="trimbin-api@trimbin.iam.gserviceaccount.com", valid=False)
     )
     storage._signer()
     assert creds.refreshed

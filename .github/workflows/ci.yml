@@ -84,6 +84,12 @@ jobs:
         run: uv run ruff check .
         working-directory: api
 
+      # The same two checks the agents job runs. They were absent here because
+      # this job did not exist; matching them means one standard, not two.
+      - name: Format check
+        run: uv run ruff format --check .
+        working-directory: api
+
       - name: Test
         run: uv run pytest -q
         working-directory: api

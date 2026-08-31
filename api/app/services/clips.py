@@ -59,38 +59,59 @@ async def write(
     """
     await (await client()).insert(
         "clips",
-        [[
-            project_id, group_id, subgroup_id, take_no, clip_id,
-            _captured_at(measurements), datetime.now(UTC),
-            "", f"gs://{object_path}", proxy_uri, sprite_uri,
-            int(measurements.duration_s * 1000),
-            description, [],
-            # Raw, un-normalised. The 1.0 placeholders are replaced once the
-            # setup is complete and the group median is known.
-            1.0, round(measurements.highlight_clip_pct + measurements.shadow_clip_pct, 4),
-            1.0, 1.0,
-            round(measurements.audio_lufs, 2), round(measurements.noise_floor_db, 2),
-            measurements.dropped_frames,
-            slate_confident, slate_raw, "active",
-            embedding or [0.0] * EMBEDDING_DIMENSIONS,
-            # The values the ratios above will be computed from, once the setup
-            # is complete. Discarding these is what left every clip in the
-            # archive carrying a placeholder 1.0 with no way back except
-            # decoding the video again.
-            round(measurements.mean_luma, 4),
-            round(measurements.sharpness, 4),
-            round(measurements.motion_mean, 4),
-            *_findings_columns(measurements),
-            # Which body shot it, when the board said so. Empty on a
-            # single-camera day, which is most of them, and empty is an answer
-            # here rather than a gap — "everything on the B camera" is a
-            # question you can only ask of a production that had a B camera.
-            camera,
-        ]],
+        [
+            [
+                project_id,
+                group_id,
+                subgroup_id,
+                take_no,
+                clip_id,
+                _captured_at(measurements),
+                datetime.now(UTC),
+                "",
+                f"gs://{object_path}",
+                proxy_uri,
+                sprite_uri,
+                int(measurements.duration_s * 1000),
+                description,
+                [],
+                # Raw, un-normalised. The 1.0 placeholders are replaced once the
+                # setup is complete and the group median is known.
+                1.0,
+                round(measurements.highlight_clip_pct + measurements.shadow_clip_pct, 4),
+                1.0,
+                1.0,
+                round(measurements.audio_lufs, 2),
+                round(measurements.noise_floor_db, 2),
+                measurements.dropped_frames,
+                slate_confident,
+                slate_raw,
+                "active",
+                embedding or [0.0] * EMBEDDING_DIMENSIONS,
+                # The values the ratios above will be computed from, once the setup
+                # is complete. Discarding these is what left every clip in the
+                # archive carrying a placeholder 1.0 with no way back except
+                # decoding the video again.
+                round(measurements.mean_luma, 4),
+                round(measurements.sharpness, 4),
+                round(measurements.motion_mean, 4),
+                *_findings_columns(measurements),
+                # Which body shot it, when the board said so. Empty on a
+                # single-camera day, which is most of them, and empty is an answer
+                # here rather than a gap — "everything on the B camera" is a
+                # question you can only ask of a production that had a B camera.
+                camera,
+            ]
+        ],
         column_names=[
-            *_COLUMNS, "embedding",
-            "exposure_raw", "sharpness_raw", "motion_raw",
-            "finding_codes", "finding_starts_s", "finding_ends_s",
+            *_COLUMNS,
+            "embedding",
+            "exposure_raw",
+            "sharpness_raw",
+            "motion_raw",
+            "finding_codes",
+            "finding_starts_s",
+            "finding_ends_s",
             "camera",
         ],
     )
@@ -141,17 +162,34 @@ async def write_unusable(
     """
     await (await client()).insert(
         "clips",
-        [[
-            project_id, 0, 0, 0, clip_id,
-            _captured_at(measurements), datetime.now(UTC),
-            "", f"gs://{object_path}", "", "",
-            int(max(measurements.duration_s, 0) * 1000),
-            reason, [],
-            1.0, 0.0, 1.0, 1.0,
-            round(measurements.audio_lufs, 2), round(measurements.noise_floor_db, 2),
-            measurements.dropped_frames,
-            0, "", "failed",
-        ]],
+        [
+            [
+                project_id,
+                0,
+                0,
+                0,
+                clip_id,
+                _captured_at(measurements),
+                datetime.now(UTC),
+                "",
+                f"gs://{object_path}",
+                "",
+                "",
+                int(max(measurements.duration_s, 0) * 1000),
+                reason,
+                [],
+                1.0,
+                0.0,
+                1.0,
+                1.0,
+                round(measurements.audio_lufs, 2),
+                round(measurements.noise_floor_db, 2),
+                measurements.dropped_frames,
+                0,
+                "",
+                "failed",
+            ]
+        ],
         column_names=_COLUMNS,
     )
     log.info("clip %s recorded as unusable: %s", clip_id, reason)
@@ -207,7 +245,9 @@ async def normalise_group(project_id: int, group_id: int, subgroup_id: int) -> i
         log.warning(
             "project %d scene %d setup %d has no raw measurements; "
             "leaving the existing ratios alone",
-            project_id, group_id, subgroup_id,
+            project_id,
+            group_id,
+            subgroup_id,
         )
         return 0
 
@@ -229,9 +269,7 @@ async def normalise_group(project_id: int, group_id: int, subgroup_id: int) -> i
     # here — ClickHouse has no median window function that is cheap over a
     # partition this small, and the guard against a zero median needs a branch
     # that is clearer in Python than in SQL.
-    divisors = {
-        axis: (value if value > 0 else 1.0) for axis, value in medians.items()
-    }
+    divisors = {axis: (value if value > 0 else 1.0) for axis, value in medians.items()}
 
     await ch.command(
         """
@@ -247,13 +285,18 @@ async def normalise_group(project_id: int, group_id: int, subgroup_id: int) -> i
             "em": divisors["exposure"],
             "sm": divisors["sharpness"],
             "mm": divisors["motion"],
-            "p": project_id, "g": group_id, "s": subgroup_id,
+            "p": project_id,
+            "g": group_id,
+            "s": subgroup_id,
         },
     )
 
     log.info(
         "normalised %d takes in project %d scene %d shot %d (1 mutation)",
-        len(rows), project_id, group_id, subgroup_id,
+        len(rows),
+        project_id,
+        group_id,
+        subgroup_id,
     )
     return len(rows)
 
@@ -294,11 +337,28 @@ def _captured_at(m: RawMeasurements) -> datetime:
 
 
 _COLUMNS = [
-    "project_id", "group_id", "subgroup_id", "take_no", "clip_id",
-    "captured_at", "ingested_at", "uploaded_by",
-    "storage_uri", "proxy_uri", "sprite_uri",
-    "duration_ms", "description", "tags",
-    "exposure_rel", "clipping_pct", "sharpness_rel", "motion_rel",
-    "audio_lufs", "noise_floor_db", "dropped_frames",
-    "slate_confident", "slate_raw", "status",
+    "project_id",
+    "group_id",
+    "subgroup_id",
+    "take_no",
+    "clip_id",
+    "captured_at",
+    "ingested_at",
+    "uploaded_by",
+    "storage_uri",
+    "proxy_uri",
+    "sprite_uri",
+    "duration_ms",
+    "description",
+    "tags",
+    "exposure_rel",
+    "clipping_pct",
+    "sharpness_rel",
+    "motion_rel",
+    "audio_lufs",
+    "noise_floor_db",
+    "dropped_frames",
+    "slate_confident",
+    "slate_raw",
+    "status",
 ]

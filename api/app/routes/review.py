@@ -135,9 +135,12 @@ async def judge(
     try:
         result = await review_service.judge(project_id, group_id, subgroup_id, force=force)
         await activity.record(
-            project_id, principal.email or "", "compared",
+            project_id,
+            principal.email or "",
+            "compared",
             detail=f"scene {group_id} shot {subgroup_id}",
-            scene=group_id, shot=subgroup_id,
+            scene=group_id,
+            shot=subgroup_id,
             quantity=int(result.get("takes", 0)),
             actor_role=members.role_of(principal.email),
         )
@@ -189,43 +192,45 @@ async def verdicts(
 
     takes = []
     for r in result.result_rows:
-        takes.append({
-            "clip_id": str(r[0]),
-            "take_no": int(r[1] or 0),
-            "outcome": r[2],
-            "score": round(float(r[3]), 4),
-            "margin": round(float(r[4]), 4),
-            "reason": r[5],
-            "reason_code": r[6],
-            # Zipped back into objects here rather than stored that way. The
-            # arrays are how ClickHouse reads them quickly; this is how an
-            # interface consumes them.
-            "findings": _findings_from(r[7], r[8], r[9], r[10]),
-            # The single span an assembly would use.
-            "usable_from_s": round(float(r[11]), 2),
-            "usable_to_s": round(float(r[12]), 2),
-            "decided_by": r[13],
-            "actor": r[14],
-            "model_id": r[15],
-            "prompt_version": r[16],
-            "panel_convened": bool(r[17]),
-            "decided_at": r[18].isoformat() if r[18] else None,
-            "proxy_uri": r[19],
-            "sprite_uri": r[20],
-            # Per axis, never one opaque number. An editor who disagrees needs
-            # to see which criterion produced the answer.
-            "criteria": dict(zip(r[21], [round(float(s), 3) for s in r[22]], strict=True)),
-            # Every usable stretch, not only the longest. A take with a problem
-            # in the middle has two, and offering one would discard the other.
-            "safe_ranges": [
-                {"start_s": float(a), "end_s": float(b)}
-                for a, b in zip(r[23], r[24], strict=True)
-            ],
-            "trim_reasons": list(r[25]),
-            "duration_s": round(int(r[26] or 0) / 1000, 2),
-            "camera": r[27] or "",
-            "captured_at": r[28].isoformat() if r[28] else None,
-        })
+        takes.append(
+            {
+                "clip_id": str(r[0]),
+                "take_no": int(r[1] or 0),
+                "outcome": r[2],
+                "score": round(float(r[3]), 4),
+                "margin": round(float(r[4]), 4),
+                "reason": r[5],
+                "reason_code": r[6],
+                # Zipped back into objects here rather than stored that way. The
+                # arrays are how ClickHouse reads them quickly; this is how an
+                # interface consumes them.
+                "findings": _findings_from(r[7], r[8], r[9], r[10]),
+                # The single span an assembly would use.
+                "usable_from_s": round(float(r[11]), 2),
+                "usable_to_s": round(float(r[12]), 2),
+                "decided_by": r[13],
+                "actor": r[14],
+                "model_id": r[15],
+                "prompt_version": r[16],
+                "panel_convened": bool(r[17]),
+                "decided_at": r[18].isoformat() if r[18] else None,
+                "proxy_uri": r[19],
+                "sprite_uri": r[20],
+                # Per axis, never one opaque number. An editor who disagrees needs
+                # to see which criterion produced the answer.
+                "criteria": dict(zip(r[21], [round(float(s), 3) for s in r[22]], strict=True)),
+                # Every usable stretch, not only the longest. A take with a problem
+                # in the middle has two, and offering one would discard the other.
+                "safe_ranges": [
+                    {"start_s": float(a), "end_s": float(b)}
+                    for a, b in zip(r[23], r[24], strict=True)
+                ],
+                "trim_reasons": list(r[25]),
+                "duration_s": round(int(r[26] or 0) / 1000, 2),
+                "camera": r[27] or "",
+                "captured_at": r[28].isoformat() if r[28] else None,
+            }
+        )
 
     if not takes:
         raise HTTPException(
@@ -301,9 +306,7 @@ async def override(
             "That clip is not one of the takes in this shot.",
         )
 
-    previous = next(
-        (v["clip_id"] for v in verdicts_now if v["outcome"] == "selected"), None
-    )
+    previous = next((v["clip_id"] for v in verdicts_now if v["outcome"] == "selected"), None)
     agreed = previous == chosen
 
     rows = rows_for_choice(verdicts_now, chosen, body)
@@ -316,9 +319,7 @@ async def override(
         # Keyed on the person and the clip so a second look at the same shot
         # replaces nothing — an editor may change their mind twice, and both
         # times happened.
-        key=decisions_service.run_hash(
-            project_id, group_id, subgroup_id, [body.clip_id]
-        ),
+        key=decisions_service.run_hash(project_id, group_id, subgroup_id, [body.clip_id]),
         model_id="",
         prompt_version="",
         decided_by="human",
@@ -327,18 +328,23 @@ async def override(
 
     log.info(
         "project %d scene %d shot %d: %s %s take %s",
-        project_id, group_id, subgroup_id, principal.email,
-        "confirmed" if agreed else "overrode to", chosen[:8],
+        project_id,
+        group_id,
+        subgroup_id,
+        principal.email,
+        "confirmed" if agreed else "overrode to",
+        chosen[:8],
     )
 
-    take_no = next(
-        (v.get("take_no", 0) for v in verdicts_now if v["clip_id"] == chosen), 0
-    )
+    take_no = next((v.get("take_no", 0) for v in verdicts_now if v["clip_id"] == chosen), 0)
     await activity.record(
-        project_id, principal.email or "",
+        project_id,
+        principal.email or "",
         "confirmed" if agreed else "chose",
         detail=body.reason,
-        scene=group_id, shot=subgroup_id, quantity=int(take_no or 0),
+        scene=group_id,
+        shot=subgroup_id,
+        quantity=int(take_no or 0),
         actor_role=members.role_of(principal.email),
     )
 
@@ -413,8 +419,7 @@ async def undo(
         Override(
             clip_id=UUID(restore_to),
             reason=(
-                f"Undone by {principal.email}: put back the take that stood "
-                f"before the last change."
+                f"Undone by {principal.email}: put back the take that stood before the last change."
             ),
         ),
     )
@@ -424,9 +429,7 @@ async def undo(
         group_id=group_id,
         subgroup_id=subgroup_id,
         verdicts=rows,
-        key=decisions_service.run_hash(
-            project_id, group_id, subgroup_id, [UUID(restore_to)]
-        ),
+        key=decisions_service.run_hash(project_id, group_id, subgroup_id, [UUID(restore_to)]),
         model_id="",
         prompt_version="",
         decided_by="human",
@@ -435,12 +438,19 @@ async def undo(
 
     log.info(
         "project %d scene %d shot %d: %s undid a change back to %s",
-        project_id, group_id, subgroup_id, principal.email, restore_to[:8],
+        project_id,
+        group_id,
+        subgroup_id,
+        principal.email,
+        restore_to[:8],
     )
     await activity.record(
-        project_id, principal.email or "", "undid",
+        project_id,
+        principal.email or "",
+        "undid",
         detail=f"scene {group_id} shot {subgroup_id}",
-        scene=group_id, shot=subgroup_id,
+        scene=group_id,
+        shot=subgroup_id,
         actor_role=members.role_of(principal.email),
     )
     return {
@@ -460,36 +470,40 @@ def rows_for_choice(verdicts: list[dict], chosen: str, body: Override) -> list[d
     rows = []
     for v in verdicts:
         is_chosen = v["clip_id"] == chosen
-        rows.append({
-            "clip_id": v["clip_id"],
-            "outcome": "selected" if is_chosen else "not_selected",
-            # The panel's score is carried forward unchanged. It is a
-            # measurement of the take, and a person disagreeing with the
-            # conclusion does not change what was measured. Rewriting it to
-            # justify the choice would destroy the evidence that makes the
-            # disagreement worth keeping.
-            "score": v["score"],
-            "margin": 0.0,
-            "reason": body.reason if is_chosen else "Not chosen by the editor.",
-            "reason_code": "selected.clean" if is_chosen else "behind.measurement",
-            # The findings stay. An editor who chose a take with a prop
-            # continuity problem decided to live with it, which is a different
-            # thing from the problem not being there.
-            "findings": v["findings"],
-            "criterion_names": v["criterion_names"],
-            "criterion_scores": v["criterion_scores"],
-            "safe_starts_s": v["safe_starts_s"],
-            "safe_ends_s": v["safe_ends_s"],
-            "trim_reasons": v["trim_reasons"],
-            "in_point_s": (
-                body.in_point_s if is_chosen and body.in_point_s is not None
-                else v["in_point_s"]
-            ),
-            "out_point_s": (
-                body.out_point_s if is_chosen and body.out_point_s is not None
-                else v["out_point_s"]
-            ),
-        })
+        rows.append(
+            {
+                "clip_id": v["clip_id"],
+                "outcome": "selected" if is_chosen else "not_selected",
+                # The panel's score is carried forward unchanged. It is a
+                # measurement of the take, and a person disagreeing with the
+                # conclusion does not change what was measured. Rewriting it to
+                # justify the choice would destroy the evidence that makes the
+                # disagreement worth keeping.
+                "score": v["score"],
+                "margin": 0.0,
+                "reason": body.reason if is_chosen else "Not chosen by the editor.",
+                "reason_code": "selected.clean" if is_chosen else "behind.measurement",
+                # The findings stay. An editor who chose a take with a prop
+                # continuity problem decided to live with it, which is a different
+                # thing from the problem not being there.
+                "findings": v["findings"],
+                "criterion_names": v["criterion_names"],
+                "criterion_scores": v["criterion_scores"],
+                "safe_starts_s": v["safe_starts_s"],
+                "safe_ends_s": v["safe_ends_s"],
+                "trim_reasons": v["trim_reasons"],
+                "in_point_s": (
+                    body.in_point_s
+                    if is_chosen and body.in_point_s is not None
+                    else v["in_point_s"]
+                ),
+                "out_point_s": (
+                    body.out_point_s
+                    if is_chosen and body.out_point_s is not None
+                    else v["out_point_s"]
+                ),
+            }
+        )
     return rows
 
 
@@ -606,8 +620,19 @@ async def tree(
     days_seen: set[str] = set()
 
     for row in result.result_rows:
-        (scene_id, shot_id, takes, unusable, label, has_verdict,
-         reviewed, margin, chosen_take, cameras, day) = row
+        (
+            scene_id,
+            shot_id,
+            takes,
+            unusable,
+            label,
+            has_verdict,
+            reviewed,
+            margin,
+            chosen_take,
+            cameras,
+            day,
+        ) = row
         scene_id, shot_id = int(scene_id), int(shot_id)
 
         cams = [c for c in cameras if c]
@@ -631,7 +656,7 @@ async def tree(
             continue
         if assignee is not None:
             wanted = assignee.strip().lower()
-            here = (meta.assignee if meta else "")
+            here = meta.assignee if meta else ""
             if wanted == "unassigned":
                 if here:
                     continue
@@ -639,28 +664,35 @@ async def tree(
                 continue
 
         node = scenes.setdefault(scene_id, {"scene": scene_id, "shots": []})
-        node["shots"].append({
-            "shot": shot_id,
-            "slug": (meta.slug if meta else "") or "",
-            "label": label or "",
-            "takes": int(takes),
-            "unusable": int(unusable),
-            "status": _status(
-                int(takes), bool(has_verdict), bool(reviewed), float(margin),
-                circled, int(chosen_take or 0), meta.state if meta else "",
-            ),
-            "state": meta.state if meta else "",
-            "assignee": meta.assignee if meta else "",
-            "circled_take": circled,
-            "chosen_take": int(chosen_take or 0),
-            "differs_from_circle": bool(
-                circled and chosen_take and circled != int(chosen_take)
-            ),
-            "margin": round(float(margin), 4),
-            "cameras": cams,
-            "shoot_day": str(day) if day else "",
-            "open_notes": notes["open"],
-        })
+        node["shots"].append(
+            {
+                "shot": shot_id,
+                "slug": (meta.slug if meta else "") or "",
+                "label": label or "",
+                "takes": int(takes),
+                "unusable": int(unusable),
+                "status": _status(
+                    int(takes),
+                    bool(has_verdict),
+                    bool(reviewed),
+                    float(margin),
+                    circled,
+                    int(chosen_take or 0),
+                    meta.state if meta else "",
+                ),
+                "state": meta.state if meta else "",
+                "assignee": meta.assignee if meta else "",
+                "circled_take": circled,
+                "chosen_take": int(chosen_take or 0),
+                "differs_from_circle": bool(
+                    circled and chosen_take and circled != int(chosen_take)
+                ),
+                "margin": round(float(margin), 4),
+                "cameras": cams,
+                "shoot_day": str(day) if day else "",
+                "open_notes": notes["open"],
+            }
+        )
 
     return {
         "project_id": project_id,
@@ -740,9 +772,7 @@ class SetState(BaseModel):
     @classmethod
     def _known(cls, value: str) -> str:
         if value not in shots.STATES:
-            raise ValueError(
-                "A shot is unset, needs_review, in_progress, or approved."
-            )
+            raise ValueError("A shot is unset, needs_review, in_progress, or approved.")
         return value
 
 
@@ -777,13 +807,19 @@ async def write_brief(
     await principal.assert_can_curate(project_id)
 
     shot = await shots.put(
-        project_id, group_id, subgroup_id,
-        body.model_dump(), author=principal.email or "",
+        project_id,
+        group_id,
+        subgroup_id,
+        body.model_dump(),
+        author=principal.email or "",
     )
     await activity.record(
-        project_id, principal.email or "", "described",
+        project_id,
+        principal.email or "",
+        "described",
         detail=body.slug or f"scene {group_id} shot {subgroup_id}",
-        scene=group_id, shot=subgroup_id,
+        scene=group_id,
+        shot=subgroup_id,
         actor_role=members.role_of(principal.email),
     )
     return {
@@ -826,9 +862,13 @@ async def circle_take(
         project_id, group_id, subgroup_id, body.take_no, principal.email or ""
     )
     await activity.record(
-        project_id, principal.email or "", "circled",
+        project_id,
+        principal.email or "",
+        "circled",
         detail=f"take {body.take_no}" if body.take_no else "cleared the circle",
-        scene=group_id, shot=subgroup_id, quantity=body.take_no,
+        scene=group_id,
+        shot=subgroup_id,
+        quantity=body.take_no,
         actor_role=members.role_of(principal.email),
     )
     return {**shot.as_dict(), "is_empty": shot.is_empty}
@@ -851,9 +891,12 @@ async def assign_shot(
     await principal.assert_can_curate(project_id)
     shot = await shots.assign(project_id, group_id, subgroup_id, body.assignee)
     await activity.record(
-        project_id, principal.email or "", "assigned",
+        project_id,
+        principal.email or "",
+        "assigned",
         detail=body.assignee or "nobody",
-        scene=group_id, shot=subgroup_id,
+        scene=group_id,
+        shot=subgroup_id,
         actor_role=members.role_of(principal.email),
     )
     return {**shot.as_dict(), "is_empty": shot.is_empty}
@@ -878,9 +921,12 @@ async def set_shot_state(
         project_id, group_id, subgroup_id, body.state, principal.email or ""
     )
     await activity.record(
-        project_id, principal.email or "", "set_state",
+        project_id,
+        principal.email or "",
+        "set_state",
         detail=body.state or "unset",
-        scene=group_id, shot=subgroup_id,
+        scene=group_id,
+        shot=subgroup_id,
         actor_role=members.role_of(principal.email),
     )
     return {**shot.as_dict(), "is_empty": shot.is_empty}
@@ -945,9 +991,12 @@ async def add_comment(
     """
     await principal.assert_can_comment(project_id)
     await activity.record(
-        project_id, principal.email or "", "commented",
+        project_id,
+        principal.email or "",
+        "commented",
         detail=body.body,
-        scene=group_id, shot=subgroup_id,
+        scene=group_id,
+        shot=subgroup_id,
         actor_role=members.role_of(principal.email),
     )
     try:

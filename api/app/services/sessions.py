@@ -275,7 +275,5 @@ def available() -> dict:
     """
     return {
         "google": bool(settings.oauth_client_id),
-        "password": bool(
-            settings.session_secret and (settings.guest_pass or settings.team_passes)
-        ),
+        "password": bool(settings.session_secret and (settings.guest_pass or settings.team_passes)),
     }

@@ -109,9 +109,7 @@ def assess(
         return Assessment("not_judged", "not compared yet")
 
     if circled_take and chosen_take and circled_take != chosen_take:
-        return Assessment(
-            "differs_from_circle", f"director circled take {circled_take}"
-        )
+        return Assessment("differs_from_circle", f"director circled take {circled_take}")
 
     if state == IN_PROGRESS:
         return Assessment("decided", "someone is on it")

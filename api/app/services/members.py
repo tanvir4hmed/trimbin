@@ -29,10 +29,12 @@ Role = Literal["lead", "editor", "guest"]
 # somebody to one or set a scene aside.
 LEAD_EDITOR = "tanvir4hmed@gmail.com"
 
-EDITORS = frozenset({
-    "dipon778@gmail.com",
-    "mohidewan10@gmail.com",
-})
+EDITORS = frozenset(
+    {
+        "dipon778@gmail.com",
+        "mohidewan10@gmail.com",
+    }
+)
 
 
 def role_of(email: str | None) -> Role:

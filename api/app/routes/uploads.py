@@ -48,10 +48,7 @@ class UploadRequest(BaseModel):
     @field_validator("filenames")
     @classmethod
     def _check_extensions(cls, names: list[str]) -> list[str]:
-        rejected = [
-            n for n in names
-            if not any(n.lower().endswith(s) for s in ACCEPTED_SUFFIXES)
-        ]
+        rejected = [n for n in names if not any(n.lower().endswith(s) for s in ACCEPTED_SUFFIXES)]
         if rejected:
             shown = ", ".join(rejected[:5])
             more = f" and {len(rejected) - 5} more" if len(rejected) > 5 else ""
@@ -207,13 +204,16 @@ async def complete_upload(
         )
 
     await activity.record(
-        job.project_id, principal.email or "", "uploaded",
+        job.project_id,
+        principal.email or "",
+        "uploaded",
         detail=(
             f"scene {job.target_scene} shot {job.target_shot}"
             if job.target_scene
             else "slates decide"
         ),
-        scene=job.target_scene, shot=job.target_shot,
+        scene=job.target_scene,
+        shot=job.target_shot,
         quantity=len(confirmed),
         actor_role=members.role_of(principal.email),
     )
@@ -249,22 +249,27 @@ async def job_status(
     groups: dict[tuple[int, int], dict] = {}
     for item in job.items:
         key = (int(item.get("scene", 0)), int(item.get("shot", 0)))
-        group = groups.setdefault(key, {
-            "scene": key[0],
-            "shot": key[1],
-            "takes": 0,
-            "unread_slates": 0,
-            "mismatches": [],
-        })
+        group = groups.setdefault(
+            key,
+            {
+                "scene": key[0],
+                "shot": key[1],
+                "takes": 0,
+                "unread_slates": 0,
+                "mismatches": [],
+            },
+        )
         group["takes"] += 1
         if not item.get("confident"):
             group["unread_slates"] += 1
         if item.get("mismatch"):
-            group["mismatches"].append({
-                "filename": item.get("filename", ""),
-                "detail": item.get("mismatch", ""),
-                "slate_raw": item.get("slate_raw", ""),
-            })
+            group["mismatches"].append(
+                {
+                    "filename": item.get("filename", ""),
+                    "detail": item.get("mismatch", ""),
+                    "slate_raw": item.get("slate_raw", ""),
+                }
+            )
 
     for group in groups.values():
         if group["mismatches"]:
@@ -284,9 +289,7 @@ async def job_status(
         "failed": job.failed_items,
         "failures": job.failures[:20],
         "target": (
-            {"scene": job.target_scene, "shot": job.target_shot}
-            if job.target_scene
-            else None
+            {"scene": job.target_scene, "shot": job.target_shot} if job.target_scene else None
         ),
         "groups": sorted(groups.values(), key=lambda g: (g["scene"], g["shot"])),
         "needs_a_look": sum(1 for g in groups.values() if g["status"] != "clean"),

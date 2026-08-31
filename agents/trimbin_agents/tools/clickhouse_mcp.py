@@ -144,10 +144,8 @@ class ClickHouseMCP:
         started = time.perf_counter()
 
         try:
-            result = await self._session.call_tool(
-                "run_query", {"query": limited}
-            )
-        except Exception as exc:  # noqa: BLE001
+            result = await self._session.call_tool("run_query", {"query": limited})
+        except Exception as exc:
             raise QueryFailed(str(exc)) from exc
 
         elapsed_ms = int((time.perf_counter() - started) * 1000)
@@ -218,9 +216,7 @@ def _rows_from(result: Any, columns: list[str] | None = None) -> list[dict[str, 
         for key in ("columns", "column_names", "meta", "header"):
             if key in content and not columns:
                 raw = content[key]
-                columns = [
-                    c.get("name") if isinstance(c, dict) else str(c) for c in raw
-                ]
+                columns = [c.get("name") if isinstance(c, dict) else str(c) for c in raw]
                 break
 
         for key in ("rows", "data", "result", "records"):
@@ -307,7 +303,6 @@ async def session() -> AsyncIterator[ClickHouseMCP]:
         env=server_env(),
     )
 
-    async with stdio_client(params) as (read, write):
-        async with ClientSession(read, write) as mcp:
-            await mcp.initialize()
-            yield ClickHouseMCP(session=mcp)
+    async with stdio_client(params) as (read, write), ClientSession(read, write) as mcp:
+        await mcp.initialize()
+        yield ClickHouseMCP(session=mcp)

@@ -104,34 +104,51 @@ async def analyse(source: Path) -> RawMeasurements:
     with tempfile.TemporaryDirectory() as tmp:
         tmp_dir = Path(tmp)
 
-        code, _, err = await _run([
-            "ffmpeg", "-hide_banner", "-nostats", "-i", str(source.resolve()),
-            "-filter_complex", (
-                # Scale before measuring, not after.
-                #
-                # Every metric here is either a ratio against the rest of the
-                # setup or a temporal comparison, and both survive downscaling
-                # intact. Measuring 2048x1152 costs fourteen times the pixels to
-                # answer the same question, and on a shoot day that is the
-                # difference between minutes and an hour.
-                #
-                # The one thing it costs: clipping is sampled rather than
-                # exhaustive, because scaling averages neighbouring pixels. A
-                # handful of blown pixels stops registering — which is the right
-                # answer anyway, since a handful is not a fault.
-                f"[0:v]fps={MEASURE_FPS},scale=-2:{MEASURE_HEIGHT}:flags=fast_bilinear,split=2[a][b];"
-                "[a]blurdetect=low=0.05:high=0.3,"
-                "signalstats=stat=tout+vrep+brng,"
-                "blackdetect=d=0.5:pic_th=0.98,"
-                "freezedetect=n=-60dB:d=1,"
-                "metadata=mode=print:file=picture.txt[sa];"
-                "[b]tblend=all_mode=difference,"
-                "signalstats,"
-                "metadata=mode=print:key=lavfi.signalstats.YAVG:file=motion.txt[sb]"
-            ),
-            "-map", "[sa]", "-f", "null", "-",
-            "-map", "[sb]", "-f", "null", "-",
-        ], timeout_s=600, cwd=tmp_dir)
+        code, _, err = await _run(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-nostats",
+                "-i",
+                str(source.resolve()),
+                "-filter_complex",
+                (
+                    # Scale before measuring, not after.
+                    #
+                    # Every metric here is either a ratio against the rest of the
+                    # setup or a temporal comparison, and both survive downscaling
+                    # intact. Measuring 2048x1152 costs fourteen times the pixels to
+                    # answer the same question, and on a shoot day that is the
+                    # difference between minutes and an hour.
+                    #
+                    # The one thing it costs: clipping is sampled rather than
+                    # exhaustive, because scaling averages neighbouring pixels. A
+                    # handful of blown pixels stops registering — which is the right
+                    # answer anyway, since a handful is not a fault.
+                    f"[0:v]fps={MEASURE_FPS},scale=-2:{MEASURE_HEIGHT}:flags=fast_bilinear,split=2[a][b];"
+                    "[a]blurdetect=low=0.05:high=0.3,"
+                    "signalstats=stat=tout+vrep+brng,"
+                    "blackdetect=d=0.5:pic_th=0.98,"
+                    "freezedetect=n=-60dB:d=1,"
+                    "metadata=mode=print:file=picture.txt[sa];"
+                    "[b]tblend=all_mode=difference,"
+                    "signalstats,"
+                    "metadata=mode=print:key=lavfi.signalstats.YAVG:file=motion.txt[sb]"
+                ),
+                "-map",
+                "[sa]",
+                "-f",
+                "null",
+                "-",
+                "-map",
+                "[sb]",
+                "-f",
+                "null",
+                "-",
+            ],
+            timeout_s=600,
+            cwd=tmp_dir,
+        )
 
         if code == 0:
             _parse_picture(_read(tmp_dir / "picture.txt"), m)
@@ -306,11 +323,21 @@ async def _measure_audio(source: Path, m: RawMeasurements) -> None:
     is what an editor actually hears, and comparing takes on anything else
     produces advice they will disagree with.
     """
-    code, _, err = await _run([
-        "ffmpeg", "-hide_banner", "-nostats", "-i", str(source),
-        "-af", "loudnorm=print_format=json",
-        "-f", "null", "-",
-    ], timeout_s=300)
+    code, _, err = await _run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-nostats",
+            "-i",
+            str(source),
+            "-af",
+            "loudnorm=print_format=json",
+            "-f",
+            "null",
+            "-",
+        ],
+        timeout_s=300,
+    )
 
     if code != 0:
         return
@@ -338,22 +365,50 @@ async def build_proxy(source: Path, out_dir: Path) -> Path:
 
     gop = int(GOP_SECONDS * PROXY_FPS)
 
-    code, _, err = await _run([
-        "ffmpeg", "-hide_banner", "-nostats", "-y", "-i", str(source),
-        # Scale to a fixed height, keep aspect, force even width.
-        "-vf", f"scale=-2:{PROXY_HEIGHT},fps={PROXY_FPS}",
-        "-c:v", "libx264", "-preset", "veryfast", "-b:v", PROXY_BITRATE,
-        # A keyframe exactly at every segment boundary, and nowhere else. Without
-        # both flags ffmpeg inserts scene-change keyframes, segments drift out of
-        # alignment, and stitched playback stalls between clips.
-        "-g", str(gop), "-keyint_min", str(gop), "-sc_threshold", "0",
-        "-c:a", "aac", "-b:a", PROXY_AUDIO_BITRATE, "-ac", "2",
-        "-f", "hls",
-        "-hls_time", str(SEGMENT_SECONDS),
-        "-hls_playlist_type", "vod",
-        "-hls_segment_filename", str(out_dir / "seg_%04d.ts"),
-        str(manifest),
-    ], timeout_s=1800)
+    code, _, err = await _run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-nostats",
+            "-y",
+            "-i",
+            str(source),
+            # Scale to a fixed height, keep aspect, force even width.
+            "-vf",
+            f"scale=-2:{PROXY_HEIGHT},fps={PROXY_FPS}",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-b:v",
+            PROXY_BITRATE,
+            # A keyframe exactly at every segment boundary, and nowhere else. Without
+            # both flags ffmpeg inserts scene-change keyframes, segments drift out of
+            # alignment, and stitched playback stalls between clips.
+            "-g",
+            str(gop),
+            "-keyint_min",
+            str(gop),
+            "-sc_threshold",
+            "0",
+            "-c:a",
+            "aac",
+            "-b:a",
+            PROXY_AUDIO_BITRATE,
+            "-ac",
+            "2",
+            "-f",
+            "hls",
+            "-hls_time",
+            str(SEGMENT_SECONDS),
+            "-hls_playlist_type",
+            "vod",
+            "-hls_segment_filename",
+            str(out_dir / "seg_%04d.ts"),
+            str(manifest),
+        ],
+        timeout_s=1800,
+    )
 
     if code != 0:
         raise RuntimeError(f"proxy encode failed: {err.strip()[-400:]}")
@@ -373,16 +428,24 @@ async def build_sprite(source: Path, out_path: Path, duration_s: float) -> Path:
     tiles = max(1, int(duration_s // SPRITE_INTERVAL_S))
     rows = max(1, -(-tiles // SPRITE_COLUMNS))  # ceiling division
 
-    code, _, err = await _run([
-        "ffmpeg", "-hide_banner", "-nostats", "-y", "-i", str(source),
-        "-vf", (
-            f"fps=1/{SPRITE_INTERVAL_S},"
-            f"scale={SPRITE_WIDTH}:-2,"
-            f"tile={SPRITE_COLUMNS}x{rows}"
-        ),
-        "-frames:v", "1", "-q:v", "5",
-        str(out_path),
-    ], timeout_s=600)
+    code, _, err = await _run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-nostats",
+            "-y",
+            "-i",
+            str(source),
+            "-vf",
+            (f"fps=1/{SPRITE_INTERVAL_S},scale={SPRITE_WIDTH}:-2,tile={SPRITE_COLUMNS}x{rows}"),
+            "-frames:v",
+            "1",
+            "-q:v",
+            "5",
+            str(out_path),
+        ],
+        timeout_s=600,
+    )
 
     if code != 0:
         raise RuntimeError(f"sprite generation failed: {err.strip()[-300:]}")
@@ -407,15 +470,31 @@ async def extract_head(source: Path, out_path: Path, seconds: float) -> Path | N
     _require_ffmpeg()
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    code, _, err = await _run([
-        "ffmpeg", "-hide_banner", "-nostats", "-y",
-        "-t", f"{seconds:.2f}", "-i", str(source),
-        "-an",  # the board is read, not heard
-        "-vf", f"scale=-2:{SLATE_HEIGHT}",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
-        "-pix_fmt", "yuv420p",
-        str(out_path),
-    ], timeout_s=300)
+    code, _, err = await _run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-nostats",
+            "-y",
+            "-t",
+            f"{seconds:.2f}",
+            "-i",
+            str(source),
+            "-an",  # the board is read, not heard
+            "-vf",
+            f"scale=-2:{SLATE_HEIGHT}",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "28",
+            "-pix_fmt",
+            "yuv420p",
+            str(out_path),
+        ],
+        timeout_s=300,
+    )
 
     if code != 0:
         log.warning("could not extract the head of %s: %s", source.name, err.strip()[-200:])
@@ -437,16 +516,28 @@ async def remux(source: Path, out_path: Path, seconds: float) -> Path | None:
     _require_ffmpeg()
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    code, _, err = await _run([
-        "ffmpeg", "-hide_banner", "-nostats", "-y",
-        "-t", f"{seconds:.2f}", "-i", str(source),
-        "-c", "copy",
-        # Segment timestamps start wherever the take did; a container that
-        # begins at a non-zero PTS confuses players and seek offsets.
-        "-avoid_negative_ts", "make_zero",
-        "-movflags", "+faststart",
-        str(out_path),
-    ], timeout_s=300)
+    code, _, err = await _run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-nostats",
+            "-y",
+            "-t",
+            f"{seconds:.2f}",
+            "-i",
+            str(source),
+            "-c",
+            "copy",
+            # Segment timestamps start wherever the take did; a container that
+            # begins at a non-zero PTS confuses players and seek offsets.
+            "-avoid_negative_ts",
+            "make_zero",
+            "-movflags",
+            "+faststart",
+            str(out_path),
+        ],
+        timeout_s=300,
+    )
 
     if code != 0:
         log.warning("could not remux %s: %s", source.name, err.strip()[-200:])
@@ -471,12 +562,24 @@ async def extract_frames(source: Path, out_dir: Path, count: int, duration_s: fl
     # diminishing return.
     interval = max(duration_s / (count + 1), 0.5)
 
-    code, _, err = await _run([
-        "ffmpeg", "-hide_banner", "-nostats", "-y", "-i", str(source),
-        "-vf", f"fps=1/{interval:.3f},scale=-2:{EMBED_FRAME_HEIGHT}",
-        "-frames:v", str(count), "-q:v", "4",
-        str(out_dir / "f_%02d.jpg"),
-    ], timeout_s=300)
+    code, _, err = await _run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-nostats",
+            "-y",
+            "-i",
+            str(source),
+            "-vf",
+            f"fps=1/{interval:.3f},scale=-2:{EMBED_FRAME_HEIGHT}",
+            "-frames:v",
+            str(count),
+            "-q:v",
+            "4",
+            str(out_dir / "f_%02d.jpg"),
+        ],
+        timeout_s=300,
+    )
 
     if code != 0:
         log.warning("could not extract frames from %s: %s", source.name, err.strip()[-200:])

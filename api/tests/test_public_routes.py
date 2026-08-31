@@ -69,10 +69,14 @@ class TestEmptyDeployment:
 
         async def empty() -> dict:
             return {
-                "real_clips": 0, "synthetic_clips": 0,
-                "real_productions": 0, "synthetic_productions": 0,
-                "real_scenes": 0, "real_shots": 0,
-                "real_hours": 0.0, "synthetic_hours": 0.0,
+                "real_clips": 0,
+                "synthetic_clips": 0,
+                "real_productions": 0,
+                "synthetic_productions": 0,
+                "real_scenes": 0,
+                "real_shots": 0,
+                "real_hours": 0.0,
+                "synthetic_hours": 0.0,
             }
 
         monkeypatch.setattr(analytics, "corpus", empty)
@@ -92,10 +96,14 @@ class TestProvenanceSeparation:
     ) -> None:
         async def mixed() -> dict:
             return {
-                "real_clips": 7, "synthetic_clips": 306215,
-                "real_productions": 1, "synthetic_productions": 400,
-                "real_scenes": 1, "real_shots": 1,
-                "real_hours": 0.02, "synthetic_hours": 4209.7,
+                "real_clips": 7,
+                "synthetic_clips": 306215,
+                "real_productions": 1,
+                "synthetic_productions": 400,
+                "real_scenes": 1,
+                "real_shots": 1,
+                "real_hours": 0.02,
+                "synthetic_hours": 4209.7,
             }
 
         monkeypatch.setattr(analytics, "corpus", mixed)
@@ -116,10 +124,14 @@ class TestProvenanceSeparation:
 
         async def mixed() -> dict:
             return {
-                "real_clips": 0, "synthetic_clips": 306215,
-                "real_productions": 0, "synthetic_productions": 400,
-                "real_scenes": 0, "real_shots": 0,
-                "real_hours": 0.0, "synthetic_hours": 4209.7,
+                "real_clips": 0,
+                "synthetic_clips": 306215,
+                "real_productions": 0,
+                "synthetic_productions": 400,
+                "real_scenes": 0,
+                "real_shots": 0,
+                "real_hours": 0.0,
+                "synthetic_hours": 4209.7,
             }
 
         monkeypatch.setattr(analytics, "corpus", mixed)
@@ -171,9 +183,13 @@ class TestPopulatedDeployment:
         async def measured() -> list:
             return [
                 {
-                    "axis": "stability", "cases": 7, "missed": 0,
-                    "false_alarms": 0, "recall_pct": 100.0,
-                    "precision_pct": 100.0, "timecode_accuracy_pct": 100.0,
+                    "axis": "stability",
+                    "cases": 7,
+                    "missed": 0,
+                    "false_alarms": 0,
+                    "recall_pct": 100.0,
+                    "precision_pct": 100.0,
+                    "timecode_accuracy_pct": 100.0,
                     "last_run": "2026-08-28T09:00:00",
                 }
             ]
@@ -247,9 +263,7 @@ class TestTheArchiveWaking:
         assert response.headers.get("Retry-After")
         assert response.json()["waking"] is True
 
-    def test_a_real_fault_is_still_a_500(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_a_real_fault_is_still_a_500(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """The distinction only helps if it stays a distinction. A broken query
         dressed as "waking" would be a bug nobody ever investigates.
 

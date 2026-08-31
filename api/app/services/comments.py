@@ -35,11 +35,20 @@ SHOT_WIDE = UUID("00000000-0000-0000-0000-000000000000")
 MAX_BODY = 2000
 
 _COLUMNS = [
-    "project_id", "group_id", "subgroup_id", "clip_id",
-    "comment_id", "parent_id",
-    "author", "author_role", "body",
-    "at_s", "to_s",
-    "created_at", "resolved_by", "resolved_at",
+    "project_id",
+    "group_id",
+    "subgroup_id",
+    "clip_id",
+    "comment_id",
+    "parent_id",
+    "author",
+    "author_role",
+    "body",
+    "at_s",
+    "to_s",
+    "created_at",
+    "resolved_by",
+    "resolved_at",
 ]
 
 
@@ -108,11 +117,20 @@ async def add(
 
     comment_id = uuid4()
     row = [
-        project_id, scene, shot, clip_id or SHOT_WIDE,
-        comment_id, parent_id or SHOT_WIDE,
-        author, author_role, text,
-        max(0.0, float(at_s)), max(0.0, float(to_s)),
-        datetime.now(UTC), "", datetime.fromtimestamp(0, UTC),
+        project_id,
+        scene,
+        shot,
+        clip_id or SHOT_WIDE,
+        comment_id,
+        parent_id or SHOT_WIDE,
+        author,
+        author_role,
+        text,
+        max(0.0, float(at_s)),
+        max(0.0, float(to_s)),
+        datetime.now(UTC),
+        "",
+        datetime.fromtimestamp(0, UTC),
     ]
     await (await client()).insert("comments", [row], column_names=_COLUMNS)
     log.info("comment on %d/%d/%d by %s", project_id, scene, shot, author)
@@ -133,9 +151,7 @@ async def add(
     }
 
 
-async def resolve(
-    project_id: int, scene: int, shot: int, comment_id: UUID, by: str
-) -> bool:
+async def resolve(project_id: int, scene: int, shot: int, comment_id: UUID, by: str) -> bool:
     """Mark a comment dealt with by writing it again, resolved.
 
     ReplacingMergeTree keyed on comment_id collapses the pair on merge and the
@@ -163,13 +179,24 @@ async def resolve(
     now = datetime.now(UTC)
     await ch.insert(
         "comments",
-        [[
-            project_id, scene, shot, clip,
-            comment_id, parent,
-            author, role, body,
-            float(at_s), float(to_s),
-            now, by, now,
-        ]],
+        [
+            [
+                project_id,
+                scene,
+                shot,
+                clip,
+                comment_id,
+                parent,
+                author,
+                role,
+                body,
+                float(at_s),
+                float(to_s),
+                now,
+                by,
+                now,
+            ]
+        ],
         column_names=_COLUMNS,
     )
     return True

@@ -72,41 +72,38 @@ async def dashboard(
 
     cards = []
     for p in mine:
-        stats = next(
-            (s for s in built["projects"] if s["project_id"] == p.project_id), None
-        )
-        cards.append({
-            "project_id": p.project_id,
-            "name": p.name,
-            "is_public": p.is_public,
-            "you_are_owner": (principal.email or "").lower() == p.owner_email.lower(),
-            # Whether this one is theirs to work, which is the difference
-            # between their own projects and ours on the same screen. The card
-            # fills in a type that promises this field, and a card missing it
-            # reads as "false" everywhere it is used.
-            "you_can_upload": bool(
-                principal.email
-                and (
-                    principal.email.lower() == p.owner_email.lower()
-                    or principal.email.lower() in {m.lower() for m in p.member_emails}
-                    or (
-                        members.is_staff(principal.email)
-                        and members.is_staff(p.owner_email)
+        stats = next((s for s in built["projects"] if s["project_id"] == p.project_id), None)
+        cards.append(
+            {
+                "project_id": p.project_id,
+                "name": p.name,
+                "is_public": p.is_public,
+                "you_are_owner": (principal.email or "").lower() == p.owner_email.lower(),
+                # Whether this one is theirs to work, which is the difference
+                # between their own projects and ours on the same screen. The card
+                # fills in a type that promises this field, and a card missing it
+                # reads as "false" everywhere it is used.
+                "you_can_upload": bool(
+                    principal.email
+                    and (
+                        principal.email.lower() == p.owner_email.lower()
+                        or principal.email.lower() in {m.lower() for m in p.member_emails}
+                        or (members.is_staff(principal.email) and members.is_staff(p.owner_email))
                     )
-                )
-            ),
-            "created_at": p.created_at.isoformat(),
-            "members": len(p.member_emails) + 1,
-            "scenes": stats["scenes"] if stats else 0,
-            "shots": stats["shots"] if stats else 0,
-            "takes": stats["takes"] if stats else 0,
-            "settled": stats["settled"] if stats else 0,
-            "waiting": stats["waiting"] if stats else 0,
-            # Null rather than zero when the project holds no footage. A project
-            # with nothing in it is not a project that is nought per cent done,
-            # and a bar drawn at zero says something untrue about it.
-            "progress_pct": stats["progress_pct"] if stats else None,
-        })
+                ),
+                "created_at": p.created_at.isoformat(),
+                "members": len(p.member_emails) + 1,
+                "scenes": stats["scenes"] if stats else 0,
+                "shots": stats["shots"] if stats else 0,
+                "takes": stats["takes"] if stats else 0,
+                "settled": stats["settled"] if stats else 0,
+                "waiting": stats["waiting"] if stats else 0,
+                # Null rather than zero when the project holds no footage. A project
+                # with nothing in it is not a project that is nought per cent done,
+                # and a bar drawn at zero says something untrue about it.
+                "progress_pct": stats["progress_pct"] if stats else None,
+            }
+        )
 
     return {
         "you": principal.email,
@@ -117,8 +114,6 @@ async def dashboard(
         "projects": sorted(cards, key=lambda c: (-(c["waiting"] or 0), c["name"])),
         "recent": [{**r, "project_name": names.get(r["project_id"], "")} for r in recent],
         "notes": [{**n, "project_name": names.get(n["project_id"], "")} for n in notes],
-        "activity": [
-            {**a, "project_name": names.get(a["project_id"], "")} for a in happened
-        ],
+        "activity": [{**a, "project_name": names.get(a["project_id"], "")} for a in happened],
         "limits": members.limits_for(principal.email).as_dict(),
     }

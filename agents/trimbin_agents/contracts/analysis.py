@@ -64,9 +64,7 @@ class TakeVerdict(Strict):
         ),
     )
     reason: str = Field(max_length=200)
-    reason_code: ReasonCode = Field(
-        description="For counting. The sentence above is for reading."
-    )
+    reason_code: ReasonCode = Field(description="For counting. The sentence above is for reading.")
     findings: list[Finding]
 
 

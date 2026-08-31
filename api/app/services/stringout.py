@@ -75,9 +75,7 @@ class Entry:
             # take 1 is the single most interesting row on this screen. It is
             # not an error on either side: the circle knows about performance,
             # which this system deliberately does not judge.
-            "differs_from_circle": bool(
-                self.circled_take and self.circled_take != self.take_no
-            ),
+            "differs_from_circle": bool(self.circled_take and self.circled_take != self.take_no),
             "open_comments": self.open_comments,
         }
 
@@ -180,9 +178,7 @@ async def scene(project_id: int, scene_id: int) -> dict:
         # three shots still open is not a scene anybody should be watching as
         # if it were finished.
         "unresolved": sum(1 for e in entries if e.needs_review),
-        "disagreements": sum(
-            1 for e in entries if e.circled_take and e.circled_take != e.take_no
-        ),
+        "disagreements": sum(1 for e in entries if e.circled_take and e.circled_take != e.take_no),
     }
 
 
@@ -214,6 +210,3 @@ def _letter(shot_id: int) -> str:
         n, rem = divmod(n - 1, 26)
         letters = chr(ord("A") + rem) + letters
     return letters
-
-
-

@@ -12,8 +12,8 @@ import pytest
 
 from trimbin_agents.config import settings
 from trimbin_agents.tools.clickhouse_mcp import (
-    ReaderMissing,
     ClickHouseMCP,
+    ReaderMissing,
     UnsafeQuery,
     assert_read_only,
     scope_clause,
@@ -63,9 +63,7 @@ class TestReadsAreAllowed:
 
     def test_a_cte_passes(self) -> None:
         """The Archivist's own queries lead with WITH more often than not."""
-        assert_read_only(
-            "WITH per_shot AS (SELECT 1) SELECT * FROM per_shot"
-        )
+        assert_read_only("WITH per_shot AS (SELECT 1) SELECT * FROM per_shot")
 
     def test_a_trailing_semicolon_is_fine(self) -> None:
         assert_read_only("SELECT 1 FROM clips;")
@@ -182,7 +180,8 @@ class TestAnErrorIsNotAnEmptyResult:
     @staticmethod
     def _block(text: str):
         class Text:
-            def __init__(self, t): self.text = t
+            def __init__(self, t):
+                self.text = t
 
         class Result:
             content = [Text(text)]

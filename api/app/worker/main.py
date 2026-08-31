@@ -41,6 +41,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("trimbin.worker")
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("ingest worker ready, project=%s", settings.project_id)
@@ -102,7 +103,7 @@ async def receive(request: Request) -> Response:
         log.warning("discarding a push with no clip in it: %s", sorted(attributes))
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-    delivery = (envelope.get("deliveryAttempt") or 1)
+    delivery = envelope.get("deliveryAttempt") or 1
     log.info("clip %s, attempt %s", attributes["clip_id"], delivery)
 
     try:

@@ -114,8 +114,7 @@ class AnalystAgent:
                     else _shortfall(request.measurements[clip.clip_id])
                 ),
                 reason_code=(
-                    ReasonCode.CLEAN if clip.clip_id == leader
-                    else ReasonCode.BEHIND_ON_MEASUREMENT
+                    ReasonCode.CLEAN if clip.clip_id == leader else ReasonCode.BEHIND_ON_MEASUREMENT
                 ),
                 findings=_findings_for(clip.clip_id, technical),
             )
@@ -190,7 +189,7 @@ class AnalystAgent:
                     temperature=0.1,
                 ),
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise AgentFailure(f"specialist failed: {exc}") from exc
 
         return [SpecialistReport.model_validate(r) for r in _loads(response.text)]
@@ -211,7 +210,7 @@ class AnalystAgent:
                 model=settings.analyst_model,
                 contents=[
                     CHIEF,
-                    *( [request.briefing] if request.briefing else [] ),
+                    *([request.briefing] if request.briefing else []),
                     _describe_takes(request),
                     _render_reports(reports),
                 ],
@@ -221,7 +220,7 @@ class AnalystAgent:
                     temperature=0.1,
                 ),
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise AgentFailure(f"chief failed: {exc}") from exc
 
         result = AnalysisResult.model_validate_json(response.text)
@@ -292,7 +291,9 @@ class AnalystAgent:
                 request.model_copy(
                     update={
                         "clips": survivors,
-                        "measurements": {c.clip_id: request.measurements[c.clip_id] for c in survivors},
+                        "measurements": {
+                            c.clip_id: request.measurements[c.clip_id] for c in survivors
+                        },
                         "bracket_round": request.bracket_round + 1,
                     }
                 ),
@@ -381,7 +382,7 @@ def _technical_report(request: AnalysisRequest) -> list[SpecialistReport]:
                     code="stability.outlier",
                     detail=f"most camera movement in this group, {m.motion_rel:.1f}x the median",
                     severity=Severity.NOTE,
-                                    where=whole,
+                    where=whole,
                 )
             )
         if m.exposure_rel <= 1 / OUTLIER_RATIO:
@@ -390,7 +391,7 @@ def _technical_report(request: AnalysisRequest) -> list[SpecialistReport]:
                     code="exposure.under",
                     detail=f"darkest take in this group, {m.exposure_rel:.2f} of the median",
                     severity=Severity.NOTE,
-                                    where=whole,
+                    where=whole,
                 )
             )
         # The bright end matters more, not less: a dark image can be lifted in
@@ -401,7 +402,7 @@ def _technical_report(request: AnalysisRequest) -> list[SpecialistReport]:
                     code="exposure.over",
                     detail=f"brightest take in this group, {m.exposure_rel:.1f}x the median",
                     severity=Severity.ATTENTION,
-                                    where=whole,
+                    where=whole,
                 )
             )
         if m.clipping_pct > 5:
@@ -410,7 +411,7 @@ def _technical_report(request: AnalysisRequest) -> list[SpecialistReport]:
                     code="exposure.clipped",
                     detail=f"{m.clipping_pct:.1f}% of frames clipped",
                     severity=Severity.ATTENTION,
-                                    where=whole,
+                    where=whole,
                 )
             )
         if m.sharpness_rel <= 1 / OUTLIER_RATIO:
@@ -419,7 +420,7 @@ def _technical_report(request: AnalysisRequest) -> list[SpecialistReport]:
                     code="focus.soft",
                     detail=f"softest take in this group, {m.sharpness_rel:.2f} of the median",
                     severity=Severity.ATTENTION,
-                                    where=whole,
+                    where=whole,
                 )
             )
         if m.dropped_frames:
@@ -428,7 +429,7 @@ def _technical_report(request: AnalysisRequest) -> list[SpecialistReport]:
                     code="frames.dropped",
                     detail=f"{m.dropped_frames} dropped frames",
                     severity=Severity.BLOCKING,
-                                    where=whole,
+                    where=whole,
                 )
             )
 

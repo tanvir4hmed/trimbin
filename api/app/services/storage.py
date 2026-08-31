@@ -52,9 +52,7 @@ def _signer() -> dict[str, str]:
     instance never does. The difference is invisible until a real request runs
     on a real instance.
     """
-    credentials, _ = google.auth.default(
-        scopes=["https://www.googleapis.com/auth/cloud-platform"]
-    )
+    credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
 
     if hasattr(credentials, "signer_email") and getattr(credentials, "signer", None):
         # A real private key is present. Sign locally: no network call, no IAM

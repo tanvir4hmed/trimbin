@@ -93,7 +93,7 @@ class ArchivistAgent:
                     thinking_config=types.ThinkingConfig(thinking_budget=0),
                 ),
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise AgentFailure(f"could not plan the search: {exc}") from exc
 
         return SearchPlan.model_validate_json(response.text)
@@ -127,7 +127,7 @@ class ArchivistAgent:
                     temperature=0.1,
                 ),
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise AgentFailure(f"could not describe the results: {exc}") from exc
 
         explanation = _Explanation.model_validate_json(response.text)
@@ -176,4 +176,4 @@ def outcome_for(matches: list[Match], widened: bool) -> Outcome:
     return Outcome.WIDENED if widened else Outcome.FOUND
 
 
-__all__ = ["ArchivistAgent", "PROMPT_VERSION", "outcome_for"]
+__all__ = ["PROMPT_VERSION", "ArchivistAgent", "outcome_for"]

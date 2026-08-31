@@ -90,9 +90,7 @@ async def _one(sql: str, params: dict | None = None) -> dict[str, Any]:
 
 async def _many(sql: str, params: dict | None = None) -> list[dict[str, Any]]:
     result = await (await client()).query(sql, parameters=params or {})
-    return [
-        dict(zip(result.column_names, row, strict=True)) for row in result.result_rows
-    ]
+    return [dict(zip(result.column_names, row, strict=True)) for row in result.result_rows]
 
 
 async def accuracy_summary() -> dict[str, Any]:
@@ -172,10 +170,14 @@ async def corpus() -> dict[str, Any]:
     row = await _one("SELECT * FROM corpus")
     if not row:
         return {
-            "real_clips": 0, "synthetic_clips": 0,
-            "real_productions": 0, "synthetic_productions": 0,
-            "real_scenes": 0, "real_shots": 0,
-            "real_hours": 0.0, "synthetic_hours": 0.0,
+            "real_clips": 0,
+            "synthetic_clips": 0,
+            "real_productions": 0,
+            "synthetic_productions": 0,
+            "real_scenes": 0,
+            "real_shots": 0,
+            "real_hours": 0.0,
+            "synthetic_hours": 0.0,
         }
     return row
 

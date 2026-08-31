@@ -47,8 +47,7 @@ class Scene:
             "scene": self.scene,
             "heading": self.heading,
             "shots": [
-                {"shot": s.shot, "slug": s.slug, "description": s.description}
-                for s in self.shots
+                {"shot": s.shot, "slug": s.slug, "description": s.description} for s in self.shots
             ],
         }
 
@@ -79,9 +78,7 @@ async def add_scene(project_id: int, scene: int, heading: str) -> Scene:
     return await get(project_id, scene)
 
 
-async def add_shot(
-    project_id: int, scene: int, shot: int, slug: str, description: str
-) -> Scene:
+async def add_shot(project_id: int, scene: int, shot: int, slug: str, description: str) -> Scene:
     """Add or replace one shot in a scene. Creates the scene if it is new."""
     ref = _doc(project_id, scene)
     snapshot = await ref.get()
@@ -115,9 +112,7 @@ async def remove_shot(project_id: int, scene: int, shot: int) -> Scene:
     if not snapshot.exists:
         return Scene(project_id=project_id, scene=scene)
     d = snapshot.to_dict() or {}
-    await ref.update(
-        {"shots": [s for s in d.get("shots", []) if int(s.get("shot", 0)) != shot]}
-    )
+    await ref.update({"shots": [s for s in d.get("shots", []) if int(s.get("shot", 0)) != shot]})
     return await get(project_id, scene)
 
 

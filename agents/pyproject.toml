@@ -46,6 +46,34 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
 
+# Never enforced until now: CI triggered on pull requests and on branches other
+# than main, and everything here reaches production by a push to main. The
+# workflow ran zero times, so this section is being written against 36 findings
+# rather than none.
+ignore = [
+    # Exceptions named for what happened rather than for being exceptions:
+    # NotReady, QueryFailed, ReaderMissing. `NotReadyError` reads worse and says
+    # less. A convention, not a correctness rule.
+    "N818",
+    # `class FindingCode(str, Enum)` should be `StrEnum` — and ruff is right,
+    # because this is the root cause of a real bug: from Python 3.11 a
+    # `str, Enum` member stringifies to "FindingCode.CONTINUITY_BLOCKING", which
+    # is how the archive filled with class names that matched no query and
+    # scored every take as flawless. It is patched around in
+    # decisions._code_value().
+    #
+    # Not fixed here. These enums are the pydantic response schema Vertex
+    # validates against, and changing their runtime type is not a change to make
+    # inside a phase whose purpose is to stop the system lying about itself.
+    # Logged as G29 against P3, which opens these contracts anyway.
+    "UP042",
+]
+
+# Tests build throwaway stand-ins. A mutable class attribute on a five-line fake
+# is not the hazard this rule is for.
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["RUF012"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true

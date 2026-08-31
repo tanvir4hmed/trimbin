@@ -27,7 +27,7 @@ class Scope(str, Enum):
     see another project should be unable to, not merely discouraged.
     """
 
-    DEMO = "demo"        # the public project, no account
+    DEMO = "demo"  # the public project, no account
     PROJECT = "project"  # one project the caller belongs to
 
 
@@ -35,10 +35,10 @@ class Outcome(str, Enum):
     """What happened, told apart deliberately."""
 
     FOUND = "found"
-    NO_MATCH = "no_match"          # searched, nothing matched
-    WIDENED = "widened"            # nothing matched exactly, near misses returned
+    NO_MATCH = "no_match"  # searched, nothing matched
+    WIDENED = "widened"  # nothing matched exactly, near misses returned
     NEEDS_CLARIFICATION = "needs_clarification"
-    FAILED = "failed"              # the search did not run
+    FAILED = "failed"  # the search did not run
 
 
 class QueryRequest(Strict):

@@ -188,10 +188,15 @@ class TestClosedVocabularies:
             FindingCode.CAMERA_UNMOTIVATED_MOVE,
             FindingCode.DIALOGUE_INCOMPLETE,
         ):
-            assert Finding(
-                code=wanted, detail="x", severity=Severity.NOTE,
-                where=TimeRange(start_s=0.0, end_s=5.0),
-            ).code is wanted
+            assert (
+                Finding(
+                    code=wanted,
+                    detail="x",
+                    severity=Severity.NOTE,
+                    where=TimeRange(start_s=0.0, end_s=5.0),
+                ).code
+                is wanted
+            )
 
     def test_an_unnameable_observation_has_somewhere_to_go(self) -> None:
         """Better than forcing a wrong code onto a true observation. A rising
@@ -225,6 +230,7 @@ class TestClosedVocabularies:
         that none of them may move a ranking."""
         assert FindingCode.PERFORMANCE_NOTE.value == "performance.note"
         assert not [
-            c for c in FindingCode
+            c
+            for c in FindingCode
             if c.value.startswith("performance.") and c is not FindingCode.PERFORMANCE_NOTE
         ]

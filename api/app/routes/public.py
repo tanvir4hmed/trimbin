@@ -121,11 +121,13 @@ async def accuracy_per_project(response: Response) -> dict[str, Any]:
         public = project is not None and (
             project.is_public or project.project_id == settings.demo_project_id
         )
-        named.append({
-            **row,
-            "name": project.name if (project and public) else None,
-            "is_public": bool(public),
-        })
+        named.append(
+            {
+                **row,
+                "name": project.name if (project and public) else None,
+                "is_public": bool(public),
+            }
+        )
 
     return {
         "projects": named,

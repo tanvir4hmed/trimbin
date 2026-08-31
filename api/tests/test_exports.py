@@ -84,9 +84,7 @@ class TestEdl:
         assert "the pause lands" in text
 
     def test_a_disagreement_with_the_circle_is_carried_out_too(self) -> None:
-        text = exports.edl(
-            "S", [_entry(differs_from_circle=True, circled_take=5)], fps=24
-        )
+        text = exports.edl("S", [_entry(differs_from_circle=True, circled_take=5)], fps=24)
         assert "CIRCLED TAKE 5" in text
 
     def test_a_zero_length_shot_is_skipped_rather_than_emitted(self) -> None:
@@ -162,10 +160,15 @@ class TestMarkers:
     def test_severity_becomes_a_colour_an_editor_already_knows(self) -> None:
         csv_text = exports.markers(
             self.ENTRIES,
-            [{
-                "clip_id": "aaa", "start_s": 3.0, "end_s": 4.0,
-                "code": "frames.dropped", "severity": "blocking",
-            }],
+            [
+                {
+                    "clip_id": "aaa",
+                    "start_s": 3.0,
+                    "end_s": 4.0,
+                    "code": "frames.dropped",
+                    "severity": "blocking",
+                }
+            ],
             [],
             fps=24,
         )
@@ -183,10 +186,15 @@ class TestMarkers:
         """
         csv_text = exports.markers(
             self.ENTRIES,
-            [{
-                "clip_id": "aaa", "start_s": 3.0, "end_s": 4.0,
-                "code": "continuity.blocking", "severity": "",
-            }],
+            [
+                {
+                    "clip_id": "aaa",
+                    "start_s": 3.0,
+                    "end_s": 4.0,
+                    "code": "continuity.blocking",
+                    "severity": "",
+                }
+            ],
             [],
             fps=24,
         )
@@ -201,10 +209,15 @@ class TestMarkers:
         suffix rule for codes that "obviously" mean blocking."""
         csv_text = exports.markers(
             self.ENTRIES,
-            [{
-                "clip_id": "aaa", "start_s": 3.0, "end_s": 4.0,
-                "code": "continuity.blocking", "severity": "note",
-            }],
+            [
+                {
+                    "clip_id": "aaa",
+                    "start_s": 3.0,
+                    "end_s": 4.0,
+                    "code": "continuity.blocking",
+                    "severity": "note",
+                }
+            ],
             [],
             fps=24,
         )
@@ -218,8 +231,15 @@ class TestMarkers:
         csv_text = exports.markers(
             self.ENTRIES,
             [],
-            [{"clip_id": "aaa", "at_s": 3.0, "to_s": 4.0,
-              "author": "maya@example.com", "body": "the pause lands"}],
+            [
+                {
+                    "clip_id": "aaa",
+                    "at_s": 3.0,
+                    "to_s": 4.0,
+                    "author": "maya@example.com",
+                    "body": "the pause lands",
+                }
+            ],
             fps=24,
         )
         assert "the pause lands" in csv_text

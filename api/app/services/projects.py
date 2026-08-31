@@ -89,22 +89,22 @@ async def create(name: str, owner_email: str, is_public: bool = False) -> int:
 
     project_id = await allocate(jobs.db().transaction())
 
-    await _doc(project_id).set({
-        "name": name,
-        "owner_email": owner_email.lower(),
-        "member_emails": [],
-        "is_public": is_public,
-        "created_at": datetime.now(UTC),
-    })
+    await _doc(project_id).set(
+        {
+            "name": name,
+            "owner_email": owner_email.lower(),
+            "member_emails": [],
+            "is_public": is_public,
+            "created_at": datetime.now(UTC),
+        }
+    )
 
     log.info("project %d created by %s", project_id, owner_email)
     return project_id
 
 
 async def add_member(project_id: int, email: str) -> None:
-    await _doc(project_id).update({
-        "member_emails": firestore.ArrayUnion([email.lower()])
-    })
+    await _doc(project_id).update({"member_emails": firestore.ArrayUnion([email.lower()])})
 
 
 async def for_member(email: str) -> list[Project]:
@@ -121,9 +121,7 @@ async def for_member(email: str) -> list[Project]:
     async for snapshot in collection.where("owner_email", "==", email).stream():
         found[int(snapshot.id)] = await get(int(snapshot.id))  # type: ignore[assignment]
 
-    async for snapshot in collection.where(
-        "member_emails", "array_contains", email
-    ).stream():
+    async for snapshot in collection.where("member_emails", "array_contains", email).stream():
         if int(snapshot.id) not in found:
             found[int(snapshot.id)] = await get(int(snapshot.id))  # type: ignore[assignment]
 
@@ -152,9 +150,7 @@ async def visible_to(email: str) -> list[Project]:
     seen = {p.project_id for p in mine}
 
     public: list[Project] = []
-    async for snapshot in (
-        jobs.db().collection(COLLECTION).where("is_public", "==", True).stream()
-    ):
+    async for snapshot in jobs.db().collection(COLLECTION).where("is_public", "==", True).stream():
         try:
             project_id = int(snapshot.id)
         except ValueError:

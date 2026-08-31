@@ -20,8 +20,15 @@ from .analytics import client
 log = logging.getLogger(__name__)
 
 _COLUMNS = [
-    "project_id", "group_id", "subgroup_id",
-    "at", "actor", "actor_role", "verb", "detail", "quantity",
+    "project_id",
+    "group_id",
+    "subgroup_id",
+    "at",
+    "actor",
+    "actor_role",
+    "verb",
+    "detail",
+    "quantity",
 ]
 
 # What a row can say. Closed, so the feed can be read at a glance and counted.
@@ -57,11 +64,19 @@ async def record(
     try:
         await (await client()).insert(
             "activity",
-            [[
-                project_id, scene, shot,
-                datetime.now(UTC), actor or "system", actor_role,
-                verb, detail[:200], max(0, int(quantity)),
-            ]],
+            [
+                [
+                    project_id,
+                    scene,
+                    shot,
+                    datetime.now(UTC),
+                    actor or "system",
+                    actor_role,
+                    verb,
+                    detail[:200],
+                    max(0, int(quantity)),
+                ]
+            ],
             column_names=_COLUMNS,
         )
     except Exception:

@@ -87,22 +87,38 @@ class TestWhatGetsWritten:
     @staticmethod
     def _verdicts():
         chosen, other = str(uuid4()), str(uuid4())
-        return chosen, other, [
-            {
-                "clip_id": chosen, "outcome": "not_selected", "score": 0.72,
-                "findings": [{"code": "continuity.prop", "start_s": 12.0, "end_s": 14.0}],
-                "criterion_names": ["focus", "continuity"], "criterion_scores": [1.0, 0.5],
-                "safe_starts_s": [0.0], "safe_ends_s": [30.0], "trim_reasons": [],
-                "in_point_s": 0.0, "out_point_s": 30.0,
-            },
-            {
-                "clip_id": other, "outcome": "selected", "score": 0.91,
-                "findings": [], "criterion_names": ["focus", "continuity"],
-                "criterion_scores": [1.0, 1.0],
-                "safe_starts_s": [0.0], "safe_ends_s": [28.0], "trim_reasons": [],
-                "in_point_s": 0.0, "out_point_s": 28.0,
-            },
-        ]
+        return (
+            chosen,
+            other,
+            [
+                {
+                    "clip_id": chosen,
+                    "outcome": "not_selected",
+                    "score": 0.72,
+                    "findings": [{"code": "continuity.prop", "start_s": 12.0, "end_s": 14.0}],
+                    "criterion_names": ["focus", "continuity"],
+                    "criterion_scores": [1.0, 0.5],
+                    "safe_starts_s": [0.0],
+                    "safe_ends_s": [30.0],
+                    "trim_reasons": [],
+                    "in_point_s": 0.0,
+                    "out_point_s": 30.0,
+                },
+                {
+                    "clip_id": other,
+                    "outcome": "selected",
+                    "score": 0.91,
+                    "findings": [],
+                    "criterion_names": ["focus", "continuity"],
+                    "criterion_scores": [1.0, 1.0],
+                    "safe_starts_s": [0.0],
+                    "safe_ends_s": [28.0],
+                    "trim_reasons": [],
+                    "in_point_s": 0.0,
+                    "out_point_s": 28.0,
+                },
+            ],
+        )
 
     def test_the_panels_score_is_carried_forward_unchanged(self) -> None:
         """A person disagreeing with the conclusion does not change what was
@@ -140,7 +156,8 @@ class TestWhatGetsWritten:
     def test_the_editors_words_land_on_the_take_they_chose(self) -> None:
         chosen, other, verdicts = self._verdicts()
         rows = rows_for_choice(
-            verdicts, chosen,
+            verdicts,
+            chosen,
             Override(clip_id=chosen, reason="the pause before the line lands"),
         )
 
@@ -173,14 +190,16 @@ class TestSeveritySurvivesTheWrite:
 
         from app.services.decisions import _findings
 
-        _, _, _, severities = _findings([
-            Finding(
-                code=FindingCode.CONTINUITY_BLOCKING,
-                detail="she crosses left instead of right",
-                severity=Severity.NOTE,
-                where=TimeRange(start_s=2.0, end_s=4.0),
-            )
-        ])
+        _, _, _, severities = _findings(
+            [
+                Finding(
+                    code=FindingCode.CONTINUITY_BLOCKING,
+                    detail="she crosses left instead of right",
+                    severity=Severity.NOTE,
+                    where=TimeRange(start_s=2.0, end_s=4.0),
+                )
+            ]
+        )
         # A note, because that is what the panel said — not "blocking", which is
         # what the code happens to be called.
         assert severities == ["note"]
@@ -195,14 +214,16 @@ class TestSeveritySurvivesTheWrite:
 
         from app.services.decisions import _findings
 
-        _, _, _, severities = _findings([
-            Finding(
-                code=FindingCode.FRAMES_DROPPED,
-                detail="3 dropped frames",
-                severity=Severity.BLOCKING,
-                where=TimeRange(start_s=0.0, end_s=10.0),
-            )
-        ])
+        _, _, _, severities = _findings(
+            [
+                Finding(
+                    code=FindingCode.FRAMES_DROPPED,
+                    detail="3 dropped frames",
+                    severity=Severity.BLOCKING,
+                    where=TimeRange(start_s=0.0, end_s=10.0),
+                )
+            ]
+        )
         assert severities == ["blocking"]
 
     def test_the_enums_value_is_written_not_its_repr(self) -> None:
@@ -217,14 +238,16 @@ class TestSeveritySurvivesTheWrite:
 
         from app.services.decisions import _findings
 
-        _, _, _, severities = _findings([
-            Finding(
-                code=FindingCode.FOCUS_LOST,
-                detail="focus goes",
-                severity=Severity.ATTENTION,
-                where=TimeRange(start_s=1.0, end_s=2.0),
-            )
-        ])
+        _, _, _, severities = _findings(
+            [
+                Finding(
+                    code=FindingCode.FOCUS_LOST,
+                    detail="focus goes",
+                    severity=Severity.ATTENTION,
+                    where=TimeRange(start_s=1.0, end_s=2.0),
+                )
+            ]
+        )
         assert severities == ["attention"]
         assert "Severity." not in severities[0]
 

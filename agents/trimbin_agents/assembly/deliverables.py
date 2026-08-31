@@ -33,9 +33,9 @@ SEGMENT_SECONDS = 4
 class ClipMedia:
     """What assembly needs to know about a clip to reference it."""
 
-    reel: str            # short name the NLE shows
-    source_uri: str      # the original, for conform
-    playlist_uri: str    # the proxy's own HLS manifest
+    reel: str  # short name the NLE shows
+    source_uri: str  # the original, for conform
+    playlist_uri: str  # the proxy's own HLS manifest
     duration_s: float
 
 
@@ -139,7 +139,7 @@ def build_playlist(
         # separately and drifting.
         lines.append(
             f'#EXT-X-DATERANGE:ID="s{selection.group_id}-{selection.subgroup_id}",'
-            f'X-TAKE={selection.take_no},'
+            f"X-TAKE={selection.take_no},"
             f'X-REASON="{_escape(selection.reason)}"'
         )
 

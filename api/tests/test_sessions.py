@@ -146,7 +146,9 @@ class TestTokens:
 
     def test_an_expired_token_is_refused(self) -> None:
         expired = sessions.Session(
-            email="alex@guest.trimbin", name="Alex", role="guest",
+            email="alex@guest.trimbin",
+            name="Alex",
+            role="guest",
             expires_at=int(time.time()) - 60,
         )
         assert sessions.verify(sessions.mint(expired)) is None
@@ -218,9 +220,7 @@ class TestTheTokenReachesThePrincipal:
     """
 
     @pytest.mark.asyncio
-    async def test_a_minted_token_is_accepted(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_a_minted_token_is_accepted(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from app import auth
 
         monkeypatch.setattr(auth.settings, "session_secret", SECRET)

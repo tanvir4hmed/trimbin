@@ -184,7 +184,11 @@ async def judge(
 
     log.info(
         "judged scene %d setup %d: %d takes, winner %s, margin %.2f",
-        group_id, subgroup_id, len(takes), result.winner_id, result.margin,
+        group_id,
+        subgroup_id,
+        len(takes),
+        result.winner_id,
+        result.margin,
     )
 
     return {
@@ -235,38 +239,38 @@ async def _load(project_id: int, group_id: int, subgroup_id: int) -> list[dict]:
 
     takes = []
     for row in result.result_rows:
-        takes.append({
-            "clip_id": UUID(str(row[0])),
-            "take_no": int(row[1]),
-            "storage_uri": str(row[2]),
-            "duration_s": max(int(row[3]) / 1000, 0.001),
-            "exposure_rel": float(row[4]),
-            "clipping_pct": min(max(float(row[5]), 0.0), 100.0),
-            "sharpness_rel": float(row[6]),
-            "motion_rel": float(row[7]),
-            "audio_lufs": float(row[8]),
-            "noise_floor_db": float(row[9]),
-            "dropped_frames": int(row[10]),
-            # What ffmpeg found at ingest. These exist before any judgement and
-            # are the evidence the panel is handed, rather than something it is
-            # asked to notice for itself.
-            "findings": [
-                {
-                    "code": str(code),
-                    "start_s": float(start),
-                    "end_s": float(end),
-                    "severity": "attention",
-                    "detail": "",
-                }
-                for code, start, end in zip(row[12], row[13], row[14], strict=True)
-            ],
-        })
+        takes.append(
+            {
+                "clip_id": UUID(str(row[0])),
+                "take_no": int(row[1]),
+                "storage_uri": str(row[2]),
+                "duration_s": max(int(row[3]) / 1000, 0.001),
+                "exposure_rel": float(row[4]),
+                "clipping_pct": min(max(float(row[5]), 0.0), 100.0),
+                "sharpness_rel": float(row[6]),
+                "motion_rel": float(row[7]),
+                "audio_lufs": float(row[8]),
+                "noise_floor_db": float(row[9]),
+                "dropped_frames": int(row[10]),
+                # What ffmpeg found at ingest. These exist before any judgement and
+                # are the evidence the panel is handed, rather than something it is
+                # asked to notice for itself.
+                "findings": [
+                    {
+                        "code": str(code),
+                        "start_s": float(start),
+                        "end_s": float(end),
+                        "severity": "attention",
+                        "detail": "",
+                    }
+                    for code, start, end in zip(row[12], row[13], row[14], strict=True)
+                ],
+            }
+        )
     return takes
 
 
-async def _fetch_windows(
-    project_id: int, takes: list[dict], work: Path
-) -> dict[UUID, bytes]:
+async def _fetch_windows(project_id: int, takes: list[dict], work: Path) -> dict[UUID, bytes]:
     """Assemble the window the panel watches, one take at a time.
 
     From the proxy, not the original — see storage.download_proxy_window for why
@@ -342,24 +346,26 @@ def _as_rows(result, takes: list[dict]) -> list[dict]:
         ranges, trims = ranges_service.safe_ranges(duration, findings)
         assembly = ranges_service.longest(ranges)
 
-        rows.append({
-            "clip_id": v.clip_id,
-            "outcome": outcome,
-            "score": v.score,
-            "margin": result.margin if outcome == "selected" else 0.0,
-            "reason": v.reason,
-            "reason_code": v.reason_code,
-            "findings": findings,
-            "criterion_names": scores.names,
-            "criterion_scores": scores.scores,
-            "safe_starts_s": [r.start_s for r in ranges],
-            "safe_ends_s": [r.end_s for r in ranges],
-            "trim_reasons": trims,
-            # The single span an assembly would use. Zero-zero when nothing is
-            # usable, which is a real answer and not a missing one.
-            "in_point_s": assembly.start_s if assembly else 0.0,
-            "out_point_s": assembly.end_s if assembly else 0.0,
-        })
+        rows.append(
+            {
+                "clip_id": v.clip_id,
+                "outcome": outcome,
+                "score": v.score,
+                "margin": result.margin if outcome == "selected" else 0.0,
+                "reason": v.reason,
+                "reason_code": v.reason_code,
+                "findings": findings,
+                "criterion_names": scores.names,
+                "criterion_scores": scores.scores,
+                "safe_starts_s": [r.start_s for r in ranges],
+                "safe_ends_s": [r.end_s for r in ranges],
+                "trim_reasons": trims,
+                # The single span an assembly would use. Zero-zero when nothing is
+                # usable, which is a real answer and not a missing one.
+                "in_point_s": assembly.start_s if assembly else 0.0,
+                "out_point_s": assembly.end_s if assembly else 0.0,
+            }
+        )
     return rows
 
 
@@ -389,16 +395,18 @@ def _merge_findings(measured: list[dict], observed, duration_s: float) -> list[d
         if end <= start:
             start, end = 0.0, duration_s
 
-        out.append({
-            # The enum's value, not its repr. Everything downstream matches on
-            # the taxonomy string, and a class name matches nothing — silently,
-            # by scoring every take as having no findings at all.
-            "code": getattr(code, "value", code),
-            "detail": getattr(f, "detail", ""),
-            "severity": getattr(getattr(f, "severity", None), "value", "attention"),
-            "start_s": start,
-            "end_s": end,
-            "source": "observed",
-        })
+        out.append(
+            {
+                # The enum's value, not its repr. Everything downstream matches on
+                # the taxonomy string, and a class name matches nothing — silently,
+                # by scoring every take as having no findings at all.
+                "code": getattr(code, "value", code),
+                "detail": getattr(f, "detail", ""),
+                "severity": getattr(getattr(f, "severity", None), "value", "attention"),
+                "start_s": start,
+                "end_s": end,
+                "source": "observed",
+            }
+        )
 
     return out

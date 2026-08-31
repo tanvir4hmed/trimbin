@@ -25,15 +25,34 @@ from .analytics import client
 log = logging.getLogger(__name__)
 
 _COLUMNS = [
-    "project_id", "group_id", "subgroup_id", "clip_id", "decided_at",
-    "outcome", "score", "margin",
-    "reason", "reason_code",
-    "finding_codes", "finding_starts_s", "finding_ends_s", "finding_severities",
-    "decided_by", "actor_id",
-    "model_id", "prompt_version", "bracket_round", "panel_convened", "run_hash",
-    "in_point_s", "out_point_s",
-    "criterion_names", "criterion_scores",
-    "safe_starts_s", "safe_ends_s", "trim_reasons",
+    "project_id",
+    "group_id",
+    "subgroup_id",
+    "clip_id",
+    "decided_at",
+    "outcome",
+    "score",
+    "margin",
+    "reason",
+    "reason_code",
+    "finding_codes",
+    "finding_starts_s",
+    "finding_ends_s",
+    "finding_severities",
+    "decided_by",
+    "actor_id",
+    "model_id",
+    "prompt_version",
+    "bracket_round",
+    "panel_convened",
+    "run_hash",
+    "in_point_s",
+    "out_point_s",
+    "criterion_names",
+    "criterion_scores",
+    "safe_starts_s",
+    "safe_ends_s",
+    "trim_reasons",
 ]
 
 
@@ -91,23 +110,46 @@ async def record(
     rows = []
     for v in verdicts:
         codes, starts, ends, severities = _findings(v.get("findings", []))
-        rows.append([
-            project_id, group_id, subgroup_id, UUID(str(v["clip_id"])), now,
-            v["outcome"], float(v.get("score", 0.0)), float(v.get("margin", 0.0)),
-            v.get("reason", "")[:400], _code_value(v.get("reason_code", "")),
-            codes, starts, ends, severities,
-            decided_by, actor_id,
-            model_id, prompt_version, bracket_round, 1 if panel_convened else 0, key,
-            float(v.get("in_point_s", 0.0)), float(v.get("out_point_s", 0.0)),
-            list(v.get("criterion_names", [])), list(v.get("criterion_scores", [])),
-            list(v.get("safe_starts_s", [])), list(v.get("safe_ends_s", [])),
-            list(v.get("trim_reasons", [])),
-        ])
+        rows.append(
+            [
+                project_id,
+                group_id,
+                subgroup_id,
+                UUID(str(v["clip_id"])),
+                now,
+                v["outcome"],
+                float(v.get("score", 0.0)),
+                float(v.get("margin", 0.0)),
+                v.get("reason", "")[:400],
+                _code_value(v.get("reason_code", "")),
+                codes,
+                starts,
+                ends,
+                severities,
+                decided_by,
+                actor_id,
+                model_id,
+                prompt_version,
+                bracket_round,
+                1 if panel_convened else 0,
+                key,
+                float(v.get("in_point_s", 0.0)),
+                float(v.get("out_point_s", 0.0)),
+                list(v.get("criterion_names", [])),
+                list(v.get("criterion_scores", [])),
+                list(v.get("safe_starts_s", [])),
+                list(v.get("safe_ends_s", [])),
+                list(v.get("trim_reasons", [])),
+            ]
+        )
 
     await (await client()).insert("decisions", rows, column_names=_COLUMNS)
     log.info(
         "recorded %d verdicts for project %d scene %d setup %d (%s)",
-        len(rows), project_id, group_id, subgroup_id,
+        len(rows),
+        project_id,
+        group_id,
+        subgroup_id,
         "panel" if panel_convened else "measurements",
     )
     return len(rows)

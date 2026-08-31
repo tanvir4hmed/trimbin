@@ -58,7 +58,9 @@ async def add_scene(
     await principal.assert_can_curate(project_id)
     scene = await structure.add_scene(project_id, body.scene, body.heading)
     await activity.record(
-        project_id, principal.email or "", "planned",
+        project_id,
+        principal.email or "",
+        "planned",
         detail=f"scene {body.scene}" + (f" — {body.heading}" if body.heading else ""),
         scene=body.scene,
         actor_role=members.role_of(principal.email),
@@ -74,13 +76,14 @@ async def add_shot(
     principal: Annotated[Principal, Depends(require_signed_in)],
 ) -> dict:
     await principal.assert_can_curate(project_id)
-    updated = await structure.add_shot(
-        project_id, scene, body.shot, body.slug, body.description
-    )
+    updated = await structure.add_shot(project_id, scene, body.shot, body.slug, body.description)
     await activity.record(
-        project_id, principal.email or "", "planned",
+        project_id,
+        principal.email or "",
+        "planned",
         detail=body.slug or f"scene {scene} shot {body.shot}",
-        scene=scene, shot=body.shot,
+        scene=scene,
+        shot=body.shot,
         actor_role=members.role_of(principal.email),
     )
     return updated.as_dict()

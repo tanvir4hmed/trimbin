@@ -23,7 +23,7 @@ from datetime import datetime
 from enum import Enum
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Strict(BaseModel):
@@ -52,7 +52,7 @@ class Confidence(str, Enum):
 
 
 class Severity(str, Enum):
-    NOTE = "note"          # worth knowing, changes nothing
+    NOTE = "note"  # worth knowing, changes nothing
     ATTENTION = "attention"  # a person should look
     BLOCKING = "blocking"  # this take cannot be used as-is
 
@@ -151,20 +151,20 @@ class ReasonCode(str, Enum):
     """
 
     # selected
-    CLEAN = "selected.clean"                    # nothing separates it but it leads
-    COMPLETE = "selected.complete"              # it finishes where others do not
-    CONTINUITY_MATCH = "selected.continuity"    # it matches the group where others drift
+    CLEAN = "selected.clean"  # nothing separates it but it leads
+    COMPLETE = "selected.complete"  # it finishes where others do not
+    CONTINUITY_MATCH = "selected.continuity"  # it matches the group where others drift
 
     # not selected
-    BEHIND_ON_MEASUREMENT = "behind.measurement"   # the numbers put it second
-    INCOMPLETE = "behind.incomplete"               # action or dialogue stops short
-    CONTINUITY_DRIFT = "behind.continuity"         # differs from the group
-    FRAMING = "behind.framing"                     # obstruction, crop, composition
-    TECHNICAL_FAULT = "behind.technical"           # focus, exposure, stability, audio
+    BEHIND_ON_MEASUREMENT = "behind.measurement"  # the numbers put it second
+    INCOMPLETE = "behind.incomplete"  # action or dialogue stops short
+    CONTINUITY_DRIFT = "behind.continuity"  # differs from the group
+    FRAMING = "behind.framing"  # obstruction, crop, composition
+    TECHNICAL_FAULT = "behind.technical"  # focus, exposure, stability, audio
 
     # neither
-    UNUSABLE = "unusable"                       # fails tier one; cannot be cut
-    NO_WINNER = "no_winner"                     # nothing here is good enough
+    UNUSABLE = "unusable"  # fails tier one; cannot be cut
+    NO_WINNER = "no_winner"  # nothing here is good enough
 
 
 class Provenance(Strict):
@@ -192,8 +192,7 @@ class TimeRange(Strict):
     end_s: float = Field(
         ge=0,
         description=(
-            "End, in seconds. For something that runs the whole take, the "
-            "clip's length — not zero."
+            "End, in seconds. For something that runs the whole take, the clip's length — not zero."
         ),
     )
 

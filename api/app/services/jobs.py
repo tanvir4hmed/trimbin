@@ -36,10 +36,10 @@ class State:
     A string literal in two files is not a shared vocabulary. This is.
     """
 
-    UPLOADING = "uploading"   # tickets issued, bytes moving
-    PROCESSING = "processing" # queued, workers running
-    DONE = "done"             # every clip accounted for, failures included
-    FAILED = "failed"         # abandoned before any work could start
+    UPLOADING = "uploading"  # tickets issued, bytes moving
+    PROCESSING = "processing"  # queued, workers running
+    DONE = "done"  # every clip accounted for, failures included
+    FAILED = "failed"  # abandoned before any work could start
 
 
 # States from which nothing further happens. The interface stops polling here.
@@ -48,9 +48,14 @@ class State:
 # the outcome, and the failures are listed beside it.
 TERMINAL = frozenset({State.DONE, State.FAILED})
 
-ALL_STATES = frozenset({
-    State.UPLOADING, State.PROCESSING, State.DONE, State.FAILED,
-})
+ALL_STATES = frozenset(
+    {
+        State.UPLOADING,
+        State.PROCESSING,
+        State.DONE,
+        State.FAILED,
+    }
+)
 
 _db: firestore.AsyncClient | None = None
 _publisher: pubsub_v1.PublisherClient | None = None
@@ -105,21 +110,28 @@ async def open_job(
     something succeeds cannot represent an upload that failed at the first file.
     """
     job_id = uuid4()
-    await db().collection(COLLECTION).document(str(job_id)).set({
-        "project_id": project_id,
-        "kind": kind,
-        "state": State.UPLOADING,
-        "total_items": total_items,
-        "completed_items": 0,
-        "failed_items": 0,
-        "failures": [],
-        "started_at": datetime.now(UTC),
-        "finished_at": None,
-        "opened_by": opened_by,
-        "target_scene": target_scene,
-        "target_shot": target_shot,
-        "items": [],
-    })
+    await (
+        db()
+        .collection(COLLECTION)
+        .document(str(job_id))
+        .set(
+            {
+                "project_id": project_id,
+                "kind": kind,
+                "state": State.UPLOADING,
+                "total_items": total_items,
+                "completed_items": 0,
+                "failed_items": 0,
+                "failures": [],
+                "started_at": datetime.now(UTC),
+                "finished_at": None,
+                "opened_by": opened_by,
+                "target_scene": target_scene,
+                "target_shot": target_shot,
+                "items": [],
+            }
+        )
+    )
     log.info("job %s opened: %s, %d items", job_id, kind, total_items)
     return job_id
 
@@ -154,10 +166,17 @@ async def set_total(job_id: UUID, total: int) -> None:
     turned up. Leaving the optimistic figure would show a progress bar that never
     reaches the end.
     """
-    await db().collection(COLLECTION).document(str(job_id)).update({
-        "total_items": total,
-        "state": State.PROCESSING,
-    })
+    await (
+        db()
+        .collection(COLLECTION)
+        .document(str(job_id))
+        .update(
+            {
+                "total_items": total,
+                "state": State.PROCESSING,
+            }
+        )
+    )
 
 
 async def record_missing(job_id: UUID, missing: list[UUID]) -> None:
@@ -167,13 +186,17 @@ async def record_missing(job_id: UUID, missing: list[UUID]) -> None:
     processes 196 of 200 files is worse than one that fails.
     """
     ref = db().collection(COLLECTION).document(str(job_id))
-    await ref.update({
-        "failed_items": firestore.Increment(len(missing)),
-        "failures": firestore.ArrayUnion([
-            {"clip_id": str(c), "reason": "not found in storage after upload"}
-            for c in missing
-        ]),
-    })
+    await ref.update(
+        {
+            "failed_items": firestore.Increment(len(missing)),
+            "failures": firestore.ArrayUnion(
+                [
+                    {"clip_id": str(c), "reason": "not found in storage after upload"}
+                    for c in missing
+                ]
+            ),
+        }
+    )
 
 
 async def record_progress(job_id: UUID, clip_id: UUID, ok: bool, reason: str = "") -> None:
@@ -201,9 +224,7 @@ async def record_progress(job_id: UUID, clip_id: UUID, ok: bool, reason: str = "
 
         update: dict = {"completed_items": completed, "failed_items": failed}
         if not ok:
-            update["failures"] = firestore.ArrayUnion(
-                [{"clip_id": str(clip_id), "reason": reason}]
-            )
+            update["failures"] = firestore.ArrayUnion([{"clip_id": str(clip_id), "reason": reason}])
 
         # Every clip accounted for, one way or the other. A job with failures
         # still finishes — "done" describes the work, not the outcome, and the
@@ -218,9 +239,7 @@ async def record_progress(job_id: UUID, clip_id: UUID, ok: bool, reason: str = "
     completed, failed, total = await count(db().transaction())
 
     if total and completed + failed >= total:
-        log.info(
-            "job %s finished: %d done, %d failed of %d", job_id, completed, failed, total
-        )
+        log.info("job %s finished: %d done, %d failed of %d", job_id, completed, failed, total)
 
 
 async def record_placement(
@@ -240,18 +259,29 @@ async def record_placement(
     rather than only a count. `mismatch` is empty when the slate agreed with the
     declared target, or when nothing was declared.
     """
-    await db().collection(COLLECTION).document(str(job_id)).update({
-        "items": firestore.ArrayUnion([{
-            "clip_id": str(clip_id),
-            "filename": filename,
-            "scene": scene,
-            "shot": shot,
-            "take_no": take_no,
-            "slate_raw": slate_raw[:120],
-            "confident": bool(confident),
-            "mismatch": mismatch,
-        }])
-    })
+    await (
+        db()
+        .collection(COLLECTION)
+        .document(str(job_id))
+        .update(
+            {
+                "items": firestore.ArrayUnion(
+                    [
+                        {
+                            "clip_id": str(clip_id),
+                            "filename": filename,
+                            "scene": scene,
+                            "shot": shot,
+                            "take_no": take_no,
+                            "slate_raw": slate_raw[:120],
+                            "confident": bool(confident),
+                            "mismatch": mismatch,
+                        }
+                    ]
+                )
+            }
+        )
+    )
 
 
 async def abandon(job_id: UUID, reason: str) -> None:
@@ -262,11 +292,18 @@ async def abandon(job_id: UUID, reason: str) -> None:
     between opening and queueing leaves a job that nothing will ever advance,
     and an editor watching a progress bar for work that was never started.
     """
-    await db().collection(COLLECTION).document(str(job_id)).update({
-        "state": State.FAILED,
-        "finished_at": datetime.now(UTC),
-        "failures": firestore.ArrayUnion([{"clip_id": "", "reason": reason}]),
-    })
+    await (
+        db()
+        .collection(COLLECTION)
+        .document(str(job_id))
+        .update(
+            {
+                "state": State.FAILED,
+                "finished_at": datetime.now(UTC),
+                "failures": firestore.ArrayUnion([{"clip_id": "", "reason": reason}]),
+            }
+        )
+    )
     log.warning("job %s abandoned: %s", job_id, reason)
 
 
@@ -277,10 +314,17 @@ async def close_empty(job_id: UUID) -> None:
     ever run and nothing will ever close this. Without it the editor watches a
     progress bar for an upload that finished failing before it started.
     """
-    await db().collection(COLLECTION).document(str(job_id)).update({
-        "state": State.DONE,
-        "finished_at": datetime.now(UTC),
-    })
+    await (
+        db()
+        .collection(COLLECTION)
+        .document(str(job_id))
+        .update(
+            {
+                "state": State.DONE,
+                "finished_at": datetime.now(UTC),
+            }
+        )
+    )
     log.info("job %s closed with nothing to process", job_id)
 
 

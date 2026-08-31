@@ -79,9 +79,7 @@ async def scene_edl(
         content=text,
         media_type="text/plain; charset=us-ascii",
         headers={
-            "Content-Disposition": (
-                f'attachment; filename="p{project_id}_scene{scene_id}.edl"'
-            )
+            "Content-Disposition": (f'attachment; filename="p{project_id}_scene{scene_id}.edl"')
         },
     )
 

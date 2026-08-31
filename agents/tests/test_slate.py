@@ -89,15 +89,23 @@ class TestNeighbourInference:
             for n in (1, 2, 3)
         ]
         request = SlateRequest(
-            clip_id=uuid4(), project_id=1, storage_uri="gs://x",
-            captured_at_epoch=0.0, duration_s=30.0, neighbours=group,
+            clip_id=uuid4(),
+            project_id=1,
+            storage_uri="gs://x",
+            captured_at_epoch=0.0,
+            duration_s=30.0,
+            neighbours=group,
         )
         assert _infer_from_neighbours(request) == (1200, 300, 4)
 
     def test_first_clip_of_a_shoot_has_no_neighbours(self) -> None:
         request = SlateRequest(
-            clip_id=uuid4(), project_id=1, storage_uri="gs://x",
-            captured_at_epoch=0.0, duration_s=30.0, neighbours=[],
+            clip_id=uuid4(),
+            project_id=1,
+            storage_uri="gs://x",
+            captured_at_epoch=0.0,
+            duration_s=30.0,
+            neighbours=[],
         )
         assert _infer_from_neighbours(request) == (0, 0, 1)
 
@@ -115,8 +123,11 @@ class TestMisplacement:
     @staticmethod
     def _clip(group: int = 1, subgroup: int = 1) -> ClipRef:
         return ClipRef(
-            clip_id=uuid4(), project_id=1,
-            group_id=group, subgroup_id=subgroup, take_no=1,
+            clip_id=uuid4(),
+            project_id=1,
+            group_id=group,
+            subgroup_id=subgroup,
+            take_no=1,
         )
 
     # A tight group and a looser one, both in the high nineties against each
@@ -176,9 +187,7 @@ class TestMisplacement:
 
     async def test_a_lone_group_has_nothing_to_compare_against(self) -> None:
         agent = SlateAgent.__new__(SlateAgent)
-        proposal = await agent.check_placement(
-            self._clip(), [0.0, 0.0, 1.0], {(1, 1): self.TIGHT}
-        )
+        proposal = await agent.check_placement(self._clip(), [0.0, 0.0, 1.0], {(1, 1): self.TIGHT})
         assert proposal is None
 
     async def test_the_clip_is_never_compared_against_itself(self) -> None:

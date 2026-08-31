@@ -59,9 +59,7 @@ class TestWhetherAShotNeedsAPerson:
     def test_a_disagreement_surfaces_even_when_the_call_was_not_close(self) -> None:
         """The whole value of holding the circle. A confident wrong answer is
         exactly the one nothing else would flag."""
-        assert _assess(margin=0.8, circled_take=3, chosen_take=1).status == (
-            "differs_from_circle"
-        )
+        assert _assess(margin=0.8, circled_take=3, chosen_take=1).status == ("differs_from_circle")
 
     def test_agreeing_with_the_circle_is_not_a_reason_to_look(self) -> None:
         assert _assess(circled_take=2, chosen_take=2).waiting_reason is None
@@ -94,9 +92,7 @@ class TestWhetherAShotNeedsAPerson:
     def test_someone_working_on_it_says_so_rather_than_vanishing(self) -> None:
         """Three editors sharing a project need to see that a shot is taken.
         Hiding it would send the second person to the same row."""
-        assert _assess(margin=0.02, state="in_progress").waiting_reason == (
-            "someone is on it"
-        )
+        assert _assess(margin=0.02, state="in_progress").waiting_reason == ("someone is on it")
 
     def test_decided_and_confirmed_are_not_the_same_thing(self) -> None:
         """A verdict nobody has looked at is not one an editor agreed with, and
@@ -156,8 +152,12 @@ class TestTheTwoAnswersAgree:
         """The tree has a dot class per status. A status nobody styled renders
         as an invisible dot, which reads as a shot with nothing wrong."""
         drawn = {
-            "too_few_takes", "not_judged", "needs_review",
-            "differs_from_circle", "decided", "confirmed",
+            "too_few_takes",
+            "not_judged",
+            "needs_review",
+            "differs_from_circle",
+            "decided",
+            "confirmed",
         }
         for result in self._every_case():
             assert result.status in drawn
@@ -165,9 +165,18 @@ class TestTheTwoAnswersAgree:
 
 def _waiting(**overrides) -> Waiting:
     base = dict(
-        project_id=1, scene=12, shot=1, slug="12A", takes=4, margin=0.1,
-        reason="close call", assignee="", state="", circled_take=0,
-        chosen_take=1, open_comments=0,
+        project_id=1,
+        scene=12,
+        shot=1,
+        slug="12A",
+        takes=4,
+        margin=0.1,
+        reason="close call",
+        assignee="",
+        state="",
+        circled_take=0,
+        chosen_take=1,
+        open_comments=0,
     )
     base.update(overrides)
     return Waiting(**base)  # type: ignore[arg-type]

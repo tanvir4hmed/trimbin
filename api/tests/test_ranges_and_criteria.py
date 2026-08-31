@@ -62,7 +62,7 @@ class TestSafeRanges:
         assert trims == ["clip.black"]
 
     def test_a_finding_with_no_span_applies_to_the_whole_take(self) -> None:
-        """"Frozen throughout" carries no timecode. Skipping it because it has
+        """ "Frozen throughout" carries no timecode. Skipping it because it has
         no span would silently keep the worst takes."""
         found, trims = ranges.safe_ranges(30.0, [finding("frames.frozen")])
         assert found == []
@@ -75,9 +75,7 @@ class TestSafeRanges:
         assert [(r.start_s, r.end_s) for r in found] == [(0.0, 60.0)]
 
     def test_a_sliver_of_clean_footage_is_not_offered_as_usable(self) -> None:
-        found, _ = ranges.safe_ranges(
-            60.0, [finding("clip.black", 0.5, 60.0)]
-        )
+        found, _ = ranges.safe_ranges(60.0, [finding("clip.black", 0.5, 60.0)])
         assert found == []
 
     def test_the_longest_stretch_is_what_an_assembly_takes(self) -> None:
@@ -105,8 +103,12 @@ class TestCriteria:
     @staticmethod
     def _typical(**overrides) -> dict:
         base = {
-            "exposure_rel": 1.0, "sharpness_rel": 1.0, "motion_rel": 1.0,
-            "clipping_pct": 0.0, "audio_lufs": -23.0, "noise_floor_db": -60.0,
+            "exposure_rel": 1.0,
+            "sharpness_rel": 1.0,
+            "motion_rel": 1.0,
+            "clipping_pct": 0.0,
+            "audio_lufs": -23.0,
+            "noise_floor_db": -60.0,
             "dropped_frames": 0,
         }
         return {**base, **overrides}
@@ -200,9 +202,7 @@ class TestCriteria:
         assert s.values["focus"] == 1.0
 
     def test_a_continuity_note_costs_less_than_a_blocking_one(self) -> None:
-        note = criteria.score_take(
-            self._typical(), [finding("continuity.prop", severity="note")]
-        )
+        note = criteria.score_take(self._typical(), [finding("continuity.prop", severity="note")])
         attention = criteria.score_take(
             self._typical(), [finding("continuity.prop", severity="attention")]
         )
@@ -230,8 +230,12 @@ class TestCriteria:
     def test_no_score_escapes_zero_to_one(self) -> None:
         extreme = criteria.score_take(
             self._typical(
-                exposure_rel=5.0, sharpness_rel=0.01, motion_rel=9.0,
-                clipping_pct=99.0, dropped_frames=500, noise_floor_db=0.0,
+                exposure_rel=5.0,
+                sharpness_rel=0.01,
+                motion_rel=9.0,
+                clipping_pct=99.0,
+                dropped_frames=500,
+                noise_floor_db=0.0,
             ),
             [finding("dialogue.incomplete"), finding("continuity.screen_direction")],
         )
