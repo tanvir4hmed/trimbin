@@ -216,40 +216,46 @@ async def normalise_group(project_id: int, group_id: int, subgroup_id: int) -> i
         for i, axis in ((1, "exposure"), (2, "sharpness"), (3, "motion"))
     }
 
-    updates = []
-    for clip_id, exposure, sharpness, motion in rows:
-        updates.append((
-            str(clip_id),
-            _ratio(float(exposure), medians["exposure"]),
-            _ratio(float(sharpness), medians["sharpness"]),
-            _ratio(float(motion), medians["motion"]),
-        ))
+    # One mutation for the whole shot, not one per take.
+    #
+    # This ran a separate ALTER UPDATE per clip, so a seven-take shot queued
+    # seven mutations and a shoot day queued hundreds. A ClickHouse mutation is
+    # not a row edit: it rewrites every part it touches, runs asynchronously,
+    # and the server caps how many may be in flight. Queueing them per row is
+    # the single most common way to make this database behave badly, and it was
+    # in the hot path of every comparison.
+    #
+    # The arithmetic moves into the statement. The medians are still computed
+    # here — ClickHouse has no median window function that is cheap over a
+    # partition this small, and the guard against a zero median needs a branch
+    # that is clearer in Python than in SQL.
+    divisors = {
+        axis: (value if value > 0 else 1.0) for axis, value in medians.items()
+    }
 
-    # ALTER UPDATE rather than re-insert. The sort key is
-    # (project_id, group_id, subgroup_id, take_no, clip_id) and none of those
-    # change here, so a mutation is legal and a second row per clip would leave
-    # every reader responsible for picking the newer one.
-    for clip_id, exposure, sharpness, motion in updates:
-        await ch.command(
-            """
-            ALTER TABLE clips UPDATE
-                exposure_rel = {e:Float32},
-                sharpness_rel = {s:Float32},
-                motion_rel = {m:Float32},
-                normalised_at = now()
-            WHERE project_id = {p:UInt32} AND clip_id = {c:UUID}
-            """,
-            parameters={
-                "e": exposure, "s": sharpness, "m": motion,
-                "p": project_id, "c": clip_id,
-            },
-        )
+    await ch.command(
+        """
+        ALTER TABLE clips UPDATE
+            exposure_rel  = if(exposure_raw > 0, exposure_raw / {em:Float32}, 1.0),
+            sharpness_rel = if(sharpness_raw > 0, sharpness_raw / {sm:Float32}, 1.0),
+            motion_rel    = if(motion_raw > 0, motion_raw / {mm:Float32}, 1.0),
+            normalised_at = now()
+        WHERE project_id = {p:UInt32} AND group_id = {g:UInt32}
+          AND subgroup_id = {s:UInt32} AND status = 'active'
+        """,
+        parameters={
+            "em": divisors["exposure"],
+            "sm": divisors["sharpness"],
+            "mm": divisors["motion"],
+            "p": project_id, "g": group_id, "s": subgroup_id,
+        },
+    )
 
     log.info(
-        "normalised %d takes in project %d scene %d setup %d",
-        len(updates), project_id, group_id, subgroup_id,
+        "normalised %d takes in project %d scene %d shot %d (1 mutation)",
+        len(rows), project_id, group_id, subgroup_id,
     )
-    return len(updates)
+    return len(rows)
 
 
 def _median(values: list[float]) -> float:
