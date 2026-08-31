@@ -18,7 +18,7 @@ from uuid import UUID
 from ..config import settings
 from ..contracts.analysis import AnalysisResult
 from ..contracts.assembly import AssemblyResult, ReviewItem, ReviewReason, Selection
-from ..contracts.base import Provenance, Severity, TimeRange
+from ..contracts.base import Finding, Provenance, Severity, TimeRange
 
 log = logging.getLogger(__name__)
 
@@ -128,7 +128,7 @@ class AssemblyAgent:
             findings=winner.findings,
         )
 
-    def _span_for(self, duration_s: float, findings: list) -> TimeRange | None:
+    def _span_for(self, duration_s: float, findings: list[Finding]) -> TimeRange | None:
         """Where the usable material is.
 
         Starts from the take minus its head and tail, then avoids any timecoded

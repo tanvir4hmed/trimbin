@@ -18,7 +18,7 @@ import logging
 from google import genai
 from google.genai import types
 
-from ..common.errors import AgentFailure
+from ..common.errors import AgentFailure, text_of
 from ..config import settings
 from ..contracts.base import Strict
 from ..contracts.query import Match, Outcome
@@ -96,7 +96,7 @@ class ArchivistAgent:
         except Exception as exc:
             raise AgentFailure(f"could not plan the search: {exc}") from exc
 
-        return SearchPlan.model_validate_json(response.text)
+        return SearchPlan.model_validate_json(text_of(response, "archivist"))
 
     async def explain(
         self,
@@ -130,7 +130,7 @@ class ArchivistAgent:
         except Exception as exc:
             raise AgentFailure(f"could not describe the results: {exc}") from exc
 
-        explanation = _Explanation.model_validate_json(response.text)
+        explanation = _Explanation.model_validate_json(text_of(response, "archivist"))
         return explanation.answer, explanation.suggestion
 
 

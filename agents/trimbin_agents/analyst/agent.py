@@ -25,7 +25,7 @@ from uuid import UUID
 from google import genai
 from google.genai import types
 
-from ..common.errors import AgentFailure
+from ..common.errors import AgentFailure, text_of
 from ..config import settings
 from ..contracts.analysis import (
     AnalysisRequest,
@@ -38,6 +38,7 @@ from ..contracts.base import (
     ClipRef,
     Confidence,
     Finding,
+    FindingCode,
     Provenance,
     ReasonCode,
     Severity,
@@ -175,7 +176,7 @@ class AnalystAgent:
             # should know what it is looking at before it is told what to look
             # for. After the instructions it reads as an afterthought, and a
             # model treats it like one.
-            contents: list = [*parts]
+            contents: list[object] = [*parts]
             if request.briefing:
                 contents.append(request.briefing)
             contents += [prompt, _describe_takes(request)]
@@ -192,7 +193,7 @@ class AnalystAgent:
         except Exception as exc:
             raise AgentFailure(f"specialist failed: {exc}") from exc
 
-        return [SpecialistReport.model_validate(r) for r in _loads(response.text)]
+        return [SpecialistReport.model_validate(r) for r in _loads(text_of(response, "specialist"))]
 
     async def _chief(
         self,
@@ -223,7 +224,7 @@ class AnalystAgent:
         except Exception as exc:
             raise AgentFailure(f"chief failed: {exc}") from exc
 
-        result = AnalysisResult.model_validate_json(response.text)
+        result = AnalysisResult.model_validate_json(text_of(response, "chief"))
 
         # The model supplies judgement and language. Provenance and the specialist
         # reports are ours to attach, so they cannot be paraphrased or dropped.
@@ -284,7 +285,8 @@ class AnalystAgent:
             )
 
         if len(survivors) == 1:
-            final_id, final_margin = survivors[0].clip_id, 1.0
+            final_id: UUID | None = survivors[0].clip_id
+            final_margin = 1.0
             rationale = "Single survivor across heats."
         else:
             final = await self.run(
@@ -379,7 +381,7 @@ def _technical_report(request: AnalysisRequest) -> list[SpecialistReport]:
         if m.motion_rel >= OUTLIER_RATIO:
             findings.append(
                 Finding(
-                    code="stability.outlier",
+                    code=FindingCode.STABILITY_OUTLIER,
                     detail=f"most camera movement in this group, {m.motion_rel:.1f}x the median",
                     severity=Severity.NOTE,
                     where=whole,
@@ -388,7 +390,7 @@ def _technical_report(request: AnalysisRequest) -> list[SpecialistReport]:
         if m.exposure_rel <= 1 / OUTLIER_RATIO:
             findings.append(
                 Finding(
-                    code="exposure.under",
+                    code=FindingCode.EXPOSURE_UNDER,
                     detail=f"darkest take in this group, {m.exposure_rel:.2f} of the median",
                     severity=Severity.NOTE,
                     where=whole,
@@ -399,7 +401,7 @@ def _technical_report(request: AnalysisRequest) -> list[SpecialistReport]:
         if m.exposure_rel >= OUTLIER_RATIO:
             findings.append(
                 Finding(
-                    code="exposure.over",
+                    code=FindingCode.EXPOSURE_OVER,
                     detail=f"brightest take in this group, {m.exposure_rel:.1f}x the median",
                     severity=Severity.ATTENTION,
                     where=whole,
@@ -408,7 +410,7 @@ def _technical_report(request: AnalysisRequest) -> list[SpecialistReport]:
         if m.clipping_pct > 5:
             findings.append(
                 Finding(
-                    code="exposure.clipped",
+                    code=FindingCode.EXPOSURE_CLIPPED,
                     detail=f"{m.clipping_pct:.1f}% of frames clipped",
                     severity=Severity.ATTENTION,
                     where=whole,
@@ -417,7 +419,7 @@ def _technical_report(request: AnalysisRequest) -> list[SpecialistReport]:
         if m.sharpness_rel <= 1 / OUTLIER_RATIO:
             findings.append(
                 Finding(
-                    code="focus.soft",
+                    code=FindingCode.FOCUS_SOFT,
                     detail=f"softest take in this group, {m.sharpness_rel:.2f} of the median",
                     severity=Severity.ATTENTION,
                     where=whole,
@@ -426,7 +428,7 @@ def _technical_report(request: AnalysisRequest) -> list[SpecialistReport]:
         if m.dropped_frames:
             findings.append(
                 Finding(
-                    code="frames.dropped",
+                    code=FindingCode.FRAMES_DROPPED,
                     detail=f"{m.dropped_frames} dropped frames",
                     severity=Severity.BLOCKING,
                     where=whole,
@@ -503,8 +505,8 @@ def _provenance(request: AnalysisRequest) -> Provenance:
     )
 
 
-def _loads(text: str) -> list[dict]:
+def _loads(text: str) -> list[object]:
     import json
 
-    data = json.loads(text)
+    data: object = json.loads(text)
     return data if isinstance(data, list) else [data]

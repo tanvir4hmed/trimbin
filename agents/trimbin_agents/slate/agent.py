@@ -18,7 +18,7 @@ from pathlib import Path
 from google import genai
 from google.genai import types
 
-from ..common.errors import AgentFailure, Unreadable
+from ..common.errors import AgentFailure, Unreadable, text_of
 from ..config import settings
 from ..contracts.base import ClipRef, Confidence
 from ..contracts.slate import (
@@ -128,7 +128,7 @@ class SlateAgent:
         except Exception as exc:
             raise AgentFailure(f"slate read failed: {exc}") from exc
 
-        reading = SlateReading.model_validate_json(response.text)
+        reading = SlateReading.model_validate_json(text_of(response, "slate reader"))
 
         # An empty board is not a failure of the model, it is the absence of a
         # board — and saying so is the whole point of the distinction.
@@ -286,4 +286,4 @@ def _cosine(a: list[float], b: list[float]) -> float:
     nb = sum(y * y for y in b) ** 0.5
     if na == 0 or nb == 0:
         return 0.0
-    return dot / (na * nb)
+    return float(dot / (na * nb))

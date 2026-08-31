@@ -216,7 +216,7 @@ def _rows_from(result: Any, columns: list[str] | None = None) -> list[dict[str, 
         for key in ("columns", "column_names", "meta", "header"):
             if key in content and not columns:
                 raw = content[key]
-                columns = [c.get("name") if isinstance(c, dict) else str(c) for c in raw]
+                columns = [str(c.get("name", "")) if isinstance(c, dict) else str(c) for c in raw]
                 break
 
         for key in ("rows", "data", "result", "records"):
