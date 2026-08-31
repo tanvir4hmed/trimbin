@@ -2006,3 +2006,47 @@ kbd{font-family:var(--mono);font-size:10.5px;background:var(--surface-2);border:
 .cut.shot-3{background:var(--violet)}
 .cut.shot-4{background:var(--rust)}
 .cut.shot-5{background:var(--mid)}
+
+/* ---------- the ingest wizard ---------- */
+
+.stepper{display:flex;gap:0;list-style:none;margin:0 0 20px;padding:0;flex-wrap:wrap}
+.stepper li{display:flex;gap:9px;align-items:center;font-size:12.5px;color:var(--faint);padding-right:26px;position:relative}
+.stepper li:not(:last-child)::after{content:"";position:absolute;right:9px;top:50%;width:14px;height:1px;background:var(--line)}
+.stepper li.on{color:var(--ink)}
+.stepper li.past{color:var(--green)}
+.stepper .sn{width:20px;height:20px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;font-size:11px;flex:none}
+.stepper li.on .sn{border-color:var(--amber);color:var(--amber)}
+.stepper li.past .sn{border-color:var(--green);color:var(--green)}
+
+/* Per file, because "sending" over forty files says nothing about which one is
+   stuck. */
+.file-rows{list-style:none;margin:12px 0 0;padding:0}
+.file-rows li{display:grid;grid-template-columns:1fr 120px 90px;gap:12px;align-items:center;padding:5px 0;font-size:12px;border-bottom:1px solid var(--line-soft)}
+.fr-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fr-state{color:var(--faint);text-align:right}
+.file-rows li.done .fr-state{color:var(--green)}
+.file-rows li.failed .fr-state{color:var(--rust)}
+.pbar.thin{height:3px}
+
+/* ---------- the placement inbox ---------- */
+
+.inbox{margin:18px 0}
+.inbox-row{display:flex;gap:14px;padding:14px;border:1px solid rgba(217,164,65,.4);border-radius:10px;margin-bottom:10px;background:var(--surface)}
+
+/* The board itself. A confidence score is not a substitute for looking at it. */
+.slate-frame{width:190px;height:110px;object-fit:cover;border-radius:7px;background:#000;flex:none}
+.slate-frame.none{display:grid;place-items:center;font-size:11px;color:var(--faint);border:1px dashed var(--line)}
+
+.inbox-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}
+.ir-head{display:flex;gap:9px;align-items:center;flex-wrap:wrap;font-size:12.5px}
+.ir-why{font-size:13px;color:var(--amber)}
+.ir-evidence{display:flex;gap:8px;flex-wrap:wrap}
+.chip-ev{font-size:11px;color:var(--low);background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:3px 8px}
+.chip-ev b{color:var(--ink);font-weight:500}
+.ir-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:3px}
+.ir-actions label{display:flex;gap:6px;align-items:center;font-size:11.5px;color:var(--low)}
+
+.pill{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:20px;border:1px solid var(--line)}
+.pill.warn{color:var(--amber);border-color:rgba(217,164,65,.45)}
+.pill.dup{color:var(--rust);border-color:rgba(196,121,106,.45)}
+.pill.quiet{color:var(--faint)}

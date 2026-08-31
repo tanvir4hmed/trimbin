@@ -50,6 +50,13 @@ class Identity:
     # Which body shot it, when the board says so. Empty is the ordinary answer
     # on a single-camera production and is not a gap.
     camera: str = ""
+
+    # What the board actually said, before parsing. `12A-PU` and `A012C` are
+    # meaningful to the production and cannot survive being turned into two
+    # integers, so the integers sort and join and these are what a person reads.
+    scene_code: str = ""
+    shot_code: str = ""
+
     embedding: list[float] = field(default_factory=list)
 
     @property
@@ -74,6 +81,38 @@ def _client():
         # exist, when it exists and is served elsewhere.
         location=settings.model_location,
     )
+
+
+async def still_from(clip: Path, out_path: Path) -> Path | None:
+    """One frame, for the slate evidence.
+
+    Best-effort. A clip whose head cannot be stilled is still a clip an editor
+    can use, and losing it to a missing thumbnail would be the wrong trade.
+    """
+    import asyncio
+
+    process = await asyncio.create_subprocess_exec(
+        "ffmpeg",
+        "-nostdin",
+        "-y",
+        "-i",
+        str(clip),
+        "-frames:v",
+        "1",
+        "-vf",
+        "scale=-2:360",
+        "-q:v",
+        "4",
+        str(out_path),
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, err = await process.communicate()
+
+    if process.returncode != 0 or not out_path.exists():
+        log.info("no slate still for %s: %s", clip.name, err.decode()[-160:].strip())
+        return None
+    return out_path
 
 
 async def read_slate(source: Path, work: Path, clip_id: UUID, project_id: int) -> Identity:
@@ -118,6 +157,13 @@ async def read_slate(source: Path, work: Path, clip_id: UUID, project_id: int) -
     identity.take_no = result.take_no
     identity.slate_confident = 1 if result.confidence.value == "confident" else 0
     identity.camera = camera_from_slate(result.reading.raw)
+    identity.scene_code = (result.reading.scene or "").strip()[:40]
+    identity.shot_code = (result.reading.shot or "").strip()[:40]
+
+    # One still from the head, kept as the evidence behind the reading. An
+    # editor deciding whether the board or the reader was wrong has to see the
+    # board; a confidence score is not a substitute for looking at it.
+    await still_from(head, work / "slate.jpg")
     log.info(
         "clip %s: board reads %r -> scene %d, shot %d, take %d",
         clip_id,

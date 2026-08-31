@@ -11,12 +11,13 @@ it and a retry re-runs one clip rather than a day.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import tempfile
 from pathlib import Path
 from uuid import UUID
 
-from ..services import clips, identify, jobs, quota, storage
+from ..services import clips, identify, jobs, placements, quota, storage
 from ..services.ffmpeg_ops import UnusableClip, analyse, build_proxy, build_sprite
 
 log = logging.getLogger(__name__)
@@ -33,6 +34,23 @@ class Rejected(Exception):
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
         self.reason = reason
+
+
+def content_hash(source: Path) -> str:
+    """A fingerprint of the bytes, not of the name.
+
+    The same file dragged in twice from two folders has two names, two clip ids
+    and identical content. Nothing noticed, so it became two takes of the same
+    shot and the comparison ranked a clip against itself.
+
+    Read in chunks: a camera original is gigabytes and hashing it whole would
+    hold the file in memory beside the ffmpeg pass already running.
+    """
+    digest = hashlib.sha256()
+    with source.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def place(
@@ -83,6 +101,7 @@ async def process(
     target_scene: int = 0,
     target_shot: int = 0,
     filename: str = "",
+    uploaded_by: str = "",
 ) -> None:
     """One clip, start to finish.
 
@@ -159,6 +178,12 @@ async def process(
                 "clip %s sent to %d/%d but %s", clip_id, target_scene, target_shot, mismatch
             )
 
+        # The same bytes already here under another name.
+        fingerprint = content_hash(source)
+        duplicate_of = await placements.duplicates_of(project_id, fingerprint)
+        if duplicate_of:
+            log.warning("clip %s has the same bytes as %s", clip_id, duplicate_of[0][:8])
+
         # How many takes of this shot are already here.
         #
         # Only knowable now: which shot a clip belongs to is decided just above.
@@ -185,11 +210,20 @@ async def process(
         await build_sprite(source, work / "sprite.jpg", measurements.duration_s)
 
         prefix = f"p{project_id}/{clip_id}"
-        # Only the proxy tree and the sprite. The head clip and the embedding
-        # frames are working files, and uploading them would put unlisted stills
-        # of somebody's footage on a public CDN.
+        # The proxy tree, the sprite, and the frame the slate was read from.
+        # The head clip and the embedding frames stay working files: uploading
+        # them would put unlisted stills of somebody's footage on a public CDN.
         storage.upload_proxy(proxy_dir, f"{prefix}/proxy")
         storage.upload_file(work / "sprite.jpg", f"{prefix}/sprite.jpg")
+
+        # The board itself, as evidence beside the reading. An editor deciding
+        # whether the slate or the reader was wrong needs to see the board, and
+        # a confidence score is not a substitute for looking.
+        slate_url = ""
+        slate_frame = work / "slate.jpg"
+        if slate_frame.exists():
+            storage.upload_file(slate_frame, f"{prefix}/slate.jpg")
+            slate_url = storage.proxy_url(f"{prefix}/slate.jpg")
 
         await clips.write(
             project_id=project_id,
@@ -205,6 +239,33 @@ async def process(
             slate_raw=identity.slate_raw,
             camera=identity.camera,
             embedding=identity.embedding,
+            uploaded_by=uploaded_by,
+            content_hash=fingerprint,
+            slate_uri=slate_url,
+            scene_code=identity.scene_code,
+            shot_code=identity.shot_code,
+        )
+
+        # Where it belongs, as a proposal rather than a decision.
+        #
+        # A disagreement is written `open` and waits for a person. Relocating
+        # footage on a slate reading is the one mistake here that scatters a
+        # shoot day silently and looks like the system working.
+        await placements.record(
+            project_id=project_id,
+            clip_id=clip_id,
+            scene=scene,
+            shot=shot,
+            take_no=identity.take_no,
+            source=placements.SLATE if identity.slate_confident else placements.FOLDER,
+            confidence=1.0 if identity.slate_confident else 0.0,
+            declared_scene=target_scene,
+            declared_shot=target_shot,
+            slate_raw=identity.slate_raw,
+            state=placements.OPEN if (mismatch or duplicate_of) else placements.SETTLED,
+            detail=(
+                mismatch or (f"same content as clip {duplicate_of[0][:8]}" if duplicate_of else "")
+            ),
         )
 
     await jobs.record_placement(
@@ -236,13 +297,22 @@ async def handle_message(attributes: dict[str, str]) -> bool:
     target_scene = int(attributes.get("target_scene", "0") or 0)
     target_shot = int(attributes.get("target_shot", "0") or 0)
     filename = attributes.get("filename", "")
+    uploaded_by = attributes.get("uploaded_by", "")
     # No default. A missing project id used to become 0, which sent the download
     # to a prefix that cannot exist and produced "not found in storage" — a
     # message that blames the upload for a fault in the queue.
     project_id = int(attributes["project_id"])
 
     try:
-        await process(job_id, clip_id, project_id, target_scene, target_shot, filename)
+        await process(
+            job_id,
+            clip_id,
+            project_id,
+            target_scene,
+            target_shot,
+            filename,
+            uploaded_by,
+        )
         await jobs.record_progress(job_id, clip_id, ok=True)
         return True
 

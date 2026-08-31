@@ -19,6 +19,7 @@ from .routes import (
     ask,
     dashboard,
     maintenance,
+    placements,
     projects,
     public,
     review,
@@ -79,6 +80,7 @@ app.include_router(uploads.router)
 app.include_router(review.router)
 app.include_router(scenes.router)
 app.include_router(screens.router)
+app.include_router(placements.router)
 app.include_router(structure.router)
 app.include_router(projects.router)
 app.include_router(maintenance.router)

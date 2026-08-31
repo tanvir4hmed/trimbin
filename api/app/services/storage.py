@@ -88,6 +88,48 @@ def proxy_url(object_path: str) -> str:
     return f"/media/{object_path}"
 
 
+async def signed_resumable_url(
+    object_path: str,
+    ttl: timedelta,
+    max_bytes: int,
+) -> tuple[str, dict[str, str]]:
+    """A URL the browser POSTs once to start a resumable session.
+
+    The single-shot PUT it replaces had two problems on a real shoot day. A
+    connection that dropped at ninety per cent of a four-gigabyte file started
+    that file again from zero, and a refresh mid-batch lost everything not yet
+    finished — which is most of it, because the browser was uploading one file
+    at a time.
+
+    A resumable session gives the browser a session URI it can hold: it asks
+    Cloud Storage how many bytes arrived and continues from there. The session
+    outlives the page, so a refresh resumes rather than restarts.
+
+    The signature covers the start of the session only. Once Cloud Storage
+    issues a session URI, that URI is the capability — which is why it is
+    scoped to one object and expires with the session rather than with our URL.
+    """
+    required = {
+        "Content-Type": "application/octet-stream",
+        "x-goog-resumable": "start",
+        "x-goog-content-length-range": f"0,{max_bytes}",
+    }
+
+    blob = client().bucket(settings.originals_bucket).blob(object_path)
+    url = blob.generate_signed_url(
+        version="v4",
+        expiration=ttl,
+        method="POST",
+        content_type="application/octet-stream",
+        headers={
+            "x-goog-resumable": "start",
+            "x-goog-content-length-range": f"0,{max_bytes}",
+        },
+        **_signer(),
+    )
+    return url, required
+
+
 async def signed_upload_url(
     object_path: str,
     ttl: timedelta,

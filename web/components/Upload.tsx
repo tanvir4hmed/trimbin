@@ -1,42 +1,48 @@
 "use client";
 
 /**
- * Drop a shoot folder, watch it land, confirm only what had to be guessed.
+ * Add files → read slates → verify matches → ingest.
  *
- * Three things this has to get right, and the previous version got none of them:
+ * Four steps because that is what actually happens, and because the third one
+ * needs a person. The system reads every board it can, and a clip whose board
+ * disagrees with the folder it came from is exactly the file somebody dragged
+ * from the wrong place — worth catching now rather than in the cut.
  *
- * A **destination**. Footage goes into a scene and a shot, and an editor who
- * already has a shot list should be able to say which. Reading it off the slate
- * stays the default.
- *
- * A **cross-check**. A clip sent to 12C whose slate reads 15B is usually a file
- * from the wrong folder. It is kept where it was sent and flagged, because
- * moving somebody's footage on a slate reading is how a shoot day scatters.
- *
- * **Live progress**. The last version told you nothing until you reloaded, and
- * often not then.
+ * Nothing moves or deletes without confirmation, which is why the verify step is
+ * a step rather than a toast.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import PlacementInbox from "@/components/PlacementInbox";
 import type { JobStatus, PlannedScene } from "@/lib/api";
 import { ApiError, api } from "@/lib/api";
+import { type Progress, uploadAll } from "@/lib/upload";
 
-type Phase = "choosing" | "uploading" | "processing" | "done" | "failed";
+type Step = "files" | "sending" | "reading" | "done";
+
+const STEPS: { key: Step; n: number; label: string }[] = [
+  { key: "files", n: 1, label: "Add files" },
+  { key: "sending", n: 2, label: "Send" },
+  { key: "reading", n: 3, label: "Read slates" },
+  { key: "done", n: 4, label: "Verify & ingest" },
+];
 
 export default function Upload({
   projectId,
   plan,
+  canResolve = true,
   onFinished,
 }: {
   projectId: number;
   plan: PlannedScene[];
+  canResolve?: boolean;
   onFinished?: () => void;
 }) {
   const [files, setFiles] = useState<File[]>([]);
   const [scene, setScene] = useState(0);
   const [shot, setShot] = useState(0);
-  const [phase, setPhase] = useState<Phase>("choosing");
-  const [sent, setSent] = useState(0);
+  const [step, setStep] = useState<Step>("files");
+  const [rows, setRows] = useState<Progress[]>([]);
   const [jobId, setJobId] = useState<string | null>(null);
   const [status, setStatus] = useState<JobStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,66 +51,36 @@ export default function Upload({
 
   const shots = plan.find((s) => s.scene === scene)?.shots ?? [];
 
-  const accept = (list: FileList | null) => {
-    setFiles(Array.from(list ?? []));
-    setError(null);
-  };
-
   const start = useCallback(async () => {
     if (files.length === 0) return;
-    setPhase("uploading");
+    setStep("sending");
     setError(null);
 
     try {
-      const target = scene && shot ? { scene, shot } : undefined;
       const grant = await api.grantUpload(
         projectId,
         files.map((f) => f.name),
-        target,
+        scene && shot ? { scene, shot } : scene ? { scene, shot: 0 } : undefined,
       );
 
-      const arrived: string[] = [];
-      const names: Record<string, string> = {};
-
-      // One at a time. A shoot folder is large files on an office connection,
-      // and six in parallel makes all six slow and the progress meaningless.
-      for (const ticket of grant.tickets) {
-        const file = files.find((f) => f.name === ticket.filename);
-        if (!file) continue;
-        try {
-          const response = await fetch(ticket.upload_url, {
-            method: "PUT",
-            headers: ticket.headers,
-            body: file,
-          });
-          if (response.ok) {
-            arrived.push(ticket.clip_id);
-            names[ticket.clip_id] = ticket.filename;
-          }
-        } catch {
-          // Left out of `arrived`, so the API is never told a file is there
-          // when it is not.
-        }
-        setSent((n) => n + 1);
-      }
-
+      const { arrived, names } = await uploadAll(grant.tickets, files, setRows);
       const result = await api.completeUpload(grant.job_id, arrived, names);
-      setJobId(grant.job_id);
-      setPhase("processing");
 
+      setJobId(grant.job_id);
+      setStep("reading");
       if (Number(result.missing) > 0) {
         setError(`${result.missing} file(s) did not reach storage.`);
       }
     } catch (e) {
-      setPhase("failed");
+      setStep("files");
       setError(e instanceof ApiError ? e.message : "Upload could not start.");
     }
   }, [files, projectId, scene, shot]);
 
-  // Poll while the workers run. The editor closed the tab or did not; either
-  // way the screen has to say where things are without being reloaded.
+  // Poll while the workers run. An editor who walked away comes back to this
+  // screen; it has to say where things are without being reloaded.
   useEffect(() => {
-    if (phase !== "processing" || !jobId) return;
+    if (step !== "reading" || !jobId) return;
     let live = true;
 
     const tick = async () => {
@@ -113,7 +89,7 @@ export default function Upload({
         if (!live) return;
         setStatus(found);
         if (found.done) {
-          setPhase("done");
+          setStep("done");
           onFinished?.();
           return;
         }
@@ -127,21 +103,38 @@ export default function Upload({
     return () => {
       live = false;
     };
-  }, [phase, jobId, onFinished]);
+  }, [step, jobId, onFinished]);
 
   const reset = () => {
-    setPhase("choosing");
+    setStep("files");
     setFiles([]);
-    setSent(0);
+    setRows([]);
     setStatus(null);
     setJobId(null);
     setError(null);
     if (input.current) input.current.value = "";
   };
 
+  const sent = rows.filter((r) => r.state === "done").length;
+  const bytesSent = rows.reduce((n, r) => n + r.sent, 0);
+  const bytesTotal = rows.reduce((n, r) => n + r.total, 0);
+  const activeStep = STEPS.findIndex((s) => s.key === step);
+
   return (
     <section className="upload">
-      {phase === "choosing" && (
+      <ol className="stepper">
+        {STEPS.map((s, i) => (
+          <li
+            key={s.key}
+            className={i === activeStep ? "on" : i < activeStep ? "past" : ""}
+          >
+            <span className="sn">{i < activeStep ? "✓" : s.n}</span>
+            {s.label}
+          </li>
+        ))}
+      </ol>
+
+      {step === "files" && (
         <>
           <div className="target">
             <label>
@@ -180,8 +173,10 @@ export default function Upload({
 
             <span className="hint small">
               {scene && shot
-                ? "Clips whose slate says otherwise will be flagged, not moved."
-                : "Slates decide where each clip goes."}
+                ? "Clips whose slate says otherwise are flagged, not moved."
+                : scene
+                  ? "This scene; the slates sort the shots inside it."
+                  : "Slates decide where each clip goes."}
             </span>
           </div>
 
@@ -195,7 +190,7 @@ export default function Upload({
             onDrop={(e) => {
               e.preventDefault();
               setDragging(false);
-              accept(e.dataTransfer.files);
+              setFiles(Array.from(e.dataTransfer.files));
             }}
             onClick={() => input.current?.click()}
             role="button"
@@ -212,7 +207,7 @@ export default function Upload({
               multiple
               hidden
               accept=".mov,.mp4,.mxf,.m4v,.avi,.mkv,.braw,.r3d"
-              onChange={(e) => accept(e.target.files)}
+              onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
             />
           </div>
 
@@ -232,44 +227,69 @@ export default function Upload({
         </>
       )}
 
-      {phase === "uploading" && (
-        <div className="ustat">
-          <span>
-            <b>{sent}</b> of {files.length} uploaded
-          </span>
-          <div className="pbar">
-            <i style={{ width: `${(sent / files.length) * 100}%` }} />
+      {step === "sending" && (
+        <>
+          <div className="ustat">
+            <span>
+              <b>{sent}</b> of {rows.length} sent
+            </span>
+            <div className="pbar">
+              <i style={{ width: `${bytesTotal ? (bytesSent / bytesTotal) * 100 : 0}%` }} />
+            </div>
+            <span className="mono small">
+              {(bytesSent / 1024 ** 3).toFixed(2)} / {(bytesTotal / 1024 ** 3).toFixed(2)} GB
+            </span>
           </div>
-          <span className="mono small">Keep this tab open.</span>
-        </div>
+
+          {/* Per file, because "sending" over forty files says nothing about
+              which one is stuck. */}
+          <ul className="file-rows">
+            {rows.map((r) => (
+              <li key={r.clipId} className={r.state}>
+                <span className="fr-name mono">{r.filename}</span>
+                <span className="pbar thin">
+                  <i style={{ width: `${r.total ? (r.sent / r.total) * 100 : 0}%` }} />
+                </span>
+                <span className="fr-state">
+                  {r.state === "failed" ? (r.error ?? "failed") : r.state}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          <p className="hint small">
+            Interrupted uploads resume. Closing this tab does not lose what has
+            already been sent.
+          </p>
+        </>
       )}
 
-      {(phase === "processing" || phase === "done") && status && (
+      {(step === "reading" || step === "done") && (
         <>
           <div className="ustat">
             <span>
               <b>
-                {status.completed + status.failed} of {status.total}
+                {(status?.completed ?? 0) + (status?.failed ?? 0)} of {status?.total ?? 0}
               </b>{" "}
-              {status.done ? "processed" : "· measuring, reading slates, building proxies"}
+              {step === "done"
+                ? "processed"
+                : "· measuring, reading slates, building proxies"}
             </span>
             <div className="pbar">
               <i
                 style={{
                   width: `${
-                    status.total
+                    status?.total
                       ? ((status.completed + status.failed) / status.total) * 100
                       : 0
                   }%`,
                 }}
               />
             </div>
-            <span className="mono small">
-              {status.done ? "done" : `${Math.round(((status.completed + status.failed) / Math.max(status.total, 1)) * 100)}%`}
-            </span>
+            <span className="mono small">{step === "done" ? "done" : "working"}</span>
           </div>
 
-          {status.groups.length > 0 && (
+          {status && status.groups.length > 0 && (
             <>
               <div className="sect">
                 {status.needs_a_look === 0
@@ -282,16 +302,7 @@ export default function Upload({
                   key={`${g.scene}-${g.shot}`}
                   className={g.status === "clean" ? "grp" : "grp amber"}
                 >
-                  <div
-                    className="gicon"
-                    style={
-                      g.status === "clean"
-                        ? undefined
-                        : { background: "var(--amber-soft)", color: "var(--amber)" }
-                    }
-                  >
-                    {g.status === "clean" ? "✓" : "!"}
-                  </div>
+                  <div className="gicon">{g.status === "clean" ? "✓" : "!"}</div>
                   <div className="gmain">
                     <div className="gt">
                       Scene {g.scene} · Shot {g.shot} — {g.takes} take
@@ -304,11 +315,6 @@ export default function Upload({
                           ? `${g.unread_slates} slate(s) could not be read`
                           : "Slate read cleanly"}
                     </div>
-                    {g.mismatches.map((m, i) => (
-                      <div key={i} className="gmis">
-                        <span className="mono">{m.filename || "clip"}</span> — {m.detail}
-                      </div>
-                    ))}
                   </div>
                   <span className="scount">{g.takes}</span>
                 </div>
@@ -316,7 +322,7 @@ export default function Upload({
             </>
           )}
 
-          {status.failures.length > 0 && (
+          {status && status.failures.length > 0 && (
             <div className="fail">
               <span>
                 <b>
@@ -333,23 +339,24 @@ export default function Upload({
             </div>
           )}
 
-          {phase === "done" && (
+          {/* The verify step. Rows appear as the workers land clips, so this is
+              here during processing too rather than only at the end. */}
+          <PlacementInbox projectId={projectId} plan={plan} canResolve={canResolve} />
+
+          {step === "done" && (
             <div className="actions">
               <button type="button" className="primary" onClick={reset}>
                 Upload more
               </button>
             </div>
           )}
-          {phase === "processing" && (
+          {step === "reading" && (
             <p className="hint small">
-              You can close this. Work continues and the project updates when it lands.
+              You can close this. Work carries on and the project updates when it
+              lands.
             </p>
           )}
         </>
-      )}
-
-      {phase === "processing" && !status && (
-        <p className="waiting">Queued.</p>
       )}
 
       {error && <p className="error small">{error}</p>}

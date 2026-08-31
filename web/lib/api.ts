@@ -99,6 +99,30 @@ export interface QueueItem {
   open_comments: number;
 }
 
+/** @unverified — /placements has no response model yet. */
+export interface PlacementRow {
+  clip_id: string;
+  scene: number;
+  shot: number;
+  take_no: number;
+  source: string;
+  actor: string;
+  confidence: number;
+  state: string;
+  slate_raw: string;
+  declared_scene: number;
+  declared_shot: number;
+  detail: string;
+  decided_at: string | null;
+  proxy_uri: string;
+  sprite_uri: string;
+  /** The frame the board was read from. The evidence, not a score. */
+  slate_uri: string;
+  duration_s: number;
+  camera: string;
+  filename: string;
+}
+
 /** @unverified */
 export interface Activity {
   project_id: number;
@@ -630,6 +654,23 @@ export const api = {
 
   /** The scenes and shots somebody declared, before any footage exists. */
   plan: (projectId: number) => request<Plan>(`/structure/${projectId}`),
+
+  /** Clips whose placement nobody has agreed with, with the evidence. */
+  placementInbox: (projectId: number) =>
+    request<{ project_id: number; waiting: PlacementRow[]; count: number }>(
+      `/placements/${projectId}`,
+    ),
+
+  /** Settle one. Move, keep where it is, or park it — never automatic. */
+  resolvePlacement: (
+    projectId: number,
+    clipId: string,
+    body: { action: "move" | "keep" | "unassign"; scene?: number; shot?: number; note?: string },
+  ) =>
+    request<{ status: string; scene: number; shot: number; detail: string }>(
+      `/placements/${projectId}/${clipId}`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
 
   /** Who did what on one production, newest first. */
   activity: (projectId: number) =>

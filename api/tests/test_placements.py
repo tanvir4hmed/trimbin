@@ -1,0 +1,211 @@
+"""Settling where a clip belongs.
+
+`clips.group_id` and `clips.subgroup_id` are in the table's sort key, so moving a
+misplaced clip cannot be an ordinary update. Placement therefore moved off the
+clip into an append-only table, and moving became an insert.
+
+What is worth testing is not the insert. It is that nothing here moves anything
+on its own, that "keep" cannot quietly become a move, and that the vocabulary
+stays closed.
+"""
+
+from __future__ import annotations
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.main import app
+from app.routes import placements as routes
+from app.services import placements
+
+
+@pytest.fixture
+def client() -> TestClient:
+    return TestClient(app)
+
+
+class TestTheVocabularyIsClosed:
+    """A free-text source column becomes six spellings of "slate" within a
+    fortnight, and then nothing can be counted."""
+
+    def test_every_source_is_named(self) -> None:
+        assert {
+            placements.SLATE,
+            placements.FOLDER,
+            placements.TIMECODE,
+            placements.FILENAME,
+            placements.HUMAN,
+        } == {"slate", "folder", "timecode", "filename", "human"}
+
+    def test_every_state_is_named(self) -> None:
+        assert {placements.OPEN, placements.SETTLED, placements.IGNORED} == {
+            "open",
+            "settled",
+            "ignored",
+        }
+
+
+class TestTheActionsAreClosed:
+    """Three things a person can say, and no fourth."""
+
+    def test_only_three_actions_are_accepted(self) -> None:
+        for action in ("move", "keep", "unassign"):
+            routes.Resolution(action=action, scene=12, shot=3)
+
+    def test_anything_else_is_refused(self) -> None:
+        from pydantic import ValidationError
+
+        for bad in ("delete", "MOVE", "", "drop", "merge"):
+            with pytest.raises(ValidationError):
+                routes.Resolution(action=bad)
+
+    def test_there_is_no_delete(self) -> None:
+        """The one action deliberately absent. An editor who uploaded a file
+        twice on purpose is doing something we have no standing to undo, and a
+        misplaced clip is misplaced, not unwanted."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            routes.Resolution(action="delete")
+
+
+class TestMovingNeedsADestination:
+    @pytest.mark.asyncio
+    async def test_a_move_without_a_scene_is_refused(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Scene zero is where the interface shows a clip as ungrouped. A move
+        that quietly meant "unassign" would look like it worked and lose the
+        clip out of the tree."""
+        from fastapi import HTTPException
+
+        from app.auth import Principal
+
+        async def allowed(self, project_id):
+            return None
+
+        monkeypatch.setattr(Principal, "assert_can_curate", allowed)
+
+        with pytest.raises(HTTPException) as raised:
+            await routes.resolve(
+                1,
+                __import__("uuid").uuid4(),
+                routes.Resolution(action="move", scene=0, shot=0),
+                Principal(email="editor@example.com"),
+            )
+        assert raised.value.status_code == 400
+
+
+class TestKeepCannotBecomeAMove:
+    """The subtle one.
+
+    "Keep where it is" reads its numbers from the current placement rather than
+    from the request. A stale page holding last week's scene and shot would
+    otherwise send them, and pressing a button labelled *keep* would move the
+    clip somewhere else.
+    """
+
+    @pytest.mark.asyncio
+    async def test_keep_ignores_the_numbers_in_the_request(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import uuid
+
+        from app.auth import Principal
+
+        clip = uuid.uuid4()
+        recorded: dict = {}
+
+        async def allowed(self, project_id):
+            return None
+
+        async def inbox(project_id):
+            return [{"clip_id": str(clip), "scene": 12, "shot": 3}]
+
+        async def resolve(project_id, clip_id, scene, shot, actor, detail=""):
+            recorded.update(scene=scene, shot=shot)
+
+        async def noted(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(Principal, "assert_can_curate", allowed)
+        monkeypatch.setattr(routes.placements, "inbox", inbox)
+        monkeypatch.setattr(routes.placements, "resolve", resolve)
+        monkeypatch.setattr(routes.activity, "record", noted)
+
+        await routes.resolve(
+            1,
+            clip,
+            # A stale page, insisting on somewhere else entirely.
+            routes.Resolution(action="keep", scene=99, shot=99),
+            Principal(email="editor@example.com"),
+        )
+        assert recorded == {"scene": 12, "shot": 3}
+
+    @pytest.mark.asyncio
+    async def test_keeping_something_already_settled_is_a_conflict(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Somebody else got there first. Writing another placement would bury
+        their decision under one made from a stale screen."""
+        import uuid
+
+        from fastapi import HTTPException
+
+        from app.auth import Principal
+
+        async def allowed(self, project_id):
+            return None
+
+        async def empty(project_id):
+            return []
+
+        monkeypatch.setattr(Principal, "assert_can_curate", allowed)
+        monkeypatch.setattr(routes.placements, "inbox", empty)
+
+        with pytest.raises(HTTPException) as raised:
+            await routes.resolve(
+                1,
+                uuid.uuid4(),
+                routes.Resolution(action="keep"),
+                Principal(email="editor@example.com"),
+            )
+        assert raised.value.status_code == 409
+
+
+class TestDuplicateDetection:
+    @pytest.mark.asyncio
+    async def test_no_hash_means_no_lookup(self) -> None:
+        """A clip whose bytes could not be hashed is not a duplicate of
+        everything else that could not be hashed."""
+        assert await placements.duplicates_of(1, "") == []
+
+
+class TestContentHashing:
+    def test_the_same_bytes_hash_the_same(self, tmp_path) -> None:
+        """The point: the same file dragged in from two folders has two names
+        and identical content. Nothing noticed, so it became two takes of one
+        shot and the comparison ranked a clip against itself."""
+        from app.worker.ingest import content_hash
+
+        a = tmp_path / "A001.mov"
+        b = tmp_path / "copy of A001.mov"
+        a.write_bytes(b"\x00\x01\x02" * 5000)
+        b.write_bytes(b"\x00\x01\x02" * 5000)
+        assert content_hash(a) == content_hash(b)
+
+    def test_different_bytes_hash_differently(self, tmp_path) -> None:
+        from app.worker.ingest import content_hash
+
+        a = tmp_path / "a.mov"
+        b = tmp_path / "b.mov"
+        a.write_bytes(b"\x00" * 5000)
+        b.write_bytes(b"\x01" * 5000)
+        assert content_hash(a) != content_hash(b)
+
+    def test_a_large_file_is_read_in_chunks(self, tmp_path) -> None:
+        """A camera original is gigabytes. Hashing it whole would hold the file
+        in memory beside the ffmpeg pass already running."""
+        from app.worker.ingest import content_hash
+
+        big = tmp_path / "big.mov"
+        big.write_bytes(b"x" * (3 * 1024 * 1024))
+        assert len(content_hash(big)) == 64

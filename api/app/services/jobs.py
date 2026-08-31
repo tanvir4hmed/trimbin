@@ -335,6 +335,7 @@ async def enqueue_ingest(
     filenames: dict[str, str] | None = None,
     target_scene: int = 0,
     target_shot: int = 0,
+    uploaded_by: str = "",
 ) -> None:
     """One message per clip.
 
@@ -361,6 +362,9 @@ async def enqueue_ingest(
             target_scene=str(target_scene),
             target_shot=str(target_shot),
             filename=(filenames or {}).get(str(clip_id), "")[:180],
+            # So the clip row can say who put it here. It has been written as an
+            # empty string since the first week.
+            uploaded_by=uploaded_by[:120],
         )
 
     log.info("queued %d clips for job %s, project %d", len(clip_ids), job_id, project_id)

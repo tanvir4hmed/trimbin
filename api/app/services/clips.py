@@ -45,6 +45,11 @@ async def write(
     camera: str = "",
     description: str = "",
     embedding: list[float] | None = None,
+    uploaded_by: str = "",
+    content_hash: str = "",
+    slate_uri: str = "",
+    scene_code: str = "",
+    shot_code: str = "",
 ) -> None:
     """Insert one clip.
 
@@ -68,7 +73,9 @@ async def write(
                 clip_id,
                 _captured_at(measurements),
                 datetime.now(UTC),
-                "",
+                # Who put it here. Written as an empty string since the first
+                # week, so the archive could not answer "who uploaded this".
+                uploaded_by,
                 f"gs://{object_path}",
                 proxy_uri,
                 sprite_uri,
@@ -101,6 +108,17 @@ async def write(
                 # here rather than a gap — "everything on the B camera" is a
                 # question you can only ask of a production that had a B camera.
                 camera,
+                # What the file said about itself. The frame rate has been
+                # measured on every clip since the first week and thrown away
+                # immediately, so every EDL declared a rate the caller typed.
+                round(measurements.fps, 3),
+                content_hash,
+                slate_uri,
+                # What the production calls them. The integers sort and join;
+                # they cannot hold `12A-PU`, and a production that labels a
+                # pickup that way means something by it.
+                scene_code,
+                shot_code,
             ]
         ],
         column_names=[
@@ -113,6 +131,11 @@ async def write(
             "finding_starts_s",
             "finding_ends_s",
             "camera",
+            "fps",
+            "content_hash",
+            "slate_uri",
+            "scene_code",
+            "shot_code",
         ],
     )
     log.info("clip %s written to project %d", clip_id, project_id)

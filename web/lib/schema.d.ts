@@ -850,6 +850,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/placements/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Inbox
+         * @description Everything waiting on a person, with the evidence to decide on.
+         *
+         *     The slate frame comes back with each row. An editor working out whether the
+         *     board or the reader was wrong has to see the board — a confidence score is
+         *     not a substitute for looking at it.
+         */
+        get: operations["inbox_placements__project_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/placements/{project_id}/{clip_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve
+         * @description Settle one clip.
+         *
+         *     For the editors who own the production. A guest may read the inbox and
+         *     comment on any shot; moving footage between shots is a change to where
+         *     somebody else's material lives.
+         */
+        post: operations["resolve_placements__project_id___clip_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/structure/{project_id}": {
         parameters: {
             query?: never;
@@ -1471,6 +1519,34 @@ export interface components {
         Question: {
             /** Question */
             question: string;
+        };
+        /**
+         * Resolution
+         * @description What an editor decided about one misplaced clip.
+         *
+         *     `move` and `keep` differ only in which numbers they carry, and both are
+         *     written the same way — as a new placement by a named person. An editor
+         *     agreeing with the machine is evidence, and a system that records only
+         *     disagreements cannot tell a checked decision from an unexamined one.
+         */
+        Resolution: {
+            /** Action */
+            action: string;
+            /**
+             * Scene
+             * @default 0
+             */
+            scene: number;
+            /**
+             * Shot
+             * @default 0
+             */
+            shot: number;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
         };
         /** SceneNode */
         SceneNode: {
@@ -2859,6 +2935,77 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ShotScreen"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    inbox_placements__project_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_placements__project_id___clip_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                clip_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Resolution"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

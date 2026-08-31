@@ -73,14 +73,14 @@ fi
 
 echo -n "Verifying… "
 count=$(curl --silent --fail --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}" \
-    --data-binary "SELECT count() FROM system.tables WHERE database = currentDatabase() AND name IN ('clips','decisions','comments','supersessions','current_selection','mv_current_selection','review_queue','accuracy_summary','real_clips','real_decisions','real_comments','accuracy_by_project','project_corpus','shoot_days','activity','real_activity')" \
+    --data-binary "SELECT count() FROM system.tables WHERE database = currentDatabase() AND name IN ('clips','decisions','comments','supersessions','current_selection','mv_current_selection','review_queue','accuracy_summary','real_clips','real_decisions','real_comments','accuracy_by_project','project_corpus','shoot_days','activity','real_activity','placements','current_placement','placement_inbox','real_placements')" \
     "${CLICKHOUSE_URL}/")
 
-if [[ "$count" -ne 16 ]]; then
-    echo "expected 16 objects, found ${count}" >&2
+if [[ "$count" -ne 20 ]]; then
+    echo "expected 20 objects, found ${count}" >&2
     exit 1
 fi
-echo "${count}/16 objects present."
+echo "${count}/20 objects present."
 
 # Indexes, not only tables.
 #
@@ -95,6 +95,14 @@ if [[ "$indexes" -ne 3 ]]; then
     exit 1
 fi
 echo "3/3 present."
+
+echo -n "Ingest columns... "
+ingest_cols=$(curl --silent --fail --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}"     --data-binary "SELECT count() FROM system.columns WHERE database = currentDatabase() AND table = 'clips' AND name IN ('fps','content_hash','slate_uri','scene_code','shot_code')"     "${CLICKHOUSE_URL}/")
+if [[ "$ingest_cols" -ne 5 ]]; then
+    echo "expected 5, found ${ingest_cols} - exports would guess the frame rate again" >&2
+    exit 1
+fi
+echo "5/5 present."
 
 echo -n "Camera column... "
 camera=$(curl --silent --fail --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}" \

@@ -44,6 +44,7 @@ VERBS = (
     "assigned",
     "set_state",
     "planned",
+    "placed",
 )
 
 

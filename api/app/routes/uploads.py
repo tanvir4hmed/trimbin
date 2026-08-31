@@ -59,6 +59,8 @@ class UploadRequest(BaseModel):
 class UploadTicket(BaseModel):
     clip_id: UUID
     filename: str
+    # POST here once to open a resumable session; Cloud Storage answers with a
+    # session URI the browser holds and can continue against after a refresh.
     upload_url: str
     storage_uri: str
     # Part of the signature, not advice. Cloud Storage refuses a PUT that omits
@@ -125,7 +127,7 @@ async def grant_upload(
             safe = _SAFE_NAME.sub("_", filename)[-120:]
             object_path = f"p{request.project_id}/{clip_id}/{safe}"
 
-            url, headers = await storage.signed_upload_url(
+            url, headers = await storage.signed_resumable_url(
                 object_path,
                 ttl=SIGNED_URL_TTL,
                 # A byte cap is the only limit enforceable before anything
@@ -201,6 +203,7 @@ async def complete_upload(
             filenames=body.filenames_by_clip or {},
             target_scene=job.target_scene,
             target_shot=job.target_shot,
+            uploaded_by=principal.email or "",
         )
 
     await activity.record(
