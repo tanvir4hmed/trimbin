@@ -1,220 +1,141 @@
 /**
- * The API surface, typed once.
+ * The API surface.
  *
- * Mirrors the Python contracts deliberately rather than generating from them.
- * A generated client would drift silently when a field is renamed on one side;
- * a hand-written one fails to compile, which is the failure mode you want at a
- * boundary two languages meet.
+ * Every type here is derived from `schema.d.ts`, which is generated from the
+ * API's own OpenAPI schema by `tools/generate-types.sh`. Nothing in this file
+ * describes a shape; it only names them and wraps fetch.
+ *
+ * It used to declare thirty-three interfaces by hand, mirroring the Python by
+ * eye, with a comment claiming a hand-written client "fails to compile" when a
+ * field is renamed. It does not — it compiles perfectly against a description
+ * that is no longer true. `/projects/{id}` omitted `member_emails` for an
+ * anonymous caller while the type declared it required, and every signed-out
+ * visitor to the workspace got a client-side exception on a page the server had
+ * answered 200.
+ *
+ * Now a renamed Python field regenerates the schema and breaks the web build,
+ * which is what the original comment was aiming at.
  *
  * The vocabulary is scene → shot → take throughout. A *shot* is one camera
- * position — 12A the wide, 12B her close-up — and a *take* is one attempt at
- * it. The word used to be "setup", which is a real word on set for the same
- * object but not the one anybody says afterwards.
+ * position — 12A the wide, 12B her close-up — and a *take* is one attempt at it.
  */
 
 import { currentToken } from "./auth";
+import type { components } from "./schema";
 
-/**
- * How bad a finding is — and the empty string, which is not a level.
- *
- * Rows written before severity was stored carry no level. That is a fourth
- * state and the interface keeps it distinct: a finding drawn as "attention"
- * because nothing was recorded looks exactly like one a panel judged, and the
- * whole argument of this system is that a judgement is either made or absent.
- */
-export type Severity = "note" | "attention" | "blocking" | "";
+type S = components["schemas"];
 
-export type Role = "lead" | "editor" | "guest";
+// -- generated ---------------------------------------------------------------
 
-export interface TimeRange {
-  start_s: number;
-  end_s: number;
+export type Me = S["Me"];
+export type Limits = S["Limits"];
+export type Project = S["Project"];
+export type Tree = S["Tree"];
+export type SceneNode = S["SceneNode"];
+export type ShotNode = S["ShotNode"];
+export type Take = S["Take"];
+export type Finding = S["Finding"];
+export type TimeRange = S["TimeRange"];
+export type Verdicts = S["Verdicts"];
+export type Brief = S["Brief"];
+export type Comment = S["Comment"];
+export type Plan = S["Plan"];
+export type PlannedScene = S["PlannedScene"];
+export type PlannedShot = S["PlannedShot"];
+export type ProjectScreen = S["ProjectScreen"];
+export type ShotScreen = S["ShotScreen"];
+
+// Read off the generated shapes rather than restated. These three are closed
+// sets on the server; writing them out again here is how the interface ends up
+// styling five of six statuses and rendering the sixth as an invisible dot.
+export type Role = S["Me"]["role"];
+export type ShotState = S["ShotNode"]["state"];
+export type ShotStatus = S["ShotNode"]["status"];
+
+// -- not yet generated -------------------------------------------------------
+//
+// These endpoints still return a bare dict, so the schema has nothing to say
+// about them. Each one is a response model waiting to be written; until then
+// the shape below is a description rather than a contract, and is marked so
+// nobody mistakes it for one.
+
+/** @unverified — /dashboard has no response model yet. */
+export interface Dashboard {
+  you: string | null;
+  role: Role;
+  queue: QueueItem[];
+  queue_total: number;
+  totals: { waiting: number; yours: number; unassigned: number; projects: number };
+  projects: (Project & {
+    members: number;
+    scenes: number;
+    shots: number;
+    takes: number;
+    settled: number;
+    waiting: number;
+    progress_pct: number | null;
+  })[];
+  recent: RecentDecision[];
+  notes: RecentNote[];
+  activity: Activity[];
+  limits: Limits;
 }
 
-/**
- * An observation about a clip, anchored in time where possible.
- *
- * `where` is what makes a finding clickable. Without it the reader is told
- * something is wrong and left to search a thirty-second take for it, which is
- * the difference between a note and a destination.
- */
-export interface Finding {
-  code: string;
-  /** 0-0 means the finding applies to the whole take rather than a moment. */
-  start_s: number;
-  end_s: number;
-  detail?: string;
-  severity?: Severity;
-  /** Whether ffmpeg measured this or a specialist observed it. */
-  source?: "measured" | "observed";
-}
 
-/**
- * One take, as the archive returns it.
- *
- * `criteria` is a map rather than fixed fields because the axis list will grow —
- * continuity is one axis today and will probably become several — and a typed
- * record per axis means a schema change on both sides for each new one.
- */
-export interface Take {
-  clip_id: string;
-  take_no: number;
-  outcome: "selected" | "runner_up" | "not_selected" | "unusable";
-  score: number;
+/** @unverified */
+export interface QueueItem {
+  project_id: number;
+  project_name: string;
+  scene: number;
+  shot: number;
+  slug: string;
+  takes: number;
   margin: number;
   reason: string;
-  reason_code: string;
-  findings: Finding[];
-  criteria: Record<string, number>;
-  /** Every usable stretch. A take with a fault in the middle has two. */
-  safe_ranges: TimeRange[];
-  /** Codes that removed time, so a trim is never a mystery. */
-  trim_reasons: string[];
-  /** The single span an assembly would use. */
-  usable_from_s: number;
-  usable_to_s: number;
-  duration_s: number;
-  proxy_uri: string;
-  sprite_uri: string;
-  decided_by: "agent" | "human";
-  actor: string;
-  model_id: string;
-  prompt_version: string;
-  panel_convened: boolean;
-  decided_at: string | null;
-  camera: string;
-  captured_at: string | null;
-}
-
-export interface Verdicts {
-  project_id: number;
-  scene: number;
-  shot: number;
-  takes: Take[];
-  recommended: string | null;
-  /** What the room preferred on the day. Never shown to the panel. */
-  circled_take: number;
-  circled_by: string;
-  differs_from_circle: boolean;
   assignee: string;
   state: ShotState;
-}
-
-/** What a person set, as distinct from what the system derived. */
-export type ShotState = "" | "needs_review" | "in_progress" | "approved";
-
-export type ShotStatus =
-  | "too_few_takes"
-  | "not_judged"
-  | "needs_review"
-  | "differs_from_circle"
-  | "decided"
-  | "confirmed";
-
-export interface ShotNode {
-  shot: number;
-  slug: string;
-  label: string;
-  takes: number;
-  unusable: number;
-  status: ShotStatus;
-  state: ShotState;
-  assignee: string;
   circled_take: number;
   chosen_take: number;
-  differs_from_circle: boolean;
+  open_comments: number;
+}
+
+/** @unverified */
+export interface Activity {
+  project_id: number;
+  project_name?: string;
+  at: string | null;
+  actor: string;
+  actor_role: string;
+  verb: string;
+  detail: string;
+  quantity: number;
+  scene: number;
+  shot: number;
+}
+
+/** @unverified */
+export interface RecentDecision {
+  project_id: number;
+  project_name: string;
+  scene: number;
+  shot: number;
+  take_no: number;
+  decided_by: "agent" | "human";
+  actor: string;
+  reason: string;
+  decided_at: string | null;
   margin: number;
-  cameras: string[];
-  shoot_day: string;
-  open_notes: number;
 }
 
-export interface SceneNode {
-  scene: number;
-  shots: ShotNode[];
-}
-
-export interface Tree {
+/** @unverified */
+export interface RecentNote {
   project_id: number;
-  scenes: SceneNode[];
-  /** The axes this project actually has, so a filter never offers nothing. */
-  cameras: string[];
-  shoot_days: string[];
-  review_margin: number;
-}
-
-/** What a shot was meant to be — the lined script, as a script supervisor writes it. */
-export interface Brief {
+  project_name: string;
   scene: number;
   shot: number;
-  slug: string;
-  heading: string;
-  action: string;
-  line: string;
-  notes: string;
-  look: string;
-  circled_take: number;
-  circled_by: string;
-  assignee: string;
-  state: ShotState;
-  state_by: string;
-  state_at: string | null;
-  updated_at: string;
-  updated_by: string;
-  is_empty: boolean;
-  note?: string;
-}
-
-export interface Comment {
-  comment_id: string;
-  parent_id: string | null;
-  clip_id: string | null;
   author: string;
-  author_role: string;
   body: string;
-  at_s: number;
-  to_s: number;
-  whole_take: boolean;
   created_at: string;
-  resolved_by: string;
-  resolved: boolean;
-  is_reply?: boolean;
-}
-
-export interface Project {
-  project_id: number;
-  name: string;
-  owner_email: string;
-  member_emails: string[];
-  is_public: boolean;
-  created_at: string;
-  you_are_owner: boolean;
-  you_can_upload: boolean;
-  /** Present only when the list was asked for with detail. */
-  scenes?: number;
-  shots?: number;
-  takes?: number;
-  settled?: number;
-  waiting?: number;
-  progress_pct?: number | null;
-}
-
-export interface PlannedShot {
-  shot: number;
-  slug: string;
-  description: string;
-}
-
-export interface PlannedScene {
-  scene: number;
-  heading: string;
-  shots: PlannedShot[];
-}
-
-export interface Plan {
-  project_id: number;
-  scenes: PlannedScene[];
-  next_scene: number;
 }
 
 /** One shot the footage landed in, as the upload screen shows it. */
@@ -240,113 +161,6 @@ export interface JobStatus {
   needs_a_look: number;
   started_at: string;
   finished_at: string | null;
-}
-
-export interface Limits {
-  projects: number;
-  scenes: number;
-  takes_per_shot: number;
-  clip_seconds: number;
-  retention_days: number;
-}
-
-/**
- * Who is asking, and what the API will let them do.
- *
- * Asked rather than worked out. A page that decides whether to draw the upload
- * button by comparing an address against a list is a second implementation of
- * the permission rules, and the two will disagree — the failure being a button
- * that is drawn and then refused, which is worse than no button.
- */
-export interface Me {
-  email: string | null;
-  signed_in: boolean;
-  role: Role;
-  can_read: boolean;
-  can_comment: boolean;
-  can_override: boolean;
-  /** Running the panel, describing a shot, circling, assigning, statusing —
-   *  in *our* productions. Inside a project you own you can do all of it. */
-  can_curate_team_projects: boolean;
-  can_upload_to_team_projects: boolean;
-  can_create_own_project: boolean;
-  can_add_members: boolean;
-  can_supersede: boolean;
-  limits: Limits;
-  demo_project_id: number;
-}
-
-export interface QueueItem {
-  project_id: number;
-  project_name: string;
-  scene: number;
-  shot: number;
-  slug: string;
-  takes: number;
-  margin: number;
-  reason: string;
-  assignee: string;
-  state: ShotState;
-  circled_take: number;
-  chosen_take: number;
-  open_comments: number;
-}
-
-export interface RecentDecision {
-  project_id: number;
-  project_name: string;
-  scene: number;
-  shot: number;
-  take_no: number;
-  decided_by: "agent" | "human";
-  actor: string;
-  reason: string;
-  decided_at: string | null;
-  margin: number;
-}
-
-export interface RecentNote {
-  project_id: number;
-  project_name: string;
-  scene: number;
-  shot: number;
-  author: string;
-  body: string;
-  created_at: string;
-}
-
-export interface Activity {
-  project_id: number;
-  project_name?: string;
-  at: string | null;
-  actor: string;
-  actor_role: string;
-  verb: string;
-  detail: string;
-  quantity: number;
-  scene: number;
-  shot: number;
-}
-
-export interface Dashboard {
-  you: string;
-  role: Role;
-  queue: QueueItem[];
-  queue_total: number;
-  totals: { waiting: number; yours: number; unassigned: number; projects: number };
-  projects: (Project & {
-    members: number;
-    scenes: number;
-    shots: number;
-    takes: number;
-    settled: number;
-    waiting: number;
-    progress_pct: number | null;
-  })[];
-  recent: RecentDecision[];
-  notes: RecentNote[];
-  activity: Activity[];
-  limits: Limits;
 }
 
 /** One shot's place in the assembled scene. */

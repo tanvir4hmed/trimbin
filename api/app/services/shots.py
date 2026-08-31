@@ -28,6 +28,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from . import revisions
 from .jobs import db
 
 log = logging.getLogger(__name__)
@@ -89,6 +90,13 @@ class Shot:
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_by: str = ""
 
+    # What the caller must send back to change any of this.
+    #
+    # Every write here was `set(merge=True)` — a blind write that cannot tell an
+    # edit from an overwrite. Two editors on the same shot both succeeded and
+    # the second silently discarded the first.
+    rev: int = 0
+
     @property
     def is_empty(self) -> bool:
         return not any((self.heading, self.action, self.line, self.notes, self.look))
@@ -111,6 +119,7 @@ class Shot:
             "state_at": self.state_at.isoformat() if self.state_at else None,
             "updated_at": self.updated_at.isoformat(),
             "updated_by": self.updated_by,
+            "rev": self.rev,
         }
 
 
@@ -122,8 +131,12 @@ class Shot:
 STATES = ("", "needs_review", "in_progress", "approved")
 
 
+def _key(project_id: int, scene: int, shot: int) -> str:
+    return f"p{project_id}_s{scene}_h{shot}"
+
+
 def _doc(project_id: int, scene: int, shot: int):
-    return db().collection(COLLECTION).document(f"p{project_id}_s{scene}_h{shot}")
+    return db().collection(COLLECTION).document(_key(project_id, scene, shot))
 
 
 def _from_doc(project_id: int, scene: int, shot: int, d: dict) -> Shot:
@@ -152,6 +165,7 @@ def _from_doc(project_id: int, scene: int, shot: int, d: dict) -> Shot:
         state_at=d.get("state_at"),
         updated_at=d.get("updated_at") or datetime.now(UTC),
         updated_by=d.get("updated_by", ""),
+        rev=int(d.get("rev", 0) or 0),
     )
 
 
@@ -174,6 +188,7 @@ async def put(
     shot: int,
     fields: dict,
     author: str,
+    expected_rev: int | None = None,
 ) -> Shot:
     """Write or replace a shot's description.
 
@@ -204,13 +219,20 @@ async def put(
         "updated_by": author,
     }
 
-    await _doc(project_id, scene, shot).set(cleaned, merge=True)
+    await revisions.bump(COLLECTION, _key(project_id, scene, shot), cleaned, expected_rev)
     log.info("shot %d/%d described by %s", scene, shot, author)
 
     return await get(project_id, scene, shot)
 
 
-async def circle(project_id: int, scene: int, shot: int, take_no: int, author: str) -> Shot:
+async def circle(
+    project_id: int,
+    scene: int,
+    shot: int,
+    take_no: int,
+    author: str,
+    expected_rev: int | None = None,
+) -> Shot:
     """Record the take the director circled on the day. Zero clears it.
 
     A take number rather than a clip id, because that is what the script
@@ -222,7 +244,9 @@ async def circle(project_id: int, scene: int, shot: int, take_no: int, author: s
     disagree is exactly the shot a person should open, and collapsing either
     into the other destroys the only signal that says so.
     """
-    await _doc(project_id, scene, shot).set(
+    await revisions.bump(
+        COLLECTION,
+        _key(project_id, scene, shot),
         {
             "project_id": project_id,
             "scene": scene,
@@ -230,27 +254,42 @@ async def circle(project_id: int, scene: int, shot: int, take_no: int, author: s
             "circled_take": max(0, int(take_no)),
             "circled_by": author if take_no else "",
         },
-        merge=True,
+        expected_rev,
     )
     log.info("shot %d/%d: take %d circled by %s", scene, shot, take_no, author)
     return await get(project_id, scene, shot)
 
 
-async def assign(project_id: int, scene: int, shot: int, assignee: str) -> Shot:
+async def assign(
+    project_id: int,
+    scene: int,
+    shot: int,
+    assignee: str,
+    expected_rev: int | None = None,
+) -> Shot:
     """Put somebody's name on a shot. An empty string unassigns it."""
-    await _doc(project_id, scene, shot).set(
+    await revisions.bump(
+        COLLECTION,
+        _key(project_id, scene, shot),
         {
             "project_id": project_id,
             "scene": scene,
             "shot": shot,
             "assignee": (assignee or "").strip().lower(),
         },
-        merge=True,
+        expected_rev,
     )
     return await get(project_id, scene, shot)
 
 
-async def set_state(project_id: int, scene: int, shot: int, state: str, author: str) -> Shot:
+async def set_state(
+    project_id: int,
+    scene: int,
+    shot: int,
+    state: str,
+    author: str,
+    expected_rev: int | None = None,
+) -> Shot:
     """What a person says the state of this work is.
 
     Deliberately separate from the status the tree derives. Derived status
@@ -262,7 +301,9 @@ async def set_state(project_id: int, scene: int, shot: int, state: str, author: 
     if state not in STATES:
         raise ValueError(f"{state!r} is not a state a shot can be in")
 
-    await _doc(project_id, scene, shot).set(
+    await revisions.bump(
+        COLLECTION,
+        _key(project_id, scene, shot),
         {
             "project_id": project_id,
             "scene": scene,
@@ -271,7 +312,7 @@ async def set_state(project_id: int, scene: int, shot: int, state: str, author: 
             "state_by": author if state else "",
             "state_at": datetime.now(UTC) if state else None,
         },
-        merge=True,
+        expected_rev,
     )
     return await get(project_id, scene, shot)
 

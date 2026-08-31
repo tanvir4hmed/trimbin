@@ -23,6 +23,7 @@ from .routes import (
     public,
     review,
     scenes,
+    screens,
     session,
     structure,
     uploads,
@@ -77,6 +78,7 @@ app.include_router(dashboard.router)
 app.include_router(uploads.router)
 app.include_router(review.router)
 app.include_router(scenes.router)
+app.include_router(screens.router)
 app.include_router(structure.router)
 app.include_router(projects.router)
 app.include_router(maintenance.router)

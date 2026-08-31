@@ -94,6 +94,20 @@ jobs:
         run: uv run pytest -q
         working-directory: api
 
+      # The committed TypeScript must match the schema the API actually
+      # publishes. Without this the generation is a convention, and a convention
+      # is what the hand-written client already was.
+      - name: Types are current
+        run: |
+          cp web/lib/schema.d.ts /tmp/committed.d.ts
+          bash tools/generate-types.sh
+          if ! diff -q /tmp/committed.d.ts web/lib/schema.d.ts >/dev/null; then
+            echo "::error::web/lib/schema.d.ts is stale - run tools/generate-types.sh"
+            diff /tmp/committed.d.ts web/lib/schema.d.ts | head -40
+            exit 1
+          fi
+          echo "generated types match the API schema"
+
   web:
     name: Web
     runs-on: ubuntu-latest

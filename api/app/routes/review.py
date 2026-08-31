@@ -23,11 +23,11 @@ import logging
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
 from ..auth import Principal, current_principal, require_signed_in
-from ..services import activity, assessment, members, shots
+from ..services import activity, assessment, members, revisions, shots
 from ..services import comments as comments_service
 from ..services import decisions as decisions_service
 from ..services import review as review_service
@@ -35,6 +35,19 @@ from ..services.analytics import client
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/review", tags=["review"])
+
+
+class Revised(BaseModel):
+    """Base for anything that edits a shot.
+
+    `rev` is what the caller was shown. A mismatch is a 409 carrying the current
+    state, so the interface can say what changed rather than "try again". Absent
+    is accepted: requiring it would break the first request after a deploy for
+    every client that had not reloaded, and that costs more than the race it
+    prevents on a field nobody edits concurrently.
+    """
+
+    rev: int | None = Field(default=None, ge=0)
 
 
 class Override(BaseModel):
@@ -271,6 +284,7 @@ async def override(
     subgroup_id: int,
     body: Override,
     principal: Annotated[Principal, Depends(require_signed_in)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict:
     """An editor choosing a take, overriding or confirming the panel.
 
@@ -289,6 +303,14 @@ async def override(
     for, and every version of it is kept, attributed, and undoable.
     """
     await principal.assert_can_comment(project_id)
+
+    # A browser retries a POST it never saw the answer to — a dropped
+    # connection, a closed laptop — and a second identical override lands in the
+    # archive as a separate editorial decision. A replayed key returns the first
+    # answer instead of doing the work again.
+    replayed = await revisions.replay(idempotency_key or "", principal.email or "")
+    if replayed is not None:
+        return replayed
 
     verdicts_now = await _verdicts_for(project_id, group_id, subgroup_id)
     if not verdicts_now:
@@ -348,12 +370,14 @@ async def override(
         actor_role=members.role_of(principal.email),
     )
 
-    return {
+    result = {
         "status": "recorded",
         "agreed_with_panel": agreed,
         "previously_recommended": previous,
         "now_selected": chosen,
     }
+    await revisions.remember(idempotency_key or "", principal.email or "", result)
+    return result
 
 
 @router.post(
@@ -732,7 +756,7 @@ def _status(
 # ---------------------------------------------------------------------------
 
 
-class ShotBrief(BaseModel):
+class ShotBrief(Revised):
     """What a shot was meant to be, as a person types it.
 
     Every field optional. A production that fills none of this in gets exactly
@@ -753,19 +777,19 @@ class ShotBrief(BaseModel):
     look: str = Field(default="", max_length=60, description="handheld, locked off, dolly in")
 
 
-class Circle(BaseModel):
+class Circle(Revised):
     """The take the director or DoP marked on the day. Zero clears it."""
 
     take_no: int = Field(ge=0, le=999)
 
 
-class Assignment(BaseModel):
+class Assignment(Revised):
     """Whose shot this is. An empty address unassigns it."""
 
     assignee: str = Field(default="", max_length=254)
 
 
-class SetState(BaseModel):
+class SetState(Revised):
     state: str = Field(default="")
 
     @field_validator("state")
@@ -810,8 +834,9 @@ async def write_brief(
         project_id,
         group_id,
         subgroup_id,
-        body.model_dump(),
+        body.model_dump(exclude={"rev"}),
         author=principal.email or "",
+        expected_rev=body.rev,
     )
     await activity.record(
         project_id,
@@ -859,7 +884,12 @@ async def circle_take(
     """
     await principal.assert_can_curate(project_id)
     shot = await shots.circle(
-        project_id, group_id, subgroup_id, body.take_no, principal.email or ""
+        project_id,
+        group_id,
+        subgroup_id,
+        body.take_no,
+        principal.email or "",
+        expected_rev=body.rev,
     )
     await activity.record(
         project_id,
@@ -889,7 +919,9 @@ async def assign_shot(
     opening it to guests would let a stranger reassign our work.
     """
     await principal.assert_can_curate(project_id)
-    shot = await shots.assign(project_id, group_id, subgroup_id, body.assignee)
+    shot = await shots.assign(
+        project_id, group_id, subgroup_id, body.assignee, expected_rev=body.rev
+    )
     await activity.record(
         project_id,
         principal.email or "",
@@ -918,7 +950,12 @@ async def set_shot_state(
     """
     await principal.assert_can_curate(project_id)
     shot = await shots.set_state(
-        project_id, group_id, subgroup_id, body.state, principal.email or ""
+        project_id,
+        group_id,
+        subgroup_id,
+        body.state,
+        principal.email or "",
+        expected_rev=body.rev,
     )
     await activity.record(
         project_id,
