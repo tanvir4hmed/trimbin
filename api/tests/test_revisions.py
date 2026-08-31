@@ -117,3 +117,27 @@ class TestTheReplayWindow:
         """Beyond it a repeat is a new command, which is right: somebody
         pressing the same button a day later means it."""
         assert revisions.REPLAY_WINDOW.total_seconds() <= 24 * 3600
+
+
+class TestTheConflictSerialises:
+    """A correctly raised 409 came back as a 500.
+
+    The payload carried the current Firestore document, so the interface could
+    "say what changed". Firestore documents hold DatetimeWithNanoseconds, which
+    FastAPI's encoder refuses — so the conflict looked like a crash, which is
+    the one thing a conflict must not look like.
+
+    The client never used that field anyway: it invalidates and refetches.
+    """
+
+    def test_the_detail_survives_json(self) -> None:
+        import json
+
+        with pytest.raises(revisions.Conflict) as raised:
+            revisions.check(1, 2)
+        json.dumps(raised.value.detail)
+
+    def test_it_carries_no_store_objects(self) -> None:
+        with pytest.raises(revisions.Conflict) as raised:
+            revisions.check(1, 2)
+        assert set(raised.value.detail) == {"detail", "expected_rev", "current_rev"}

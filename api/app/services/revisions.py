@@ -28,7 +28,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
 
 from fastapi import HTTPException, status
 from google.cloud import firestore
@@ -52,19 +51,26 @@ REPLAY_WINDOW = timedelta(hours=6)
 class Conflict(HTTPException):
     """Somebody else changed this while you were looking at it.
 
-    409 rather than 412, and carrying the current state rather than only saying
-    no. An interface that is told "conflict" can offer nothing but a reload; one
-    that is handed the current value can say what changed and who changed it.
+    409 rather than 412, carrying both revisions so the interface can say what
+    happened rather than only "try again".
+
+    It carried the current document too, on the reasoning that a client handed
+    the current value can say what changed. Two things were wrong with that. The
+    client never used it — it invalidates and refetches, which is the same
+    answer by a route that is already correct — and a Firestore document holds
+    DatetimeWithNanoseconds, which FastAPI's encoder refuses. So a correctly
+    raised 409 came back as a 500, and the conflict looked like a crash.
+
+    Both revisions, and nothing that has to be serialised on the way out.
     """
 
-    def __init__(self, expected: int, found: int, current: Any = None) -> None:
+    def __init__(self, expected: int, found: int) -> None:
         super().__init__(
             status.HTTP_409_CONFLICT,
             {
-                "detail": ("Somebody else changed this while you were looking at it."),
+                "detail": "Somebody else changed this while you were looking at it.",
                 "expected_rev": expected,
                 "current_rev": found,
-                "current": current,
             },
         )
 
@@ -111,7 +117,7 @@ async def bump(
         current = (snapshot.to_dict() or {}).get("rev", 0) if snapshot.exists else 0
 
         if expected is not None and expected != current:
-            raise Conflict(expected, current, snapshot.to_dict() if snapshot.exists else None)
+            raise Conflict(expected, current)
 
         transaction.set(ref, {**fields, "rev": current + 1}, merge=True)
         return current + 1
