@@ -30,51 +30,57 @@ class TestTheReasonIsRequired:
 
     def test_a_reason_is_mandatory(self) -> None:
         with pytest.raises(ValidationError):
-            Override(clip_id=uuid4())
+            Override(rev=0, clip_id=uuid4())
 
     def test_whitespace_is_not_a_reason(self) -> None:
         with pytest.raises(ValidationError):
-            Override(clip_id=uuid4(), reason="     ")
+            Override(rev=0, clip_id=uuid4(), reason="     ")
 
     def test_a_reason_is_normalised_not_stored_ragged(self) -> None:
         """Two editors typing the same thing with different spacing should
         produce one group in the archive, not two."""
-        o = Override(clip_id=uuid4(), reason="  better   performance \n")
+        o = Override(rev=0, clip_id=uuid4(), reason="  better   performance \n")
         assert o.reason == "better performance"
 
     def test_a_short_but_real_reason_is_accepted(self) -> None:
         """The bar is "said something", not "wrote an essay". Set it higher and
         people stop overriding rather than start explaining."""
-        assert Override(clip_id=uuid4(), reason="pace").reason == "pace"
+        assert Override(rev=0, clip_id=uuid4(), reason="pace").reason == "pace"
 
     def test_an_essay_is_refused_rather_than_silently_truncated(self) -> None:
         """Truncation would store half a sentence as if it were the whole
         thought, which is worse than asking the person to shorten it."""
         with pytest.raises(ValidationError):
-            Override(clip_id=uuid4(), reason="x" * 500)
+            Override(rev=0, clip_id=uuid4(), reason="x" * 500)
 
 
 class TestNarrowingTheRange:
     """An editor may accept the panel's take and still want less of it."""
 
     def test_no_points_means_the_offered_range_stands(self) -> None:
-        o = Override(clip_id=uuid4(), reason="fine")
+        o = Override(rev=0, clip_id=uuid4(), reason="fine")
         assert o.in_point_s is None
         assert o.out_point_s is None
 
     def test_points_are_kept_when_given(self) -> None:
-        o = Override(clip_id=uuid4(), reason="trim the head", in_point_s=4.8, out_point_s=17.5)
+        o = Override(
+            rev=0,
+            clip_id=uuid4(),
+            reason="trim the head",
+            in_point_s=4.8,
+            out_point_s=17.5,
+        )
         assert (o.in_point_s, o.out_point_s) == (4.8, 17.5)
 
     def test_a_negative_point_is_refused(self) -> None:
         with pytest.raises(ValidationError):
-            Override(clip_id=uuid4(), reason="x", in_point_s=-1.0)
+            Override(rev=0, clip_id=uuid4(), reason="x", in_point_s=-1.0)
 
 
 class TestTheClipMustBeReal:
     def test_something_that_is_not_a_uuid_is_refused(self) -> None:
         with pytest.raises(ValidationError):
-            Override(clip_id="take 4", reason="better performance")
+            Override(rev=0, clip_id="take 4", reason="better performance")
 
 
 class TestWhatGetsWritten:
@@ -126,7 +132,7 @@ class TestWhatGetsWritten:
         evidence the disagreement is worth having."""
         chosen, _, verdicts = self._verdicts()
         rows = rows_for_choice(
-            verdicts, chosen, Override(clip_id=chosen, reason="better performance")
+            verdicts, chosen, Override(rev=0, clip_id=chosen, reason="better performance")
         )
 
         by_id = {r["clip_id"]: r for r in rows}
@@ -135,7 +141,7 @@ class TestWhatGetsWritten:
     def test_exactly_one_take_is_selected(self) -> None:
         chosen, _other, verdicts = self._verdicts()
         rows = rows_for_choice(
-            verdicts, chosen, Override(clip_id=chosen, reason="better performance")
+            verdicts, chosen, Override(rev=0, clip_id=chosen, reason="better performance")
         )
 
         selected = [r for r in rows if r["outcome"] == "selected"]
@@ -147,7 +153,7 @@ class TestWhatGetsWritten:
         live with it, which is a different thing from it not being there."""
         chosen, _, verdicts = self._verdicts()
         rows = rows_for_choice(
-            verdicts, chosen, Override(clip_id=chosen, reason="better performance")
+            verdicts, chosen, Override(rev=0, clip_id=chosen, reason="better performance")
         )
 
         by_id = {r["clip_id"]: r for r in rows}
@@ -158,7 +164,7 @@ class TestWhatGetsWritten:
         rows = rows_for_choice(
             verdicts,
             chosen,
-            Override(clip_id=chosen, reason="the pause before the line lands"),
+            Override(rev=0, clip_id=chosen, reason="the pause before the line lands"),
         )
 
         by_id = {r["clip_id"]: r for r in rows}

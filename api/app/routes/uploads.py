@@ -21,6 +21,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
+from .. import schemas
 from ..auth import Principal, current_principal, require_signed_in
 from ..services import activity, jobs, members, quota, storage
 
@@ -60,7 +61,8 @@ class UploadTicket(BaseModel):
     clip_id: UUID
     filename: str
     # POST here once to open a resumable session; Cloud Storage answers with a
-    # session URI the browser holds and can continue against after a refresh.
+    # session URI the browser can continue against while the upload page owns
+    # the selected File object.
     upload_url: str
     storage_uri: str
     # Part of the signature, not advice. Cloud Storage refuses a PUT that omits
@@ -228,7 +230,7 @@ async def complete_upload(
     }
 
 
-@router.get("/jobs/{job_id}")
+@router.get("/jobs/{job_id}", response_model=schemas.JobStatus)
 async def job_status(
     job_id: UUID,
     principal: Annotated[Principal, Depends(current_principal)],

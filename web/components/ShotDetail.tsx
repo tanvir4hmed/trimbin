@@ -124,9 +124,9 @@ export default function ShotDetail({
   const data = screen.data?.verdicts ?? null;
   const brief = screen.data?.brief ?? null;
 
-  const chooseTake = useChooseTake(projectId, scene, shot);
+  const chooseTake = useChooseTake(projectId, scene, shot, data?.rev ?? 0);
   const judgeShot = useJudge(projectId, scene, shot);
-  const undoChange = useUndo(projectId, scene, shot);
+  const undoChange = useUndo(projectId, scene, shot, data?.rev ?? 0);
   const edits = useShotEdits(projectId, scene, shot, brief ?? undefined);
 
   // The recommended take opens by default, and only until somebody picks
@@ -564,9 +564,8 @@ function TakeRow({
    *
    * The transport every editor already has in their hands: K stops, L plays and
    * doubles on each press, J does the same backwards, and the arrows step a
-   * frame. Assumed 24fps for the step — the archive does not record the
-   * original rate, and a quarter-frame either way is below what anyone can see
-   * at this scale.
+   * frame. Uses the measured source rate; legacy clips fall back to 24fps and
+   * are explicitly represented as unmeasured in the API.
    */
   const transport = (e: React.KeyboardEvent<HTMLDivElement>) => {
     const el = player.current?.element();
@@ -589,10 +588,10 @@ function TakeRow({
       el.currentTime = Math.max(0, el.currentTime - 1);
     } else if (e.key === "ArrowLeft") {
       e.preventDefault();
-      el.currentTime = Math.max(0, el.currentTime - 1 / 24);
+      el.currentTime = Math.max(0, el.currentTime - 1 / (take.fps || 24));
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
-      el.currentTime = Math.min(take.duration_s, el.currentTime + 1 / 24);
+      el.currentTime = Math.min(take.duration_s, el.currentTime + 1 / (take.fps || 24));
     }
   };
 

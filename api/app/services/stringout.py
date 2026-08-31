@@ -48,6 +48,9 @@ class Entry:
     needs_review: bool
     circled_take: int
     open_comments: int
+    fps: float = 0.0
+    scene_code: str = ""
+    shot_code: str = ""
 
     @property
     def duration_s(self) -> float:
@@ -77,6 +80,9 @@ class Entry:
             # which this system deliberately does not judge.
             "differs_from_circle": bool(self.circled_take and self.circled_take != self.take_no),
             "open_comments": self.open_comments,
+            "fps": round(self.fps, 3),
+            "scene_code": self.scene_code,
+            "shot_code": self.shot_code,
         }
 
 
@@ -108,11 +114,12 @@ async def scene(project_id: int, scene_id: int) -> dict:
                l.in_point_s, l.out_point_s,
                c.proxy_uri, c.sprite_uri,
                l.reason, l.decided_by, l.actor, l.margin,
-               c.duration_ms
+               c.duration_ms, c.fps, c.scene_code, c.shot_code
         FROM latest AS l
-        INNER JOIN clips AS c
+        INNER JOIN current_clip_placement AS c
             ON c.clip_id = l.clip_id AND c.project_id = {p:UInt32}
-        WHERE l.outcome = 'selected'
+        WHERE l.outcome = 'selected' AND c.group_id = {g:UInt32}
+          AND c.subgroup_id = l.subgroup_id
         ORDER BY l.subgroup_id
         """,
         parameters={"p": project_id, "g": scene_id},
@@ -165,8 +172,13 @@ async def scene(project_id: int, scene_id: int) -> dict:
                 ).needs_a_person,
                 circled_take=described.circled_take if described else 0,
                 open_comments=open_counts.get((scene_id, shot_id), {}).get("open", 0),
+                fps=float(r[12] or 0),
+                scene_code=r[13] or "",
+                shot_code=r[14] or "",
             )
         )
+
+    measured_rates = sorted({round(e.fps, 3) for e in entries if e.fps > 0})
 
     return {
         "project_id": project_id,
@@ -179,6 +191,8 @@ async def scene(project_id: int, scene_id: int) -> dict:
         # if it were finished.
         "unresolved": sum(1 for e in entries if e.needs_review),
         "disagreements": sum(1 for e in entries if e.circled_take and e.circled_take != e.take_no),
+        "source_fps": measured_rates,
+        "export_fps": measured_rates[0] if len(measured_rates) == 1 else 0.0,
     }
 
 
@@ -187,7 +201,7 @@ async def scenes_in(project_id: int) -> list[int]:
     ch = await client()
     result = await ch.query(
         """
-        SELECT DISTINCT group_id FROM clips
+        SELECT DISTINCT group_id FROM current_clip_placement
         WHERE project_id = {p:UInt32} ORDER BY group_id
         """,
         parameters={"p": project_id},

@@ -179,6 +179,57 @@ class TestDuplicateDetection:
         assert await placements.duplicates_of(1, "") == []
 
 
+class TestPlacementEventsAreTotallyOrdered:
+    """A second-resolution timestamp is not an event order.
+
+    Two people can resolve two inbox rows in the same second, and an automated
+    proposal can arrive in that second too. Every append therefore carries its
+    own UUID and millisecond clock; the ClickHouse view uses both.
+    """
+
+    @pytest.mark.asyncio
+    async def test_each_append_has_an_event_id_and_precise_time(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import uuid
+
+        inserted: list[list] = []
+
+        class FakeClickHouse:
+            async def insert(self, table, rows, column_names):
+                assert table == "placements"
+                assert "event_id" in column_names
+                assert "occurred_at" in column_names
+                inserted.extend(rows)
+
+        async def fake_client():
+            return FakeClickHouse()
+
+        monkeypatch.setattr(placements, "client", fake_client)
+        clip = uuid.uuid4()
+
+        await placements.record(1, clip, 12, 2, 4, placements.SLATE)
+        await placements.record(1, clip, 12, 3, 4, placements.HUMAN)
+
+        event_index = placements._COLUMNS.index("event_id")
+        precise_index = placements._COLUMNS.index("occurred_at")
+        assert inserted[0][event_index] != inserted[1][event_index]
+        assert all(row[precise_index].tzinfo is not None for row in inserted)
+
+    def test_the_canonical_view_exists_in_the_migration(self) -> None:
+        from pathlib import Path
+
+        migration = (
+            Path(__file__).parents[2]
+            / "clickhouse"
+            / "migrations"
+            / "020_current_clip_placement.sql"
+        ).read_text(encoding="utf-8")
+        assert "CREATE VIEW current_clip_placement" in migration
+        assert "tuple(" in migration
+        assert "event_id" in migration
+
+
 class TestContentHashing:
     def test_the_same_bytes_hash_the_same(self, tmp_path) -> None:
         """The point: the same file dragged in from two folders has two names

@@ -109,7 +109,7 @@ async def remove_shot(
     ch = await client()
     result = await ch.query(
         """
-        SELECT count() FROM clips
+        SELECT count() FROM current_clip_placement
         WHERE project_id = {p:UInt32} AND group_id = {g:UInt32} AND subgroup_id = {s:UInt32}
         """,
         parameters={"p": project_id, "g": scene, "s": shot},

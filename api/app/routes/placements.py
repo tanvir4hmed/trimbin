@@ -22,6 +22,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from .. import schemas
 from ..auth import Principal, current_principal, require_signed_in
 from ..services import activity, members, placements
 
@@ -44,7 +45,7 @@ class Resolution(BaseModel):
     note: str = Field(default="", max_length=200)
 
 
-@router.get("/{project_id}")
+@router.get("/{project_id}", response_model=schemas.PlacementInbox)
 async def inbox(
     project_id: int,
     principal: Annotated[Principal, Depends(current_principal)],
@@ -64,7 +65,11 @@ async def inbox(
     }
 
 
-@router.post("/{project_id}/{clip_id}", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{project_id}/{clip_id}",
+    status_code=status.HTTP_201_CREATED,
+    response_model=schemas.PlacementResolved,
+)
 async def resolve(
     project_id: int,
     clip_id: UUID,

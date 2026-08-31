@@ -20,16 +20,16 @@ would be refusing the evidence.
 from __future__ import annotations
 
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
+from .. import schemas
 from ..auth import Principal, current_principal, require_signed_in
-from ..services import activity, assessment, members, revisions, shots
+from ..services import activity, assessment, members, revisions, selections, shots
 from ..services import comments as comments_service
-from ..services import decisions as decisions_service
 from ..services import review as review_service
 from ..services.analytics import client
 
@@ -50,7 +50,7 @@ class Revised(BaseModel):
     rev: int | None = Field(default=None, ge=0)
 
 
-class Override(BaseModel):
+class Override(Revised):
     """An editor choosing a different take, and saying why.
 
     The reason is required by the schema, not merely encouraged. An override
@@ -59,6 +59,10 @@ class Override(BaseModel):
     the reason no model can be trained to make these calls today.
     """
 
+    # Selection changes the same shot aggregate as circle/assignment/state, so
+    # it must prove which revision the editor saw. Unlike older edit routes,
+    # omission is not accepted here: two people choosing a take is common.
+    rev: int = Field(ge=0)
     clip_id: UUID
     reason: str = Field(min_length=3, max_length=400)
     # Where the editor actually wants to use, if they narrowed it. Absent means
@@ -73,6 +77,12 @@ class Override(BaseModel):
         if len(cleaned) < 3:
             raise ValueError("Say why, even briefly.")
         return cleaned
+
+
+class UndoRequest(Revised):
+    """Undo is a new selection and has the same concurrency contract."""
+
+    rev: int = Field(ge=0)
 
 
 def _findings_from(codes, starts, ends, severities) -> list[dict]:
@@ -164,7 +174,7 @@ async def judge(
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
-@router.get("/{project_id}/{group_id}/{subgroup_id}")
+@router.get("/{project_id}/{group_id}/{subgroup_id}", response_model=schemas.Verdicts)
 async def verdicts(
     project_id: int,
     group_id: int,
@@ -192,9 +202,12 @@ async def verdicts(
                c.proxy_uri, c.sprite_uri,
                d.criterion_names, d.criterion_scores,
                d.safe_starts_s, d.safe_ends_s, d.trim_reasons,
-               c.duration_ms, c.camera, c.captured_at
+               c.duration_ms, c.camera, c.captured_at,
+               c.fps, c.scene_code, c.shot_code
         FROM decisions AS d
-        LEFT JOIN clips AS c ON c.clip_id = d.clip_id AND c.project_id = d.project_id
+        INNER JOIN current_clip_placement AS c
+            ON c.clip_id = d.clip_id AND c.project_id = d.project_id
+           AND c.group_id = d.group_id AND c.subgroup_id = d.subgroup_id
         WHERE d.project_id = {p:UInt32} AND d.group_id = {g:UInt32}
           AND d.subgroup_id = {s:UInt32}
         ORDER BY d.decided_at DESC, d.score DESC
@@ -242,6 +255,9 @@ async def verdicts(
                 "duration_s": round(int(r[26] or 0) / 1000, 2),
                 "camera": r[27] or "",
                 "captured_at": r[28].isoformat() if r[28] else None,
+                "fps": round(float(r[29] or 0), 3),
+                "scene_code": r[30] or "",
+                "shot_code": r[31] or "",
             }
         )
 
@@ -252,6 +268,21 @@ async def verdicts(
         )
 
     brief = await shots.get(project_id, group_id, subgroup_id)
+    if brief.selection_archive_state == "pending" and brief.selection_event_id:
+        try:
+            await selections.deliver(brief.selection_event_id)
+            brief = await shots.get(project_id, group_id, subgroup_id)
+        except Exception:
+            log.exception("selection event %s is still pending", brief.selection_event_id)
+
+    # Firestore is the mutable operational answer. ClickHouse normally contains
+    # the same event by this point; if its delivery is pending, the screen still
+    # shows the choice the person actually saved rather than the previous one.
+    if brief.selected_clip_id and any(t["clip_id"] == brief.selected_clip_id for t in takes):
+        for take in takes:
+            take["outcome"] = (
+                "selected" if take["clip_id"] == brief.selected_clip_id else "not_selected"
+            )
     chosen = next((t for t in takes if t["outcome"] == "selected"), None)
 
     return {
@@ -271,12 +302,15 @@ async def verdicts(
         ),
         "assignee": brief.assignee,
         "state": brief.state,
+        "rev": brief.rev,
+        "selection_archive_state": brief.selection_archive_state,
     }
 
 
 @router.post(
     "/{project_id}/{group_id}/{subgroup_id}/select",
     status_code=status.HTTP_201_CREATED,
+    response_model=schemas.Recorded,
 )
 async def override(
     project_id: int,
@@ -333,20 +367,23 @@ async def override(
 
     rows = rows_for_choice(verdicts_now, chosen, body)
 
-    await decisions_service.record(
-        project_id=project_id,
-        group_id=group_id,
-        subgroup_id=subgroup_id,
-        verdicts=rows,
-        # Keyed on the person and the clip so a second look at the same shot
-        # replaces nothing — an editor may change their mind twice, and both
-        # times happened.
-        key=decisions_service.run_hash(project_id, group_id, subgroup_id, [body.clip_id]),
-        model_id="",
-        prompt_version="",
-        decided_by="human",
-        actor_id=principal.email or "",
+    committed = await selections.commit(
+        project_id,
+        group_id,
+        subgroup_id,
+        chosen=chosen,
+        fallback_previous=previous,
+        reason=body.reason,
+        actor=principal.email or "",
+        rows=rows,
+        expected_rev=body.rev,
     )
+    archive_pending = False
+    try:
+        archive_pending = not await selections.deliver(committed.event_id)
+    except Exception:
+        archive_pending = True
+        log.exception("selection saved; ClickHouse event %s remains pending", committed.event_id)
 
     log.info(
         "project %d scene %d shot %d: %s %s take %s",
@@ -359,22 +396,27 @@ async def override(
     )
 
     take_no = next((v.get("take_no", 0) for v in verdicts_now if v["clip_id"] == chosen), 0)
-    await activity.record(
-        project_id,
-        principal.email or "",
-        "confirmed" if agreed else "chose",
-        detail=body.reason,
-        scene=group_id,
-        shot=subgroup_id,
-        quantity=int(take_no or 0),
-        actor_role=members.role_of(principal.email),
-    )
+    try:
+        await activity.record(
+            project_id,
+            principal.email or "",
+            "confirmed" if agreed else "chose",
+            detail=body.reason,
+            scene=group_id,
+            shot=subgroup_id,
+            quantity=int(take_no or 0),
+            actor_role=members.role_of(principal.email),
+        )
+    except Exception:
+        log.exception("selection activity row failed; selection event remains authoritative")
 
     result = {
         "status": "recorded",
         "agreed_with_panel": agreed,
         "previously_recommended": previous,
         "now_selected": chosen,
+        "rev": committed.rev,
+        "archive_pending": archive_pending,
     }
     await revisions.remember(idempotency_key or "", principal.email or "", result)
     return result
@@ -383,12 +425,15 @@ async def override(
 @router.post(
     "/{project_id}/{group_id}/{subgroup_id}/undo",
     status_code=status.HTTP_201_CREATED,
+    response_model=schemas.Undone,
 )
 async def undo(
     project_id: int,
     group_id: int,
     subgroup_id: int,
+    body: UndoRequest,
     principal: Annotated[Principal, Depends(require_signed_in)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict:
     """Put back what stood before the last human decision on this shot.
 
@@ -407,6 +452,13 @@ async def undo(
     """
     await principal.assert_can_comment(project_id)
 
+    replayed = await revisions.replay(idempotency_key or "", principal.email or "")
+    if replayed is not None:
+        return replayed
+
+    brief = await shots.get(project_id, group_id, subgroup_id)
+    revisions.check(body.rev, brief.rev)
+
     ch = await client()
     result = await ch.query(
         """
@@ -420,13 +472,19 @@ async def undo(
         parameters={"p": project_id, "g": group_id, "s": subgroup_id},
     )
 
-    if len(result.result_rows) < 2:
+    newest: Any
+    previous_row: Any
+    if brief.selected_clip_id and brief.previous_selected_clip_id:
+        newest = (UUID(brief.selected_clip_id), "selected", "human", "", None)
+        previous_row = (UUID(brief.previous_selected_clip_id), "selected", "human", "", None)
+    elif len(result.result_rows) >= 2:
+        newest, previous_row = result.result_rows[0], result.result_rows[1]
+    else:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             "Nothing to undo — only one decision has ever been made here.",
         )
 
-    newest, previous_row = result.result_rows[0], result.result_rows[1]
     if newest[2] != "human":
         raise HTTPException(
             status.HTTP_409_CONFLICT,
@@ -441,6 +499,7 @@ async def undo(
         verdicts_now,
         restore_to,
         Override(
+            rev=body.rev,
             clip_id=UUID(restore_to),
             reason=(
                 f"Undone by {principal.email}: put back the take that stood before the last change."
@@ -448,17 +507,25 @@ async def undo(
         ),
     )
 
-    await decisions_service.record(
-        project_id=project_id,
-        group_id=group_id,
-        subgroup_id=subgroup_id,
-        verdicts=rows,
-        key=decisions_service.run_hash(project_id, group_id, subgroup_id, [UUID(restore_to)]),
-        model_id="",
-        prompt_version="",
-        decided_by="human",
-        actor_id=principal.email or "",
+    committed = await selections.commit(
+        project_id,
+        group_id,
+        subgroup_id,
+        chosen=restore_to,
+        fallback_previous=str(newest[0]),
+        reason=(
+            f"Undone by {principal.email}: put back the take that stood before the last change."
+        ),
+        actor=principal.email or "",
+        rows=rows,
+        expected_rev=body.rev,
     )
+    archive_pending = False
+    try:
+        archive_pending = not await selections.deliver(committed.event_id)
+    except Exception:
+        archive_pending = True
+        log.exception("undo saved; ClickHouse event %s remains pending", committed.event_id)
 
     log.info(
         "project %d scene %d shot %d: %s undid a change back to %s",
@@ -468,20 +535,27 @@ async def undo(
         principal.email,
         restore_to[:8],
     )
-    await activity.record(
-        project_id,
-        principal.email or "",
-        "undid",
-        detail=f"scene {group_id} shot {subgroup_id}",
-        scene=group_id,
-        shot=subgroup_id,
-        actor_role=members.role_of(principal.email),
-    )
-    return {
+    try:
+        await activity.record(
+            project_id,
+            principal.email or "",
+            "undid",
+            detail=f"scene {group_id} shot {subgroup_id}",
+            scene=group_id,
+            shot=subgroup_id,
+            actor_role=members.role_of(principal.email),
+        )
+    except Exception:
+        log.exception("undo activity row failed; selection event remains authoritative")
+    response = {
         "status": "undone",
         "restored": restore_to,
         "undone_from": str(newest[0]),
+        "rev": committed.rev,
+        "archive_pending": archive_pending,
     }
+    await revisions.remember(idempotency_key or "", principal.email or "", response)
+    return response
 
 
 def rows_for_choice(verdicts: list[dict], chosen: str, body: Override) -> list[dict]:
@@ -540,17 +614,20 @@ async def _verdicts_for(project_id: int, group_id: int, subgroup_id: int) -> lis
     ch = await client()
     result = await ch.query(
         """
-        SELECT clip_id, outcome, score,
+        SELECT d.clip_id, d.outcome, d.score,
                finding_codes, finding_starts_s, finding_ends_s,
                finding_severities,
                criterion_names, criterion_scores,
                safe_starts_s, safe_ends_s, trim_reasons,
-               in_point_s, out_point_s
-        FROM decisions
-        WHERE project_id = {p:UInt32} AND group_id = {g:UInt32}
-          AND subgroup_id = {s:UInt32}
-        ORDER BY clip_id, decided_at DESC
-        LIMIT 1 BY clip_id
+               in_point_s, out_point_s, c.take_no
+        FROM decisions AS d
+        INNER JOIN current_clip_placement AS c
+            ON c.project_id = d.project_id AND c.clip_id = d.clip_id
+           AND c.group_id = d.group_id AND c.subgroup_id = d.subgroup_id
+        WHERE d.project_id = {p:UInt32} AND d.group_id = {g:UInt32}
+          AND d.subgroup_id = {s:UInt32}
+        ORDER BY d.clip_id, d.decided_at DESC
+        LIMIT 1 BY d.clip_id
         """,
         parameters={"p": project_id, "g": group_id, "s": subgroup_id},
     )
@@ -568,12 +645,13 @@ async def _verdicts_for(project_id: int, group_id: int, subgroup_id: int) -> lis
             "trim_reasons": list(r[11]),
             "in_point_s": float(r[12]),
             "out_point_s": float(r[13]),
+            "take_no": int(r[14] or 0),
         }
         for r in result.result_rows
     ]
 
 
-@router.get("/{project_id}")
+@router.get("/{project_id}", response_model=schemas.Tree)
 async def tree(
     project_id: int,
     principal: Annotated[Principal, Depends(current_principal)],
@@ -622,8 +700,10 @@ async def tree(
             maxIf(l.margin, l.outcome = 'selected')          AS margin,
             maxIf(c.take_no, l.outcome = 'selected')         AS chosen_take,
             arrayDistinct(groupArray(c.camera))              AS cameras,
-            toString(min(toDate(c.captured_at)))             AS shoot_day
-        FROM clips AS c
+            toString(min(toDate(c.captured_at)))             AS shoot_day,
+            anyIf(c.scene_code, c.scene_code != '')          AS scene_code,
+            anyIf(c.shot_code, c.shot_code != '')            AS shot_code
+        FROM current_clip_placement AS c
         LEFT JOIN latest AS l
             ON l.group_id = c.group_id
            AND l.subgroup_id = c.subgroup_id
@@ -656,6 +736,8 @@ async def tree(
             chosen_take,
             cameras,
             day,
+            scene_code,
+            shot_code,
         ) = row
         scene_id, shot_id = int(scene_id), int(shot_id)
 
@@ -687,11 +769,14 @@ async def tree(
             elif here != wanted:
                 continue
 
-        node = scenes.setdefault(scene_id, {"scene": scene_id, "shots": []})
+        node = scenes.setdefault(
+            scene_id,
+            {"scene": scene_id, "scene_code": scene_code or "", "shots": []},
+        )
         node["shots"].append(
             {
                 "shot": shot_id,
-                "slug": (meta.slug if meta else "") or "",
+                "slug": (meta.slug if meta else "") or shot_code or "",
                 "label": label or "",
                 "takes": int(takes),
                 "unusable": int(unusable),

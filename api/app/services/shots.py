@@ -87,6 +87,13 @@ class Shot:
     state_by: str = ""
     state_at: datetime | None = None
 
+    # Current human take choice. Mutable operational state belongs here; the
+    # full immutable decision and its evidence are delivered to ClickHouse.
+    selected_clip_id: str = ""
+    previous_selected_clip_id: str = ""
+    selection_event_id: str = ""
+    selection_archive_state: str = ""
+
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_by: str = ""
 
@@ -117,6 +124,10 @@ class Shot:
             "state": self.state,
             "state_by": self.state_by,
             "state_at": self.state_at.isoformat() if self.state_at else None,
+            "selected_clip_id": self.selected_clip_id,
+            "previous_selected_clip_id": self.previous_selected_clip_id,
+            "selection_event_id": self.selection_event_id,
+            "selection_archive_state": self.selection_archive_state,
             "updated_at": self.updated_at.isoformat(),
             "updated_by": self.updated_by,
             "rev": self.rev,
@@ -163,6 +174,10 @@ def _from_doc(project_id: int, scene: int, shot: int, d: dict) -> Shot:
         state=d.get("state", ""),
         state_by=d.get("state_by", ""),
         state_at=d.get("state_at"),
+        selected_clip_id=d.get("selected_clip_id", ""),
+        previous_selected_clip_id=d.get("previous_selected_clip_id", ""),
+        selection_event_id=d.get("selection_event_id", ""),
+        selection_archive_state=d.get("selection_archive_state", ""),
         updated_at=d.get("updated_at") or datetime.now(UTC),
         updated_by=d.get("updated_by", ""),
         rev=int(d.get("rev", 0) or 0),

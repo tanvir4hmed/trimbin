@@ -258,8 +258,8 @@ export default function Upload({
           </ul>
 
           <p className="hint small">
-            Interrupted uploads resume. Closing this tab does not lose what has
-            already been sent.
+            A dropped connection continues from the last accepted chunk while
+            this page stays open. After a refresh, choose the files again.
           </p>
         </>
       )}

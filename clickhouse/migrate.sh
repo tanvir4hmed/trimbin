@@ -73,14 +73,24 @@ fi
 
 echo -n "Verifying… "
 count=$(curl --silent --fail --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}" \
-    --data-binary "SELECT count() FROM system.tables WHERE database = currentDatabase() AND name IN ('clips','decisions','comments','supersessions','current_selection','mv_current_selection','review_queue','accuracy_summary','real_clips','real_decisions','real_comments','accuracy_by_project','project_corpus','shoot_days','activity','real_activity','placements','current_placement','placement_inbox','real_placements')" \
+    --data-binary "SELECT count() FROM system.tables WHERE database = currentDatabase() AND name IN ('clips','decisions','comments','supersessions','current_selection','mv_current_selection','review_queue','accuracy_summary','real_clips','real_decisions','real_comments','accuracy_by_project','project_corpus','shoot_days','activity','real_activity','placements','current_placement','current_clip_placement','placement_inbox','real_placements')" \
     "${CLICKHOUSE_URL}/")
 
-if [[ "$count" -ne 20 ]]; then
-    echo "expected 20 objects, found ${count}" >&2
+if [[ "$count" -ne 21 ]]; then
+    echo "expected 21 objects, found ${count}" >&2
     exit 1
 fi
-echo "${count}/20 objects present."
+echo "${count}/21 objects present."
+
+echo -n "Placement ordering columns... "
+placement_cols=$(curl --silent --fail --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}" \
+    --data-binary "SELECT count() FROM system.columns WHERE database = currentDatabase() AND table = 'placements' AND name IN ('event_id','occurred_at')" \
+    "${CLICKHOUSE_URL}/")
+if [[ "$placement_cols" -ne 2 ]]; then
+    echo "expected 2, found ${placement_cols} - current placement can be nondeterministic" >&2
+    exit 1
+fi
+echo "2/2 present."
 
 # Indexes, not only tables.
 #

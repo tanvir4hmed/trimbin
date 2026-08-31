@@ -104,11 +104,11 @@ async def run(
     params: dict[str, Any] = {"project_id": project_id}
 
     if plan.get("scene") is not None:
-        conditions.append("d.group_id = {scene:UInt32}")
+        conditions.append("c.group_id = {scene:UInt32}")
         params["scene"] = int(plan["scene"])
 
     if plan.get("setup") is not None:
-        conditions.append("d.subgroup_id = {setup:UInt32}")
+        conditions.append("c.subgroup_id = {setup:UInt32}")
         params["setup"] = int(plan["setup"])
 
     if plan.get("take") is not None:
@@ -163,8 +163,8 @@ async def run(
     sql = f"""
         SELECT
             toString(d.clip_id)   AS clip_id,
-            d.group_id            AS scene,
-            d.subgroup_id         AS setup,
+            c.group_id            AS scene,
+            c.subgroup_id         AS setup,
             c.take_no             AS take_no,
             d.outcome             AS outcome,
             d.reason              AS reason,
@@ -180,7 +180,7 @@ async def run(
             d.out_point_s         AS usable_to_s,
             {score}               AS relevance
         FROM decisions AS d
-        INNER JOIN clips AS c
+        INNER JOIN current_clip_placement AS c
             ON c.clip_id = d.clip_id AND c.project_id = d.project_id
         WHERE {" AND ".join(conditions)}
         ORDER BY {order}

@@ -97,13 +97,12 @@ async def signed_resumable_url(
 
     The single-shot PUT it replaces had two problems on a real shoot day. A
     connection that dropped at ninety per cent of a four-gigabyte file started
-    that file again from zero, and a refresh mid-batch lost everything not yet
-    finished — which is most of it, because the browser was uploading one file
-    at a time.
+    that file again from zero.
 
     A resumable session gives the browser a session URI it can hold: it asks
-    Cloud Storage how many bytes arrived and continues from there. The session
-    outlives the page, so a refresh resumes rather than restarts.
+    Cloud Storage how many bytes arrived and continues from there while the
+    browser still owns the File object. Restoring a batch after a page refresh
+    is a separate product feature and is not implied by this URL.
 
     The signature covers the start of the session only. Once Cloud Storage
     issues a session URI, that URI is the capability — which is why it is

@@ -69,6 +69,7 @@ export default function ReviewPage() {
     item?.project_id ?? 0,
     item?.scene ?? 0,
     item?.shot ?? 0,
+    verdicts?.rev ?? 0,
   );
   const busy = chooseTake.isPending;
 

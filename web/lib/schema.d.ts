@@ -761,11 +761,9 @@ export interface paths {
          * Scene Edl
          * @description The stringout as a CMX3600 EDL, with the reasoning in the comments.
          *
-         *     The frame rate is declared by the caller and written into the header,
-         *     because nothing in the archive records what the original was shot at — the
-         *     proxies are normalised on the way in. An EDL cut at 24 for 25fps footage is
-         *     wrong by a frame a second, and it is better for an assistant to read that in
-         *     the file than to discover it in a conform.
+         *     Uses the measured source rate when every selected clip agrees. Mixed or
+         *     legacy footage still accepts an explicit rate; otherwise the documented
+         *     24fps fallback is used and named in the file header.
          */
         get: operations["scene_edl_scenes__project_id___scene_id__edl_get"];
         put?: never;
@@ -1183,6 +1181,32 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Activity */
+        Activity: {
+            /** Project Id */
+            project_id: number;
+            /**
+             * Project Name
+             * @default
+             */
+            project_name: string;
+            /** At */
+            at?: string | null;
+            /** Actor */
+            actor: string;
+            /** Actor Role */
+            actor_role: string;
+            /** Verb */
+            verb: string;
+            /** Detail */
+            detail: string;
+            /** Quantity */
+            quantity: number;
+            /** Scene */
+            scene: number;
+            /** Shot */
+            shot: number;
+        };
         /**
          * Assignment
          * @description Whose shot this is. An empty address unassigns it.
@@ -1240,6 +1264,26 @@ export interface components {
              * @default 0
              */
             rev: number;
+            /**
+             * Selected Clip Id
+             * @default
+             */
+            selected_clip_id: string;
+            /**
+             * Previous Selected Clip Id
+             * @default
+             */
+            previous_selected_clip_id: string;
+            /**
+             * Selection Event Id
+             * @default
+             */
+            selection_event_id: string;
+            /**
+             * Selection Archive State
+             * @default
+             */
+            selection_archive_state: string;
             /** Note */
             note?: string | null;
         };
@@ -1285,6 +1329,27 @@ export interface components {
              */
             is_reply: boolean;
         };
+        /** DashboardScreen */
+        DashboardScreen: {
+            /** You */
+            you?: string | null;
+            /** Role */
+            role: string;
+            /** Queue */
+            queue: components["schemas"]["QueueItem"][];
+            /** Queue Total */
+            queue_total: number;
+            totals: components["schemas"]["Totals"];
+            /** Projects */
+            projects: components["schemas"]["ProjectCard"][];
+            /** Recent */
+            recent: components["schemas"]["RecentDecision"][];
+            /** Notes */
+            notes: components["schemas"]["RecentNote"][];
+            /** Activity */
+            activity: components["schemas"]["Activity"][];
+            limits: components["schemas"]["Limits"];
+        };
         /** Finding */
         Finding: {
             /** Code */
@@ -1308,6 +1373,37 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** JobStatus */
+        JobStatus: {
+            /** Job Id */
+            job_id: string;
+            /** State */
+            state: string;
+            /** Done */
+            done: boolean;
+            /** Total */
+            total: number;
+            /** Completed */
+            completed: number;
+            /** Failed */
+            failed: number;
+            /** Failures */
+            failures: {
+                [key: string]: unknown;
+            }[];
+            /** Target */
+            target?: {
+                [key: string]: unknown;
+            } | null;
+            /** Groups */
+            groups: components["schemas"]["UploadGroup"][];
+            /** Needs A Look */
+            needs_a_look: number;
+            /** Started At */
+            started_at: string;
+            /** Finished At */
+            finished_at?: string | null;
         };
         /** Limits */
         Limits: {
@@ -1424,6 +1520,8 @@ export interface components {
          *     the reason no model can be trained to make these calls today.
          */
         Override: {
+            /** Rev */
+            rev: number;
             /**
              * Clip Id
              * Format: uuid
@@ -1442,6 +1540,67 @@ export interface components {
             username: string;
             /** Password */
             password: string;
+        };
+        /** PlacementInbox */
+        PlacementInbox: {
+            /** Project Id */
+            project_id: number;
+            /** Waiting */
+            waiting: components["schemas"]["PlacementItem"][];
+            /** Count */
+            count: number;
+        };
+        /** PlacementItem */
+        PlacementItem: {
+            /** Clip Id */
+            clip_id: string;
+            /** Scene */
+            scene: number;
+            /** Shot */
+            shot: number;
+            /** Take No */
+            take_no: number;
+            /** Source */
+            source: string;
+            /** Actor */
+            actor: string;
+            /** Confidence */
+            confidence: number;
+            /** State */
+            state: string;
+            /** Slate Raw */
+            slate_raw: string;
+            /** Declared Scene */
+            declared_scene: number;
+            /** Declared Shot */
+            declared_shot: number;
+            /** Detail */
+            detail: string;
+            /** Decided At */
+            decided_at?: string | null;
+            /** Proxy Uri */
+            proxy_uri: string;
+            /** Sprite Uri */
+            sprite_uri: string;
+            /** Slate Uri */
+            slate_uri: string;
+            /** Duration S */
+            duration_s: number;
+            /** Camera */
+            camera: string;
+            /** Filename */
+            filename: string;
+        };
+        /** PlacementResolved */
+        PlacementResolved: {
+            /** Status */
+            status: string;
+            /** Scene */
+            scene: number;
+            /** Shot */
+            shot: number;
+            /** Detail */
+            detail: string;
         };
         /** Plan */
         Plan: {
@@ -1501,6 +1660,42 @@ export interface components {
             /** Progress Pct */
             progress_pct?: number | null;
         };
+        /** ProjectCard */
+        ProjectCard: {
+            /** Project Id */
+            project_id: number;
+            /** Name */
+            name: string;
+            /** Owner Email */
+            owner_email: string;
+            /** Member Emails */
+            member_emails: string[];
+            /** Is Public */
+            is_public: boolean;
+            /** Created At */
+            created_at: string;
+            /** You Are Owner */
+            you_are_owner: boolean;
+            /** You Can Upload */
+            you_can_upload: boolean;
+            /** Scenes */
+            scenes?: number | null;
+            /** Shots */
+            shots?: number | null;
+            /** Takes */
+            takes?: number | null;
+            /** Settled */
+            settled?: number | null;
+            /** Waiting */
+            waiting?: number | null;
+            /** Progress Pct */
+            progress_pct?: number | null;
+            /**
+             * Members
+             * @default 1
+             */
+            members: number;
+        };
         /**
          * ProjectScreen
          * @description Everything the project workspace draws, in one answer.
@@ -1519,6 +1714,108 @@ export interface components {
         Question: {
             /** Question */
             question: string;
+        };
+        /** QueueItem */
+        QueueItem: {
+            /** Project Id */
+            project_id: number;
+            /** Project Name */
+            project_name: string;
+            /** Scene */
+            scene: number;
+            /** Shot */
+            shot: number;
+            /** Slug */
+            slug: string;
+            /** Takes */
+            takes: number;
+            /** Margin */
+            margin: number;
+            /** Reason */
+            reason: string;
+            /** Assignee */
+            assignee: string;
+            /** State */
+            state: string;
+            /** Circled Take */
+            circled_take: number;
+            /** Chosen Take */
+            chosen_take: number;
+            /** Open Comments */
+            open_comments: number;
+        };
+        /** RecentDecision */
+        RecentDecision: {
+            /** Project Id */
+            project_id: number;
+            /**
+             * Project Name
+             * @default
+             */
+            project_name: string;
+            /** Scene */
+            scene: number;
+            /** Shot */
+            shot: number;
+            /** Take No */
+            take_no: number;
+            /** Decided By */
+            decided_by: string;
+            /** Actor */
+            actor: string;
+            /** Reason */
+            reason: string;
+            /** Decided At */
+            decided_at?: string | null;
+            /** Margin */
+            margin: number;
+        };
+        /** RecentNote */
+        RecentNote: {
+            /** Project Id */
+            project_id: number;
+            /**
+             * Project Name
+             * @default
+             */
+            project_name: string;
+            /** Scene */
+            scene: number;
+            /** Shot */
+            shot: number;
+            /** Author */
+            author: string;
+            /** Body */
+            body: string;
+            /** Created At */
+            created_at: string;
+        };
+        /**
+         * Recorded
+         * @description The answer to an override.
+         *
+         *     Says what changed rather than "ok", because the interface tells the editor
+         *     whether they agreed with the panel and that is not knowable from a 201.
+         */
+        Recorded: {
+            /** Status */
+            status: string;
+            /** Agreed With Panel */
+            agreed_with_panel: boolean;
+            /** Previously Recommended */
+            previously_recommended?: string | null;
+            /** Now Selected */
+            now_selected: string;
+            /**
+             * Rev
+             * @default 0
+             */
+            rev: number;
+            /**
+             * Archive Pending
+             * @default false
+             */
+            archive_pending: boolean;
         };
         /**
          * Resolution
@@ -1552,6 +1849,11 @@ export interface components {
         SceneNode: {
             /** Scene */
             scene: number;
+            /**
+             * Scene Code
+             * @default
+             */
+            scene_code: string;
             /** Shots */
             shots: components["schemas"]["ShotNode"][];
         };
@@ -1672,6 +1974,87 @@ export interface components {
             /** Open Comments */
             open_comments: number;
         };
+        /** Stringout */
+        Stringout: {
+            /** Project Id */
+            project_id: number;
+            /** Scene */
+            scene: number;
+            /** Entries */
+            entries: components["schemas"]["StringoutEntry"][];
+            /** Duration S */
+            duration_s: number;
+            /** Shots */
+            shots: number;
+            /** Unresolved */
+            unresolved: number;
+            /** Disagreements */
+            disagreements: number;
+            /**
+             * Source Fps
+             * @default []
+             */
+            source_fps: number[];
+            /**
+             * Export Fps
+             * @default 0
+             */
+            export_fps: number;
+        };
+        /** StringoutEntry */
+        StringoutEntry: {
+            /** Scene */
+            scene: number;
+            /** Shot */
+            shot: number;
+            /** Slug */
+            slug: string;
+            /** Clip Id */
+            clip_id: string;
+            /** Take No */
+            take_no: number;
+            /** Start S */
+            start_s: number;
+            /** End S */
+            end_s: number;
+            /** Duration S */
+            duration_s: number;
+            /** Proxy Uri */
+            proxy_uri: string;
+            /** Sprite Uri */
+            sprite_uri: string;
+            /** Reason */
+            reason: string;
+            /** Decided By */
+            decided_by: string;
+            /** Actor */
+            actor: string;
+            /** Margin */
+            margin: number;
+            /** Needs Review */
+            needs_review: boolean;
+            /** Circled Take */
+            circled_take: number;
+            /** Differs From Circle */
+            differs_from_circle: boolean;
+            /** Open Comments */
+            open_comments: number;
+            /**
+             * Fps
+             * @default 0
+             */
+            fps: number;
+            /**
+             * Scene Code
+             * @default
+             */
+            scene_code: string;
+            /**
+             * Shot Code
+             * @default
+             */
+            shot_code: string;
+        };
         /** Take */
         Take: {
             /** Clip Id */
@@ -1727,6 +2110,21 @@ export interface components {
             camera: string;
             /** Captured At */
             captured_at?: string | null;
+            /**
+             * Fps
+             * @default 0
+             */
+            fps: number;
+            /**
+             * Scene Code
+             * @default
+             */
+            scene_code: string;
+            /**
+             * Shot Code
+             * @default
+             */
+            shot_code: string;
         };
         /** TimeRange */
         TimeRange: {
@@ -1734,6 +2132,17 @@ export interface components {
             start_s: number;
             /** End S */
             end_s: number;
+        };
+        /** Totals */
+        Totals: {
+            /** Waiting */
+            waiting: number;
+            /** Yours */
+            yours: number;
+            /** Unassigned */
+            unassigned: number;
+            /** Projects */
+            projects: number;
         };
         /** Tree */
         Tree: {
@@ -1747,6 +2156,33 @@ export interface components {
             shoot_days: string[];
             /** Review Margin */
             review_margin: number;
+        };
+        /**
+         * UndoRequest
+         * @description Undo is a new selection and has the same concurrency contract.
+         */
+        UndoRequest: {
+            /** Rev */
+            rev: number;
+        };
+        /** Undone */
+        Undone: {
+            /** Status */
+            status: string;
+            /** Restored */
+            restored: string;
+            /** Undone From */
+            undone_from: string;
+            /**
+             * Rev
+             * @default 0
+             */
+            rev: number;
+            /**
+             * Archive Pending
+             * @default false
+             */
+            archive_pending: boolean;
         };
         /** UploadComplete */
         UploadComplete: {
@@ -1773,6 +2209,23 @@ export interface components {
             tickets: components["schemas"]["UploadTicket"][];
             /** Expires In S */
             expires_in_s: number;
+        };
+        /** UploadGroup */
+        UploadGroup: {
+            /** Scene */
+            scene: number;
+            /** Shot */
+            shot: number;
+            /** Takes */
+            takes: number;
+            /** Unread Slates */
+            unread_slates: number;
+            /** Mismatches */
+            mismatches: {
+                [key: string]: unknown;
+            }[];
+            /** Status */
+            status: string;
         };
         /** UploadRequest */
         UploadRequest: {
@@ -1847,6 +2300,16 @@ export interface components {
              * @enum {string}
              */
             state: "" | "needs_review" | "in_progress" | "approved";
+            /**
+             * Rev
+             * @default 0
+             */
+            rev: number;
+            /**
+             * Selection Archive State
+             * @default
+             */
+            selection_archive_state: string;
         };
     };
     responses: never;
@@ -2116,9 +2579,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DashboardScreen"];
                 };
             };
         };
@@ -2208,9 +2669,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["JobStatus"];
                 };
             };
             /** @description Validation Error */
@@ -2276,9 +2735,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Verdicts"];
                 };
             };
             /** @description Validation Error */
@@ -2354,9 +2811,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Recorded"];
                 };
             };
             /** @description Validation Error */
@@ -2373,7 +2828,9 @@ export interface operations {
     undo_review__project_id___group_id___subgroup_id__undo_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
             path: {
                 project_id: number;
                 group_id: number;
@@ -2381,7 +2838,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UndoRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             201: {
@@ -2389,9 +2850,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Undone"];
                 };
             };
             /** @description Validation Error */
@@ -2427,9 +2886,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Tree"];
                 };
             };
             /** @description Validation Error */
@@ -2795,9 +3252,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Stringout"];
                 };
             };
             /** @description Validation Error */
@@ -2814,7 +3269,7 @@ export interface operations {
     scene_edl_scenes__project_id___scene_id__edl_get: {
         parameters: {
             query?: {
-                fps?: number;
+                fps?: number | null;
             };
             header?: never;
             path: {
@@ -2848,7 +3303,7 @@ export interface operations {
     scene_markers_scenes__project_id___scene_id__markers_csv_get: {
         parameters: {
             query?: {
-                fps?: number;
+                fps?: number | null;
             };
             header?: never;
             path: {
@@ -2965,9 +3420,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlacementInbox"];
                 };
             };
             /** @description Validation Error */
@@ -3003,9 +3456,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlacementResolved"];
                 };
             };
             /** @description Validation Error */

@@ -68,7 +68,7 @@ async def pending(project_id: int) -> list[Setup]:
     result = await ch.query(
         """
         SELECT c.group_id, c.subgroup_id, groupArray(c.clip_id) AS clip_ids
-        FROM clips AS c
+        FROM current_clip_placement AS c
         WHERE c.project_id = {p:UInt32} AND c.status = 'active'
         GROUP BY c.group_id, c.subgroup_id
         HAVING count() >= {min:UInt8}
@@ -229,7 +229,7 @@ async def _load(project_id: int, group_id: int, subgroup_id: int) -> list[dict]:
                exposure_rel, clipping_pct, sharpness_rel, motion_rel,
                audio_lufs, noise_floor_db, dropped_frames, normalised_at,
                finding_codes, finding_starts_s, finding_ends_s
-        FROM clips
+        FROM current_clip_placement
         WHERE project_id = {p:UInt32} AND group_id = {g:UInt32}
           AND subgroup_id = {s:UInt32} AND status = 'active'
         ORDER BY take_no, clip_id

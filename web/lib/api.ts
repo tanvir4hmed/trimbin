@@ -188,26 +188,7 @@ export interface JobStatus {
 }
 
 /** One shot's place in the assembled scene. */
-export interface StringoutEntry {
-  scene: number;
-  shot: number;
-  slug: string;
-  clip_id: string;
-  take_no: number;
-  start_s: number;
-  end_s: number;
-  duration_s: number;
-  proxy_uri: string;
-  sprite_uri: string;
-  reason: string;
-  decided_by: "agent" | "human";
-  actor: string;
-  margin: number;
-  needs_review: boolean;
-  circled_take: number;
-  differs_from_circle: boolean;
-  open_comments: number;
-}
+export type StringoutEntry = S["StringoutEntry"];
 
 /**
  * The scene assembled from the takes that were chosen.
@@ -216,15 +197,7 @@ export interface StringoutEntry {
  * hands the editor: every shot of the scene, in order, one take each. It is not
  * an edit — nothing here decides where a cut goes, which is a story question.
  */
-export interface Stringout {
-  project_id: number;
-  scene: number;
-  entries: StringoutEntry[];
-  duration_s: number;
-  shots: number;
-  unresolved: number;
-  disagreements: number;
-}
+export type Stringout = S["Stringout"];
 
 export interface AccuracySummary {
   /**
@@ -477,14 +450,15 @@ export const api = {
     projectId: number,
     scene: number,
     shot: number,
-    body: { clip_id: string; reason: string; in_point_s?: number; out_point_s?: number },
+    body: {
+      rev: number;
+      clip_id: string;
+      reason: string;
+      in_point_s?: number;
+      out_point_s?: number;
+    },
   ) =>
-    request<{
-      status: string;
-      agreed_with_panel: boolean;
-      previously_recommended: string | null;
-      now_selected: string;
-    }>(`/review/${projectId}/${scene}/${shot}/select`, {
+    request<S["Recorded"]>(`/review/${projectId}/${scene}/${shot}/select`, {
       method: "POST",
       // A retry of a dropped request must not land in the archive as a second
       // editorial decision. The key is per attempt, so a genuine second choice
@@ -494,10 +468,14 @@ export const api = {
     }),
 
   /** Put back what stood before the last human decision. Written forward, never deleted. */
-  undo: (projectId: number, scene: number, shot: number) =>
-    request<{ status: string; restored: string; undone_from: string }>(
+  undo: (projectId: number, scene: number, shot: number, rev: number) =>
+    request<S["Undone"]>(
       `/review/${projectId}/${scene}/${shot}/undo`,
-      { method: "POST" },
+      {
+        method: "POST",
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+        body: JSON.stringify({ rev }),
+      },
     ),
 
   brief: (projectId: number, scene: number, shot: number) =>

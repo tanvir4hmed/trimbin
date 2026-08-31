@@ -160,6 +160,7 @@ class ShotNode(Model):
 
 class SceneNode(Model):
     scene: int
+    scene_code: str = ""
     shots: list[ShotNode]
 
 
@@ -214,6 +215,9 @@ class Take(Model):
     duration_s: float
     camera: str = ""
     captured_at: str | None = None
+    fps: float = 0.0
+    scene_code: str = ""
+    shot_code: str = ""
 
 
 class Verdicts(Model):
@@ -227,6 +231,8 @@ class Verdicts(Model):
     differs_from_circle: bool
     assignee: str
     state: ShotState
+    rev: int = 0
+    selection_archive_state: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -256,6 +262,10 @@ class Brief(Model):
     # services/revisions.py: a command without it, or with a stale one, is a
     # 409 rather than a silent overwrite of somebody else's edit.
     rev: int = 0
+    selected_clip_id: str = ""
+    previous_selected_clip_id: str = ""
+    selection_event_id: str = ""
+    selection_archive_state: str = ""
     note: str | None = None
 
 
@@ -414,14 +424,40 @@ class ShotScreen(Model):
     open_comments: int
 
 
+class StringoutEntry(Model):
+    scene: int
+    shot: int
+    slug: str
+    clip_id: str
+    take_no: int
+    start_s: float
+    end_s: float
+    duration_s: float
+    proxy_uri: str
+    sprite_uri: str
+    reason: str
+    decided_by: str
+    actor: str
+    margin: float
+    needs_review: bool
+    circled_take: int
+    differs_from_circle: bool
+    open_comments: int
+    fps: float = 0.0
+    scene_code: str = ""
+    shot_code: str = ""
+
+
 class Stringout(Model):
     project_id: int
     scene: int
-    entries: list[dict]
+    entries: list[StringoutEntry]
     duration_s: float
     shots: int
     unresolved: int
     disagreements: int
+    source_fps: list[float] = []
+    export_fps: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -441,12 +477,15 @@ class Recorded(Model):
     previously_recommended: str | None = None
     now_selected: str
     rev: int = 0
+    archive_pending: bool = False
 
 
 class Undone(Model):
     status: str
     restored: str
     undone_from: str
+    rev: int = 0
+    archive_pending: bool = False
 
 
 class Judged(Model):
@@ -484,3 +523,38 @@ class JobStatus(Model):
     needs_a_look: int
     started_at: str
     finished_at: str | None = None
+
+
+class PlacementItem(Model):
+    clip_id: str
+    scene: int
+    shot: int
+    take_no: int
+    source: str
+    actor: str
+    confidence: float
+    state: str
+    slate_raw: str
+    declared_scene: int
+    declared_shot: int
+    detail: str
+    decided_at: str | None = None
+    proxy_uri: str
+    sprite_uri: str
+    slate_uri: str
+    duration_s: float
+    camera: str
+    filename: str
+
+
+class PlacementInbox(Model):
+    project_id: int
+    waiting: list[PlacementItem]
+    count: int
+
+
+class PlacementResolved(Model):
+    status: str
+    scene: int
+    shot: int
+    detail: str

@@ -81,7 +81,7 @@ export default function SceneTree({
       {scenes.map((scene) => (
         <section key={scene.scene}>
           <h3>
-            <span>Scene {scene.scene}</span>
+            <span>Scene {scene.scene_code || scene.scene}</span>
             {onOpenScene && (
               <button
                 type="button"

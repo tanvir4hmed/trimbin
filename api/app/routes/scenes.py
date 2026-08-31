@@ -17,6 +17,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
 
+from .. import schemas
 from ..auth import Principal, current_principal
 from ..services import exports, stringout
 from ..services.analytics import client
@@ -35,7 +36,7 @@ async def scenes(
     return {"project_id": project_id, "scenes": await stringout.scenes_in(project_id)}
 
 
-@router.get("/{project_id}/{scene_id}")
+@router.get("/{project_id}/{scene_id}", response_model=schemas.Stringout)
 async def scene(
     project_id: int,
     scene_id: int,
@@ -57,23 +58,22 @@ async def scene_edl(
     project_id: int,
     scene_id: int,
     principal: Annotated[Principal, Depends(current_principal)],
-    fps: float = exports.DEFAULT_FPS,
+    fps: float | None = None,
 ) -> Response:
     """The stringout as a CMX3600 EDL, with the reasoning in the comments.
 
-    The frame rate is declared by the caller and written into the header,
-    because nothing in the archive records what the original was shot at — the
-    proxies are normalised on the way in. An EDL cut at 24 for 25fps footage is
-    wrong by a frame a second, and it is better for an assistant to read that in
-    the file than to discover it in a conform.
+    Uses the measured source rate when every selected clip agrees. Mixed or
+    legacy footage still accepts an explicit rate; otherwise the documented
+    24fps fallback is used and named in the file header.
     """
     await principal.assert_can_read(project_id)
 
     built = await stringout.scene(project_id, scene_id)
+    export_fps = fps or float(built.get("export_fps") or exports.DEFAULT_FPS)
     text = exports.edl(
         title=f"TRIMBIN P{project_id} SCENE {scene_id}",
         entries=built["entries"],
-        fps=fps,
+        fps=export_fps,
     )
     return Response(
         content=text,
@@ -89,7 +89,7 @@ async def scene_markers(
     project_id: int,
     scene_id: int,
     principal: Annotated[Principal, Depends(current_principal)],
-    fps: float = exports.DEFAULT_FPS,
+    fps: float | None = None,
 ) -> Response:
     """Every finding and every note as timeline markers, in record time.
 
@@ -101,10 +101,11 @@ async def scene_markers(
     await principal.assert_can_read(project_id)
 
     built = await stringout.scene(project_id, scene_id)
+    export_fps = fps or float(built.get("export_fps") or exports.DEFAULT_FPS)
     findings = await _findings_for_scene(project_id, scene_id)
     notes = await _notes_for_scene(project_id, scene_id)
 
-    text = exports.markers(built["entries"], findings, notes, fps=fps)
+    text = exports.markers(built["entries"], findings, notes, fps=export_fps)
     return Response(
         content=text,
         media_type="text/csv; charset=utf-8",
@@ -142,7 +143,9 @@ async def _findings_for_scene(project_id: int, scene_id: int) -> list[dict]:
         -- the whole row. Losing a finding is worse than losing its colour.
         LEFT ARRAY JOIN codes AS code, starts AS start_s, ends AS end_s,
                         arrayResize(sevs, length(codes), '') AS severity
-        LEFT JOIN clips AS c ON c.clip_id = d.clip_id AND c.project_id = {p:UInt32}
+        LEFT JOIN current_clip_placement AS c
+            ON c.clip_id = d.clip_id AND c.project_id = {p:UInt32}
+           AND c.group_id = {g:UInt32} AND c.subgroup_id = d.subgroup_id
         ORDER BY d.subgroup_id, c.take_no
         """,
         parameters={"p": project_id, "g": scene_id},

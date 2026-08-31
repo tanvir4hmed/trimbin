@@ -145,7 +145,7 @@ function useShotInvalidation(projectId: number, scene: number, shot: number) {
   };
 }
 
-export function useChooseTake(projectId: number, scene: number, shot: number) {
+export function useChooseTake(projectId: number, scene: number, shot: number, rev: number) {
   const invalidate = useShotInvalidation(projectId, scene, shot);
   return useMutation({
     mutationFn: (input: {
@@ -153,15 +153,15 @@ export function useChooseTake(projectId: number, scene: number, shot: number) {
       reason: string;
       in_point_s?: number;
       out_point_s?: number;
-    }) => api.select(projectId, scene, shot, input),
+    }) => api.select(projectId, scene, shot, { ...input, rev }),
     onSuccess: invalidate,
   });
 }
 
-export function useUndo(projectId: number, scene: number, shot: number) {
+export function useUndo(projectId: number, scene: number, shot: number, rev: number) {
   const invalidate = useShotInvalidation(projectId, scene, shot);
   return useMutation({
-    mutationFn: () => api.undo(projectId, scene, shot),
+    mutationFn: () => api.undo(projectId, scene, shot, rev),
     onSuccess: invalidate,
   });
 }

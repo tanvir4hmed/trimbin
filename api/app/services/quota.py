@@ -102,7 +102,7 @@ async def takes_in_shot(project_id: int, scene: int, shot: int) -> int:
     ch = await client()
     result = await ch.query(
         """
-        SELECT count() FROM clips
+        SELECT count() FROM current_clip_placement
         WHERE project_id = {p:UInt32} AND group_id = {g:UInt32}
           AND subgroup_id = {s:UInt32} AND status = 'active'
         """,

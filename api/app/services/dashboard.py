@@ -107,7 +107,7 @@ async def for_projects(project_ids: list[int], viewer: str) -> dict:
         circled = described.circled_take if described else 0
         state = described.state if described else ""
         assignee = described.assignee if described else ""
-        slug = (described.slug if described else "") or ""
+        slug = (described.slug if described else "") or row["shot_code"]
 
         reason = assessment.assess(
             takes=row["takes"],
@@ -193,7 +193,7 @@ async def recent_decisions(project_ids: list[int], limit: int = 12) -> list[dict
                c.take_no, d.decided_by, d.actor_id, d.reason, d.decided_at,
                d.margin
         FROM decisions AS d
-        LEFT JOIN clips AS c
+        LEFT JOIN current_clip_placement AS c
             ON c.clip_id = d.clip_id AND c.project_id = d.project_id
         WHERE d.project_id IN {ids:Array(UInt32)} AND d.outcome = 'selected'
         ORDER BY d.decided_at DESC
@@ -250,8 +250,9 @@ async def _shot_rows(project_ids: list[int]) -> list[dict]:
             max(l.outcome = 'selected')                           AS has_verdict,
             maxIf(l.decided_by = 'human', l.outcome = 'selected') AS confirmed,
             maxIf(l.margin, l.outcome = 'selected')               AS margin,
-            maxIf(c.take_no, l.outcome = 'selected')              AS chosen_take
-        FROM clips AS c
+            maxIf(c.take_no, l.outcome = 'selected')              AS chosen_take,
+            anyIf(c.shot_code, c.shot_code != '')                 AS shot_code
+        FROM current_clip_placement AS c
         LEFT JOIN latest AS l
             ON l.project_id = c.project_id
            AND l.group_id = c.group_id
@@ -274,6 +275,7 @@ async def _shot_rows(project_ids: list[int]) -> list[dict]:
             "confirmed": bool(r[5]),
             "margin": float(r[6]),
             "chosen_take": int(r[7] or 0),
+            "shot_code": r[8] or "",
         }
         for r in result.result_rows
     ]

@@ -145,6 +145,10 @@ export default function ScenePage({
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (data?.export_fps) setFps(data.export_fps);
+  }, [data?.export_fps]);
+
   const segments = useMemo(() => {
     if (!data) return [];
     return mode === "rough" ? roughCut(data.entries, cut) : fullTakes(data.entries);

@@ -15,6 +15,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
+from .. import schemas
 from ..auth import Principal, current_principal, require_signed_in
 from ..config import settings
 from ..services import activity, members, projects
@@ -47,7 +48,7 @@ async def me(
     }
 
 
-@router.get("/dashboard")
+@router.get("/dashboard", response_model=schemas.DashboardScreen)
 async def dashboard(
     principal: Annotated[Principal, Depends(require_signed_in)],
 ) -> dict:

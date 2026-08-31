@@ -238,7 +238,7 @@ async def normalise_group(project_id: int, group_id: int, subgroup_id: int) -> i
     result = await ch.query(
         """
         SELECT clip_id, exposure_raw, sharpness_raw, motion_raw
-        FROM clips
+        FROM current_clip_placement
         WHERE project_id = {p:UInt32} AND group_id = {g:UInt32}
           AND subgroup_id = {s:UInt32} AND status = 'active'
         ORDER BY clip_id, ingested_at DESC
@@ -301,16 +301,15 @@ async def normalise_group(project_id: int, group_id: int, subgroup_id: int) -> i
             sharpness_rel = if(sharpness_raw > 0, sharpness_raw / {sm:Float32}, 1.0),
             motion_rel    = if(motion_raw > 0, motion_raw / {mm:Float32}, 1.0),
             normalised_at = now()
-        WHERE project_id = {p:UInt32} AND group_id = {g:UInt32}
-          AND subgroup_id = {s:UInt32} AND status = 'active'
+        WHERE project_id = {p:UInt32} AND clip_id IN {ids:Array(UUID)}
+          AND status = 'active'
         """,
         parameters={
             "em": divisors["exposure"],
             "sm": divisors["sharpness"],
             "mm": divisors["motion"],
             "p": project_id,
-            "g": group_id,
-            "s": subgroup_id,
+            "ids": [r[0] for r in rows],
         },
     )
 

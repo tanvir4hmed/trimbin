@@ -10,13 +10,11 @@
  * **No resume.** A connection that dropped at ninety per cent of a four-gigabyte
  * file started that file again from zero.
  *
- * **Nothing survived a refresh.** Close the tab mid-batch and every file not yet
- * finished was lost, which was most of them.
- *
- * A resumable session fixes all three. Cloud Storage hands back a session URI;
+ * A resumable session fixes interrupted requests within the active upload.
+ * Cloud Storage hands back a session URI;
  * the browser can ask it how many bytes arrived and continue from there. The
- * session outlives the page, so the URI is worth keeping in localStorage — a
- * refresh resumes rather than restarts.
+ * browser cannot restore a File object after a refresh, so this does not claim
+ * cross-refresh recovery: after a reload the person must choose the files again.
  */
 
 export interface Ticket {
@@ -46,38 +44,22 @@ const PARALLEL = 3;
  *  requires for every chunk but the last. */
 const CHUNK = 8 * 1024 * 1024;
 
-const SESSIONS_KEY = "trimbin.upload.sessions";
-
-/** Session URIs, so a refresh continues instead of starting again. */
-function sessions(): Record<string, string> {
-  try {
-    return JSON.parse(localStorage.getItem(SESSIONS_KEY) ?? "{}");
-  } catch {
-    return {};
-  }
-}
+/** Session capabilities live only for this page. Persisting one without the
+ * File object and batch ticket cannot resume anything after a refresh, and it
+ * leaves a storage capability behind in localStorage for no benefit. */
+const sessionUris = new Map<string, string>();
 
 function remember(clipId: string, uri: string): void {
-  try {
-    localStorage.setItem(SESSIONS_KEY, JSON.stringify({ ...sessions(), [clipId]: uri }));
-  } catch {
-    // Private browsing. The upload still works; it just cannot be resumed.
-  }
+  sessionUris.set(clipId, uri);
 }
 
 function forget(clipId: string): void {
-  try {
-    const all = sessions();
-    delete all[clipId];
-    localStorage.setItem(SESSIONS_KEY, JSON.stringify(all));
-  } catch {
-    /* nothing to clear */
-  }
+  sessionUris.delete(clipId);
 }
 
 /** Open a resumable session, or reuse the one this file already has. */
 async function openSession(ticket: Ticket): Promise<string> {
-  const existing = sessions()[ticket.clip_id];
+  const existing = sessionUris.get(ticket.clip_id);
   if (existing) return existing;
 
   const response = await fetch(ticket.upload_url, {

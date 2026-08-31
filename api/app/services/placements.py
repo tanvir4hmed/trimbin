@@ -23,7 +23,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from .analytics import client
 
@@ -36,6 +36,8 @@ _COLUMNS = [
     "subgroup_id",
     "take_no",
     "at",
+    "event_id",
+    "occurred_at",
     "source",
     "actor",
     "confidence",
@@ -112,6 +114,7 @@ async def record(
     detail: str = "",
 ) -> None:
     """Append one placement. Never replaces an earlier one."""
+    occurred_at = datetime.now(UTC)
     await (await client()).insert(
         "placements",
         [
@@ -121,7 +124,9 @@ async def record(
                 scene,
                 shot,
                 take_no,
-                datetime.now(UTC),
+                occurred_at,
+                uuid4(),
+                occurred_at,
                 source,
                 actor,
                 float(confidence),
@@ -223,15 +228,15 @@ async def inbox(project_id: int) -> list[dict]:
 async def current(project_id: int) -> dict[str, tuple[int, int]]:
     """Where every clip in a project currently sits.
 
-    For the readers that still join on `clips.group_id`. Those are being moved
-    across one at a time; until then this is how a mover's decision reaches
-    them.
+    This is mainly useful to callers that need a compact map. Operational SQL
+    should read `current_clip_placement`, the canonical relation that also
+    includes clips without a placement event.
     """
     ch = await client()
     result = await ch.query(
         """
         SELECT toString(clip_id), group_id, subgroup_id
-        FROM current_placement
+        FROM current_clip_placement
         WHERE project_id = {p:UInt32}
         """,
         parameters={"p": project_id},

@@ -87,14 +87,14 @@ class TestEveryQueryIsScopedToOneProject:
 class TestFiltersReachTheQuery:
     def test_a_scene_narrows(self) -> None:
         sql, params = sql_for({"scene": 12})
-        assert "d.group_id = {scene:UInt32}" in sql
+        assert "c.group_id = {scene:UInt32}" in sql
         assert params["scene"] == 12
 
     def test_scene_zero_is_a_real_scene(self) -> None:
         """Ungrouped clips sit in scene zero. A truthiness check would drop the
         filter and answer about the whole project instead."""
         sql, params = sql_for({"scene": 0})
-        assert "d.group_id" in sql
+        assert "c.group_id" in sql
         assert params["scene"] == 0
 
     def test_an_outcome_narrows(self) -> None:
