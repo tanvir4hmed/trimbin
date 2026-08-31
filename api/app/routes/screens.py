@@ -34,10 +34,18 @@ router = APIRouter(prefix="/screens", tags=["screens"])
 
 
 def _me(principal: Principal) -> schemas.Me:
+    """Who is asking, from the one place that decides.
+
+    `capabilities()` already reports `signed_in`, so passing it again here was a
+    duplicate keyword and a TypeError on every call — and `/me` gets away with
+    the same duplication because it builds a dict, where a repeated key is an
+    overwrite rather than an error.
+
+    Spread only, so there is one source for every field.
+    """
     return schemas.Me(
-        email=principal.email,
-        signed_in=not principal.is_anonymous,
         **members.capabilities(principal.email),
+        email=principal.email,
         demo_project_id=settings.demo_project_id,
     )
 
