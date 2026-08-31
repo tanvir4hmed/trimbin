@@ -1,14 +1,19 @@
-# Runs on every pull request. Fast, no cloud access, no secrets.
+# Every check that can run without credentials.
 #
-# Deliberately separate from deploy.yml: a check that needs credentials cannot run
-# on a fork's pull request, and a check that cannot run is a check nobody trusts.
+# Runs on pull requests, on pushes to any branch including main, and — the part
+# that matters — as a reusable workflow that deploy.yml calls before it deploys.
+#
+# It ran zero times before today. The triggers were `pull_request` and
+# `push: branches-ignore: [main]`, and the only way anything reaches production
+# here is a push to main, so no test has ever gated a deployment. The job was
+# even named "Agents & API" while every step ran in `agents/`.
 
 name: CI
 
 on:
   pull_request:
   push:
-    branches-ignore: [main]
+  workflow_call:
 
 permissions:
   contents: read
@@ -18,8 +23,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  python:
-    name: Agents & API
+  agents:
+    name: Agents
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -52,6 +57,65 @@ jobs:
       - name: Test
         run: uv run pytest -q
         working-directory: agents
+
+  api:
+    name: API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # Resolves trimbin-agents through the path source in api/pyproject.toml.
+      # Before that declaration existed this step was impossible, which is why
+      # these tests only ever ran locally.
+      - name: Install
+        run: uv sync --all-extras --dev
+        working-directory: api
+
+      - name: Lint
+        run: uv run ruff check .
+        working-directory: api
+
+      - name: Test
+        run: uv run pytest -q
+        working-directory: api
+
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+        working-directory: web
+
+      - name: Types
+        run: npx tsc --noEmit
+        working-directory: web
+
+      # The build is the check that matters. A page can typecheck and still fail
+      # to prerender, and that failure only appears in deploy.
+      - name: Build
+        run: npx next build
+        working-directory: web
+        env:
+          NEXT_PUBLIC_OAUTH_CLIENT_ID: ""
+          NEXT_PUBLIC_TRIAL_PASS: ""
 
   terraform:
     name: Terraform

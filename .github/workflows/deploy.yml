@@ -25,8 +25,20 @@ env:
   SERVICE: trimbin-api
 
 jobs:
+  # Nothing reaches production without the tests passing.
+  #
+  # This gate did not exist. CI ran only on branches other than main and only
+  # ever ran the agents suite, so every deployment so far went out with no test
+  # having gated it. Calling the workflow rather than repeating its steps means
+  # there is one definition of "the checks".
+  checks:
+    name: Checks
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
   deploy:
     name: Deploy to production
+    needs: checks
     runs-on: ubuntu-latest
     environment: production
 

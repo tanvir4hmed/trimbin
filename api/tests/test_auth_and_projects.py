@@ -70,7 +70,9 @@ class TestAudienceVerification:
         self, monkeypatch
     ) -> None:
         """The audience is the whole point of the check."""
-        monkeypatch.setattr(auth.settings, "oauth_client_id", "our-client.apps.googleusercontent.com")
+        monkeypatch.setattr(
+            auth.settings, "oauth_client_id", "our-client.apps.googleusercontent.com"
+        )
         seen = {}
 
         def verify(token, request, audience=None):

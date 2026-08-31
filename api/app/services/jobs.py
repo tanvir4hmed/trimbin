@@ -24,6 +24,34 @@ log = logging.getLogger(__name__)
 
 COLLECTION = "jobs"
 
+
+class State:
+    """Every state a job can be in, named once.
+
+    The worker wrote "done" and the route asked whether the state was
+    "finished" — two vocabularies for one thing, neither of them wrong on its
+    own. The upload screen polled forever, showed real progress the whole time,
+    and never said it had finished. Nothing errored anywhere.
+
+    A string literal in two files is not a shared vocabulary. This is.
+    """
+
+    UPLOADING = "uploading"   # tickets issued, bytes moving
+    PROCESSING = "processing" # queued, workers running
+    DONE = "done"             # every clip accounted for, failures included
+    FAILED = "failed"         # abandoned before any work could start
+
+
+# States from which nothing further happens. The interface stops polling here.
+#
+# "done" covers a batch with failures in it: the word describes the work, not
+# the outcome, and the failures are listed beside it.
+TERMINAL = frozenset({State.DONE, State.FAILED})
+
+ALL_STATES = frozenset({
+    State.UPLOADING, State.PROCESSING, State.DONE, State.FAILED,
+})
+
 _db: firestore.AsyncClient | None = None
 _publisher: pubsub_v1.PublisherClient | None = None
 
@@ -80,7 +108,7 @@ async def open_job(
     await db().collection(COLLECTION).document(str(job_id)).set({
         "project_id": project_id,
         "kind": kind,
-        "state": "uploading",
+        "state": State.UPLOADING,
         "total_items": total_items,
         "completed_items": 0,
         "failed_items": 0,
@@ -128,7 +156,7 @@ async def set_total(job_id: UUID, total: int) -> None:
     """
     await db().collection(COLLECTION).document(str(job_id)).update({
         "total_items": total,
-        "state": "processing",
+        "state": State.PROCESSING,
     })
 
 
@@ -181,7 +209,7 @@ async def record_progress(job_id: UUID, clip_id: UUID, ok: bool, reason: str = "
         # still finishes — "done" describes the work, not the outcome, and the
         # failures are listed beside it.
         if total and completed + failed >= total:
-            update["state"] = "done"
+            update["state"] = State.DONE
             update["finished_at"] = datetime.now(UTC)
 
         transaction.update(ref, update)
@@ -235,7 +263,7 @@ async def abandon(job_id: UUID, reason: str) -> None:
     and an editor watching a progress bar for work that was never started.
     """
     await db().collection(COLLECTION).document(str(job_id)).update({
-        "state": "failed",
+        "state": State.FAILED,
         "finished_at": datetime.now(UTC),
         "failures": firestore.ArrayUnion([{"clip_id": "", "reason": reason}]),
     })
@@ -250,7 +278,7 @@ async def close_empty(job_id: UUID) -> None:
     progress bar for an upload that finished failing before it started.
     """
     await db().collection(COLLECTION).document(str(job_id)).update({
-        "state": "done",
+        "state": State.DONE,
         "finished_at": datetime.now(UTC),
     })
     log.info("job %s closed with nothing to process", job_id)

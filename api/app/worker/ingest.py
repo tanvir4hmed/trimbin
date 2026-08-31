@@ -255,7 +255,7 @@ async def handle_message(attributes: dict[str, str]) -> bool:
         await jobs.record_progress(job_id, clip_id, ok=False, reason=reason)
         return True
 
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.exception("clip %s failed", clip_id)
         await jobs.record_progress(job_id, clip_id, ok=False, reason=f"processing error: {exc}")
         return False

@@ -20,6 +20,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from . import assessment
 from . import comments as comments_service
 from . import shots as shots_service
 from .analytics import client
@@ -85,7 +86,7 @@ async def for_projects(project_ids: list[int], viewer: str) -> dict:
 
     rows = await _shot_rows(project_ids)
     meta = await shots_service.for_projects(project_ids)
-    margin_threshold = _review_margin()
+    margin_threshold = assessment.review_margin()
 
     waiting: list[Waiting] = []
     per_project: dict[int, dict] = {
@@ -108,16 +109,16 @@ async def for_projects(project_ids: list[int], viewer: str) -> dict:
         assignee = described.assignee if described else ""
         slug = (described.slug if described else "") or ""
 
-        reason = _why_it_waits(
+        reason = assessment.assess(
             takes=row["takes"],
             has_verdict=row["has_verdict"],
             confirmed=row["confirmed"],
             margin=row["margin"],
-            threshold=margin_threshold,
-            circled=circled,
-            chosen=row["chosen_take"],
+            circled_take=circled,
+            chosen_take=row["chosen_take"],
             state=state,
-        )
+            threshold=margin_threshold,
+        ).waiting_reason
 
         if reason is None:
             bucket["settled"] += 1
@@ -278,51 +279,6 @@ async def _shot_rows(project_ids: list[int]) -> list[dict]:
     ]
 
 
-def _why_it_waits(
-    takes: int,
-    has_verdict: bool,
-    confirmed: bool,
-    margin: float,
-    threshold: float,
-    circled: int,
-    chosen: int,
-    state: str,
-) -> str | None:
-    """The one reason worth showing, or None if this shot needs nobody.
-
-    Ordered by how much a person adds, not by which check ran first. An editor
-    scanning eleven rows reads the reason column and nothing else, so a shot
-    that is both a close call and disagrees with the circled take must say the
-    thing they cannot work out for themselves.
-
-    A person marking a shot approved ends the matter, whatever the margin says.
-    Derived status is a claim about the system's confidence; a set status is a
-    claim by somebody with a name, and the second one wins.
-    """
-    if state == "approved":
-        return None
-    if state == "in_progress":
-        return "someone is on it"
-
-    if takes < 2:
-        return None  # nothing to compare; not work, just a fact
-    if not has_verdict:
-        return "not compared yet"
-
-    # Checked before the margin. A shot where the room circled take 3 and the
-    # measurements chose take 1 is the most interesting row on the page whether
-    # the call was close or not — and the circle knows about performance, which
-    # this system deliberately never judges.
-    if circled and chosen and circled != chosen:
-        return f"director circled take {circled}"
-
-    if confirmed:
-        return None
-    if margin < threshold:
-        return "close call"
-    return None
-
-
 def _queue_rank(item: Waiting, viewer: str) -> tuple:
     """Yours first, then unassigned, then closest call.
 
@@ -339,7 +295,4 @@ def _queue_rank(item: Waiting, viewer: str) -> tuple:
     return (mine, urgency, item.margin, item.project_id, item.scene, item.shot)
 
 
-def _review_margin() -> float:
-    from trimbin_agents.config import settings as agent_settings
 
-    return agent_settings.review_margin

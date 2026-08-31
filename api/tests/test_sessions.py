@@ -181,7 +181,9 @@ class TestHandles:
 
 class TestWhatTheInterfaceIsTold:
     def test_both_doors_are_reported(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(sessions.settings, "oauth_client_id", "something.apps.googleusercontent.com")
+        monkeypatch.setattr(
+            sessions.settings, "oauth_client_id", "something.apps.googleusercontent.com"
+        )
         options = sessions.available()
         assert options["google"] and options["password"]
 

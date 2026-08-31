@@ -17,9 +17,8 @@ from fastapi import APIRouter, Depends
 
 from ..auth import Principal, current_principal, require_signed_in
 from ..config import settings
-from ..services import activity
+from ..services import activity, members, projects
 from ..services import dashboard as dashboard_service
-from ..services import members, projects
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["dashboard"])

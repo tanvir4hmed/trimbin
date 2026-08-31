@@ -23,10 +23,10 @@ from pathlib import Path
 from .measure import (
     EMBED_FRAME_HEIGHT,
     GOP_SECONDS,
-    PROXY_AUDIO_BITRATE,
-    PROXY_BITRATE,
     MEASURE_FPS,
     MEASURE_HEIGHT,
+    PROXY_AUDIO_BITRATE,
+    PROXY_BITRATE,
     PROXY_FPS,
     PROXY_HEIGHT,
     SEGMENT_SECONDS,

@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field

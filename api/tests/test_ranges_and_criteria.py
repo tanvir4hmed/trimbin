@@ -11,8 +11,6 @@ disagrees has to be able to see which axis produced the answer.
 
 from __future__ import annotations
 
-import pytest
-
 from app.services import criteria, ranges
 
 
@@ -258,8 +256,9 @@ class TestCodesReachStorageAsTheirValues:
     """
 
     def test_an_enum_member_stores_as_its_taxonomy_string(self) -> None:
-        from app.services.decisions import _code_value
         from trimbin_agents.contracts.base import FindingCode
+
+        from app.services.decisions import _code_value
 
         assert _code_value(FindingCode.CONTINUITY_BLOCKING) == "continuity.blocking"
         assert "FindingCode" not in _code_value(FindingCode.CONTINUITY_BLOCKING)
@@ -272,8 +271,9 @@ class TestCodesReachStorageAsTheirValues:
 
     def test_scoring_matches_what_gets_stored(self) -> None:
         """The two have to agree or the breakdown is decorative."""
-        from app.services.decisions import _code_value
         from trimbin_agents.contracts.base import FindingCode
+
+        from app.services.decisions import _code_value
 
         stored = _code_value(FindingCode.DIALOGUE_INCOMPLETE)
         assert stored in criteria.COMPLETION_COSTS

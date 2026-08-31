@@ -274,7 +274,7 @@ async def job_status(
         else:
             group["status"] = "clean"
 
-    done = job.state in ("finished", "abandoned")
+    done = job.state in jobs.TERMINAL
     return {
         "job_id": str(job.job_id),
         "state": job.state,

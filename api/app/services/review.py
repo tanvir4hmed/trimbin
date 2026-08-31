@@ -20,12 +20,11 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from uuid import UUID
 
+from . import assessment, criteria, storage
 from . import clips as clips_service
-from . import criteria
-from . import shots as shots_service
 from . import decisions as decisions_service
 from . import ranges as ranges_service
-from . import storage
+from . import shots as shots_service
 from .analytics import client
 from .ffmpeg_ops import remux
 
@@ -196,7 +195,7 @@ async def judge(
         "winner": str(result.winner_id) if result.winner_id else None,
         "margin": round(result.margin, 4),
         "panel_convened": panel_convened,
-        "needs_review": result.margin < agent_settings.review_margin,
+        "needs_review": result.margin < assessment.review_margin(),
         "rationale": result.rationale,
         "verdicts_written": written,
     }

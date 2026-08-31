@@ -219,7 +219,6 @@ class TestTheOutcomeComesFromTheRows:
 class TestThePlanTheModelFillsIn:
     def test_an_invented_outcome_is_refused(self) -> None:
         from pydantic import ValidationError
-
         from trimbin_agents.contracts.search import SearchPlan
 
         with pytest.raises(ValidationError):
@@ -227,7 +226,6 @@ class TestThePlanTheModelFillsIn:
 
     def test_an_invented_decider_is_refused(self) -> None:
         from pydantic import ValidationError
-
         from trimbin_agents.contracts.search import SearchPlan
 
         with pytest.raises(ValidationError):
@@ -237,7 +235,6 @@ class TestThePlanTheModelFillsIn:
         """The taxonomy is closed everywhere else; a search that accepted a code
         outside it would return nothing and look like an empty archive."""
         from pydantic import ValidationError
-
         from trimbin_agents.contracts.search import SearchPlan
 
         with pytest.raises(ValidationError):

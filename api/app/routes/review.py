@@ -27,12 +27,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
 from ..auth import Principal, current_principal, require_signed_in
-from ..services import activity
+from ..services import activity, assessment, members, shots
 from ..services import comments as comments_service
 from ..services import decisions as decisions_service
-from ..services import members
 from ..services import review as review_service
-from ..services import shots
 from ..services.analytics import client
 
 log = logging.getLogger(__name__)
@@ -601,7 +599,7 @@ async def tree(
 
     described = await shots.for_project(project_id)
     note_counts = await comments_service.counts_for_project(project_id)
-    threshold = _review_margin()
+    threshold = assessment.review_margin()
 
     scenes: dict[int, dict] = {}
     cameras_seen: set[str] = set()
@@ -676,17 +674,6 @@ async def tree(
     }
 
 
-def _review_margin() -> float:
-    """Below this gap between first and second place, a person should look.
-
-    Mirrors the agents' review_margin; imported rather than repeated so the
-    queue and the archive cannot disagree.
-    """
-    from trimbin_agents.config import settings as agent_settings
-
-    return agent_settings.review_margin
-
-
 def _status(
     takes: int,
     has_verdict: bool,
@@ -696,32 +683,16 @@ def _status(
     chosen: int = 0,
     state: str = "",
 ) -> str:
-    """What the dot beside a shot means.
-
-    Six states now. The distinction that matters most is still between "decided"
-    and "confirmed" — a verdict nobody has looked at is not the same as one an
-    editor agreed with, and a tree showing them alike hides the only work left.
-
-    The new one is `differs_from_circle`, and it outranks a close call. A shot
-    where the room circled take 3 and the measurements chose take 1 needs a
-    person whether or not the numbers were close, because the circle knows about
-    performance and this system deliberately does not.
-
-    A person marking the shot approved ends it, whatever the margin says.
-    """
-    if state == "approved":
-        return "confirmed"
-    if takes < 2:
-        return "too_few_takes"
-    if not has_verdict:
-        return "not_judged"
-    if circled and chosen and circled != chosen:
-        return "differs_from_circle"
-    if reviewed:
-        return "confirmed"
-    if margin < _review_margin():
-        return "needs_review"
-    return "decided"
+    """The dot beside a shot, from the one rule in services/assessment.py."""
+    return assessment.assess(
+        takes=takes,
+        has_verdict=has_verdict,
+        confirmed=reviewed,
+        margin=margin,
+        circled_take=circled,
+        chosen_take=chosen,
+        state=state,
+    ).status
 
 
 # ---------------------------------------------------------------------------

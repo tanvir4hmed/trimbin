@@ -64,7 +64,7 @@ async def record(
             ]],
             column_names=_COLUMNS,
         )
-    except Exception:  # noqa: BLE001
+    except Exception:
         # Never the reason an action fails.
         log.exception("could not record activity: %s %s", actor, verb)
 

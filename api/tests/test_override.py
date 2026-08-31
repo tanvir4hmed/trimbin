@@ -117,7 +117,7 @@ class TestWhatGetsWritten:
         assert by_id[chosen]["score"] == 0.72
 
     def test_exactly_one_take_is_selected(self) -> None:
-        chosen, other, verdicts = self._verdicts()
+        chosen, _other, verdicts = self._verdicts()
         rows = rows_for_choice(
             verdicts, chosen, Override(clip_id=chosen, reason="better performance")
         )
@@ -254,8 +254,8 @@ class TestTimecodesSurviveTheWrite:
 
     def test_a_nested_finding_keeps_its_span(self) -> None:
         from trimbin_agents.contracts.base import (
-            FindingCode,
             Finding,
+            FindingCode,
             Severity,
             TimeRange,
         )
@@ -289,8 +289,8 @@ class TestTimecodesSurviveTheWrite:
         """review._merge_findings emits exactly this: ffmpeg's flat findings
         beside the panel's contract objects, in one list."""
         from trimbin_agents.contracts.base import (
-            FindingCode,
             Finding,
+            FindingCode,
             Severity,
             TimeRange,
         )

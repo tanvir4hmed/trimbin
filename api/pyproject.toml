@@ -16,6 +16,12 @@ dependencies = [
     "google-cloud-firestore>=2.19.0",
     "google-cloud-pubsub>=2.23.0",
     "google-cloud-secret-manager>=2.20.0",
+    # The API imports trimbin_agents: the contracts, the analyst, the review
+    # margin. It did so without declaring it, which worked because the local
+    # virtualenv had it installed editable and nothing else ever built this
+    # package. CI could not reproduce the environment, so the API tests could
+    # not run anywhere but on my machine.
+    "trimbin-agents",
 ]
 
 [project.optional-dependencies]
@@ -25,6 +31,12 @@ dev = [
     "httpx>=0.27.0",
     "ruff>=0.7.0",
 ]
+
+# A path dependency rather than a published one. The two packages are versioned
+# together in one repository and there is no world in which the API wants an
+# older agents than it ships with.
+[tool.uv.sources]
+trimbin-agents = { path = "../agents", editable = true }
 
 [build-system]
 requires = ["hatchling"]
@@ -39,6 +51,31 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
+
+# Never enforced until now, because the API was never linted anywhere. These
+# four are turned off deliberately rather than by fixing 30 files to satisfy a
+# rule that is wrong for this codebase.
+ignore = [
+    # `Depends(...)` and `Query(...)` in a default argument is not a mistake —
+    # it is how FastAPI declares dependencies, and every route in the framework
+    # is written this way.
+    "B008",
+    # Exceptions here are named for what happened, not for being exceptions:
+    # Waking, NotReady, Rejected, BadPass. `WakingError` reads worse and says
+    # less. The convention is a convention, not a correctness rule.
+    "N818",
+    # Em dashes and curly quotes in prose. The comments in this codebase are
+    # written to be read; ambiguity with a hyphen is not a real hazard in a
+    # docstring.
+    "RUF001",
+    "RUF002",
+]
+
+# Tests build throwaway stand-ins for Firestore documents and credentials. A
+# mutable class attribute on a five-line fake is not the hazard this rule is
+# for, and ClassVar annotations on stubs would obscure what they stand in for.
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["RUF012"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

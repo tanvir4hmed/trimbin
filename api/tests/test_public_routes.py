@@ -187,7 +187,9 @@ class TestPopulatedDeployment:
 
 
 class TestCaching:
-    def test_public_pages_are_cacheable(self, client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_public_pages_are_cacheable(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """A burst of visitors should cost one query. The window is short enough
         that the page stays visibly live, which is the point of it."""
 

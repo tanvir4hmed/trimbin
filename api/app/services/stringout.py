@@ -20,6 +20,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from . import assessment
 from . import comments as comments_service
 from . import shots as shots_service
 from .analytics import client
@@ -121,7 +122,7 @@ async def scene(project_id: int, scene_id: int) -> dict:
 
     meta = await shots_service.for_project(project_id)
     open_counts = await comments_service.counts_for_project(project_id)
-    margin = _review_margin()
+    margin = assessment.review_margin()
 
     entries: list[Entry] = []
     for r in result.result_rows:
@@ -151,7 +152,19 @@ async def scene(project_id: int, scene_id: int) -> dict:
                 decided_by=r[8] or "",
                 actor=r[9] or "",
                 margin=float(r[10]),
-                needs_review=float(r[10]) < margin and (r[8] or "") != "human",
+                # The same rule the tree and the queue use. This was
+                # margin-only, so a scene could report "all settled" while the
+                # dashboard listed three of its shots as waiting.
+                needs_review=assessment.assess(
+                    takes=2,
+                    has_verdict=True,
+                    confirmed=(r[8] or "") == "human",
+                    margin=float(r[10]),
+                    circled_take=described.circled_take if described else 0,
+                    chosen_take=int(r[2] or 0),
+                    state=described.state if described else "",
+                    threshold=margin,
+                ).needs_a_person,
                 circled_take=described.circled_take if described else 0,
                 open_comments=open_counts.get((scene_id, shot_id), {}).get("open", 0),
             )
@@ -203,7 +216,4 @@ def _letter(shot_id: int) -> str:
     return letters
 
 
-def _review_margin() -> float:
-    from trimbin_agents.config import settings as agent_settings
 
-    return agent_settings.review_margin

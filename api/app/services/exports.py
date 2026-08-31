@@ -46,9 +46,9 @@ def timecode(seconds: float, fps: float = DEFAULT_FPS) -> str:
     """
     if seconds < 0:
         seconds = 0.0
-    total_frames = int(round(seconds * fps))
-    frames = total_frames % int(round(fps))
-    total_seconds = total_frames // int(round(fps))
+    total_frames = round(seconds * fps)
+    frames = total_frames % round(fps)
+    total_seconds = total_frames // round(fps)
     return (
         f"{total_seconds // 3600:02d}:"
         f"{(total_seconds % 3600) // 60:02d}:"

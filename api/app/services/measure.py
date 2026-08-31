@@ -152,7 +152,8 @@ class RawMeasurements:
         black_total = sum(s.end_s - s.start_s for s in self.black_spans)
         if black_total > self.duration_s * 0.9:
             return False, "clip.black"
-        if self.freeze_spans and sum(s.end_s - s.start_s for s in self.freeze_spans) > self.duration_s * 0.8:
+        frozen = sum(s.end_s - s.start_s for s in self.freeze_spans)
+        if self.freeze_spans and frozen > self.duration_s * 0.8:
             return False, "clip.frozen"
         return True, ""
 

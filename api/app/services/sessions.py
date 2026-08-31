@@ -248,7 +248,7 @@ def verify(token: str) -> Session | None:
         )
     except NotConfigured:
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:
         # Malformed input from a browser is normal, not exceptional.
         return None
 

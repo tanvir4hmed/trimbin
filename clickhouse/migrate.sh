@@ -82,6 +82,20 @@ if [[ "$count" -ne 16 ]]; then
 fi
 echo "${count}/16 objects present."
 
+# Indexes, not only tables.
+#
+# The verifier counted tables and views and never counted indexes, so
+# idx_embedding sat in the migration file and not on the table for weeks while
+# every deploy reported success. A declaration nothing compares against is a
+# claim, not a schema.
+echo -n "Indexes on clips... "
+indexes=$(curl --silent --fail --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}"     --data-binary "SELECT count() FROM system.data_skipping_indices WHERE database = currentDatabase() AND table = 'clips' AND name IN ('idx_embedding','idx_description','idx_duration')"     "${CLICKHOUSE_URL}/")
+if [[ "$indexes" -ne 3 ]]; then
+    echo "expected 3, found ${indexes} - vector or text search will scan" >&2
+    exit 1
+fi
+echo "3/3 present."
+
 echo -n "Camera column... "
 camera=$(curl --silent --fail --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}" \
     --data-binary "SELECT count() FROM system.columns WHERE database = currentDatabase() AND table = 'clips' AND name = 'camera'" \
