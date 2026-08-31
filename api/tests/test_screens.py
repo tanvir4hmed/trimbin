@@ -153,9 +153,7 @@ class TestTheShotScreen:
         assert response.status_code == 200
         assert response.json()["verdicts"] is None
 
-    def test_the_brief_comes_back_with_its_revision(
-        self, client: TestClient, stubbed
-    ) -> None:
+    def test_the_brief_comes_back_with_its_revision(self, client: TestClient, stubbed) -> None:
         """Without it the interface cannot send back what it was shown, and
         every edit is a blind write again."""
         assert client.get("/screens/shot/1/12/1").json()["brief"]["rev"] == 3
@@ -186,7 +184,7 @@ class TestEveryScreenRouteConstructsItsResponse:
         # assertion pass by finding nothing.
         registered = {p for p in app.openapi()["paths"] if p.startswith("/screens")}
         assert registered == set(paths), (
-            "a screen route has no smoke test: " f"{registered ^ set(paths)}"
+            f"a screen route has no smoke test: {registered ^ set(paths)}"
         )
         for url in paths.values():
             assert client.get(url).status_code == 200, url
