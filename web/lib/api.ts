@@ -306,7 +306,10 @@ export const api = {
   dashboard: () => request<Dashboard>("/dashboard"),
 
   /** Projects this person can open. `detail` adds the counts a list screen needs. */
-  projects: (detail = false, state: "active" | "archived" | "trashed" = "active") =>
+  projects: (
+    detail = false,
+    state: "active" | "archived" | "trashed" | "deleted" = "active",
+  ) =>
     request<{ you: string; role: Role; limits: Limits; projects: Project[] }>(
       `/projects?detail=${detail ? "true" : "false"}&state_filter=${state}`,
     ),

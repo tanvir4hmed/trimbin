@@ -1126,6 +1126,12 @@ export interface paths {
          *     how far through, how many are waiting. It is one extra query across every
          *     project rather than one per row, and it is optional because the project
          *     switcher in the header wants names and nothing else.
+         *
+         *     `deleted` is listable by its owner because delete here is a state, not a
+         *     purge — the route has always had a `restore` action and read deleted rows to
+         *     serve it. Without a way to see them, restore was a feature nobody could
+         *     reach, and deleting the demo project meant a signed-out visitor got a 404
+         *     with no way back.
          */
         get: operations["mine_projects_get"];
         put?: never;
@@ -4513,7 +4519,7 @@ export interface operations {
         parameters: {
             query?: {
                 detail?: boolean;
-                state_filter?: "active" | "archived" | "trashed";
+                state_filter?: "active" | "archived" | "trashed" | "deleted";
             };
             header?: never;
             path?: never;

@@ -94,7 +94,7 @@ def _as_dict(project, viewer_email: str | None) -> dict:
 async def mine(
     principal: Annotated[Principal, Depends(require_signed_in)],
     detail: bool = False,
-    state_filter: Literal["active", "archived", "trashed"] = "active",
+    state_filter: Literal["active", "archived", "trashed", "deleted"] = "active",
 ) -> dict:
     """Everything this person can open.
 
@@ -102,6 +102,12 @@ async def mine(
     how far through, how many are waiting. It is one extra query across every
     project rather than one per row, and it is optional because the project
     switcher in the header wants names and nothing else.
+
+    `deleted` is listable by its owner because delete here is a state, not a
+    purge — the route has always had a `restore` action and read deleted rows to
+    serve it. Without a way to see them, restore was a feature nobody could
+    reach, and deleting the demo project meant a signed-out visitor got a 404
+    with no way back.
     """
     found = (
         await projects.visible_to(principal.email or "")

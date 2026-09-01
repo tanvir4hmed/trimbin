@@ -31,7 +31,7 @@ export default function ProjectsPage() {
   const [sort, setSort] = useState<SortKey>("waiting");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [scope, setScope] = useState<"active" | "archived" | "trashed">("active");
+  const [scope, setScope] = useState<"active" | "archived" | "trashed" | "deleted">("active");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,7 +95,7 @@ export default function ProjectsPage() {
       name = window.prompt("Project name", project.name)?.trim() ?? "";
       if (!name || name === project.name) return;
     }
-    if ((action === "trash" || action === "delete") && !window.confirm(action === "delete" ? "Remove this project from Trimbin? Its immutable audit records remain retained." : "Move this project to Trash?")) return;
+    if ((action === "trash" || action === "delete") && !window.confirm(action === "delete" ? "Remove this project from Trimbin?\n\nIt disappears from every list, and from the signed-out view if it was public. Its footage, decisions and audit records are all kept, and you can bring it back from the Removed tab." : "Move this project to Trash?")) return;
     try {
       await api.changeProject(project.project_id, { rev: project.rev, action, name });
       await load();
@@ -131,7 +131,7 @@ export default function ProjectsPage() {
       </header>
 
       <nav className="project-scope-tabs" aria-label="Project state">
-        {(["active", "archived", "trashed"] as const).map((item) => <button key={item} className={scope === item ? "on" : ""} onClick={() => setScope(item)}>{item === "active" ? "Current" : item === "archived" ? "Archived" : "Trash"}</button>)}
+        {(["active", "archived", "trashed", "deleted"] as const).map((item) => <button key={item} className={scope === item ? "on" : ""} onClick={() => setScope(item)}>{item === "active" ? "Current" : item === "archived" ? "Archived" : item === "trashed" ? "Trash" : "Removed"}</button>)}
       </nav>
 
       {error && <p className="error">{error}</p>}
@@ -213,7 +213,7 @@ export default function ProjectsPage() {
                     {p.member_emails.length > 0 &&
                       ` +${p.member_emails.length}`}
                   </td>
-                  <td>{p.you_are_owner ? <div className="project-actions">{scope === "active" && <><button onClick={() => void command(p, "rename")}>Rename</button><button onClick={() => void command(p, "archive")}>Archive</button><button onClick={() => void command(p, "trash")}>Trash</button></>}{scope === "archived" && <><button onClick={() => void command(p, "restore")}>Restore</button><button onClick={() => void command(p, "trash")}>Trash</button></>}{scope === "trashed" && <><button onClick={() => void command(p, "restore")}>Restore</button><button className="danger" onClick={() => void command(p, "delete")}>Delete</button></>}</div> : <span className="dim">—</span>}</td>
+                  <td>{p.you_are_owner ? <div className="project-actions">{scope === "active" && <><button onClick={() => void command(p, "rename")}>Rename</button><button onClick={() => void command(p, "archive")}>Archive</button><button onClick={() => void command(p, "trash")}>Trash</button></>}{scope === "archived" && <><button onClick={() => void command(p, "restore")}>Restore</button><button onClick={() => void command(p, "trash")}>Trash</button></>}{scope === "trashed" && <><button onClick={() => void command(p, "restore")}>Restore</button><button className="danger" onClick={() => void command(p, "delete")}>Delete</button></>}{scope === "deleted" && <button onClick={() => void command(p, "restore")}>Restore</button>}</div> : <span className="dim">—</span>}</td>
                 </tr>
               ))}
             </tbody>

@@ -74,7 +74,20 @@ async def is_member(project_id: int, email: str) -> bool:
 
 
 async def is_owner(project_id: int, email: str) -> bool:
-    project = await get(project_id)
+    """Who owns it, regardless of the state it is in.
+
+    Deleted projects included, and that is the point: `PATCH` supports a
+    `restore` action and fetches with `include_deleted=True` to serve it, but
+    the ownership check in front of it could not see a deleted project and
+    answered 403. Restore was unreachable for the one state it exists to undo,
+    so deleting was a one-way door — and it takes the public demo project with
+    it, which is what a signed-out judge sees.
+
+    This decides *who* may act. Each route still decides whether the project is
+    in a state that allows the action: `add_member` fetches without deleted rows
+    and still refuses, while `change_project` fetches with them and can restore.
+    """
+    project = await get(project_id, include_deleted=True)
     return project is not None and email.lower() == project.owner_email.lower()
 
 
@@ -132,12 +145,16 @@ async def for_member(email: str, *, states: set[str] | None = None) -> list[Proj
 
     found: dict[int, Project] = {}
 
+    # Fetched including deleted rows, then filtered by `allowed` below. `get`
+    # hides deleted projects, which meant asking for them returned nothing at
+    # all and the owner had no way to see — or restore — something they had
+    # removed.
     async for snapshot in collection.where("owner_email", "==", email).stream():
-        found[int(snapshot.id)] = await get(int(snapshot.id))  # type: ignore[assignment]
+        found[int(snapshot.id)] = await get(int(snapshot.id), include_deleted=True)  # type: ignore[assignment]
 
     async for snapshot in collection.where("member_emails", "array_contains", email).stream():
         if int(snapshot.id) not in found:
-            found[int(snapshot.id)] = await get(int(snapshot.id))  # type: ignore[assignment]
+            found[int(snapshot.id)] = await get(int(snapshot.id), include_deleted=True)  # type: ignore[assignment]
 
     allowed = states or {"active"}
     return sorted(
