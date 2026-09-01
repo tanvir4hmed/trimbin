@@ -23,6 +23,7 @@ from .base import (
     Strict,
     TimeRange,
 )
+from .segments import SegmentObservation
 
 __all__ = [
     "Actor",
@@ -35,6 +36,7 @@ __all__ = [
     "Measurements",
     "Provenance",
     "ReasonCode",
+    "SegmentObservation",
     "Severity",
     "SpecialistReport",
     "Strict",

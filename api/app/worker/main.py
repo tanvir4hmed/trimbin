@@ -33,7 +33,7 @@ from fastapi import FastAPI, Request, Response, status
 
 from ..config import settings
 from ..services import analytics
-from .ingest import handle_message
+from .ingest import handle_analysis_message, handle_message
 
 logging.basicConfig(
     level=logging.INFO,
@@ -99,7 +99,13 @@ async def receive(request: Request) -> Response:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     attributes = _attributes(envelope)
-    if not {"job_id", "clip_id", "project_id"} <= attributes.keys():
+    task = attributes.get("task", "ingest")
+    required = (
+        {"clip_id", "project_id", "duration_s"}
+        if task == "full_take_analysis"
+        else {"job_id", "clip_id", "project_id"}
+    )
+    if not required <= attributes.keys():
         log.warning("discarding a push with no clip in it: %s", sorted(attributes))
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -107,7 +113,11 @@ async def receive(request: Request) -> Response:
     log.info("clip %s, attempt %s", attributes["clip_id"], delivery)
 
     try:
-        acknowledge = await handle_message(attributes)
+        acknowledge = (
+            await handle_analysis_message(attributes)
+            if task == "full_take_analysis"
+            else await handle_message(attributes)
+        )
     except (KeyError, ValueError) as exc:
         # Malformed identifiers, not a processing failure. handle_message parses
         # them before its own try block, so this is the only place they surface.

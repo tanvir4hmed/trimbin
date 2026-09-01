@@ -8,7 +8,7 @@ person sees should be somewhere you can read the arithmetic.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import Field, model_validator
@@ -16,7 +16,7 @@ from pydantic import Field, model_validator
 from .base import Finding, Provenance, Strict, TimeRange
 
 
-class ReviewReason(str, Enum):
+class ReviewReason(StrEnum):
     """Why a shot is being handed to a person.
 
     Named rather than a boolean, because the interface says something different

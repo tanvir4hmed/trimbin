@@ -17,7 +17,7 @@ import tempfile
 from pathlib import Path
 from uuid import UUID
 
-from ..services import clips, identify, jobs, placements, quota, storage
+from ..services import clips, full_take, identify, jobs, placements, quota, storage
 from ..services.ffmpeg_ops import UnusableClip, analyse, build_proxy, build_sprite
 
 log = logging.getLogger(__name__)
@@ -279,7 +279,49 @@ async def process(
         confident=bool(identity.slate_confident),
         mismatch=mismatch,
     )
+    try:
+        await jobs.enqueue_analysis(
+            project_id,
+            [
+                {
+                    "clip_id": clip_id,
+                    "group_id": scene,
+                    "subgroup_id": shot,
+                    "take_no": identity.take_no,
+                    "duration_s": measurements.duration_s,
+                }
+            ],
+        )
+    except Exception:
+        # The clip is ingested and must not be re-encoded because scheduling its
+        # independent analysis failed. Backfill reads ClickHouse and can recover
+        # any clip without a completed run.
+        log.exception("could not persist the analysis task for clip %s", clip_id)
     log.info("clip %s: done", clip_id)
+
+
+async def handle_analysis_message(attributes: dict[str, str]) -> bool:
+    """Run only full-take intelligence; safe for independent Pub/Sub retry."""
+    project_id = int(attributes["project_id"])
+    clip_id = UUID(attributes["clip_id"])
+    try:
+        await jobs.record_analysis_state(project_id, clip_id, "processing")
+        await full_take.analyse_clip(
+            project_id=project_id,
+            clip_id=clip_id,
+            scene=int(attributes.get("scene", "0") or 0),
+            shot=int(attributes.get("shot", "0") or 0),
+            duration_s=float(attributes["duration_s"]),
+        )
+        await jobs.record_analysis_state(project_id, clip_id, "completed")
+        return True
+    except Exception as exc:
+        try:
+            await jobs.record_analysis_state(project_id, clip_id, "failed", str(exc))
+        except Exception:
+            log.exception("could not record analysis task failure for clip %s", clip_id)
+        log.exception("full-take analysis failed for clip %s", attributes.get("clip_id"))
+        return False
 
 
 async def handle_message(attributes: dict[str, str]) -> bool:

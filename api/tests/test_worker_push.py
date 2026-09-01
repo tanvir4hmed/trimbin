@@ -37,6 +37,16 @@ VALID = {
     "project_id": "1",
 }
 
+ANALYSIS = {
+    "task": "full_take_analysis",
+    "clip_id": VALID["clip_id"],
+    "project_id": "1",
+    "scene": "12",
+    "shot": "2",
+    "take_no": "4",
+    "duration_s": "70.0",
+}
+
 
 class TestAcknowledgement:
     def test_success_acknowledges(self, client, monkeypatch):
@@ -69,6 +79,36 @@ class TestAcknowledgement:
         monkeypatch.setattr(worker_main, "handle_message", rejected)
         assert client.post("/pubsub", json=envelope(VALID)).status_code == 204
         assert seen["clip_id"] == VALID["clip_id"]
+
+
+class TestIndependentAnalysisDelivery:
+    def test_it_does_not_require_an_upload_job(self, client, monkeypatch):
+        seen = {}
+
+        async def analysed(attributes):
+            seen.update(attributes)
+            return True
+
+        monkeypatch.setattr(worker_main, "handle_analysis_message", analysed)
+        assert client.post("/pubsub", json=envelope(ANALYSIS)).status_code == 204
+        assert seen["duration_s"] == "70.0"
+        assert "job_id" not in seen
+
+    def test_a_model_failure_requests_redelivery_without_reingesting(self, client, monkeypatch):
+        async def failed(attributes):
+            return False
+
+        async def must_not_ingest(attributes):
+            raise AssertionError("analysis retry must not re-run ingest")
+
+        monkeypatch.setattr(worker_main, "handle_analysis_message", failed)
+        monkeypatch.setattr(worker_main, "handle_message", must_not_ingest)
+        assert client.post("/pubsub", json=envelope(ANALYSIS)).status_code == 500
+
+    def test_analysis_without_a_duration_is_not_retryable(self, client, monkeypatch):
+        monkeypatch.setattr(worker_main, "handle_analysis_message", _must_not_run)
+        incomplete = {key: value for key, value in ANALYSIS.items() if key != "duration_s"}
+        assert client.post("/pubsub", json=envelope(incomplete)).status_code == 204
 
 
 class TestMalformedDelivery:

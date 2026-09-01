@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from trimbin_agents.analyst.agent import (
     OUTLIER_RATIO,
+    _full_take_reports,
     _rank_on_measurements,
     _score,
     _shortfall,
@@ -19,7 +20,13 @@ from trimbin_agents.analyst.agent import (
 )
 from trimbin_agents.config import settings
 from trimbin_agents.contracts.analysis import AnalysisRequest, Measurements
-from trimbin_agents.contracts.base import ClipRef, Severity
+from trimbin_agents.contracts.base import (
+    ClipRef,
+    Finding,
+    FindingCode,
+    Severity,
+    TimeRange,
+)
 
 
 def _measurements(**overrides) -> Measurements:
@@ -115,6 +122,24 @@ class TestTechnicalReport:
         reports = _technical_report(request)
         assert all(not r.findings for r in reports)
         assert all("within the group" in r.summary for r in reports)
+
+
+class TestFullTakeEvidence:
+    def test_a_late_finding_becomes_a_report_the_chief_must_weigh(self) -> None:
+        request = _request(_measurements(), _measurements())
+        late = Finding(
+            code=FindingCode.FOCUS_LOST,
+            detail="Focus drifts off the eyes near the end.",
+            severity=Severity.ATTENTION,
+            where=TimeRange(start_s=58, end_s=61),
+        )
+        request = request.model_copy(
+            update={"observed_findings": {request.clips[0].clip_id: [late]}}
+        )
+        reports = _full_take_reports(request)
+        assert len(reports) == 1
+        assert reports[0].findings[0].where.start_s == 58
+        assert "Full-duration" in reports[0].summary
 
     def test_an_outlier_is_described_not_condemned(self) -> None:
         """The wording is the product decision: a fact an editor interprets,

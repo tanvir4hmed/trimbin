@@ -21,7 +21,9 @@ the way out — a route that forgets a field fails here rather than in a browser
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel
 
@@ -233,6 +235,104 @@ class Verdicts(Model):
     state: ShotState
     rev: int = 0
     selection_archive_state: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Full-take intelligence
+# ---------------------------------------------------------------------------
+
+
+class AnalysisRun(Model):
+    run_id: UUID
+    run_key: str
+    state: str
+    duration_s: float
+    covered_until_s: float
+    window_count: int
+    segment_count: int
+    finding_count: int
+    model_id: str
+    prompt_version: str
+    error: str
+    occurred_at: datetime
+
+
+class ClipAnalysisIdentity(Model):
+    scene: int
+    shot: int
+    take_no: int
+    duration_s: float
+    proxy_uri: str
+    sprite_uri: str
+    fps: float
+    scene_code: str
+    shot_code: str
+
+
+class ClipSegment(Model):
+    segment_id: UUID
+    run_id: UUID
+    start_s: float
+    end_s: float
+    description: str
+    transcript: str
+    actions: list[str]
+    objects: list[str]
+    speakers: list[str]
+    shot_size: str
+    camera_motion: str
+    has_embedding: bool
+
+
+class FindingEvent(Model):
+    clip_id: UUID
+    finding_id: UUID
+    event_id: UUID
+    run_id: UUID
+    revision: int
+    action: str
+    code: str
+    detail: str
+    severity: str
+    start_s: float
+    end_s: float
+    evidence_segment_ids: list[UUID]
+    sources: list[str]
+    supersedes_event_id: UUID | None = None
+    actor_id: str
+    actor_role: str
+    occurred_at: datetime
+    archive_state: str = "delivered"
+
+
+class TakeAnalysis(Model):
+    project_id: int
+    clip_id: UUID
+    clip: ClipAnalysisIdentity
+    run: AnalysisRun | None = None
+    status: str
+    coverage_complete: bool
+    description: str
+    segments: list[ClipSegment]
+    findings: list[FindingEvent]
+    history: list[FindingEvent]
+    safe_ranges: list[TimeRange]
+    primary_usable_range: TimeRange | None = None
+
+
+class FindingActionResult(Model):
+    status: str
+    finding_id: UUID
+    event_id: UUID
+    action: str
+    rev: int
+    archive_pending: bool
+
+
+class AnalysisQueued(Model):
+    status: str
+    project_id: int
+    queued: int
 
 
 # ---------------------------------------------------------------------------

@@ -199,6 +199,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/analysis/{project_id}/{clip_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Take Analysis
+         * @description Everything Phase 2 needs to seek and draw lanes without another query.
+         */
+        get: operations["take_analysis_analysis__project_id___clip_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/analysis/{project_id}/{clip_id}/findings/{finding_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Act On Finding
+         * @description Confirm, dismiss, correct, or range-adjust one machine finding.
+         */
+        post: operations["act_on_finding_analysis__project_id___clip_id__findings__finding_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/analysis/{project_id}/backfill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Backfill
+         * @description Queue active legacy clips whose current run is absent or failed.
+         */
+        post: operations["backfill_analysis__project_id__backfill_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/options": {
         parameters: {
             query?: never;
@@ -1207,6 +1267,48 @@ export interface components {
             /** Shot */
             shot: number;
         };
+        /** AnalysisQueued */
+        AnalysisQueued: {
+            /** Status */
+            status: string;
+            /** Project Id */
+            project_id: number;
+            /** Queued */
+            queued: number;
+        };
+        /** AnalysisRun */
+        AnalysisRun: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Run Key */
+            run_key: string;
+            /** State */
+            state: string;
+            /** Duration S */
+            duration_s: number;
+            /** Covered Until S */
+            covered_until_s: number;
+            /** Window Count */
+            window_count: number;
+            /** Segment Count */
+            segment_count: number;
+            /** Finding Count */
+            finding_count: number;
+            /** Model Id */
+            model_id: string;
+            /** Prompt Version */
+            prompt_version: string;
+            /** Error */
+            error: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+        };
         /**
          * Assignment
          * @description Whose shot this is. An empty address unassigns it.
@@ -1297,6 +1399,60 @@ export interface components {
             /** Take No */
             take_no: number;
         };
+        /** ClipAnalysisIdentity */
+        ClipAnalysisIdentity: {
+            /** Scene */
+            scene: number;
+            /** Shot */
+            shot: number;
+            /** Take No */
+            take_no: number;
+            /** Duration S */
+            duration_s: number;
+            /** Proxy Uri */
+            proxy_uri: string;
+            /** Sprite Uri */
+            sprite_uri: string;
+            /** Fps */
+            fps: number;
+            /** Scene Code */
+            scene_code: string;
+            /** Shot Code */
+            shot_code: string;
+        };
+        /** ClipSegment */
+        ClipSegment: {
+            /**
+             * Segment Id
+             * Format: uuid
+             */
+            segment_id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Start S */
+            start_s: number;
+            /** End S */
+            end_s: number;
+            /** Description */
+            description: string;
+            /** Transcript */
+            transcript: string;
+            /** Actions */
+            actions: string[];
+            /** Objects */
+            objects: string[];
+            /** Speakers */
+            speakers: string[];
+            /** Shot Size */
+            shot_size: string;
+            /** Camera Motion */
+            camera_motion: string;
+            /** Has Embedding */
+            has_embedding: boolean;
+        };
         /** Comment */
         Comment: {
             /** Comment Id */
@@ -1368,6 +1524,125 @@ export interface components {
              * @default
              */
             severity: string;
+        };
+        /** FindingActionResult */
+        FindingActionResult: {
+            /** Status */
+            status: string;
+            /**
+             * Finding Id
+             * Format: uuid
+             */
+            finding_id: string;
+            /**
+             * Event Id
+             * Format: uuid
+             */
+            event_id: string;
+            /** Action */
+            action: string;
+            /** Rev */
+            rev: number;
+            /** Archive Pending */
+            archive_pending: boolean;
+        };
+        /**
+         * FindingCode
+         * @description The closed vocabulary every finding must use.
+         *
+         *     Closed because it was open, and an open one produced thirty-nine codes
+         *     across twelve takes with no two specialists agreeing. `dialogue.truncated`,
+         *     `completion.dialogue_incomplete` and `dialogue.completion` all appeared,
+         *     all meaning the same thing.
+         *
+         *     Two consequences, both bad. Scoring recognised none of them, so the
+         *     per-criterion breakdown silently reported perfect continuity for every take.
+         *     And the archive stopped being queryable — "show me every take with a
+         *     continuity problem" cannot work when the problem has five spellings, and a
+         *     queryable archive is the point of the product.
+         *
+         *     Passed to the model as the response schema, so it selects rather than
+         *     invents. Its own wording survives in `detail`, which is where the useful
+         *     specificity was anyway: the code says what kind of thing, the detail says
+         *     what happened.
+         * @enum {string}
+         */
+        FindingCode: "focus.soft" | "focus.lost" | "motion.blur" | "stability.shake" | "stability.outlier" | "exposure.under" | "exposure.over" | "exposure.clipped" | "white_balance.shift" | "noise.high" | "frames.dropped" | "frames.frozen" | "clip.black" | "clip.too_short" | "audio.clipping" | "audio.silence" | "audio.dropout" | "audio.noise_floor" | "slate.present" | "action.pre_roll" | "action.incomplete" | "dialogue.incomplete" | "dialogue.fluffed" | "camera.move_short" | "camera.focus_pull_late" | "camera.unmotivated_move" | "frame.boom_visible" | "frame.crew_visible" | "frame.shadow" | "frame.subject_exits" | "frame.obstruction" | "continuity.prop" | "continuity.wardrobe" | "continuity.hair" | "continuity.eyeline" | "continuity.screen_direction" | "continuity.blocking" | "continuity.lighting" | "continuity.set_dressing" | "performance.note" | "other";
+        /** FindingCommand */
+        FindingCommand: {
+            /** Rev */
+            rev: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "confirm" | "dismiss" | "correct" | "adjust_range";
+            code?: components["schemas"]["FindingCode"] | null;
+            /** Detail */
+            detail?: string | null;
+            /** Severity */
+            severity?: ("note" | "attention" | "blocking") | null;
+            /** Start S */
+            start_s?: number | null;
+            /** End S */
+            end_s?: number | null;
+        };
+        /** FindingEvent */
+        FindingEvent: {
+            /**
+             * Clip Id
+             * Format: uuid
+             */
+            clip_id: string;
+            /**
+             * Finding Id
+             * Format: uuid
+             */
+            finding_id: string;
+            /**
+             * Event Id
+             * Format: uuid
+             */
+            event_id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Revision */
+            revision: number;
+            /** Action */
+            action: string;
+            /** Code */
+            code: string;
+            /** Detail */
+            detail: string;
+            /** Severity */
+            severity: string;
+            /** Start S */
+            start_s: number;
+            /** End S */
+            end_s: number;
+            /** Evidence Segment Ids */
+            evidence_segment_ids: string[];
+            /** Sources */
+            sources: string[];
+            /** Supersedes Event Id */
+            supersedes_event_id?: string | null;
+            /** Actor Id */
+            actor_id: string;
+            /** Actor Role */
+            actor_role: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /**
+             * Archive State
+             * @default delivered
+             */
+            archive_state: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2126,6 +2401,33 @@ export interface components {
              */
             shot_code: string;
         };
+        /** TakeAnalysis */
+        TakeAnalysis: {
+            /** Project Id */
+            project_id: number;
+            /**
+             * Clip Id
+             * Format: uuid
+             */
+            clip_id: string;
+            clip: components["schemas"]["ClipAnalysisIdentity"];
+            run?: components["schemas"]["AnalysisRun"] | null;
+            /** Status */
+            status: string;
+            /** Coverage Complete */
+            coverage_complete: boolean;
+            /** Description */
+            description: string;
+            /** Segments */
+            segments: components["schemas"]["ClipSegment"][];
+            /** Findings */
+            findings: components["schemas"]["FindingEvent"][];
+            /** History */
+            history: components["schemas"]["FindingEvent"][];
+            /** Safe Ranges */
+            safe_ranges: components["schemas"]["TimeRange"][];
+            primary_usable_range?: components["schemas"]["TimeRange"] | null;
+        };
         /** TimeRange */
         TimeRange: {
             /** Start S */
@@ -2481,6 +2783,108 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    take_analysis_analysis__project_id___clip_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                clip_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TakeAnalysis"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    act_on_finding_analysis__project_id___clip_id__findings__finding_id__post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                project_id: number;
+                clip_id: string;
+                finding_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FindingCommand"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FindingActionResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    backfill_analysis__project_id__backfill_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisQueued"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

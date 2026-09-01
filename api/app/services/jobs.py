@@ -11,6 +11,7 @@ of its history is worth keeping.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -23,6 +24,7 @@ from ..config import settings
 log = logging.getLogger(__name__)
 
 COLLECTION = "jobs"
+ANALYSIS_QUEUE_COLLECTION = "analysis_tasks"
 
 
 class State:
@@ -368,3 +370,80 @@ async def enqueue_ingest(
         )
 
     log.info("queued %d clips for job %s, project %d", len(clip_ids), job_id, project_id)
+
+
+async def enqueue_analysis(
+    project_id: int,
+    clips: list[dict],
+) -> int:
+    """Queue independent full-take work, one retryable message per clip."""
+    topic = publisher().topic_path(settings.project_id, settings.ingest_topic)
+    queued = 0
+    for clip in clips:
+        clip_id = str(clip["clip_id"])
+        attributes = {
+            "task": "full_take_analysis",
+            "project_id": str(project_id),
+            "clip_id": clip_id,
+            "scene": str(int(clip.get("group_id", clip.get("scene", 0)) or 0)),
+            "shot": str(int(clip.get("subgroup_id", clip.get("shot", 0)) or 0)),
+            "take_no": str(int(clip.get("take_no", 0) or 0)),
+            "duration_s": f"{float(clip.get('duration_s', 0.0)):.3f}",
+        }
+        task_ref = db().collection(ANALYSIS_QUEUE_COLLECTION).document(f"p{project_id}_{clip_id}")
+        await task_ref.set(
+            {
+                **attributes,
+                "state": "pending",
+                "updated_at": datetime.now(UTC),
+                "error": "",
+            }
+        )
+        try:
+            future = publisher().publish(topic, b"", **attributes)
+            message_id = await asyncio.to_thread(future.result, timeout=30)
+            await task_ref.set(
+                {
+                    "state": "queued",
+                    "message_id": message_id,
+                    "updated_at": datetime.now(UTC),
+                },
+                merge=True,
+            )
+            queued += 1
+        except Exception as exc:
+            await task_ref.set(
+                {
+                    "state": "publish_failed",
+                    "error": str(exc)[:500],
+                    "updated_at": datetime.now(UTC),
+                },
+                merge=True,
+            )
+            log.exception("could not queue full-take analysis for clip %s", clip_id)
+
+    log.info(
+        "queued full-take analysis for %d/%d clips in project %d", queued, len(clips), project_id
+    )
+    return queued
+
+
+async def record_analysis_state(
+    project_id: int,
+    clip_id: UUID,
+    state: str,
+    error: str = "",
+) -> None:
+    await (
+        db()
+        .collection(ANALYSIS_QUEUE_COLLECTION)
+        .document(f"p{project_id}_{clip_id}")
+        .set(
+            {
+                "state": state,
+                "error": error[:500],
+                "updated_at": datetime.now(UTC),
+            },
+            merge=True,
+        )
+    )

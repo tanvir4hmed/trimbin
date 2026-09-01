@@ -79,6 +79,14 @@ class AnalysisRequest(Strict):
 
     clips: list[ClipRef] = Field(min_length=1, max_length=8)
     measurements: dict[UUID, Measurements]
+    observed_findings: dict[UUID, list[Finding]] = Field(
+        default_factory=dict,
+        description=(
+            "Full-duration findings produced independently per clip. These are "
+            "observable technical, continuity, and completion evidence; they "
+            "never contain a performance preference."
+        ),
+    )
     bracket_round: int = Field(default=0, ge=0)
     look_profile: str | None = Field(
         default=None,

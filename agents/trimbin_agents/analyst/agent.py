@@ -16,7 +16,6 @@ can reconstruct how a winner was reached rather than merely asserting one.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
@@ -59,7 +58,6 @@ _HERE = Path(__file__).parent
 
 TECHNICAL = (_HERE / "prompt_technical_v1.md").read_text(encoding="utf-8")
 CONTINUITY = (_HERE / "prompt_continuity_v1.md").read_text(encoding="utf-8")
-PERFORMANCE = (_HERE / "prompt_performance_v1.md").read_text(encoding="utf-8")
 CHIEF = (_HERE / "prompt_chief_v1.md").read_text(encoding="utf-8")
 
 # How far from the group median counts as an outlier worth mentioning. Below
@@ -81,10 +79,13 @@ class AnalystAgent:
         if len(request.clips) > settings.max_takes_per_comparison:
             return await self._bracket(request, clip_bytes)
 
-        technical = _technical_report(request)
+        technical = _technical_report(request) + _full_take_reports(request)
         leader, margin = _rank_on_measurements(request)
 
-        if margin >= settings.panel_margin:
+        # A wide measurement margin cannot hide a late observable issue. When
+        # full-take analysis found anything, the chief must weigh it before a
+        # recommendation exists.
+        if margin >= settings.panel_margin and not any(request.observed_findings.values()):
             return await self._fast_path(request, technical, leader, margin)
 
         return await self._panel(request, technical, clip_bytes)
@@ -146,10 +147,10 @@ class AnalystAgent:
     ) -> AnalysisResult:
         """The takes are technically equivalent, so the reasons have to be found.
 
-        Continuity and performance run concurrently: they watch the same footage
-        and neither depends on the other's answer, so waiting for one before
-        starting the other would double the latency of the slowest step for
-        nothing.
+        The recommendation is intentionally narrower than an editor's choice.
+        It may use measured technical evidence plus observable continuity and
+        completion evidence. Performance preference belongs to the human and is
+        never sent to the chief as a ranking signal.
         """
         parts = [
             types.Part.from_bytes(data=clip_bytes[c.clip_id], mime_type="video/mp4")
@@ -157,12 +158,8 @@ class AnalystAgent:
             if c.clip_id in clip_bytes
         ]
 
-        continuity, performance = await asyncio.gather(
-            self._specialist(CONTINUITY, parts, request),
-            self._specialist(PERFORMANCE, parts, request),
-        )
-
-        reports = technical + continuity + performance
+        continuity = await self._specialist(CONTINUITY, parts, request)
+        reports = technical + continuity
         return await self._chief(request, reports)
 
     async def _specialist(
@@ -448,6 +445,27 @@ def _technical_report(request: AnalysisRequest) -> list[SpecialistReport]:
             )
         )
 
+    return reports
+
+
+def _full_take_reports(request: AnalysisRequest) -> list[SpecialistReport]:
+    """Turn independent window evidence into reports the chief must weigh."""
+    reports = []
+    for clip in request.clips:
+        findings = list(request.observed_findings.get(clip.clip_id, []))
+        if not findings:
+            continue
+        reports.append(
+            SpecialistReport(
+                clip_id=clip.clip_id,
+                findings=findings,
+                confidence=Confidence.CONFIDENT,
+                summary=(
+                    f"Full-duration analysis found {len(findings)} observable "
+                    "issue(s); see their absolute source ranges."
+                ),
+            )
+        )
     return reports
 
 

@@ -20,7 +20,7 @@ Two conventions apply everywhere in this package:
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -32,14 +32,14 @@ class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class Actor(str, Enum):
+class Actor(StrEnum):
     """Who produced a decision. Human choices always outrank agent ones."""
 
     AGENT = "agent"
     HUMAN = "human"
 
 
-class Confidence(str, Enum):
+class Confidence(StrEnum):
     """How much weight a downstream step should give this result.
 
     UNCERTAIN is a first-class outcome. An agent that cannot answer must say so
@@ -51,13 +51,13 @@ class Confidence(str, Enum):
     UNCERTAIN = "uncertain"
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     NOTE = "note"  # worth knowing, changes nothing
     ATTENTION = "attention"  # a person should look
     BLOCKING = "blocking"  # this take cannot be used as-is
 
 
-class FindingCode(str, Enum):
+class FindingCode(StrEnum):
     """The closed vocabulary every finding must use.
 
     Closed because it was open, and an open one produced thirty-nine codes
@@ -138,7 +138,7 @@ class FindingCode(str, Enum):
     OTHER = "other"
 
 
-class ReasonCode(str, Enum):
+class ReasonCode(StrEnum):
     """Why a take was placed where it was, in a form that groups.
 
     Closed for the same reason FindingCode is. Left open, the chief wrote

@@ -249,23 +249,47 @@ def download_proxy_window(object_prefix: str, destination, seconds: float) -> bo
     Returns False when nothing could be fetched, so the caller can judge the
     rest of the setup rather than failing the whole shot.
     """
+    return download_proxy_range(object_prefix, destination, 0.0, seconds)
+
+
+def download_proxy_range(
+    object_prefix: str,
+    destination,
+    start_s: float,
+    end_s: float,
+) -> bool:
+    """Fetch one segment-aligned source range from an HLS proxy.
+
+    Full-take analysis works in overlapping windows. Fetching from segment zero
+    for every window would repeatedly download the beginning and would make a
+    58-second finding impossible to observe in the final window.
+
+    Window boundaries are chosen on the HLS segment grid by the caller. The
+    floor/ceiling here still make the function safe for a future caller with a
+    fractional range: evidence is widened, never silently clipped.
+    """
+    from math import ceil, floor
+
     from .measure import SEGMENT_SECONDS
 
+    if end_s <= start_s:
+        return False
+
     bucket = client().bucket(settings.proxies_bucket)
-    needed = max(1, -(-int(seconds) // SEGMENT_SECONDS))  # ceiling division
+    first = max(0, floor(start_s / SEGMENT_SECONDS))
+    stop = max(first + 1, ceil(end_s / SEGMENT_SECONDS))
 
     written = 0
     with open(destination, "wb") as out:
-        for index in range(needed):
+        for index in range(first, stop):
             blob = bucket.blob(f"{object_prefix}/proxy/seg_{index:04d}.ts")
             if not blob.exists():
-                # A take shorter than the window simply has fewer segments.
                 break
             out.write(blob.download_as_bytes())
             written += 1
 
     if written == 0:
-        log.warning("no proxy segments under %s", object_prefix)
+        log.warning("no proxy segments under %s for %.2f-%.2f", object_prefix, start_s, end_s)
         return False
     return True
 

@@ -20,7 +20,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from uuid import UUID
 
-from . import assessment, criteria, storage
+from . import analysis_store, assessment, criteria, storage
 from . import clips as clips_service
 from . import decisions as decisions_service
 from . import ranges as ranges_service
@@ -30,14 +30,12 @@ from .ffmpeg_ops import remux
 
 log = logging.getLogger(__name__)
 
-# How much of each take the panel watches.
+# How much comparative footage the continuity panel previews together.
 #
-# The panel is the expensive call and its cost scales with footage length, so a
-# seven-take setup of seventy-second takes would send eight minutes of video to
-# settle one question. Specialists are looking for continuity and performance
-# differences, which show in the first half-minute of a take far more often than
-# they show in the last. This is a real limit and worth naming: a continuity
-# error at 0:58 of a 1:10 take will be missed.
+# This is not the take-analysis coverage limit. Every clip has already been
+# observed independently over overlapping full-duration windows and those
+# findings are supplied to the chief. The preview exists only for direct
+# cross-take comparison; a 00:58 issue is still present in the full-take report.
 PANEL_WINDOW_S = 30.0
 
 # Below this many takes there is nothing to compare.
@@ -110,6 +108,13 @@ async def judge(
             "there is nothing to compare"
         )
 
+    incomplete = [take for take in takes if take.get("analysis_complete") is False]
+    if incomplete:
+        raise NotReady(
+            f"full-take analysis is still pending for {len(incomplete)} of "
+            f"{len(takes)} take(s); no recommendation was recorded"
+        )
+
     key = decisions_service.run_hash(
         project_id, group_id, subgroup_id, [t["clip_id"] for t in takes]
     )
@@ -124,7 +129,7 @@ async def judge(
     from trimbin_agents.analyst.agent import PROMPT_VERSION, AnalystAgent
     from trimbin_agents.config import settings as agent_settings
     from trimbin_agents.contracts.analysis import AnalysisRequest, Measurements
-    from trimbin_agents.contracts.base import ClipRef
+    from trimbin_agents.contracts.base import ClipRef, Finding, TimeRange
 
     shot_meta = await shots_service.get(project_id, group_id, subgroup_id)
 
@@ -155,6 +160,19 @@ async def judge(
                 duration_s=t["duration_s"],
                 dropped_frames=t["dropped_frames"],
             )
+            for t in takes
+        },
+        observed_findings={
+            t["clip_id"]: [
+                Finding(
+                    code=f["code"],
+                    detail=f.get("detail", "")[:200],
+                    severity=f.get("severity") or "attention",
+                    where=TimeRange(start_s=f["start_s"], end_s=f["end_s"]),
+                )
+                for f in t.get("findings", [])
+                if f.get("code") != "performance.note"
+            ]
             for t in takes
         },
     )
@@ -218,7 +236,7 @@ def _panel_likely(request) -> bool:
     from trimbin_agents.config import settings as agent_settings
 
     _, margin = _rank_on_measurements(request)
-    return margin < agent_settings.panel_margin
+    return bool(any(request.observed_findings.values())) or margin < agent_settings.panel_margin
 
 
 async def _load(project_id: int, group_id: int, subgroup_id: int) -> list[dict]:
@@ -267,6 +285,14 @@ async def _load(project_id: int, group_id: int, subgroup_id: int) -> list[dict]:
                 ],
             }
         )
+    complete, findings = await analysis_store.working_findings_for_clips(
+        project_id,
+        [take["clip_id"] for take in takes],
+    )
+    for take in takes:
+        take["analysis_complete"] = str(take["clip_id"]) in complete
+        if take["analysis_complete"]:
+            take["findings"] = findings.get(str(take["clip_id"]), [])
     return takes
 
 

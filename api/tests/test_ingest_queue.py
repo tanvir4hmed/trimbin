@@ -26,6 +26,50 @@ class FakePublisher:
         self.published.append((topic, data, attributes))
 
 
+class FakeFuture:
+    def __init__(self, error: Exception | None = None):
+        self.error = error
+
+    def result(self, timeout: int):
+        if self.error:
+            raise self.error
+        return "message-1"
+
+
+class AnalysisPublisher(FakePublisher):
+    def __init__(self, error: Exception | None = None):
+        super().__init__()
+        self.error = error
+
+    def publish(self, topic, data, **attributes):
+        super().publish(topic, data, **attributes)
+        return FakeFuture(self.error)
+
+
+class Ref:
+    def __init__(self):
+        self.data = {}
+
+    async def set(self, fields: dict, merge: bool = False):
+        self.data = {**self.data, **fields} if merge else dict(fields)
+
+
+class Collection:
+    def __init__(self, docs: dict[str, Ref]):
+        self.docs = docs
+
+    def document(self, key: str):
+        return self.docs.setdefault(key, Ref())
+
+
+class Store:
+    def __init__(self):
+        self.collections: dict[str, dict[str, Ref]] = {}
+
+    def collection(self, name: str):
+        return Collection(self.collections.setdefault(name, {}))
+
+
 @pytest.fixture
 def publisher(monkeypatch):
     fake = FakePublisher()
@@ -69,3 +113,48 @@ async def test_attributes_are_strings(publisher):
 
     _, _, attributes = publisher.published[0]
     assert all(isinstance(v, str) for v in attributes.values())
+
+
+@pytest.mark.asyncio
+async def test_analysis_publish_is_confirmed_and_durably_tracked(monkeypatch):
+    publisher = AnalysisPublisher()
+    store = Store()
+    monkeypatch.setattr(jobs, "publisher", lambda: publisher)
+    monkeypatch.setattr(jobs, "db", lambda: store)
+
+    queued = await jobs.enqueue_analysis(
+        7,
+        [
+            {
+                "clip_id": CLIPS[0],
+                "group_id": 12,
+                "subgroup_id": 2,
+                "take_no": 4,
+                "duration_s": 70,
+            }
+        ],
+    )
+
+    assert queued == 1
+    task = next(iter(store.collections[jobs.ANALYSIS_QUEUE_COLLECTION].values())).data
+    assert task["state"] == "queued"
+    assert task["message_id"] == "message-1"
+    assert publisher.published[0][2]["task"] == "full_take_analysis"
+
+
+@pytest.mark.asyncio
+async def test_analysis_publish_failure_is_visible_and_not_reported_as_queued(monkeypatch):
+    publisher = AnalysisPublisher(RuntimeError("permission denied"))
+    store = Store()
+    monkeypatch.setattr(jobs, "publisher", lambda: publisher)
+    monkeypatch.setattr(jobs, "db", lambda: store)
+
+    queued = await jobs.enqueue_analysis(
+        7,
+        [{"clip_id": CLIPS[0], "duration_s": 70}],
+    )
+
+    assert queued == 0
+    task = next(iter(store.collections[jobs.ANALYSIS_QUEUE_COLLECTION].values())).data
+    assert task["state"] == "publish_failed"
+    assert "permission denied" in task["error"]

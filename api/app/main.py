@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 
 from .config import settings
 from .routes import (
+    analysis,
     ask,
     dashboard,
     maintenance,
@@ -70,10 +71,11 @@ app.add_middleware(
     # routes were added, and the failure would have been a CORS preflight
     # rejection in the browser with a working endpoint behind it.
     allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
 )
 
 app.include_router(public.router)
+app.include_router(analysis.router)
 app.include_router(session.router)
 app.include_router(dashboard.router)
 app.include_router(uploads.router)

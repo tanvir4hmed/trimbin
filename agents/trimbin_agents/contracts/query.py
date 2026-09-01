@@ -12,7 +12,7 @@ stop trusting either.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import Field, model_validator
@@ -20,7 +20,7 @@ from pydantic import Field, model_validator
 from .base import Strict, TimeRange
 
 
-class Scope(str, Enum):
+class Scope(StrEnum):
     """How far a question is allowed to reach.
 
     Enforced in the query rather than in the prompt. A visitor asking politely to
@@ -31,7 +31,7 @@ class Scope(str, Enum):
     PROJECT = "project"  # one project the caller belongs to
 
 
-class Outcome(str, Enum):
+class Outcome(StrEnum):
     """What happened, told apart deliberately."""
 
     FOUND = "found"

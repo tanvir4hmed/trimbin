@@ -38,14 +38,9 @@ resource "google_secret_manager_secret_iam_member" "worker_clickhouse" {
   member    = "serviceAccount:${google_service_account.worker.email}"
 }
 
-# Firestore for job progress, and Vertex for the two model calls the worker
-# makes on every clip: reading the slate and embedding the frames.
-#
-# No pubsub.publisher — the worker consumes and never queues. The aiplatform
-# grant is the one worth naming: this process runs unattended on files a
-# stranger uploaded, so it holds a key to a paid model. That is why a guest
-# has hard clip and duration limits, and why the worker's own endpoint takes no
-# public callers.
+# Firestore for job progress, and Vertex for model calls. Publishing is granted
+# separately on the one ingest topic below; a project-wide publisher role would
+# let a compromised worker address unrelated topics it never needs.
 resource "google_project_iam_member" "worker_roles" {
   for_each = toset([
     "roles/datastore.user",
@@ -55,6 +50,15 @@ resource "google_project_iam_member" "worker_roles" {
   project = var.project_id
   role    = each.value
   member  = "serviceAccount:${google_service_account.worker.email}"
+}
+
+# Ingest completion schedules an independent full-take analysis message. This
+# separation matters: a model timeout retries analysis only, never the clip's
+# proxy encode or ClickHouse ingest row.
+resource "google_pubsub_topic_iam_member" "worker_analysis_publisher" {
+  topic  = google_pubsub_topic.ingest.name
+  role   = "roles/pubsub.publisher"
+  member = "serviceAccount:${google_service_account.worker.email}"
 }
 
 resource "google_cloud_run_v2_service" "worker" {

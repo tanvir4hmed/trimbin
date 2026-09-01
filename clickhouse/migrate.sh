@@ -73,14 +73,24 @@ fi
 
 echo -n "Verifying… "
 count=$(curl --silent --fail --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}" \
-    --data-binary "SELECT count() FROM system.tables WHERE database = currentDatabase() AND name IN ('clips','decisions','comments','supersessions','current_selection','mv_current_selection','review_queue','accuracy_summary','real_clips','real_decisions','real_comments','accuracy_by_project','project_corpus','shoot_days','activity','real_activity','placements','current_placement','current_clip_placement','placement_inbox','real_placements')" \
+    --data-binary "SELECT count() FROM system.tables WHERE database = currentDatabase() AND name IN ('clips','decisions','comments','supersessions','current_selection','mv_current_selection','review_queue','accuracy_summary','real_clips','real_decisions','real_comments','accuracy_by_project','project_corpus','shoot_days','activity','real_activity','placements','current_placement','current_clip_placement','placement_inbox','real_placements','analysis_runs','current_analysis_runs','clip_segments','current_clip_segments','clip_analysis_summary','finding_events','current_finding_state','current_findings')" \
     "${CLICKHOUSE_URL}/")
 
-if [[ "$count" -ne 21 ]]; then
-    echo "expected 21 objects, found ${count}" >&2
+if [[ "$count" -ne 29 ]]; then
+    echo "expected 29 objects, found ${count}" >&2
     exit 1
 fi
-echo "${count}/21 objects present."
+echo "${count}/29 objects present."
+
+echo -n "Full-take intelligence indexes... "
+intelligence_indexes=$(curl --silent --fail --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}" \
+    --data-binary "SELECT count() FROM system.data_skipping_indices WHERE database = currentDatabase() AND table = 'clip_segments' AND name IN ('idx_segment_embedding','idx_segment_description','idx_segment_range')" \
+    "${CLICKHOUSE_URL}/")
+if [[ "$intelligence_indexes" -ne 3 ]]; then
+    echo "expected 3, found ${intelligence_indexes} - segment retrieval would scan" >&2
+    exit 1
+fi
+echo "3/3 present."
 
 echo -n "Placement ordering columns... "
 placement_cols=$(curl --silent --fail --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}" \

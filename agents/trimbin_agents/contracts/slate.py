@@ -14,7 +14,7 @@ through, and every downstream decision inherits it.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import Field, model_validator
@@ -22,7 +22,7 @@ from pydantic import Field, model_validator
 from .base import ClipRef, Confidence, Strict
 
 
-class GroupingSource(str, Enum):
+class GroupingSource(StrEnum):
     """How the take's place in the shoot was established."""
 
     SLATE = "slate"  # read off the board

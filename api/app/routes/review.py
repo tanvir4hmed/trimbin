@@ -28,7 +28,16 @@ from pydantic import BaseModel, Field, field_validator
 
 from .. import schemas
 from ..auth import Principal, current_principal, require_signed_in
-from ..services import activity, assessment, members, revisions, selections, shots
+from ..services import (
+    activity,
+    analysis_store,
+    assessment,
+    members,
+    ranges,
+    revisions,
+    selections,
+    shots,
+)
 from ..services import comments as comments_service
 from ..services import review as review_service
 from ..services.analytics import client
@@ -266,6 +275,21 @@ async def verdicts(
             status.HTTP_404_NOT_FOUND,
             "No verdicts for this shot yet",
         )
+
+    complete, working_findings = await analysis_store.working_findings_for_clips(
+        project_id,
+        [UUID(take["clip_id"]) for take in takes],
+    )
+    for take in takes:
+        if take["clip_id"] not in complete:
+            continue
+        take["findings"] = working_findings.get(take["clip_id"], [])
+        safe, trims = ranges.safe_ranges(float(take["duration_s"]), take["findings"])
+        primary = ranges.longest(safe)
+        take["safe_ranges"] = [{"start_s": span.start_s, "end_s": span.end_s} for span in safe]
+        take["trim_reasons"] = trims
+        take["usable_from_s"] = primary.start_s if primary else 0.0
+        take["usable_to_s"] = primary.end_s if primary else 0.0
 
     brief = await shots.get(project_id, group_id, subgroup_id)
     if brief.selection_archive_state == "pending" and brief.selection_event_id:

@@ -232,3 +232,29 @@ async def embed(source: Path, work: Path, clip_id: UUID, duration_s: float) -> l
 
     n = len(vectors)
     return [sum(v[i] for v in vectors) / n for i in range(len(vectors[0]))]
+
+
+async def embed_text(text: str, *, subject: str = "segment") -> list[float]:
+    """Embed a segment description in the same space used by search queries.
+
+    Segment rows are immutable. A zero vector therefore means the model call did
+    not succeed and can be selected for a later re-analysis; it is never dressed
+    up as a semantic result.
+    """
+    cleaned = " ".join((text or "").split())
+    if not cleaned:
+        return []
+
+    try:
+        from google.genai import types
+
+        response = await _client().aio.models.embed_content(
+            model=settings.embedding_model,
+            contents=[cleaned],
+            config=types.EmbedContentConfig(output_dimensionality=_EMBEDDING_DIMENSIONS),
+        )
+        values = response.embeddings[0].values
+        return list(values) if values else []
+    except Exception:
+        log.exception("embedding failed for %s; writing zeros", subject)
+        return []
