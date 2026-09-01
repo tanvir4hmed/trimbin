@@ -57,6 +57,28 @@ _FORBIDDEN = re.compile(
 # a benign-looking SELECT carries something else behind it.
 _MULTI_STATEMENT = re.compile(r";\s*\S")
 
+# A single-quoted literal, backslash escapes included, as ClickHouse writes them.
+# Unbalanced quotes deliberately do not match: the raw text then stays in place
+# and the checks below run against it, which fails closed.
+_LITERAL = re.compile(r"'(?:[^'\\]|\\.)*'")
+
+
+def _outside_literals(sql: str) -> str:
+    """The statement with its string values blanked out.
+
+    The keyword and semicolon checks are about what the statement *does*, and a
+    word inside a quoted value does none of it. Scanning the whole string meant
+    an editor asking "where does she drop the shoes" got "DROP is not
+    permitted" and a 503 reading "Archive search is temporarily unavailable" —
+    the search text is interpolated into the SQL as a literal, so the question
+    was matching the guard rather than the archive.
+
+    Every question containing drop, delete, create, alter, update, truncate or
+    system failed this way, which for footage notes is not an unusual word list.
+    """
+    return _LITERAL.sub("''", sql)
+
+
 MAX_ROWS = 200
 QUERY_TIMEOUT_S = 30
 
@@ -93,13 +115,18 @@ def assert_read_only(sql: str) -> None:
     if not stripped:
         raise UnsafeQuery("empty statement")
 
-    if _MULTI_STATEMENT.search(sql):
+    # Values blanked before the structural checks, so a person's own words
+    # cannot be mistaken for the statement's verbs. What a query *does* is only
+    # ever written outside its literals.
+    code = _outside_literals(stripped)
+
+    if _MULTI_STATEMENT.search(_outside_literals(sql)):
         raise UnsafeQuery("only one statement per query")
 
-    if not stripped.upper().startswith(("SELECT", "WITH")):
+    if not code.upper().startswith(("SELECT", "WITH")):
         raise UnsafeQuery("only SELECT is permitted")
 
-    if match := _FORBIDDEN.search(stripped):
+    if match := _FORBIDDEN.search(code):
         raise UnsafeQuery(f"{match.group(0).upper()} is not permitted")
 
 

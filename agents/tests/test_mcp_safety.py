@@ -50,11 +50,27 @@ class TestWritesAreRefused:
         with pytest.raises(UnsafeQuery):
             assert_read_only("SELECT * FROM clips WHERE 1=1; dRoP TABLE clips")
 
-    def test_a_write_verb_inside_a_select_is_rejected(self) -> None:
-        """Conservative on purpose. A false refusal costs one rephrased query;
-        a false acceptance costs the archive."""
+    def test_a_write_verb_in_the_statement_is_rejected(self) -> None:
+        """Outside the literals, where a verb can actually do something."""
         with pytest.raises(UnsafeQuery):
-            assert_read_only("SELECT * FROM clips WHERE reason LIKE '%DROP TABLE%'")
+            assert_read_only("SELECT * FROM clips WHERE 1=1 AND (DROP TABLE clips)")
+
+    def test_a_write_verb_inside_a_quoted_value_is_allowed(self) -> None:
+        """This test used to assert the opposite, and the reasoning was wrong.
+
+        It said a false refusal costs one rephrased query. It does not: the
+        search text is interpolated into the SQL as a literal, so an editor
+        asking "where does she drop the shoes" got a 503 reading "Archive
+        search is temporarily unavailable" with no way to know the question was
+        the problem. Drop, delete, create, alter, update and system are ordinary
+        words about footage.
+
+        It also buys no safety. This check is documented in the module as the
+        fourth layer and the least important one — the read-only user's grants
+        are what stop a write — and a keyword inside a properly escaped literal
+        cannot execute in any case.
+        """
+        assert_read_only("SELECT * FROM clips WHERE reason LIKE '%DROP TABLE%'")
 
 
 class TestReadsAreAllowed:
@@ -227,3 +243,63 @@ class TestAnErrorIsNotAnEmptyResult:
         from trimbin_agents.tools.clickhouse_mcp import _rows_from
 
         assert _rows_from(self._block("some future format")) == []
+
+
+class TestAQuestionIsNotAStatement:
+    """The guard reads the statement, not the person's words.
+
+    An editor asked "where does the woman drop the shoes". The search text is
+    interpolated into the SQL as a quoted literal, the keyword scan ran over the
+    whole string, and the answer came back "Archive search is temporarily
+    unavailable" — a 503 caused by the question rather than by the archive.
+
+    Footage notes are full of these words. "The take where he drops the glass",
+    "she deletes the message", "the system boots up" — every one of them failed.
+    """
+
+    def test_a_forbidden_word_inside_a_value_is_allowed(self) -> None:
+        from trimbin_agents.tools.clickhouse_mcp import assert_read_only
+
+        assert_read_only(
+            "SELECT clip_id FROM decisions WHERE project_id = 1 "
+            "AND positionCaseInsensitive(reason, 'drop the shoes') > 0"
+        )
+
+    def test_every_keyword_survives_being_quoted(self) -> None:
+        from trimbin_agents.tools.clickhouse_mcp import assert_read_only
+
+        for word in ("drop", "delete", "create", "alter", "update", "system", "truncate"):
+            assert_read_only(f"SELECT 1 FROM t WHERE project_id = 1 AND note = '{word} it'")
+
+    def test_a_semicolon_inside_a_value_is_not_a_second_statement(self) -> None:
+        from trimbin_agents.tools.clickhouse_mcp import assert_read_only
+
+        assert_read_only("SELECT 1 FROM t WHERE project_id = 1 AND note = 'wide; then close'")
+
+    def test_an_escaped_quote_does_not_end_the_literal(self) -> None:
+        """`_interpolated` escapes with a backslash, so the guard must read one."""
+        from trimbin_agents.tools.clickhouse_mcp import assert_read_only
+
+        assert_read_only(r"SELECT 1 FROM t WHERE project_id = 1 AND note = 'director\'s drop cue'")
+
+    def test_a_real_write_is_still_refused(self) -> None:
+        """The point of blanking literals is that it changes nothing outside
+        them."""
+        from trimbin_agents.tools.clickhouse_mcp import UnsafeQuery, assert_read_only
+
+        with pytest.raises(UnsafeQuery, match="DROP"):
+            assert_read_only("SELECT 1 FROM t WHERE note = 'x' AND (DROP TABLE t)")
+
+    def test_a_write_hidden_after_a_quoted_semicolon_is_still_refused(self) -> None:
+        from trimbin_agents.tools.clickhouse_mcp import UnsafeQuery, assert_read_only
+
+        with pytest.raises(UnsafeQuery):
+            assert_read_only("SELECT 1 FROM t WHERE note = 'a;b'; DROP TABLE t")
+
+    def test_an_unbalanced_quote_fails_closed(self) -> None:
+        """Nothing matches, so the raw text is scanned — refusing is the safe
+        answer for a statement nobody can parse."""
+        from trimbin_agents.tools.clickhouse_mcp import UnsafeQuery, assert_read_only
+
+        with pytest.raises(UnsafeQuery):
+            assert_read_only("SELECT 1 FROM t WHERE note = 'unclosed AND DROP TABLE t")
