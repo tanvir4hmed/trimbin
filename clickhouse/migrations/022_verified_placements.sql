@@ -25,7 +25,45 @@ GROUP BY project_id, clip_id;
 
 CREATE VIEW current_clip_placement AS
 SELECT
-    c.* EXCEPT (group_id, subgroup_id, take_no),
+    -- Do not use `c.* EXCEPT (...)` in a persisted view. ClickHouse 26.2
+    -- preserved the qualifier in the view schema (`c.project_id`) and every
+    -- operational query asking for the documented `project_id` failed. A
+    -- canonical relation is a contract, so spell the contract out.
+    c.project_id AS project_id,
+    c.clip_id AS clip_id,
+    c.captured_at AS captured_at,
+    c.ingested_at AS ingested_at,
+    c.uploaded_by AS uploaded_by,
+    c.storage_uri AS storage_uri,
+    c.proxy_uri AS proxy_uri,
+    c.sprite_uri AS sprite_uri,
+    c.duration_ms AS duration_ms,
+    c.description AS description,
+    c.tags AS tags,
+    c.exposure_rel AS exposure_rel,
+    c.clipping_pct AS clipping_pct,
+    c.sharpness_rel AS sharpness_rel,
+    c.motion_rel AS motion_rel,
+    c.audio_lufs AS audio_lufs,
+    c.noise_floor_db AS noise_floor_db,
+    c.dropped_frames AS dropped_frames,
+    c.slate_confident AS slate_confident,
+    c.slate_raw AS slate_raw,
+    c.status AS status,
+    c.embedding AS embedding,
+    c.exposure_raw AS exposure_raw,
+    c.sharpness_raw AS sharpness_raw,
+    c.motion_raw AS motion_raw,
+    c.normalised_at AS normalised_at,
+    c.finding_codes AS finding_codes,
+    c.finding_starts_s AS finding_starts_s,
+    c.finding_ends_s AS finding_ends_s,
+    c.camera AS camera,
+    c.fps AS fps,
+    c.content_hash AS content_hash,
+    c.slate_uri AS slate_uri,
+    c.scene_code AS scene_code,
+    c.shot_code AS shot_code,
     if(s.clip_id = toUUID('00000000-0000-0000-0000-000000000000'), c.group_id, s.group_id) AS group_id,
     if(s.clip_id = toUUID('00000000-0000-0000-0000-000000000000'), c.subgroup_id, s.subgroup_id) AS subgroup_id,
     if(s.clip_id = toUUID('00000000-0000-0000-0000-000000000000') OR s.take_no = 0, c.take_no, s.take_no) AS take_no

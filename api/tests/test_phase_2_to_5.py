@@ -78,6 +78,46 @@ def test_a_segment_match_at_zero_still_has_an_exact_playable_range() -> None:
 
 
 @pytest.mark.asyncio
+async def test_finding_search_returns_the_finding_range_not_the_take_range(monkeypatch) -> None:
+    captured: dict = {}
+
+    async def execute(sql, params, project_id):
+        captured.update(sql=sql, params=params, project_id=project_id)
+        return (
+            [
+                {
+                    "clip_id": str(CLIP),
+                    "scene": 12,
+                    "setup": 2,
+                    "take_no": 5,
+                    "duration_s": 65,
+                    "outcome": "analysed",
+                    "reason": "Foreground wall obstructs frame.",
+                    "reason_code": "finding.match",
+                    "decided_by": "agent",
+                    "proxy_uri": "https://proxy/index.m3u8",
+                    "finding_codes": ["frame.obstruction"],
+                    "finding_starts_s": [0.0],
+                    "usable_from_s": 0.0,
+                    "usable_to_s": 16.0,
+                    "relevance": 1.0,
+                }
+            ],
+            4,
+        )
+
+    monkeypatch.setattr(search, "_execute", execute)
+    rows, _, _ = await search.run(7, {"finding": "frame.obstruction", "limit": 20})
+    match = ask._as_match(rows[0])
+
+    assert "FROM current_findings AS f" in captured["sql"]
+    assert captured["params"]["finding"] == "frame.obstruction"
+    assert match.where is not None
+    assert (match.where.start_s, match.where.end_s) == (0.0, 16.0)
+    assert match.description == "Foreground wall obstructs frame."
+
+
+@pytest.mark.asyncio
 async def test_search_fails_closed_when_official_mcp_is_unavailable(monkeypatch) -> None:
     from trimbin_agents.tools import clickhouse_mcp
 
@@ -110,6 +150,7 @@ class Principal:
 @pytest.mark.asyncio
 async def test_ingest_commit_settles_before_it_queues_analysis(monkeypatch) -> None:
     order: list[str] = []
+    settled: dict = {}
     job = jobs.Job(
         job_id=JOB,
         project_id=7,
@@ -126,6 +167,7 @@ async def test_ingest_commit_settles_before_it_queues_analysis(monkeypatch) -> N
 
     async def settle(*args, **kwargs):
         order.append("settled")
+        settled.update(kwargs)
 
     async def activity(*args, **kwargs):
         order.append("activity")
@@ -154,11 +196,12 @@ async def test_ingest_commit_settles_before_it_queues_analysis(monkeypatch) -> N
 
     result = await uploads.commit_ingest(
         JOB,
-        uploads.CommitIngest(items=[uploads.IngestResolution(clip_id=CLIP, action="keep")]),
+        uploads.CommitIngest(items=[uploads.IngestResolution(clip_id=CLIP, action="keep", take=7)]),
         Principal(),
     )
     assert result == {"status": "committed", "committed": 1, "analysis_queued": 1}
     assert order[-1] == "analysis"
+    assert settled["take_no"] == 7
 
 
 @pytest.mark.asyncio
@@ -209,6 +252,9 @@ def test_verified_placement_migration_never_promotes_an_open_proposal() -> None:
     assert "WHERE state IN ('settled', 'ignored')" in sql
     assert "LEFT JOIN settled_placement" in sql
     assert "proposed.state = 'open'" in sql
+    assert "c.project_id AS project_id" in sql
+    assert "c.clip_id AS clip_id" in sql
+    assert "SELECT\n    c.* EXCEPT" not in sql
 
 
 @pytest.mark.asyncio

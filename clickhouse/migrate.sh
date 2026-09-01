@@ -82,6 +82,21 @@ if [[ "$count" -ne 29 ]]; then
 fi
 echo "${count}/29 objects present."
 
+echo -n "Canonical placement view... "
+placement_view_cols=$(curl --silent --fail --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}" \
+    --data-binary "SELECT count() FROM system.columns WHERE database = currentDatabase() AND table = 'current_clip_placement' AND name IN ('project_id','clip_id','group_id','subgroup_id','take_no','status')" \
+    "${CLICKHOUSE_URL}/")
+if [[ "$placement_view_cols" -ne 6 ]]; then
+    echo "expected 6 contract columns, found ${placement_view_cols}" >&2
+    exit 1
+fi
+# Parsing a real application predicate catches a view whose columns were stored
+# under qualified names even when system.tables still says that the view exists.
+curl --silent --fail --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}" \
+    --data-binary "SELECT count() FROM current_clip_placement WHERE project_id = 0 AND status = 'active'" \
+    "${CLICKHOUSE_URL}/" >/dev/null
+echo "queryable."
+
 echo -n "Full-take intelligence indexes... "
 intelligence_indexes=$(curl --silent --fail --user "${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}" \
     --data-binary "SELECT count() FROM system.data_skipping_indices WHERE database = currentDatabase() AND table = 'clip_segments' AND name IN ('idx_segment_embedding','idx_segment_description','idx_segment_range')" \

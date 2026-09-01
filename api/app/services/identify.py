@@ -46,6 +46,10 @@ class Identity:
     subgroup_id: int = 0
     take_no: int = 0
     slate_confident: int = 0
+    # Evidence completeness, not a claim that the model is calibrated. A full
+    # scene/shot/take slate read is stronger than a partial board, and inference
+    # remains visibly uncertain instead of becoming a fake 0%/100% binary.
+    placement_confidence: float = 0.0
     slate_raw: str = ""
     # Which body shot it, when the board says so. Empty is the ordinary answer
     # on a single-camera production and is not a gap.
@@ -156,6 +160,12 @@ async def read_slate(source: Path, work: Path, clip_id: UUID, project_id: int) -
     identity.subgroup_id = result.subgroup_id
     identity.take_no = result.take_no
     identity.slate_confident = 1 if result.confidence.value == "confident" else 0
+    if identity.slate_confident:
+        identity.placement_confidence = (
+            0.92 if (result.reading.scene and result.reading.shot and result.reading.take) else 0.78
+        )
+    else:
+        identity.placement_confidence = 0.35
     identity.camera = camera_from_slate(result.reading.raw)
     identity.scene_code = (result.reading.scene or "").strip()[:40]
     identity.shot_code = (result.reading.shot or "").strip()[:40]

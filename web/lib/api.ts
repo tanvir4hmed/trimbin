@@ -607,7 +607,7 @@ export const api = {
   grantUpload: (
     projectId: number,
     filenames: string[],
-    target?: { scene: number; shot: number },
+    target?: { scene: number; shot: number; take?: number },
   ) =>
     request<{
       job_id: string;
@@ -625,6 +625,7 @@ export const api = {
         filenames,
         scene: target?.scene ?? 0,
         shot: target?.shot ?? 0,
+        take: target?.take ?? 0,
       }),
     }),
 
@@ -654,6 +655,7 @@ export const api = {
       action: "move" | "keep" | "unassign" | "create";
       scene?: number;
       shot?: number;
+      take?: number;
       heading?: string;
       slug?: string;
       description?: string;
@@ -671,6 +673,7 @@ export const api = {
       action: "move" | "keep" | "unassign" | "create";
       scene?: number;
       shot?: number;
+      take?: number;
     },
   ) => request<{ status: string; clip_id: string }>(`/uploads/jobs/${jobId}/draft`, {
     method: "PUT",

@@ -54,6 +54,7 @@ class UploadRequest(BaseModel):
     # slates and group by what they say.
     scene: int = Field(default=0, ge=0)
     shot: int = Field(default=0, ge=0)
+    take: int = Field(default=0, ge=0)
 
     @field_validator("filenames")
     @classmethod
@@ -98,6 +99,7 @@ class IngestResolution(BaseModel):
     action: Literal["move", "keep", "unassign", "create"]
     scene: int = Field(default=0, ge=0)
     shot: int = Field(default=0, ge=0)
+    take: int = Field(default=0, ge=0)
     heading: str = Field(default="", max_length=160)
     slug: str = Field(default="", max_length=80)
     description: str = Field(default="", max_length=500)
@@ -142,6 +144,7 @@ async def grant_upload(
         opened_by=principal.email or "",
         target_scene=request.scene,
         target_shot=request.shot,
+        target_take=request.take,
     )
 
     # The job exists now, so a failure from here on has to close it. Otherwise
@@ -233,6 +236,7 @@ async def complete_upload(
             filenames=body.filenames_by_clip or {},
             target_scene=job.target_scene,
             target_shot=job.target_shot,
+            target_take=job.target_take,
             uploaded_by=principal.email or "",
         )
 
@@ -342,7 +346,9 @@ async def job_status(
         "failed": job.failed_items,
         "failures": job.failures[:20],
         "target": (
-            {"scene": job.target_scene, "shot": job.target_shot} if job.target_scene else None
+            {"scene": job.target_scene, "shot": job.target_shot, "take": job.target_take}
+            if job.target_scene
+            else None
         ),
         "groups": sorted(groups.values(), key=lambda g: (g["scene"], g["shot"])),
         "needs_a_look": sum(1 for g in groups.values() if g["status"] != "clean"),
@@ -423,6 +429,7 @@ async def commit_ingest(
                     f"Scene {scene} shot {shot} already has the allowed number of takes.",
                 )
             batch_counts[key] = batch_counts.get(key, 0) + 1
+        take_no = int(decision.take or proposed.get("take_no", 0) or 0)
         await placements.resolve(
             job.project_id,
             decision.clip_id,
@@ -430,6 +437,7 @@ async def commit_ingest(
             shot,
             principal.email or "",
             detail,
+            take_no=take_no,
         )
         committed.add(str(decision.clip_id))
         await activity.record(

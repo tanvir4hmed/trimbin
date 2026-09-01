@@ -103,6 +103,12 @@ async def run(
     is worth more than one they have to trust, and this system's whole argument
     is that the reasoning should be visible.
     """
+    # A named finding already owns an exact evidence range. Do not search the
+    # whole decision and then attach its editorial in/out points: that produced
+    # an answer saying 0-16s beside a player link for the entire 65s take.
+    if plan.get("finding"):
+        return await _run_findings(project_id, plan)
+
     # Descriptions and semantic intent belong to moments, not whole decision
     # rows. A result therefore carries the segment's exact playable range.
     if plan.get("text") or plan.get("semantic") or embedding:
@@ -224,6 +230,79 @@ async def _execute(sql: str, params: dict[str, Any], project_id: int) -> tuple[l
     except Exception as exc:
         log.exception("MCP query failed")
         raise SearchUnavailable("Archive search is temporarily unavailable.") from exc
+
+
+async def _run_findings(
+    project_id: int,
+    plan: dict[str, Any],
+) -> tuple[list[dict], str, int]:
+    """Return the human-current finding itself as the playable evidence."""
+    conditions = [
+        "f.project_id = {project_id:UInt32}",
+        "f.code = {finding:String}",
+    ]
+    params: dict[str, Any] = {
+        "project_id": project_id,
+        "finding": _code_value(plan["finding"]),
+        "limit": min(int(plan.get("limit", 20)), HARD_LIMIT),
+    }
+    if plan.get("scene") is not None:
+        conditions.append("c.group_id = {scene:UInt32}")
+        params["scene"] = int(plan["scene"])
+    if plan.get("setup") is not None:
+        conditions.append("c.subgroup_id = {setup:UInt32}")
+        params["setup"] = int(plan["setup"])
+    if plan.get("take") is not None:
+        conditions.append("c.take_no = {take:UInt16}")
+        params["take"] = int(plan["take"])
+    if plan.get("outcome"):
+        conditions.append("d.outcome = {outcome:String}")
+        params["outcome"] = str(plan["outcome"])
+    if plan.get("decided_by"):
+        conditions.append("d.decided_by = {decided_by:String}")
+        params["decided_by"] = str(plan["decided_by"])
+
+    sql = f"""
+        WITH latest_decision AS
+        (
+            SELECT clip_id,
+                   argMax(outcome, decided_at) AS outcome,
+                   argMax(reason, decided_at) AS reason,
+                   argMax(decided_by, decided_at) AS decided_by,
+                   argMax(actor_id, decided_at) AS actor,
+                   argMax(score, decided_at) AS score
+            FROM decisions
+            WHERE project_id = {{project_id:UInt32}}
+            GROUP BY clip_id
+        )
+        SELECT
+            toString(f.clip_id) AS clip_id,
+            c.group_id AS scene,
+            c.subgroup_id AS setup,
+            c.take_no AS take_no,
+            if(d.outcome = '', 'analysed', d.outcome) AS outcome,
+            f.detail AS reason,
+            'finding.match' AS reason_code,
+            if(d.decided_by = '', 'agent', d.decided_by) AS decided_by,
+            d.actor AS actor,
+            d.score AS score,
+            [f.code] AS finding_codes,
+            [f.start_s] AS finding_starts_s,
+            round(c.duration_ms / 1000, 2) AS duration_s,
+            c.proxy_uri AS proxy_uri,
+            f.start_s AS usable_from_s,
+            f.end_s AS usable_to_s,
+            1 AS relevance
+        FROM current_findings AS f
+        INNER JOIN current_clip_placement AS c
+            ON c.project_id = f.project_id AND c.clip_id = f.clip_id
+        LEFT JOIN latest_decision AS d ON d.clip_id = f.clip_id
+        WHERE {" AND ".join(conditions)}
+        ORDER BY f.start_s, c.take_no
+        LIMIT {{limit:UInt16}}
+    """
+    rows, elapsed_ms = await _execute(sql, params, project_id)
+    return rows, _readable(sql), elapsed_ms
 
 
 async def _run_moments(
@@ -363,7 +442,9 @@ async def widen(project_id: int, plan: dict[str, Any]) -> tuple[list[dict], str,
     differently.
     """
     wider = dict(plan)
-    for field in ("text", "take", "finding", "setup"):
+    # A named finding is evidence and is never removed. Free-text memory can be
+    # approximate, but a widened result remains labelled as widened.
+    for field in ("text", "take", "setup"):
         if wider.get(field):
             wider[field] = None if field != "text" else ""
             return await run(project_id, wider)

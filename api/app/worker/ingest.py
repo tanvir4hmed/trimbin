@@ -100,6 +100,7 @@ async def process(
     project_id: int,
     target_scene: int = 0,
     target_shot: int = 0,
+    target_take: int = 0,
     filename: str = "",
     uploaded_by: str = "",
 ) -> None:
@@ -166,6 +167,17 @@ async def process(
         identity = await identify.read_slate(source, work, clip_id, project_id)
         identity.embedding = await identify.embed(source, work, clip_id, measurements.duration_s)
 
+        read_take = identity.take_no
+        if target_take:
+            if identity.slate_confident and read_take and read_take != target_take:
+                log.warning(
+                    "clip %s declared take %d but slate reads take %d",
+                    clip_id,
+                    target_take,
+                    read_take,
+                )
+            identity.take_no = target_take
+
         scene, shot, mismatch = place(
             target_scene,
             target_shot,
@@ -173,6 +185,9 @@ async def process(
             identity.subgroup_id,
             bool(identity.slate_confident),
         )
+        if target_take and identity.slate_confident and read_take and read_take != target_take:
+            take_mismatch = f"slate reads take {read_take}, declared take is {target_take}"
+            mismatch = f"{mismatch}; {take_mismatch}" if mismatch else take_mismatch
         if mismatch:
             log.warning(
                 "clip %s sent to %d/%d but %s", clip_id, target_scene, target_shot, mismatch
@@ -259,7 +274,7 @@ async def process(
             shot=shot,
             take_no=identity.take_no,
             source=placements.SLATE if identity.slate_confident else placements.FOLDER,
-            confidence=1.0 if identity.slate_confident else 0.0,
+            confidence=identity.placement_confidence,
             declared_scene=target_scene,
             declared_shot=target_shot,
             slate_raw=identity.slate_raw,
@@ -288,7 +303,7 @@ async def process(
         duration_s=measurements.duration_s,
         camera=identity.camera,
         slate_uri=slate_url,
-        confidence=1.0 if identity.slate_confident else 0.0,
+        confidence=identity.placement_confidence,
         duplicate_of=duplicate_of[0] if duplicate_of else "",
     )
     # Full-take work starts after verification. Until then this is staged
@@ -334,6 +349,7 @@ async def handle_message(attributes: dict[str, str]) -> bool:
     clip_id = UUID(attributes["clip_id"])
     target_scene = int(attributes.get("target_scene", "0") or 0)
     target_shot = int(attributes.get("target_shot", "0") or 0)
+    target_take = int(attributes.get("target_take", "0") or 0)
     filename = attributes.get("filename", "")
     uploaded_by = attributes.get("uploaded_by", "")
     # No default. A missing project id used to become 0, which sent the download
@@ -348,6 +364,7 @@ async def handle_message(attributes: dict[str, str]) -> bool:
             project_id,
             target_scene,
             target_shot,
+            target_take,
             filename,
             uploaded_by,
         )

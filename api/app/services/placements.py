@@ -156,6 +156,8 @@ async def resolve(
     shot: int,
     actor: str,
     detail: str = "",
+    *,
+    take_no: int = 0,
 ) -> None:
     """A person settling where a clip belongs.
 
@@ -168,7 +170,7 @@ async def resolve(
         clip_id,
         scene,
         shot,
-        take_no=0,
+        take_no=take_no,
         source=HUMAN,
         actor=actor,
         confidence=1.0,

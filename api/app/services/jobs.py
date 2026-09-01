@@ -96,6 +96,7 @@ class Job:
     # and the slate decides.
     target_scene: int = 0
     target_shot: int = 0
+    target_take: int = 0
     # One entry per clip: what happened to it, and where it landed.
     items: list[dict] = field(default_factory=list)
 
@@ -107,6 +108,7 @@ async def open_job(
     opened_by: str,
     target_scene: int = 0,
     target_shot: int = 0,
+    target_take: int = 0,
 ) -> UUID:
     """Create the record before any work starts.
 
@@ -132,6 +134,7 @@ async def open_job(
                 "opened_by": opened_by,
                 "target_scene": target_scene,
                 "target_shot": target_shot,
+                "target_take": target_take,
                 "items": [],
             }
         )
@@ -159,6 +162,7 @@ async def get_job(job_id: UUID) -> Job | None:
         opened_by=d.get("opened_by", ""),
         target_scene=int(d.get("target_scene", 0) or 0),
         target_shot=int(d.get("target_shot", 0) or 0),
+        target_take=int(d.get("target_take", 0) or 0),
         items=d.get("items", []),
     )
 
@@ -403,6 +407,7 @@ async def enqueue_ingest(
     filenames: dict[str, str] | None = None,
     target_scene: int = 0,
     target_shot: int = 0,
+    target_take: int = 0,
     uploaded_by: str = "",
 ) -> None:
     """One message per clip.
@@ -429,6 +434,7 @@ async def enqueue_ingest(
             # the worker reads as "the slate decides".
             target_scene=str(target_scene),
             target_shot=str(target_shot),
+            target_take=str(target_take),
             filename=(filenames or {}).get(str(clip_id), "")[:180],
             # So the clip row can say who put it here. It has been written as an
             # empty string since the first week.

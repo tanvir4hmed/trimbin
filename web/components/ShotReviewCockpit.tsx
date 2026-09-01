@@ -33,6 +33,10 @@ function label(code: string) {
   return code.replaceAll(".", " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function findingSeverity(value: string): "note" | "attention" | "blocking" {
+  return value === "note" || value === "blocking" ? value : "attention";
+}
+
 function analysisFor(analyses: TakeAnalysis[], clipId: string) {
   return analyses.find((row) => String(row.clip_id) === clipId);
 }
@@ -70,6 +74,7 @@ export default function ShotReviewCockpit({
   const [notice, setNotice] = useState("");
   const [adjusting, setAdjusting] = useState(false);
   const [commentAt, setCommentAt] = useState<{ clipId: string; at: number } | null>(null);
+  const [playheads, setPlayheads] = useState<Record<string, number>>({});
   const playerA = useRef<PlayerHandle>(null);
   const playerB = useRef<PlayerHandle>(null);
 
@@ -115,7 +120,10 @@ export default function ShotReviewCockpit({
     activePlayer(clipId)?.seek(finding.start_s, true);
   };
 
-  const act = async (action: "confirm" | "dismiss" | "adjust_range") => {
+  const act = async (
+    action: "confirm" | "dismiss" | "correct" | "adjust_range",
+    changes: { detail?: string; severity?: "note" | "attention" | "blocking" } = {},
+  ) => {
     if (!focus) return;
     try {
       await findingAction.mutateAsync({
@@ -126,7 +134,7 @@ export default function ShotReviewCockpit({
           action,
           ...(action === "adjust_range"
             ? { start_s: focus.finding.start_s, end_s: focus.finding.end_s }
-            : {}),
+            : action === "correct" ? changes : {}),
         },
       });
       setNotice(action === "dismiss" ? "Finding dismissed. Its history is preserved." : "Finding review recorded.");
@@ -156,6 +164,11 @@ export default function ShotReviewCockpit({
   if (screen.isError) return <div className="cockpit-state error">Could not load this shot. <button onClick={() => void screen.refetch()}>Retry</button></div>;
   if (!verdicts || !takes.length) return <div className="cockpit-state"><div><p>No takes have been compared for this shot yet.</p>{canCurate && <button className="primary" disabled={judge.isPending} onClick={() => void judge.mutateAsync()}>{judge.isPending ? "Comparing full takes…" : "Analyse & compare takes"}</button>}</div></div>;
 
+  const humanChoiceRecorded = verdicts.rev > 0 || takes.some(
+    (take) => take.outcome === "selected" && take.decided_by === "human",
+  );
+  const selectedAt = selected ? playheads[selected.clip_id] ?? 0 : 0;
+
   return (
     <div className="shot-cockpit">
       <section className="cockpit-main">
@@ -167,7 +180,7 @@ export default function ShotReviewCockpit({
           <div className="cockpit-summary">
             <span>{takes.length} takes</span>
             <span>{analyses.filter((item) => item.coverage_complete).length}/{takes.length} fully analysed</span>
-            <span className="live-dot">Human decision required</span>
+            <span className={humanChoiceRecorded ? "live-dot complete" : "live-dot"}>{humanChoiceRecorded ? "Human choice recorded" : "Human decision required"}</span>
           </div>
         </header>
 
@@ -187,7 +200,10 @@ export default function ShotReviewCockpit({
           {[{ side: "a" as const, take: a, ref: playerA }, { side: "b" as const, take: b, ref: playerB }].map(({ side, take, ref }) => take && (
             <div key={side} className={activeSide === side ? "compare-player active" : "compare-player"} onClick={() => setActiveSide(side)}>
               <span className="player-badge">{side.toUpperCase()} · TAKE {take.take_no}</span>
-              <Player ref={ref} className="player" src={take.proxy_uri} poster={take.sprite_uri} onTimeUpdate={(at) => { if (activeSide === side) setCommentAt((old) => old && old.clipId === take.clip_id ? { ...old, at } : old); }} />
+              <Player ref={ref} className="player" src={take.proxy_uri} poster={take.sprite_uri} onTimeUpdate={(at) => {
+                setPlayheads((current) => ({ ...current, [take.clip_id]: at }));
+                if (activeSide === side) setCommentAt((old) => old && old.clipId === take.clip_id ? { ...old, at } : old);
+              }} />
             </div>
           ))}
         </div>
@@ -206,7 +222,7 @@ export default function ShotReviewCockpit({
         </div>
 
         <section className="issue-lanes">
-          <header><div><p className="eyebrow">CUTS &amp; ISSUES</p><h2>Every take on one clock</h2></div><div className="lane-legend"><span className="clean-key">Clean</span><span className="warn-key">Issue</span><span className="slate-key">Slate / exit</span></div></header>
+          <header><div><p className="eyebrow">TAKE ANALYSIS · USABLE RANGES &amp; ISSUES</p><h2>Every take on one clock</h2></div><div className="lane-legend"><span className="clean-key">Clean</span><span className="warn-key">Issue</span><span className="slate-key">Slate / exit</span></div></header>
           <div className="time-ruler"><span>00:00</span><span>{tc(duration * .25)}</span><span>{tc(duration * .5)}</span><span>{tc(duration * .75)}</span><span>{tc(duration)}</span></div>
           {takes.map((take) => {
             const analysis = analysisFor(analyses, take.clip_id);
@@ -226,7 +242,7 @@ export default function ShotReviewCockpit({
 
       <aside className="cockpit-inspector">
         {focus ? (
-          <FindingInspector focus={focus} take={takes.find((take) => take.clip_id === focus.clipId)} adjusting={adjusting} setAdjusting={setAdjusting} onChange={(start, end) => setFocus({ ...focus, finding: { ...focus.finding, start_s: start, end_s: end } })} onConfirm={() => void act("confirm")} onDismiss={() => void act("dismiss")} onAdjust={() => void act("adjust_range")} pending={findingAction.isPending} />
+          <FindingInspector focus={focus} take={takes.find((take) => take.clip_id === focus.clipId)} adjusting={adjusting} setAdjusting={setAdjusting} onChange={(start, end) => setFocus({ ...focus, finding: { ...focus.finding, start_s: start, end_s: end } })} onConfirm={() => void act("confirm")} onDismiss={() => void act("dismiss")} onCorrect={(detail, severity) => void act("correct", { detail, severity })} onAdjust={() => void act("adjust_range")} pending={findingAction.isPending} canAct={canComment} />
         ) : (
           <>
             <p className="eyebrow">AI RECOMMENDATION</p>
@@ -241,21 +257,30 @@ export default function ShotReviewCockpit({
               <div className="selection-take">Take {selected.take_no}<span>{selected.clip_id === recommended?.clip_id ? "AI suggestion" : "Alternative"}</span></div>
               <label>Use range<div className="range-inputs"><input type="number" step="0.01" min="0" max={selected.duration_s} value={range.from} onChange={(event) => setRange({ ...range, from: Number(event.target.value) })} /><span>→</span><input type="number" step="0.01" min="0" max={selected.duration_s} value={range.to} onChange={(event) => setRange({ ...range, to: Number(event.target.value) })} /></div></label>
               {selected.clip_id !== recommended?.clip_id && <div className="reason-chips">{HUMAN_REASONS.map((item) => <button key={item} className={reason === item ? "chip on" : "chip"} onClick={() => setReason(item)}>{item}</button>)}</div>}
-              <button className="primary cockpit-confirm" disabled={choose.isPending || !(range.to > range.from)} onClick={() => void selectTake()}>{selected.clip_id === recommended?.clip_id ? `Confirm Take ${selected.take_no}` : "Modify & Select"}</button>
+              <button className="primary cockpit-confirm" disabled={!canComment || choose.isPending || !(range.to > range.from)} onClick={() => void selectTake()}>{canComment ? (selected.clip_id === recommended?.clip_id ? `Confirm Take ${selected.take_no}` : "Modify & Select") : "Sign in to select a take"}</button>
             </div>}
             <div className="finding-list"><h3>Findings to verify</h3>{analyses.flatMap((analysis) => analysis.findings.map((finding) => ({ analysis, finding }))).slice(0, 8).map(({ analysis, finding }) => <button key={String(finding.finding_id)} onClick={() => inspect(String(analysis.clip_id), finding)}><span className={`finding-dot severity-${finding.severity}`} /><span><b>{tc(finding.start_s)}–{tc(finding.end_s)} {label(finding.code)}</b><small>Take {analysis.clip.take_no} · {finding.detail}</small></span><i>›</i></button>)}</div>
           </>
         )}
         {notice && <p className="cockpit-notice">{notice}</p>}
+        {canComment && selected && <button className="ghost note-at-playhead" onClick={() => setCommentAt({ clipId: selected.clip_id, at: selectedAt })}>＋ Add note at {tc(selectedAt)}</button>}
         <Comments projectId={projectId} scene={scene} shot={shot} canComment={canComment} comments={screen.data?.comments ?? []} takes={takes.map((take) => ({ clip_id: take.clip_id, take_no: take.take_no }))} pending={commentAt} onConsumedPending={() => setCommentAt(null)} />
       </aside>
     </div>
   );
 }
 
-function FindingInspector({ focus, take, adjusting, setAdjusting, onChange, onConfirm, onDismiss, onAdjust, pending }: { focus: Focus; take?: Take; adjusting: boolean; setAdjusting: (value: boolean) => void; onChange: (start: number, end: number) => void; onConfirm: () => void; onDismiss: () => void; onAdjust: () => void; pending: boolean }) {
+function FindingInspector({ focus, take, adjusting, setAdjusting, onChange, onConfirm, onDismiss, onCorrect, onAdjust, pending, canAct }: { focus: Focus; take?: Take; adjusting: boolean; setAdjusting: (value: boolean) => void; onChange: (start: number, end: number) => void; onConfirm: () => void; onDismiss: () => void; onCorrect: (detail: string, severity: "note" | "attention" | "blocking") => void; onAdjust: () => void; pending: boolean; canAct: boolean }) {
   const finding = focus.finding;
   const evidence = useRef<PlayerHandle>(null);
+  const [correcting, setCorrecting] = useState(false);
+  const [detail, setDetail] = useState(finding.detail);
+  const [severity, setSeverity] = useState<"note" | "attention" | "blocking">(findingSeverity(finding.severity));
+  useEffect(() => {
+    setCorrecting(false);
+    setDetail(finding.detail);
+    setSeverity(findingSeverity(finding.severity));
+  }, [finding.finding_id, finding.detail, finding.severity]);
   return <div className="finding-inspector">
     <p className="eyebrow">FINDING · TAKE {take?.take_no ?? "—"}</p>
     <h2>{tc(finding.start_s)}–{tc(finding.end_s)} {label(finding.code)}</h2>
@@ -266,6 +291,8 @@ function FindingInspector({ focus, take, adjusting, setAdjusting, onChange, onCo
     </div>
     <section><p className="eyebrow">AI TECHNICAL NOTE</p><p>{finding.detail || "The model detected a visible technical inconsistency in this range."}</p></section>
     {adjusting && <div className="range-inputs"><input aria-label="Finding start" type="number" step="0.01" value={finding.start_s} onChange={(event) => onChange(Number(event.target.value), finding.end_s)} /><span>→</span><input aria-label="Finding end" type="number" step="0.01" value={finding.end_s} onChange={(event) => onChange(finding.start_s, Number(event.target.value))} /></div>}
-    <div className="finding-actions"><button className="primary" disabled={pending} onClick={onConfirm}>Issue is correct</button><button className="ghost" disabled={pending} onClick={onDismiss}>Dismiss issue</button>{adjusting ? <button className="ghost" disabled={pending} onClick={onAdjust}>Save adjusted range</button> : <button className="ghost" onClick={() => setAdjusting(true)}>Adjust range</button>}</div>
+    {correcting && <div className="finding-correction"><label>Correct technical note<textarea value={detail} maxLength={500} onChange={(event) => setDetail(event.target.value)} /></label><label>Severity<select value={severity} onChange={(event) => setSeverity(event.target.value as typeof severity)}><option value="note">Note</option><option value="attention">Attention</option><option value="blocking">Blocking</option></select></label><button className="primary" disabled={pending || !detail.trim()} onClick={() => onCorrect(detail.trim(), severity)}>Save correction</button></div>}
+    <div className="finding-actions"><button className="primary" disabled={!canAct || pending} onClick={onConfirm}>Issue is correct</button><button className="ghost" disabled={!canAct || pending} onClick={onDismiss}>Dismiss issue</button><button className="ghost" disabled={!canAct || pending} onClick={() => setCorrecting((value) => !value)}>{correcting ? "Cancel correction" : "Correct finding"}</button>{adjusting ? <button className="ghost" disabled={!canAct || pending} onClick={onAdjust}>Save adjusted range</button> : <button className="ghost" disabled={!canAct} onClick={() => setAdjusting(true)}>Adjust range</button>}</div>
+    {!canAct && <p className="policy-note">Sign in to confirm, correct, dismiss, or adjust this finding.</p>}
   </div>;
 }

@@ -1817,6 +1817,11 @@ export interface components {
              */
             shot: number;
             /**
+             * Take
+             * @default 0
+             */
+            take: number;
+            /**
              * Heading
              * @default
              */
@@ -2892,6 +2897,11 @@ export interface components {
              * @default 0
              */
             shot: number;
+            /**
+             * Take
+             * @default 0
+             */
+            take: number;
         };
         /** UploadTicket */
         UploadTicket: {

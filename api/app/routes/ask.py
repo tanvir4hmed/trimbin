@@ -193,7 +193,7 @@ def _as_match(row: dict):
         duration_s=float(row.get("duration_s") or 0.0),
         description=(
             str(row.get("reason") or "")[:300]
-            if row.get("reason_code") == "segment.match"
+            if row.get("reason_code") in {"segment.match", "finding.match"}
             else ", ".join(str(c) for c in codes[:3]) or "no findings"
         ),
         outcome=str(row["outcome"]),
