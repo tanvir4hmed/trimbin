@@ -78,6 +78,14 @@ async def dashboard(
             {
                 "project_id": p.project_id,
                 "name": p.name,
+                # A card is a Project plus a headcount, and Project requires
+                # these two. Leaving them out took the whole screen down: the
+                # response model rejected every card, so Home and the review
+                # queue answered 500 while the data behind them was fine.
+                "owner_email": p.owner_email,
+                "member_emails": list(p.member_emails),
+                "state": p.state,
+                "rev": p.rev,
                 "is_public": p.is_public,
                 "you_are_owner": (principal.email or "").lower() == p.owner_email.lower(),
                 # Whether this one is theirs to work, which is the difference

@@ -26,12 +26,17 @@ from ..contracts.search import SearchPlan
 
 log = logging.getLogger(__name__)
 
-PROMPT_VERSION = "archivist/v2"
+# v3 renames "setup" to "shot". The word reached people: the archive
+# answered "in scene 1, setup 1, take 3" to a question asked in the product's
+# own vocabulary. Bumped rather than edited in place because the version is
+# recorded with every answer, and leaving it would file new wording under the
+# old prompt.
+PROMPT_VERSION = "archivist/v3"
 
 _PLANNER = """You turn an editor's question into filters over a footage archive.
 
 The archive holds takes. Each take has:
-  - a scene, a setup (camera position) and a take number
+  - a scene, a shot (one camera position, e.g. 12A the wide) and a take number
   - what was decided about it: selected, runner_up, not_selected, unusable
   - who decided: agent (the system) or human (an editor overruling it)
   - the reason, in the words recorded at the time
@@ -158,7 +163,7 @@ def _render(matches: list[Match]) -> str:
     for m in matches:
         where = f" at {m.where.start_s:.1f}s" if m.where else ""
         lines.append(
-            f"- scene {m.group_id} setup {m.subgroup_id} take {m.take_no}: "
+            f"- scene {m.group_id} shot {m.subgroup_id} take {m.take_no}: "
             f"{m.outcome}, {m.reason}{where} (decided by {m.decided_by})"
         )
     return "\n".join(lines)

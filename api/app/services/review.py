@@ -104,7 +104,7 @@ async def judge(
 
     if len(takes) < MIN_TAKES:
         raise NotReady(
-            f"scene {group_id} setup {subgroup_id} has {len(takes)} take(s); "
+            f"scene {group_id} shot {subgroup_id} has {len(takes)} take(s); "
             "there is nothing to compare"
         )
 

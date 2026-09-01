@@ -1572,8 +1572,11 @@ export interface components {
         DashboardScreen: {
             /** You */
             you?: string | null;
-            /** Role */
-            role: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "lead" | "editor" | "guest";
             /** Queue */
             queue: components["schemas"]["QueueItem"][];
             /** Queue Total */
@@ -2253,8 +2256,11 @@ export interface components {
         ProjectList: {
             /** You */
             you?: string | null;
-            /** Role */
-            role: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "lead" | "editor" | "guest";
             limits: components["schemas"]["Limits"];
             /** Projects */
             projects: components["schemas"]["Project"][];

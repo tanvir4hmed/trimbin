@@ -15,8 +15,10 @@ import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AskArchive from "@/components/AskArchive";
+import PlacementInbox from "@/components/PlacementInbox";
 import SceneTree from "@/components/SceneTree";
 import ShotReviewCockpit from "@/components/ShotReviewCockpit";
+import Structure from "@/components/Structure";
 import { ApiError } from "@/lib/api";
 import { useProjectScreen } from "@/lib/queries";
 
@@ -34,6 +36,11 @@ export default function ProjectPage({
   const [camera, setCamera] = useState("");
   const [shootDay, setShootDay] = useState("");
   const [assignee, setAssignee] = useState("");
+  // Which scene the rail is showing. 0 is every scene, which is right for a
+  // three-scene project and wrong for a thirty-scene one — so it is a choice
+  // rather than a fixed answer.
+  const [railScene, setRailScene] = useState(0);
+  const [planning, setPlanning] = useState(false);
 
   const screen = useProjectScreen(projectId, {
     camera: camera || undefined,
@@ -81,6 +88,25 @@ export default function ProjectPage({
     return first ? { scene: tree.scenes[0].scene, shot: first.shot } : null;
   }, [tree, selected, search]);
 
+  // The slugline lives on the plan, not on the tree — the tree is what footage
+  // says exists, the plan is what the production declared.
+  const headings = useMemo(
+    () => new Map((data?.plan.scenes ?? []).map((s) => [s.scene, s.heading])),
+    [data],
+  );
+
+  const openScene = tree?.scenes.find((s) => s.scene === open?.scene);
+  const openShot = openScene?.shots.find((s) => s.shot === open?.shot);
+
+  // The rail's scenes, narrowed to one when a scene is chosen. The tree keeps
+  // every shot of it; narrowing the column is about finding a scene quickly,
+  // not about hiding work.
+  const railScenes = useMemo(
+    () =>
+      !tree ? [] : railScene ? tree.scenes.filter((s) => s.scene === railScene) : tree.scenes,
+    [tree, railScene],
+  );
+
   const canComment = Boolean(me?.signed_in);
   // Told by the API rather than worked out here. A page that decides this by
   // comparing addresses is a second implementation of the permission rules.
@@ -125,12 +151,19 @@ export default function ProjectPage({
             {me?.signed_in ? "Dashboard" : "Trimbin"}
           </Link>
           <span aria-hidden>›</span>
-          <span>{project?.name ?? `Project ${projectId}`}</span>
+          {/* Labelled, because these productions are *named* after scenes —
+              "Scene 2 - two perspectives" holding scene 1 put two different
+              scene numbers side by side in one line and read as a fault. */}
+          <span className="crumb-project">
+            <small>project</small>
+            {project?.name ?? `Project ${projectId}`}
+          </span>
           {open && (
             <>
               <span aria-hidden>›</span>
-              <span>
-                Scene {open.scene} · Shot {open.shot}
+              <span className="crumb-shot">
+                Scene {openScene?.scene_code || open.scene} ·{" "}
+                {openShot?.slug || `Shot ${open.shot}`}
               </span>
             </>
           )}
@@ -214,8 +247,18 @@ export default function ProjectPage({
         </div>
       )}
 
+      {/* Draws nothing until a clip is actually waiting, so it costs an empty
+          project nothing and cannot be missed on a project where ingest found
+          a file in the wrong folder. */}
+      <PlacementInbox
+        projectId={projectId}
+        plan={data.plan.scenes}
+        canResolve={canCurate}
+      />
+
       {!empty && (
         <AskArchive
+          collapsible
           projectId={projectId}
           onOpen={(scene, shot, at, clipId) => router.push(`/project/${projectId}?scene=${scene}&shot=${shot}${at !== undefined ? `&at=${at}` : ""}${clipId ? `&clip=${clipId}` : ""}`)}
         />
@@ -224,17 +267,87 @@ export default function ProjectPage({
       {empty ? (
         <div className="empty-project">
           <h2>{filtered ? "Nothing matches those filters" : "Nothing here yet"}</h2>
-          {!filtered && <p>Drop a shoot folder to begin.</p>}
+          {!filtered && (
+            <p>
+              Declare the scenes and shots, then upload into them — or upload
+              first and let the slate sort the footage.
+            </p>
+          )}
           {!filtered && canCurate && <Link className="primary" href={`/project/${projectId}/ingest`}>Add footage</Link>}
+          {!filtered && canCurate && (
+            <Structure
+              projectId={projectId}
+              scenes={data.plan.scenes}
+              canEdit={canCurate}
+              onChanged={() => void screen.refetch()}
+            />
+          )}
         </div>
       ) : (
         <div className="workspace-split">
-          <SceneTree
-            scenes={tree.scenes}
-            selected={open}
-            onSelect={(scene, shot) => setSelected({ scene, shot })}
-            onOpenScene={(scene) => router.push(`/project/${projectId}/scene/${scene}`)}
-          />
+          <div className="rail">
+            {/* Switching scene from the work, not only from the dashboard.
+                Everything in this column belongs to one scene at a time, and
+                the alternative was scrolling a flat list of every shot in the
+                production to reach the next one. */}
+            <div className="rail-scene">
+              <label>
+                Scene
+                <select
+                  value={railScene}
+                  onChange={(event) => setRailScene(Number(event.target.value))}
+                >
+                  <option value={0}>All scenes ({tree.scenes.length})</option>
+                  {tree.scenes.map((scene) => (
+                    <option key={scene.scene} value={scene.scene}>
+                      {scene.scene_code || `Scene ${scene.scene}`}
+                      {headings.get(scene.scene) ? ` · ${headings.get(scene.scene)}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {open && (
+                <Link
+                  className="ghost small"
+                  href={`/project/${projectId}/scene/${open.scene}`}
+                >
+                  Play
+                </Link>
+              )}
+            </div>
+
+            <SceneTree
+              scenes={railScenes}
+              selected={open}
+              onSelect={(scene, shot) => setSelected({ scene, shot })}
+              onOpenScene={(scene) => router.push(`/project/${projectId}/scene/${scene}`)}
+            />
+
+            {canCurate && (
+              // The scene and shot list has always been editable and the editor
+              // was never placed on a page, so a production could be created
+              // and then had nowhere to declare its scenes — which is also why
+              // ingest's "I know scene / shot / take" had an empty menu.
+              <div className="rail-plan">
+                <button
+                  type="button"
+                  className="linkish rail-plan-toggle"
+                  onClick={() => setPlanning((value) => !value)}
+                  aria-expanded={planning}
+                >
+                  {planning ? "Done planning" : "Add scenes & shots"}
+                </button>
+                {planning && (
+                  <Structure
+                    projectId={projectId}
+                    scenes={data.plan.scenes}
+                    canEdit={canCurate}
+                    onChanged={() => void screen.refetch()}
+                  />
+                )}
+              </div>
+            )}
+          </div>
 
           <section className="pane">
             {open ? (

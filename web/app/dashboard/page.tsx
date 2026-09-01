@@ -49,7 +49,11 @@ function say(verb: string, quantity: number): string {
   }
 }
 
-function ago(iso: string | null): string {
+// Undefined as well as null: `at` carries a default in the response model,
+// so the generated type makes it optional even though the service always
+// sends it. The guard below already covered both; only the signature was
+// narrower than the data.
+function ago(iso: string | null | undefined): string {
   if (!iso) return "";
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
   if (mins < 1) return "just now";

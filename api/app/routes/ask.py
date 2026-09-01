@@ -168,6 +168,20 @@ async def _embed(description: str) -> list[float] | None:
         return None
 
 
+def _clipped(text: str, limit: int) -> str:
+    """Cut at a word, and say that it was cut.
+
+    A hard slice ended answers like "…his friends do not like h", which reads as
+    a rendering fault rather than a shortened sentence. When a match comes from
+    a segment the reason is that segment's description, and descriptions are
+    long enough that this was the common case, not the rare one.
+    """
+    if len(text) <= limit:
+        return text
+    head = text[:limit].rsplit(" ", 1)[0].rstrip(" ,;:—-")
+    return f"{head or text[:limit]}…"
+
+
 def _as_match(row: dict):
     """One row, as the contract the interface reads.
 
@@ -192,12 +206,12 @@ def _as_match(row: dict):
         take_no=int(row.get("take_no") or 0),
         duration_s=float(row.get("duration_s") or 0.0),
         description=(
-            str(row.get("reason") or "")[:300]
+            _clipped(str(row.get("reason") or ""), 300)
             if row.get("reason_code") in {"segment.match", "finding.match"}
             else ", ".join(str(c) for c in codes[:3]) or "no findings"
         ),
         outcome=str(row["outcome"]),
-        reason=str(row["reason"])[:200],
+        reason=_clipped(str(row["reason"]), 200),
         decided_by=str(row["decided_by"]),
         playlist_uri=str(row.get("proxy_uri") or ""),
         where=where,

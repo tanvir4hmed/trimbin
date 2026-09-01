@@ -114,7 +114,19 @@ export default function Upload({ projectId, plan, canResolve = true, onFinished 
       window.localStorage.setItem(storageKey, JSON.stringify({ job_id: grant.job_id, tickets: grant.tickets, filenames: files.map((file) => file.name), target: requestedTarget }));
       setJobId(grant.job_id);
       const { arrived, names } = await uploadAll(grant.tickets, files, setRows);
+      // Always reported, including the empty case: the job stays open until
+      // somebody says what arrived, and a job nobody closes waits for ever.
       const result = await api.completeUpload(grant.job_id, arrived, names);
+      if (!arrived.length) {
+        // Every file failed. The wizard used to walk on to Verify and draw an
+        // empty table, which reads as "the upload vanished" — and it did, in
+        // the sense that nothing was ever told to the person. The per-file
+        // reason is on the rows and is now shown with them.
+        setStage("add");
+        window.localStorage.removeItem(storageKey);
+        setError(`No file reached storage. Nothing was added to ${files.length === 1 ? "the project" : "the project from this batch"}.`);
+        return;
+      }
       if (Number(result.missing)) setError(`${result.missing} file(s) did not reach storage.`);
     } catch (cause) {
       setStage("add");
@@ -129,6 +141,10 @@ export default function Upload({ projectId, plan, canResolve = true, onFinished 
     catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save that verification choice."); }
   };
   const unresolved = items.filter((item) => !item.verified && !decisions[item.clip_id]);
+  // A file that fails is recorded on its row and was never drawn. Silence is
+  // the worst possible report on an upload: the batch appears to progress and
+  // then simply stops existing.
+  const failed = rows.filter((row) => row.state === "failed");
 
   const commit = async () => {
     if (!jobId || unresolved.length) return;
@@ -174,6 +190,7 @@ export default function Upload({ projectId, plan, canResolve = true, onFinished 
 
     {stage === "verify" && <footer className="ingest-footer"><div><b>Nothing moves or deletes without confirmation.</b><span>{unresolved.length ? `${unresolved.length} clip${unresolved.length === 1 ? "" : "s"} still need a decision.` : "All assignments are ready."}</span></div><button className="primary" disabled={Boolean(unresolved.length) || !items.length} onClick={() => void commit()}>Commit {items.filter((item) => !item.verified).length} clips to project</button></footer>}
     {stage === "ingest" && <div className="ingest-complete"><span>✓</span><div><h2>Ingest committed</h2><p>{status?.items.filter((item) => item.verified).length ?? 0} clips are organized. Full-take analysis is queued.</p></div><button className="ghost" onClick={reset}>Add another batch</button></div>}
+    {failed.length > 0 && <div className="ingest-failures"><b>{failed.length} file{failed.length === 1 ? "" : "s"} did not upload</b><ul>{failed.map((row) => <li key={row.clipId}><span>{row.filename}</span><small>{row.error || "upload failed"}</small></li>)}</ul></div>}
     {error && <p className="error ingest-error">{error}</p>}
   </section>;
 }

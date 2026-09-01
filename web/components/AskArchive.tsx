@@ -45,12 +45,22 @@ export default function AskArchive({
   projectId,
   onOpen,
   initialQuestion,
+  collapsible = false,
 }: {
   projectId: number;
   /** Jump to a take in the workspace, at the timecode if there is one. */
   onOpen?: (scene: number, shot: number, at?: number, clipId?: string) => void;
   /** Rendered on the archive screen, where the box is the whole page. */
   initialQuestion?: string;
+  /**
+   * Folded away until asked for.
+   *
+   * In the workspace this sat as a full-width band between the filters and the
+   * work, so opening a shot meant scrolling past a question box every time.
+   * Search already has its own place in the bar; here it is a thing you reach
+   * for occasionally, and it should cost one line until you do.
+   */
+  collapsible?: boolean;
 }) {
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
@@ -58,6 +68,7 @@ export default function AskArchive({
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSql, setShowSql] = useState(false);
+  const [open, setOpen] = useState(!collapsible);
 
   useEffect(() => {
     api
@@ -99,9 +110,30 @@ export default function AskArchive({
     void send(initialQuestion);
   }, [initialQuestion, send]);
 
+  if (collapsible && !open) {
+    return (
+      <section className="ask ask-folded">
+        <button type="button" className="ask-open" onClick={() => setOpen(true)}>
+          <span className="ask-open-label">Ask the archive</span>
+          <span className="ask-open-hint">
+            {suggestions[0] ? `e.g. ${suggestions[0]}` : "Search every decision and its reason"}
+          </span>
+          <i aria-hidden>+</i>
+        </button>
+      </section>
+    );
+  }
+
   return (
     <section className="ask">
-      <h2>Ask the archive</h2>
+      <h2>
+        Ask the archive
+        {collapsible && (
+          <button type="button" className="linkish ask-close" onClick={() => setOpen(false)}>
+            close
+          </button>
+        )}
+      </h2>
       <p className="dim small">
         Every decision is kept with the reason recorded at the time. This is how
         you get one back.
@@ -176,7 +208,7 @@ export default function AskArchive({
                     disabled={!onOpen}
                   >
                     <span className="where">
-                      Scene {m.group_id} · Setup {m.subgroup_id} · Take {m.take_no}
+                      Scene {m.group_id} · Shot {m.subgroup_id} · Take {m.take_no}
                     </span>
                     <span className={`outcome ${m.outcome}`}>{m.outcome}</span>
                     <span className="ask-reason">{m.reason}</span>

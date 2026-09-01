@@ -95,7 +95,7 @@ class Session(Model):
     token: str
     email: str
     name: str
-    role: str
+    role: Role
     expires_at: int
 
 
@@ -134,7 +134,7 @@ class Project(Model):
 
 class ProjectList(Model):
     you: str | None = None
-    role: str
+    role: Role
     limits: Limits
     projects: list[Project]
 
@@ -474,7 +474,7 @@ class ProjectCard(Project):
 
 class DashboardScreen(Model):
     you: str | None = None
-    role: str
+    role: Role
     queue: list[QueueItem]
     queue_total: int
     totals: Totals

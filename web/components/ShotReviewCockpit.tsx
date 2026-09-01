@@ -9,6 +9,7 @@ import {
   useChooseTake,
   useFindingAction,
   useJudge,
+  useShotEdits,
   useShotScreen,
 } from "@/lib/queries";
 
@@ -47,6 +48,8 @@ export default function ShotReviewCockpit({
   shot,
   canComment,
   canCurate,
+  you,
+  teamEmails,
   initialClipId = "",
   initialAt = 0,
 }: {
@@ -99,6 +102,7 @@ export default function ShotReviewCockpit({
   const choose = useChooseTake(projectId, scene, shot, verdicts?.rev ?? 0);
   const findingAction = useFindingAction(projectId, scene, shot);
   const judge = useJudge(projectId, scene, shot);
+  const edits = useShotEdits(projectId, scene, shot, screen.data?.brief);
   const duration = Math.max(1, ...takes.map((take) => take.duration_s || 0));
   const pct = (value: number) => `${Math.min(100, Math.max(0, (value / duration) * 100))}%`;
 
@@ -259,6 +263,30 @@ export default function ShotReviewCockpit({
               {selected.clip_id !== recommended?.clip_id && <div className="reason-chips">{HUMAN_REASONS.map((item) => <button key={item} className={reason === item ? "chip on" : "chip"} onClick={() => setReason(item)}>{item}</button>)}</div>}
               <button className="primary cockpit-confirm" disabled={!canComment || choose.isPending || !(range.to > range.from)} onClick={() => void selectTake()}>{canComment ? (selected.clip_id === recommended?.clip_id ? `Confirm Take ${selected.take_no}` : "Modify & Select") : "Sign in to select a take"}</button>
             </div>}
+            <WhoIsOnIt
+              assignee={screen.data?.brief.assignee ?? ""}
+              state={screen.data?.brief.state ?? ""}
+              you={you}
+              team={teamEmails}
+              canAct={canComment}
+              pending={edits.assign.isPending || edits.setState.isPending}
+              onAssign={async (who) => {
+                try {
+                  await edits.assign.mutateAsync(who);
+                  setNotice(who ? `Assigned to ${who.split("@")[0]}.` : "Left unclaimed.");
+                } catch (error) {
+                  setNotice(conflictMessage(error) ?? "Could not change who is on this shot.");
+                }
+              }}
+              onState={async (next) => {
+                try {
+                  await edits.setState.mutateAsync(next);
+                  setNotice(next ? `Marked ${next.replaceAll("_", " ")}.` : "Status cleared.");
+                } catch (error) {
+                  setNotice(conflictMessage(error) ?? "Could not change the status.");
+                }
+              }}
+            />
             <div className="finding-list"><h3>Findings to verify</h3>{analyses.flatMap((analysis) => analysis.findings.map((finding) => ({ analysis, finding }))).slice(0, 8).map(({ analysis, finding }) => <button key={String(finding.finding_id)} onClick={() => inspect(String(analysis.clip_id), finding)}><span className={`finding-dot severity-${finding.severity}`} /><span><b>{tc(finding.start_s)}–{tc(finding.end_s)} {label(finding.code)}</b><small>Take {analysis.clip.take_no} · {finding.detail}</small></span><i>›</i></button>)}</div>
           </>
         )}
@@ -295,4 +323,93 @@ function FindingInspector({ focus, take, adjusting, setAdjusting, onChange, onCo
     <div className="finding-actions"><button className="primary" disabled={!canAct || pending} onClick={onConfirm}>Issue is correct</button><button className="ghost" disabled={!canAct || pending} onClick={onDismiss}>Dismiss issue</button><button className="ghost" disabled={!canAct || pending} onClick={() => setCorrecting((value) => !value)}>{correcting ? "Cancel correction" : "Correct finding"}</button>{adjusting ? <button className="ghost" disabled={!canAct || pending} onClick={onAdjust}>Save adjusted range</button> : <button className="ghost" disabled={!canAct} onClick={() => setAdjusting(true)}>Adjust range</button>}</div>
     {!canAct && <p className="policy-note">Sign in to confirm, correct, dismiss, or adjust this finding.</p>}
   </div>;
+}
+
+/**
+ * Who has this shot, and whether it is still moving.
+ *
+ * Assignment was filterable on the project page and settable nowhere: the only
+ * control lived in the component the cockpit replaced, so the workspace offered
+ * a filter for a state no one could enter. That is why nobody could tell what
+ * it was for.
+ *
+ * It is worth one line of explanation because the benefit is not obvious from a
+ * dropdown. Three editors share one queue; claiming a shot is how the other two
+ * stop seeing it as unclaimed work and reviewing the same takes twice.
+ */
+function WhoIsOnIt({
+  assignee,
+  state,
+  you,
+  team,
+  canAct,
+  pending,
+  onAssign,
+  onState,
+}: {
+  assignee: string;
+  state: string;
+  you: string;
+  team: string[];
+  canAct: boolean;
+  pending: boolean;
+  onAssign: (who: string) => void;
+  onState: (next: "" | "in_progress" | "approved") => void;
+}) {
+  const people = useMemo(() => {
+    const set = new Set(team.filter(Boolean));
+    if (you) set.add(you);
+    if (assignee) set.add(assignee);
+    return Array.from(set).sort();
+  }, [team, you, assignee]);
+
+  const mine = Boolean(you) && assignee === you;
+
+  return (
+    <div className="who-card">
+      <p className="eyebrow">WHO IS ON THIS</p>
+      <div className="who-row">
+        <select
+          aria-label="Assigned to"
+          value={assignee}
+          disabled={!canAct || pending}
+          onChange={(event) => onAssign(event.target.value)}
+        >
+          <option value="">Unclaimed</option>
+          {people.map((person) => (
+            <option key={person} value={person}>
+              {person === you ? `${person.split("@")[0]} (you)` : person.split("@")[0]}
+            </option>
+          ))}
+        </select>
+        {canAct && you && !mine && (
+          <button className="ghost small" disabled={pending} onClick={() => onAssign(you)}>
+            Claim
+          </button>
+        )}
+        {canAct && mine && (
+          <button className="ghost small" disabled={pending} onClick={() => onAssign("")}>
+            Release
+          </button>
+        )}
+      </div>
+      <div className="who-row">
+        <select
+          aria-label="Shot status"
+          value={state}
+          disabled={!canAct || pending}
+          onChange={(event) => onState(event.target.value as "" | "in_progress" | "approved")}
+        >
+          <option value="">No status</option>
+          <option value="in_progress">In progress</option>
+          <option value="approved">Approved</option>
+        </select>
+      </div>
+      <p className="policy-note">
+        Claiming takes this shot out of everyone else&apos;s unclaimed queue, so
+        two people do not review the same takes. Approved removes it from the
+        queue entirely.
+      </p>
+    </div>
+  );
 }

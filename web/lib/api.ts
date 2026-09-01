@@ -61,108 +61,21 @@ export type ShotStatus = S["ShotNode"]["status"];
 // the shape below is a description rather than a contract, and is marked so
 // nobody mistakes it for one.
 
-/** @unverified — /dashboard has no response model yet. */
-export interface Dashboard {
-  you: string | null;
-  role: Role;
-  queue: QueueItem[];
-  queue_total: number;
-  totals: { waiting: number; yours: number; unassigned: number; projects: number };
-  projects: (Project & {
-    members: number;
-    scenes: number;
-    shots: number;
-    takes: number;
-    settled: number;
-    waiting: number;
-    progress_pct: number | null;
-  })[];
-  recent: RecentDecision[];
-  notes: RecentNote[];
-  activity: Activity[];
-  limits: Limits;
-}
-
-
-/** @unverified */
-export interface QueueItem {
-  project_id: number;
-  project_name: string;
-  scene: number;
-  shot: number;
-  slug: string;
-  takes: number;
-  margin: number;
-  reason: string;
-  assignee: string;
-  state: ShotState;
-  circled_take: number;
-  chosen_take: number;
-  open_comments: number;
-}
-
-/** @unverified — /placements has no response model yet. */
-export interface PlacementRow {
-  clip_id: string;
-  scene: number;
-  shot: number;
-  take_no: number;
-  source: string;
-  actor: string;
-  confidence: number;
-  state: string;
-  slate_raw: string;
-  declared_scene: number;
-  declared_shot: number;
-  detail: string;
-  decided_at: string | null;
-  proxy_uri: string;
-  sprite_uri: string;
-  /** The frame the board was read from. The evidence, not a score. */
-  slate_uri: string;
-  duration_s: number;
-  camera: string;
-  filename: string;
-}
-
-/** @unverified */
-export interface Activity {
-  project_id: number;
-  project_name?: string;
-  at: string | null;
-  actor: string;
-  actor_role: string;
-  verb: string;
-  detail: string;
-  quantity: number;
-  scene: number;
-  shot: number;
-}
-
-/** @unverified */
-export interface RecentDecision {
-  project_id: number;
-  project_name: string;
-  scene: number;
-  shot: number;
-  take_no: number;
-  decided_by: "agent" | "human";
-  actor: string;
-  reason: string;
-  decided_at: string | null;
-  margin: number;
-}
-
-/** @unverified */
-export interface RecentNote {
-  project_id: number;
-  project_name: string;
-  scene: number;
-  shot: number;
-  author: string;
-  body: string;
-  created_at: string;
-}
+// These were hand-written because the endpoints had no response model. They
+// now do — `/dashboard` returns DashboardScreen and `/placements` returns
+// PlacementInbox — so they are derived like everything else.
+//
+// Writing them by hand is not a neutral shortcut. `ProjectCard` gained
+// `owner_email` and `member_emails` as required fields and the route did not
+// send them, which took Home and the review queue down together with a 500.
+// A generated type turns that into a failed build.
+export type Dashboard = S["DashboardScreen"];
+export type QueueItem = S["QueueItem"];
+export type PlacementRow = S["PlacementItem"];
+export type PlacementInbox = S["PlacementInbox"];
+export type Activity = S["Activity"];
+export type RecentDecision = S["RecentDecision"];
+export type RecentNote = S["RecentNote"];
 
 /** One shot the footage landed in, as the upload screen shows it. */
 export interface UploadGroup {

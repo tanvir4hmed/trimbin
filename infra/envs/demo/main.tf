@@ -83,10 +83,35 @@ resource "google_storage_bucket" "originals" {
 
   # Browsers upload straight here with a signed URL — video never passes through
   # the API, which keeps Cloud Run small and the egress bill honest.
+  #
+  # A resumable upload is three kinds of request and this allowed one of them.
+  # POST opens the session; the browser then reads the session address out of
+  # the `Location` header, sends the file in chunks with `Content-Range`, and
+  # reads `Range` off each 308 to learn how much actually landed.
+  #
+  # With POST missing, the preflight failed and the session was never opened.
+  # Every file then "failed" in a `catch` the wizard did not display, the batch
+  # completed with nothing arrived, and the job closed empty one second after it
+  # opened. Uploading from a browser has never once worked; that is why the
+  # placement inbox has always been empty.
+  #
+  # `response_header` is both halves of the negotiation on Cloud Storage: it
+  # answers the preflight's `Access-Control-Allow-Headers` and sets
+  # `Access-Control-Expose-Headers` on the real response. A header absent here
+  # is a header the browser may neither send nor read — and reading is silent,
+  # which is the worse of the two.
   cors {
-    origin          = var.allowed_origins
-    method          = ["GET", "PUT", "HEAD"]
-    response_header = ["Content-Type", "x-goog-resumable"]
+    origin = var.allowed_origins
+    method = ["GET", "PUT", "POST", "HEAD"]
+    response_header = [
+      "Content-Type",
+      "Content-Range",
+      "Content-Length",
+      "Location",
+      "Range",
+      "x-goog-resumable",
+      "x-goog-content-length-range",
+    ]
     max_age_seconds = 3600
   }
 
