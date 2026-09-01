@@ -12,6 +12,13 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.routes import analysis
 
+MIGRATION = (
+    Path(__file__).resolve().parents[2]
+    / "clickhouse"
+    / "migrations"
+    / "021_full_take_intelligence.sql"
+)
+
 
 class TestOpenAPI:
     def test_take_analysis_has_a_real_response_model(self) -> None:
@@ -127,7 +134,7 @@ class TestLiveResponseValidation:
 
 class TestMigrationShape:
     def test_the_three_phase_tables_and_current_views_are_declared(self) -> None:
-        sql = Path("clickhouse/migrations/021_full_take_intelligence.sql").read_text()
+        sql = MIGRATION.read_text(encoding="utf-8")
         for name in (
             "analysis_runs",
             "clip_segments",
@@ -139,12 +146,12 @@ class TestMigrationShape:
             assert name in sql
 
     def test_interactive_analysis_uses_no_clickhouse_mutation(self) -> None:
-        sql = Path("clickhouse/migrations/021_full_take_intelligence.sql").read_text().upper()
+        sql = MIGRATION.read_text(encoding="utf-8").upper()
         assert "ALTER TABLE CLIPS UPDATE" not in sql
         assert "ALTER TABLE FINDING_EVENTS UPDATE" not in sql
 
     def test_old_run_findings_cannot_leak_into_the_current_view(self) -> None:
-        sql = Path("clickhouse/migrations/021_full_take_intelligence.sql").read_text()
+        sql = MIGRATION.read_text(encoding="utf-8")
         current = sql.split("CREATE VIEW IF NOT EXISTS current_findings AS", 1)[1]
         assert "r.run_id = f.run_id" in current
         assert "human_dismissed" in current
