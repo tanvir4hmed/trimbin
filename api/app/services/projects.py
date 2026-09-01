@@ -30,17 +30,27 @@ class Project:
     member_emails: list[str]
     is_public: bool
     created_at: datetime
+    state: str = "active"
+    rev: int = 0
+
+
+class ProjectConflict(RuntimeError):
+    def __init__(self, current: int) -> None:
+        self.current = current
+        super().__init__(f"expected an older revision; current revision is {current}")
 
 
 def _doc(project_id: int):
     return jobs.db().collection(COLLECTION).document(str(project_id))
 
 
-async def get(project_id: int) -> Project | None:
+async def get(project_id: int, *, include_deleted: bool = False) -> Project | None:
     snapshot = await _doc(project_id).get()
     if not snapshot.exists:
         return None
     d = snapshot.to_dict() or {}
+    if d.get("state") == "deleted" and not include_deleted:
+        return None
     return Project(
         project_id=project_id,
         name=d.get("name", ""),
@@ -48,6 +58,8 @@ async def get(project_id: int) -> Project | None:
         member_emails=d.get("member_emails", []),
         is_public=d.get("is_public", False),
         created_at=d.get("created_at") or datetime.now(UTC),
+        state=d.get("state", "active"),
+        rev=int(d.get("rev", 0)),
     )
 
 
@@ -96,6 +108,8 @@ async def create(name: str, owner_email: str, is_public: bool = False) -> int:
             "member_emails": [],
             "is_public": is_public,
             "created_at": datetime.now(UTC),
+            "state": "active",
+            "rev": 0,
         }
     )
 
@@ -107,7 +121,7 @@ async def add_member(project_id: int, email: str) -> None:
     await _doc(project_id).update({"member_emails": firestore.ArrayUnion([email.lower()])})
 
 
-async def for_member(email: str) -> list[Project]:
+async def for_member(email: str, *, states: set[str] | None = None) -> list[Project]:
     """Everything this person can open.
 
     Two queries rather than one, because Firestore cannot OR across fields.
@@ -125,8 +139,9 @@ async def for_member(email: str) -> list[Project]:
         if int(snapshot.id) not in found:
             found[int(snapshot.id)] = await get(int(snapshot.id))  # type: ignore[assignment]
 
+    allowed = states or {"active"}
     return sorted(
-        (p for p in found.values() if p is not None),
+        (p for p in found.values() if p is not None and p.state in allowed),
         key=lambda p: p.created_at,
         reverse=True,
     )
@@ -158,7 +173,7 @@ async def visible_to(email: str) -> list[Project]:
         if project_id in seen:
             continue
         found = await get(project_id)
-        if found is not None:
+        if found is not None and found.state == "active":
             public.append(found)
 
     # Theirs first, then ours. A person opens the thing they are working on, and
@@ -175,3 +190,37 @@ def is_public_project(project_id: int) -> bool:
     own rather than in a shared scratch space.
     """
     return project_id == settings.demo_project_id
+
+
+async def change(
+    project_id: int,
+    *,
+    expected_rev: int,
+    name: str | None = None,
+    state: str | None = None,
+) -> Project:
+    """Rename or move through archive/trash with optimistic concurrency."""
+    ref = _doc(project_id)
+
+    @firestore.async_transactional
+    async def apply(transaction) -> None:
+        snapshot = await ref.get(transaction=transaction)
+        if not snapshot.exists:
+            raise KeyError(project_id)
+        data = snapshot.to_dict() or {}
+        current = int(data.get("rev", 0))
+        if current != expected_rev:
+            raise ProjectConflict(current)
+        update: dict = {"rev": current + 1, "updated_at": datetime.now(UTC)}
+        if name is not None:
+            update["name"] = name
+        if state is not None:
+            update["state"] = state
+            update[f"{state}_at"] = datetime.now(UTC)
+        transaction.update(ref, update)
+
+    await apply(jobs.db().transaction())
+    found = await get(project_id, include_deleted=True)
+    if found is None:
+        raise KeyError(project_id)
+    return found

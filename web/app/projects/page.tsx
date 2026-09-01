@@ -31,11 +31,12 @@ export default function ProjectsPage() {
   const [sort, setSort] = useState<SortKey>("waiting");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [scope, setScope] = useState<"active" | "archived" | "trashed">("active");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const found = await api.projects(true);
+      const found = await api.projects(true, scope);
       setProjects(found.projects);
       setRole(found.role);
       setLimits(found.limits);
@@ -50,7 +51,7 @@ export default function ProjectsPage() {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, scope]);
 
   useEffect(() => {
     if (!currentIdentity()) {
@@ -88,6 +89,19 @@ export default function ProjectsPage() {
     });
   }, [projects, filter, sort]);
 
+  const command = async (project: Project, action: "rename" | "archive" | "trash" | "restore" | "delete") => {
+    let name = "";
+    if (action === "rename") {
+      name = window.prompt("Project name", project.name)?.trim() ?? "";
+      if (!name || name === project.name) return;
+    }
+    if ((action === "trash" || action === "delete") && !window.confirm(action === "delete" ? "Remove this project from Trimbin? Its immutable audit records remain retained." : "Move this project to Trash?")) return;
+    try {
+      await api.changeProject(project.project_id, { rev: project.rev, action, name });
+      await load();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not update the project."); }
+  };
+
   if (loading) {
     return (
       <main className="shell">
@@ -115,6 +129,10 @@ export default function ProjectsPage() {
           />
         )}
       </header>
+
+      <nav className="project-scope-tabs" aria-label="Project state">
+        {(["active", "archived", "trashed"] as const).map((item) => <button key={item} className={scope === item ? "on" : ""} onClick={() => setScope(item)}>{item === "active" ? "Current" : item === "archived" ? "Archived" : "Trash"}</button>)}
+      </nav>
 
       {error && <p className="error">{error}</p>}
 
@@ -158,6 +176,7 @@ export default function ProjectsPage() {
                 <th>Progress</th>
                 <th>Waiting</th>
                 <th>Who</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -194,6 +213,7 @@ export default function ProjectsPage() {
                     {p.member_emails.length > 0 &&
                       ` +${p.member_emails.length}`}
                   </td>
+                  <td>{p.you_are_owner ? <div className="project-actions">{scope === "active" && <><button onClick={() => void command(p, "rename")}>Rename</button><button onClick={() => void command(p, "archive")}>Archive</button><button onClick={() => void command(p, "trash")}>Trash</button></>}{scope === "archived" && <><button onClick={() => void command(p, "restore")}>Restore</button><button onClick={() => void command(p, "trash")}>Trash</button></>}{scope === "trashed" && <><button onClick={() => void command(p, "restore")}>Restore</button><button className="danger" onClick={() => void command(p, "delete")}>Delete</button></>}</div> : <span className="dim">—</span>}</td>
                 </tr>
               ))}
             </tbody>

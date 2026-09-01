@@ -118,12 +118,23 @@ async def scene(project_id: int, scene_id: int) -> dict:
         FROM latest AS l
         INNER JOIN current_clip_placement AS c
             ON c.clip_id = l.clip_id AND c.project_id = {p:UInt32}
-        WHERE l.outcome = 'selected' AND c.group_id = {g:UInt32}
+        WHERE l.outcome = 'selected' AND l.decided_by = 'human'
+          AND c.group_id = {g:UInt32}
           AND c.subgroup_id = l.subgroup_id
         ORDER BY l.subgroup_id
         """,
         parameters={"p": project_id, "g": scene_id},
     )
+    observed_result = await ch.query(
+        """
+        SELECT DISTINCT subgroup_id
+        FROM current_clip_placement
+        WHERE project_id = {p:UInt32} AND group_id = {g:UInt32}
+        ORDER BY subgroup_id
+        """,
+        parameters={"p": project_id, "g": scene_id},
+    )
+    observed_shots = {int(row[0]) for row in observed_result.result_rows}
 
     meta = await shots_service.for_project(project_id)
     open_counts = await comments_service.counts_for_project(project_id)
@@ -180,20 +191,54 @@ async def scene(project_id: int, scene_id: int) -> dict:
 
     measured_rates = sorted({round(e.fps, 3) for e in entries if e.fps > 0})
 
+    timeline = coverage_timeline(scene_id, entries, meta, observed_shots)
+    ordered_shots = [item["shot"] for item in timeline]
+
     return {
         "project_id": project_id,
         "scene": scene_id,
         "entries": [e.as_dict() for e in entries],
         "duration_s": round(sum(e.duration_s for e in entries), 2),
-        "shots": len(entries),
-        # Said plainly rather than left for the reader to count. A scene with
-        # three shots still open is not a scene anybody should be watching as
-        # if it were finished.
-        "unresolved": sum(1 for e in entries if e.needs_review),
+        "shots": len(ordered_shots),
+        "unresolved": sum(1 for item in timeline if item["kind"] == "gap"),
         "disagreements": sum(1 for e in entries if e.circled_take and e.circled_take != e.take_no),
         "source_fps": measured_rates,
         "export_fps": measured_rates[0] if len(measured_rates) == 1 else 0.0,
+        "timeline": timeline,
     }
+
+
+def coverage_timeline(
+    scene_id: int,
+    entries: list[Entry],
+    meta: dict,
+    observed_shots: set[int] | None = None,
+) -> list[dict]:
+    """Confirmed takes in shot order; every planned or observed omission is a gap."""
+    planned = sorted(
+        (shot for (scene_no, _), shot in meta.items() if scene_no == scene_id),
+        key=lambda shot: shot.shot,
+    )
+    entry_by_shot = {entry.shot: entry for entry in entries}
+    ordered_shots = sorted(
+        set(entry_by_shot) | {shot.shot for shot in planned} | (observed_shots or set())
+    )
+    timeline = []
+    for shot_id in ordered_shots:
+        entry = entry_by_shot.get(shot_id)
+        described = meta.get((scene_id, shot_id))
+        timeline.append(
+            {
+                "kind": "selected" if entry else "gap",
+                "scene": scene_id,
+                "shot": shot_id,
+                "slug": (described.slug if described else "") or f"{scene_id}{_letter(shot_id)}",
+                "duration_s": entry.duration_s if entry else 0.0,
+                "entry": entry.as_dict() if entry else None,
+            }
+        )
+
+    return timeline
 
 
 async def scenes_in(project_id: int) -> list[int]:

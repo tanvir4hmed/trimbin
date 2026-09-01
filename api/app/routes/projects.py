@@ -18,11 +18,12 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
+from .. import schemas
 from ..auth import Principal, current_principal, require_signed_in
 from ..config import settings
 from ..services import dashboard as dashboard_service
@@ -58,6 +59,12 @@ class NewMember(BaseModel):
         return cleaned
 
 
+class ProjectCommand(BaseModel):
+    rev: int = Field(ge=0)
+    action: Literal["rename", "archive", "trash", "restore", "delete"]
+    name: str = Field(default="", max_length=120)
+
+
 def _as_dict(project, viewer_email: str | None) -> dict:
     return {
         "project_id": project.project_id,
@@ -78,13 +85,16 @@ def _as_dict(project, viewer_email: str | None) -> dict:
                 or (members.is_staff(viewer_email) and members.is_staff(project.owner_email))
             )
         ),
+        "state": getattr(project, "state", "active"),
+        "rev": getattr(project, "rev", 0),
     }
 
 
-@router.get("")
+@router.get("", response_model=schemas.ProjectList)
 async def mine(
     principal: Annotated[Principal, Depends(require_signed_in)],
     detail: bool = False,
+    state_filter: Literal["active", "archived", "trashed"] = "active",
 ) -> dict:
     """Everything this person can open.
 
@@ -93,7 +103,11 @@ async def mine(
     project rather than one per row, and it is optional because the project
     switcher in the header wants names and nothing else.
     """
-    found = await projects.visible_to(principal.email or "")
+    found = (
+        await projects.visible_to(principal.email or "")
+        if state_filter == "active"
+        else await projects.for_member(principal.email or "", states={state_filter})
+    )
     rows = [_as_dict(p, principal.email) for p in found]
 
     if detail and found:
@@ -112,7 +126,7 @@ async def mine(
     }
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED, response_model=schemas.ProjectCreated)
 async def create(
     body: NewProject,
     principal: Annotated[Principal, Depends(require_signed_in)],
@@ -129,7 +143,9 @@ async def create(
     here.
     """
     limits = members.limits_for(principal.email)
-    existing = await projects.for_member(principal.email or "")
+    existing = await projects.for_member(
+        principal.email or "", states={"active", "archived", "trashed"}
+    )
     owned = [p for p in existing if p.owner_email.lower() == (principal.email or "").lower()]
 
     if len(owned) >= limits.projects:
@@ -154,14 +170,14 @@ async def create(
     )
 
     project = await projects.get(project_id)
-    return (
-        {**_as_dict(project, principal.email), "limits": limits.as_dict()}
-        if project
-        else {"project_id": project_id}
-    )
+    if project is None:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, "Project creation did not persist."
+        )
+    return {**_as_dict(project, principal.email), "limits": limits.as_dict()}
 
 
-@router.get("/{project_id}")
+@router.get("/{project_id}", response_model=schemas.Project)
 async def one(
     project_id: int,
     principal: Annotated[Principal, Depends(current_principal)],
@@ -198,6 +214,40 @@ async def one(
         }
 
     return _as_dict(project, principal.email)
+
+
+@router.patch("/{project_id}", response_model=schemas.Project)
+async def change_project(
+    project_id: int,
+    body: ProjectCommand,
+    principal: Annotated[Principal, Depends(require_signed_in)],
+) -> dict:
+    """Owner-only lifecycle. A guest has full authority over their own project."""
+    await principal.assert_is_owner(project_id)
+    current = await projects.get(project_id, include_deleted=True)
+    if current is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such project.")
+    if body.action == "rename" and not body.name.strip():
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "A project needs a name.")
+    next_state = {
+        "archive": "archived",
+        "trash": "trashed",
+        "restore": "active",
+        "delete": "deleted",
+    }.get(body.action)
+    try:
+        changed = await projects.change(
+            project_id,
+            expected_rev=body.rev,
+            name=body.name.strip() if body.action == "rename" else None,
+            state=next_state,
+        )
+    except projects.ProjectConflict as exc:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Somebody changed this project. Current revision is {exc.current}.",
+        ) from exc
+    return _as_dict(changed, principal.email)
 
 
 @router.post("/{project_id}/members", status_code=status.HTTP_201_CREATED)

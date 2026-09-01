@@ -174,6 +174,18 @@ export function useJudge(projectId: number, scene: number, shot: number) {
   });
 }
 
+export function useFindingAction(projectId: number, scene: number, shot: number) {
+  const invalidate = useShotInvalidation(projectId, scene, shot);
+  return useMutation({
+    mutationFn: (input: {
+      clipId: string;
+      findingId: string;
+      body: Parameters<typeof api.actOnFinding>[3];
+    }) => api.actOnFinding(projectId, input.clipId, input.findingId, input.body),
+    onSuccess: invalidate,
+  });
+}
+
 /**
  * The four edits that carry a revision.
  *

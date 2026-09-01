@@ -12,6 +12,7 @@ difference between a running system and a screenshot.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -23,6 +24,7 @@ from ..config import settings
 log = logging.getLogger(__name__)
 
 _client: AsyncClient | None = None
+_client_lock = asyncio.Lock()
 
 
 class Waking(Exception):
@@ -40,37 +42,44 @@ async def client() -> AsyncClient:
     if _client is not None:
         return _client
 
-    try:
-        _client = await clickhouse_connect.get_async_client(
-            host=settings.clickhouse_host,
-            port=settings.clickhouse_port,
-            username=settings.clickhouse_user,
-            password=settings.clickhouse_password,
-            secure=True,
-            query_limit=0,
-            connect_timeout=90,
-            # Generous on both, because the wait is not where the old comment
-            # assumed it was.
-            #
-            # The service idles to keep costs down and takes tens of seconds to
-            # wake. That happens during the client's own first statement — a
-            # `SELECT version()` — which is governed by this timeout and not by
-            # connect_timeout. Thirty seconds here meant the very first request
-            # after a quiet period returned a 500 while the database was doing
-            # exactly what it was configured to do.
-            #
-            # The cost of the generous value is that a genuinely slow query now
-            # waits longer before failing. That is the better trade: a slow
-            # query is rare and a cold start is most visits.
-            send_receive_timeout=150,
-        )
-    except Exception as exc:
-        # Leave nothing half-built. A client that failed to initialise is not
-        # usable, and caching it would make one cold start into a permanent
-        # outage until the instance is replaced.
-        _client = None
-        log.warning("could not reach the archive: %s", exc)
-        raise Waking("The archive is waking up.") from exc
+    # Screen BFFs intentionally run independent reads together. On a cold
+    # process those calls used to race through this block, opening several
+    # aiohttp pools and caching only the last one. The abandoned pools produced
+    # warnings and leaked sockets until Cloud Run recycled the instance.
+    async with _client_lock:
+        if _client is not None:
+            return _client
+        try:
+            _client = await clickhouse_connect.get_async_client(
+                host=settings.clickhouse_host,
+                port=settings.clickhouse_port,
+                username=settings.clickhouse_user,
+                password=settings.clickhouse_password,
+                secure=True,
+                query_limit=0,
+                connect_timeout=90,
+                # Generous on both, because the wait is not where the old comment
+                # assumed it was.
+                #
+                # The service idles to keep costs down and takes tens of seconds to
+                # wake. That happens during the client's own first statement — a
+                # `SELECT version()` — which is governed by this timeout and not by
+                # connect_timeout. Thirty seconds here meant the very first request
+                # after a quiet period returned a 500 while the database was doing
+                # exactly what it was configured to do.
+                #
+                # The cost of the generous value is that a genuinely slow query now
+                # waits longer before failing. That is the better trade: a slow
+                # query is rare and a cold start is most visits.
+                send_receive_timeout=150,
+            )
+        except Exception as exc:
+            # Leave nothing half-built. A client that failed to initialise is not
+            # usable, and caching it would make one cold start into a permanent
+            # outage until the instance is replaced.
+            _client = None
+            log.warning("could not reach the archive: %s", exc)
+            raise Waking("The archive is waking up.") from exc
 
     return _client
 

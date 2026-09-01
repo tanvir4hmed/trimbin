@@ -31,29 +31,22 @@ def sql_for(plan: dict, embedding: list[float] | None = None) -> tuple[str, dict
     """
     captured: dict = {}
 
-    class FakeResult:
-        column_names: list[str] = []
-        result_rows: list[list] = []
-
-    class FakeClient:
-        async def query(self, sql, parameters=None):
-            captured["sql"] = sql
-            captured["params"] = parameters or {}
-            return FakeResult()
-
     import asyncio
 
     async def go():
-        original = search.client
+        original = search._execute
 
-        async def fake_client():
-            return FakeClient()
+        async def fake_execute(sql, parameters, project_id):
+            captured["sql"] = sql
+            captured["params"] = parameters or {}
+            captured["project_id"] = project_id
+            return [], 0
 
-        search.client = fake_client  # type: ignore[assignment]
+        search._execute = fake_execute  # type: ignore[assignment]
         try:
             await search.run(7, plan, embedding)
         finally:
-            search.client = original  # type: ignore[assignment]
+            search._execute = original  # type: ignore[assignment]
 
     asyncio.run(go())
     return captured["sql"], captured["params"]
@@ -109,7 +102,7 @@ class TestFiltersReachTheQuery:
 
     def test_a_finding_narrows(self) -> None:
         sql, params = sql_for({"finding": "continuity.prop"})
-        assert "has(d.finding_codes" in sql
+        assert "current_findings" in sql
         assert params["finding"] == "continuity.prop"
 
     def test_a_finding_enum_reaches_the_query_as_its_value(self) -> None:
@@ -137,7 +130,7 @@ class TestTextSearch:
 
     def test_it_looks_where_people_actually_wrote(self) -> None:
         sql, _ = sql_for({"text": "boom"})
-        for column in ("d.reason", "c.description", "c.slate_raw", "d.finding_codes"):
+        for column in ("s.description", "s.transcript", "s.actions", "s.objects"):
             assert column in sql
 
 
@@ -266,7 +259,13 @@ class TestTheColumnNamesMatchTheSelect:
     @staticmethod
     def _aliases(sql: str) -> list[str]:
         """The AS names in the SELECT, in order."""
-        select = sql[sql.index("SELECT") : sql.index("FROM decisions")]
+        marker = (
+            "FROM current_clip_segments"
+            if "FROM current_clip_segments" in sql
+            else "FROM decisions"
+        )
+        before = sql[: sql.index(marker)]
+        select = before[before.rindex("SELECT") :]
         return re.findall(r"\bAS\s+(\w+)", select)
 
     def test_every_selected_column_is_named(self) -> None:

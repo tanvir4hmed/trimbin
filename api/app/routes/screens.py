@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -27,6 +28,7 @@ from ..auth import Principal, current_principal
 from ..config import settings
 from ..services import comments as comments_service
 from ..services import members, projects, shots, structure
+from . import analysis as analysis_routes
 from . import review as review_routes
 
 log = logging.getLogger(__name__)
@@ -117,9 +119,17 @@ async def shot_screen(
         comments_service.for_shot(project_id, scene, shot),
     )
 
+    analyses: list[schemas.TakeAnalysis] = []
+    if verdicts:
+        loaded = await asyncio.gather(
+            *(analysis_routes._read(project_id, UUID(take.clip_id)) for take in verdicts.takes)
+        )
+        analyses = [schemas.TakeAnalysis(**row) for row in loaded]
+
     return schemas.ShotScreen(
         verdicts=verdicts,
         brief=schemas.Brief(**brief.as_dict(), is_empty=brief.is_empty),
+        analyses=analyses,
         comments=[schemas.Comment(**c) for c in notes],
         open_comments=sum(1 for c in notes if not c["resolved"]),
     )
@@ -163,4 +173,6 @@ def _project_dict(project, principal: Principal) -> schemas.Project:
                 or (members.is_staff(email) and members.is_staff(project.owner_email))
             )
         ),
+        state=getattr(project, "state", "active"),
+        rev=getattr(project, "rev", 0),
     )

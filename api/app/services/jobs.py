@@ -41,6 +41,7 @@ class State:
     UPLOADING = "uploading"  # tickets issued, bytes moving
     PROCESSING = "processing"  # queued, workers running
     DONE = "done"  # every clip accounted for, failures included
+    COMMITTED = "committed"  # verification complete; canonical placement exists
     FAILED = "failed"  # abandoned before any work could start
 
 
@@ -48,13 +49,14 @@ class State:
 #
 # "done" covers a batch with failures in it: the word describes the work, not
 # the outcome, and the failures are listed beside it.
-TERMINAL = frozenset({State.DONE, State.FAILED})
+TERMINAL = frozenset({State.DONE, State.COMMITTED, State.FAILED})
 
 ALL_STATES = frozenset(
     {
         State.UPLOADING,
         State.PROCESSING,
         State.DONE,
+        State.COMMITTED,
         State.FAILED,
     }
 )
@@ -254,6 +256,12 @@ async def record_placement(
     slate_raw: str,
     confident: bool,
     mismatch: str = "",
+    *,
+    duration_s: float = 0.0,
+    camera: str = "",
+    slate_uri: str = "",
+    confidence: float = 0.0,
+    duplicate_of: str = "",
 ) -> None:
     """Where one clip ended up, and whether that is where it was sent.
 
@@ -278,12 +286,70 @@ async def record_placement(
                             "slate_raw": slate_raw[:120],
                             "confident": bool(confident),
                             "mismatch": mismatch,
+                            "duration_s": round(float(duration_s), 3),
+                            "camera": camera[:20],
+                            "slate_uri": slate_uri,
+                            "confidence": round(float(confidence), 3),
+                            "duplicate_of": duplicate_of,
+                            "verified": False,
                         }
                     ]
                 )
             }
         )
     )
+
+
+async def mark_verified(job_id: UUID, clip_ids: set[str]) -> None:
+    """Persist per-item commit state so refresh returns to the same batch."""
+    ref = db().collection(COLLECTION).document(str(job_id))
+
+    @firestore.async_transactional
+    async def update(transaction) -> None:
+        snapshot = await ref.get(transaction=transaction)
+        if not snapshot.exists:
+            return
+        data = snapshot.to_dict() or {}
+        items = [
+            {**item, "verified": True} if str(item.get("clip_id")) in clip_ids else item
+            for item in data.get("items", [])
+        ]
+        finished = bool(items) and all(bool(item.get("verified")) for item in items)
+        transaction.update(
+            ref,
+            {
+                "items": items,
+                **(
+                    {"state": State.COMMITTED, "finished_at": datetime.now(UTC)} if finished else {}
+                ),
+            },
+        )
+
+    await update(db().transaction())
+
+
+async def save_ingest_draft(job_id: UUID, clip_id: UUID, draft: dict) -> None:
+    """Save one verification choice before the batch is committed."""
+    ref = db().collection(COLLECTION).document(str(job_id))
+
+    @firestore.async_transactional
+    async def update(transaction) -> None:
+        snapshot = await ref.get(transaction=transaction)
+        if not snapshot.exists:
+            raise KeyError(job_id)
+        data = snapshot.to_dict() or {}
+        found = False
+        items = []
+        for item in data.get("items", []):
+            if str(item.get("clip_id")) == str(clip_id):
+                item = {**item, "draft": draft}
+                found = True
+            items.append(item)
+        if not found:
+            raise ValueError(clip_id)
+        transaction.update(ref, {"items": items})
+
+    await update(db().transaction())
 
 
 async def abandon(job_id: UUID, reason: str) -> None:

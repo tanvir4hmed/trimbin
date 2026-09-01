@@ -122,8 +122,8 @@ function Archive() {
           key={`${projectId}-${asked ?? ""}`}
           projectId={projectId}
           initialQuestion={asked}
-          onOpen={(scene, shot) =>
-            router.push(`/project/${projectId}?scene=${scene}&shot=${shot}`)
+          onOpen={(scene, shot, at, clipId) =>
+            router.push(`/project/${projectId}?scene=${scene}&shot=${shot}${at !== undefined ? `&at=${at}` : ""}${clipId ? `&clip=${clipId}` : ""}`)
           }
         />
       )}

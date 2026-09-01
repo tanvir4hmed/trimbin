@@ -96,14 +96,20 @@ async def ask(
     if plan.semantic:
         embedding = await _embed(plan.semantic)
 
-    rows, sql, elapsed_ms = await search.run(project_id, filters, embedding)
+    try:
+        rows, sql, elapsed_ms = await search.run(project_id, filters, embedding)
+    except search.SearchUnavailable as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
 
     widened = False
     if not rows and not plan.is_empty():
         # Offered, not substituted. The near misses are labelled as near misses,
         # because a person asked about scene 12 would act on rows from scene 9
         # without noticing they were not what they asked for.
-        rows, sql, elapsed_ms = await search.widen(project_id, filters)
+        try:
+            rows, sql, elapsed_ms = await search.widen(project_id, filters)
+        except search.SearchUnavailable as exc:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
         widened = bool(rows)
 
     matches = [_as_match(r) for r in rows]
@@ -174,8 +180,10 @@ def _as_match(row: dict):
     starts = row.get("finding_starts_s") or []
     codes = row.get("finding_codes") or []
     where = None
-    if starts and float(starts[0]) > 0:
-        where = TimeRange(start_s=float(starts[0]), end_s=float(starts[0]) + 2.0)
+    if starts:
+        start = float(starts[0])
+        end = float(row.get("usable_to_s") or start + 2.0)
+        where = TimeRange(start_s=start, end_s=max(start + 0.05, end))
 
     return Match(
         clip_id=row["clip_id"],
@@ -183,7 +191,11 @@ def _as_match(row: dict):
         subgroup_id=int(row["setup"]),
         take_no=int(row.get("take_no") or 0),
         duration_s=float(row.get("duration_s") or 0.0),
-        description=", ".join(str(c) for c in codes[:3]) or "no findings",
+        description=(
+            str(row.get("reason") or "")[:300]
+            if row.get("reason_code") == "segment.match"
+            else ", ".join(str(c) for c in codes[:3]) or "no findings"
+        ),
         outcome=str(row["outcome"]),
         reason=str(row["reason"])[:200],
         decided_by=str(row["decided_by"]),

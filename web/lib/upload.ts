@@ -44,22 +44,23 @@ const PARALLEL = 3;
  *  requires for every chunk but the last. */
 const CHUNK = 8 * 1024 * 1024;
 
-/** Session capabilities live only for this page. Persisting one without the
- * File object and batch ticket cannot resume anything after a refresh, and it
- * leaves a storage capability behind in localStorage for no benefit. */
 const sessionUris = new Map<string, string>();
+
+function sessionKey(clipId: string) { return `trimbin.upload.session.${clipId}`; }
 
 function remember(clipId: string, uri: string): void {
   sessionUris.set(clipId, uri);
+  window.localStorage.setItem(sessionKey(clipId), uri);
 }
 
 function forget(clipId: string): void {
   sessionUris.delete(clipId);
+  window.localStorage.removeItem(sessionKey(clipId));
 }
 
 /** Open a resumable session, or reuse the one this file already has. */
 async function openSession(ticket: Ticket): Promise<string> {
-  const existing = sessionUris.get(ticket.clip_id);
+  const existing = sessionUris.get(ticket.clip_id) ?? window.localStorage.getItem(sessionKey(ticket.clip_id));
   if (existing) return existing;
 
   const response = await fetch(ticket.upload_url, {

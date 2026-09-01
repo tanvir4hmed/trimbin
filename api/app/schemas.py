@@ -120,6 +120,8 @@ class Project(Model):
     created_at: str
     you_are_owner: bool
     you_can_upload: bool
+    state: Literal["active", "archived", "trashed", "deleted"] = "active"
+    rev: int = 0
 
     # Present only when the list was asked for with detail.
     scenes: int | None = None
@@ -135,6 +137,10 @@ class ProjectList(Model):
     role: str
     limits: Limits
     projects: list[Project]
+
+
+class ProjectCreated(Project):
+    limits: Limits
 
 
 # ---------------------------------------------------------------------------
@@ -520,6 +526,10 @@ class ShotScreen(Model):
 
     verdicts: Verdicts | None = None
     brief: Brief
+    # Full-take read models are bundled with the screen. The browser can switch
+    # takes, seek findings and redraw every lane without a ClickHouse request in
+    # the interaction path.
+    analyses: list[TakeAnalysis] = []
     comments: list[Comment]
     open_comments: int
 
@@ -548,6 +558,34 @@ class StringoutEntry(Model):
     shot_code: str = ""
 
 
+class CoverageItem(Model):
+    kind: Literal["selected", "gap"]
+    scene: int
+    shot: int
+    slug: str
+    duration_s: float
+    entry: StringoutEntry | None = None
+
+
+class SceneFinding(Model):
+    clip_id: str
+    shot: int
+    take_no: int
+    code: str
+    start_s: float
+    end_s: float
+    detail: str
+    severity: str
+
+
+class SceneNote(Model):
+    clip_id: str
+    author: str
+    body: str
+    at_s: float
+    to_s: float
+
+
 class Stringout(Model):
     project_id: int
     scene: int
@@ -558,6 +596,15 @@ class Stringout(Model):
     disagreements: int
     source_fps: list[float] = []
     export_fps: float = 0.0
+    timeline: list[CoverageItem] = []
+    findings: list[SceneFinding] = []
+    notes: list[SceneNote] = []
+    activity: list[Activity] = []
+
+
+class SceneList(Model):
+    project_id: int
+    scenes: list[int]
 
 
 # ---------------------------------------------------------------------------
@@ -610,6 +657,25 @@ class UploadGroup(Model):
     status: str
 
 
+class IngestItem(Model):
+    clip_id: str
+    filename: str
+    scene: int
+    shot: int
+    take_no: int
+    slate_raw: str
+    confident: bool
+    confidence: float = 0.0
+    mismatch: str = ""
+    duration_s: float = 0.0
+    camera: str = ""
+    slate_uri: str = ""
+    duplicate_of: str = ""
+    verified: bool = False
+    status: str
+    draft: dict | None = None
+
+
 class JobStatus(Model):
     job_id: str
     state: str
@@ -623,6 +689,7 @@ class JobStatus(Model):
     needs_a_look: int
     started_at: str
     finished_at: str | None = None
+    items: list[IngestItem] = []
 
 
 class PlacementItem(Model):

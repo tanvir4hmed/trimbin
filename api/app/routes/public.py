@@ -33,6 +33,20 @@ def _cached(response: Response) -> None:
     response.headers["Cache-Control"] = f"public, max-age={CACHE_SECONDS}"
 
 
+@router.get("/mcp-evidence")
+async def mcp_evidence(response: Response) -> dict[str, Any]:
+    """Public, checkable statement of the runtime search boundary."""
+    _cached(response)
+    return {
+        "runtime": "official mcp-clickhouse over stdio",
+        "identity": "dedicated ClickHouse read-only user",
+        "project_scoped": True,
+        "direct_fallback": False,
+        "configured": bool(settings.clickhouse_reader_user and settings.clickhouse_reader_password),
+        "result_contract": "exact clip_id plus playable start_s/end_s",
+    }
+
+
 @router.get("/accuracy")
 async def accuracy(response: Response) -> dict[str, Any]:
     """How often the system is right, defined precisely enough to publish.

@@ -44,6 +44,8 @@ export type PlannedScene = S["PlannedScene"];
 export type PlannedShot = S["PlannedShot"];
 export type ProjectScreen = S["ProjectScreen"];
 export type ShotScreen = S["ShotScreen"];
+export type TakeAnalysis = S["TakeAnalysis"];
+export type FindingEvent = S["FindingEvent"];
 
 // Read off the generated shapes rather than restated. These three are closed
 // sets on the server; writing them out again here is how the interface ends up
@@ -172,20 +174,7 @@ export interface UploadGroup {
   status: "clean" | "unread" | "mismatch";
 }
 
-export interface JobStatus {
-  job_id: string;
-  state: string;
-  done: boolean;
-  total: number;
-  completed: number;
-  failed: number;
-  failures: { clip_id: string; reason: string }[];
-  target: { scene: number; shot: number } | null;
-  groups: UploadGroup[];
-  needs_a_look: number;
-  started_at: string;
-  finished_at: string | null;
-}
+export type JobStatus = S["JobStatus"];
 
 /** One shot's place in the assembled scene. */
 export type StringoutEntry = S["StringoutEntry"];
@@ -367,6 +356,29 @@ export const api = {
   shotScreen: (projectId: number, scene: number, shot: number) =>
     request<ShotScreen>(`/screens/shot/${projectId}/${scene}/${shot}`),
 
+  actOnFinding: (
+    projectId: number,
+    clipId: string,
+    findingId: string,
+    body: {
+      rev: number;
+      action: "confirm" | "dismiss" | "correct" | "adjust_range";
+      code?: string;
+      detail?: string;
+      severity?: "note" | "attention" | "blocking";
+      start_s?: number;
+      end_s?: number;
+    },
+  ) =>
+    request<S["FindingActionResult"]>(
+      `/analysis/${projectId}/${clipId}/findings/${findingId}`,
+      {
+        method: "POST",
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+        body: JSON.stringify(body),
+      },
+    ),
+
   /**
    * Which ways in this deployment has.
    *
@@ -381,9 +393,9 @@ export const api = {
   dashboard: () => request<Dashboard>("/dashboard"),
 
   /** Projects this person can open. `detail` adds the counts a list screen needs. */
-  projects: (detail = false) =>
+  projects: (detail = false, state: "active" | "archived" | "trashed" = "active") =>
     request<{ you: string; role: Role; limits: Limits; projects: Project[] }>(
-      detail ? "/projects?detail=true" : "/projects",
+      `/projects?detail=${detail ? "true" : "false"}&state_filter=${state}`,
     ),
 
   project: (projectId: number) => request<Project>(`/projects/${projectId}`),
@@ -477,6 +489,11 @@ export const api = {
         body: JSON.stringify({ rev }),
       },
     ),
+
+  changeProject: (
+    projectId: number,
+    body: { rev: number; action: "rename" | "archive" | "trash" | "restore" | "delete"; name?: string },
+  ) => request<Project>(`/projects/${projectId}`, { method: "PATCH", body: JSON.stringify(body) }),
 
   brief: (projectId: number, scene: number, shot: number) =>
     request<Brief>(`/review/${projectId}/${scene}/${shot}/brief`),
@@ -629,6 +646,36 @@ export const api = {
     ),
 
   jobStatus: (jobId: string) => request<JobStatus>(`/uploads/jobs/${jobId}`),
+
+  commitIngest: (
+    jobId: string,
+    items: {
+      clip_id: string;
+      action: "move" | "keep" | "unassign" | "create";
+      scene?: number;
+      shot?: number;
+      heading?: string;
+      slug?: string;
+      description?: string;
+      note?: string;
+    }[],
+  ) => request<{ status: string; committed: number; analysis_queued: number }>(
+    `/uploads/jobs/${jobId}/commit`,
+    { method: "POST", body: JSON.stringify({ items }) },
+  ),
+
+  saveIngestDraft: (
+    jobId: string,
+    item: {
+      clip_id: string;
+      action: "move" | "keep" | "unassign" | "create";
+      scene?: number;
+      shot?: number;
+    },
+  ) => request<{ status: string; clip_id: string }>(`/uploads/jobs/${jobId}/draft`, {
+    method: "PUT",
+    body: JSON.stringify({ item }),
+  }),
 
   /** The scenes and shots somebody declared, before any footage exists. */
   plan: (projectId: number) => request<Plan>(`/structure/${projectId}`),

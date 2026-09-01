@@ -15,27 +15,28 @@
  */
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import SignInPanel from "@/components/SignInPanel";
-import type { Me } from "@/lib/api";
+import type { Me, Project } from "@/lib/api";
 import { api } from "@/lib/api";
 import { Identity, currentIdentity, signOut } from "@/lib/auth";
 
 const LINKS = [
-  { href: "/dashboard", label: "Work" },
+  { href: "/dashboard", label: "Home" },
   { href: "/review", label: "Review" },
   { href: "/projects", label: "Projects" },
-  { href: "/archive", label: "Archive" },
-  { href: "/accuracy", label: "Accuracy" },
+  { href: "/archive", label: "Search" },
 ] as const;
 
 export default function AppBar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [me, setMe] = useState<Me | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
 
   // Read the stored session on mount rather than during render. sessionStorage
   // does not exist while Next renders on the server, and reaching for it there
@@ -66,6 +67,11 @@ export default function AppBar() {
     void loadMe();
   }, [identity, loadMe]);
 
+  useEffect(() => {
+    if (!identity) { setProjects([]); return; }
+    void api.projects().then((result) => setProjects(result.projects)).catch(() => setProjects([]));
+  }, [identity]);
+
   // Close the menus when the route changes. A panel that survives navigation
   // covers the page somebody just asked for.
   useEffect(() => {
@@ -79,8 +85,10 @@ export default function AppBar() {
   return (
     <nav className="topbar">
       <Link href={identity ? "/dashboard" : "/"} className="logo">
-        Trim<span>bin</span>
+        <i aria-hidden>◩</i> TRIM<span>BIN</span>
       </Link>
+
+      {identity && projects.length > 0 && <label className="project-switcher"><span>Project</span><select aria-label="Project switcher" value={pathname.match(/\/project\/(\d+)/)?.[1] ?? ""} onChange={(event) => { if (event.target.value) router.push(`/project/${event.target.value}`); }}><option value="">Switch project…</option>{projects.map((project) => <option key={project.project_id} value={project.project_id}>{project.name}</option>)}</select></label>}
 
       {identity && (
         <div className="nav">
@@ -114,7 +122,7 @@ export default function AppBar() {
             aria-expanded={menuOpen}
             aria-label="More"
           >
-            ⋯
+            ☰
           </button>
           {menuOpen && (
             <div className="overflow-menu" role="menu">

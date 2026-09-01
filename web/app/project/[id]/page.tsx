@@ -16,9 +16,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AskArchive from "@/components/AskArchive";
 import SceneTree from "@/components/SceneTree";
-import ShotDetail from "@/components/ShotDetail";
-import Structure from "@/components/Structure";
-import Upload from "@/components/Upload";
+import ShotReviewCockpit from "@/components/ShotReviewCockpit";
 import { ApiError } from "@/lib/api";
 import { useProjectScreen } from "@/lib/queries";
 
@@ -33,7 +31,6 @@ export default function ProjectPage({
   const search = useSearchParams();
 
   const [selected, setSelected] = useState<{ scene: number; shot: number } | null>(null);
-  const [uploading, setUploading] = useState(false);
   const [camera, setCamera] = useState("");
   const [shootDay, setShootDay] = useState("");
   const [assignee, setAssignee] = useState("");
@@ -146,13 +143,7 @@ export default function ProjectPage({
             </Link>
           )}
           {canCurate ? (
-            <button
-              type="button"
-              className="primary"
-              onClick={() => setUploading((v) => !v)}
-            >
-              {uploading ? "Close" : "Upload takes"}
-            </button>
+            <Link className="primary" href={`/project/${projectId}/ingest`}>Upload takes</Link>
           ) : (
             me?.signed_in && (
               <span className="hint small">
@@ -163,22 +154,6 @@ export default function ProjectPage({
           )}
         </div>
       </header>
-
-      {uploading && canCurate && (
-        <>
-          <Structure
-            projectId={projectId}
-            scenes={data.plan.scenes}
-            canEdit={canCurate}
-            onChanged={() => void screen.refetch()}
-          />
-          <Upload
-            projectId={projectId}
-            plan={data.plan.scenes}
-            onFinished={() => void screen.refetch()}
-          />
-        </>
-      )}
 
       {!empty && (
         <div className="filters">
@@ -242,7 +217,7 @@ export default function ProjectPage({
       {!empty && (
         <AskArchive
           projectId={projectId}
-          onOpen={(scene, shot) => setSelected({ scene, shot })}
+          onOpen={(scene, shot, at, clipId) => router.push(`/project/${projectId}?scene=${scene}&shot=${shot}${at !== undefined ? `&at=${at}` : ""}${clipId ? `&clip=${clipId}` : ""}`)}
         />
       )}
 
@@ -250,21 +225,7 @@ export default function ProjectPage({
         <div className="empty-project">
           <h2>{filtered ? "Nothing matches those filters" : "Nothing here yet"}</h2>
           {!filtered && <p>Drop a shoot folder to begin.</p>}
-          {!filtered && canCurate && !uploading && (
-            <>
-              <Structure
-                projectId={projectId}
-                scenes={data.plan.scenes}
-                canEdit={canCurate}
-                onChanged={() => void screen.refetch()}
-              />
-              <Upload
-                projectId={projectId}
-                plan={data.plan.scenes}
-                onFinished={() => void screen.refetch()}
-              />
-            </>
-          )}
+          {!filtered && canCurate && <Link className="primary" href={`/project/${projectId}/ingest`}>Add footage</Link>}
         </div>
       ) : (
         <div className="workspace-split">
@@ -277,7 +238,7 @@ export default function ProjectPage({
 
           <section className="pane">
             {open ? (
-              <ShotDetail
+              <ShotReviewCockpit
                 // Remounts when the shot changes, so no state leaks between two
                 // shots — an expanded take from the last one staying open over a
                 // different take's findings is a real confusion.
@@ -289,6 +250,8 @@ export default function ProjectPage({
                 canCurate={canCurate}
                 you={me?.email ?? ""}
                 teamEmails={teamEmails}
+                initialClipId={search.get("clip") ?? ""}
+                initialAt={Number(search.get("at") ?? 0)}
               />
             ) : (
               <p className="hint">Choose a shot.</p>

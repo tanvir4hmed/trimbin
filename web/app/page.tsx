@@ -43,10 +43,11 @@ export default function Home() {
   return (
     <main className="door">
       <section className="door-inner">
-        <h1>Which take, and why.</h1>
+        <p className="door-kicker">EDITORIAL OPERATIONS · TAKE INTELLIGENCE</p>
+        <h1>Review the day. Keep the decision.</h1>
         <p className="lede">
-          Post-production triage. Every take measured, compared within its shot,
-          and the reason kept.
+          Trimbin organizes footage by scene and shot, shows every take’s usable
+          ranges and technical issues, and keeps human choices searchable.
         </p>
 
         <div className="door-actions">
@@ -56,6 +57,8 @@ export default function Home() {
             <SignInPanel onSignedIn={() => router.push("/dashboard")} />
           )}
         </div>
+
+        <div className="door-workflow" aria-label="What Trimbin does"><span><b>01</b> Verify ingest</span><span><b>02</b> Review every take</span><span><b>03</b> Play scene coverage</span></div>
 
         {TRIAL_PASS && (
           <dl className="creds under-door">

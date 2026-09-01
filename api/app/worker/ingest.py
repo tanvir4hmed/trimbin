@@ -232,8 +232,10 @@ async def process(
             measurements=measurements,
             proxy_uri=storage.proxy_url(f"{prefix}/proxy/index.m3u8"),
             sprite_uri=storage.proxy_url(f"{prefix}/sprite.jpg"),
-            group_id=scene,
-            subgroup_id=shot,
+            # Staging has no canonical home. The slate/folder assignment below
+            # is an open proposal; a human commit appends the settled placement.
+            group_id=0,
+            subgroup_id=0,
             take_no=identity.take_no,
             slate_confident=identity.slate_confident,
             slate_raw=identity.slate_raw,
@@ -248,9 +250,8 @@ async def process(
 
         # Where it belongs, as a proposal rather than a decision.
         #
-        # A disagreement is written `open` and waits for a person. Relocating
-        # footage on a slate reading is the one mistake here that scatters a
-        # shoot day silently and looks like the system working.
+        # Every proposal is written `open` and waits for a person. Even a high
+        # confidence match is evidence, not permission to file footage.
         await placements.record(
             project_id=project_id,
             clip_id=clip_id,
@@ -262,9 +263,15 @@ async def process(
             declared_scene=target_scene,
             declared_shot=target_shot,
             slate_raw=identity.slate_raw,
-            state=placements.OPEN if (mismatch or duplicate_of) else placements.SETTLED,
+            state=placements.OPEN,
             detail=(
-                mismatch or (f"same content as clip {duplicate_of[0][:8]}" if duplicate_of else "")
+                mismatch
+                or (f"same content as clip {duplicate_of[0][:8]}" if duplicate_of else "")
+                or (
+                    "matched; waiting for verification"
+                    if scene and shot
+                    else "could not assign from slate"
+                )
             ),
         )
 
@@ -278,25 +285,14 @@ async def process(
         slate_raw=identity.slate_raw,
         confident=bool(identity.slate_confident),
         mismatch=mismatch,
+        duration_s=measurements.duration_s,
+        camera=identity.camera,
+        slate_uri=slate_url,
+        confidence=1.0 if identity.slate_confident else 0.0,
+        duplicate_of=duplicate_of[0] if duplicate_of else "",
     )
-    try:
-        await jobs.enqueue_analysis(
-            project_id,
-            [
-                {
-                    "clip_id": clip_id,
-                    "group_id": scene,
-                    "subgroup_id": shot,
-                    "take_no": identity.take_no,
-                    "duration_s": measurements.duration_s,
-                }
-            ],
-        )
-    except Exception:
-        # The clip is ingested and must not be re-encoded because scheduling its
-        # independent analysis failed. Backfill reads ClickHouse and can recover
-        # any clip without a completed run.
-        log.exception("could not persist the analysis task for clip %s", clip_id)
+    # Full-take work starts after verification. Until then this is staged
+    # footage, not a take in a canonical shot.
     log.info("clip %s: done", clip_id)
 
 

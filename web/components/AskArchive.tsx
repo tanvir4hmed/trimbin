@@ -48,7 +48,7 @@ export default function AskArchive({
 }: {
   projectId: number;
   /** Jump to a take in the workspace, at the timecode if there is one. */
-  onOpen?: (scene: number, shot: number, at?: number) => void;
+  onOpen?: (scene: number, shot: number, at?: number, clipId?: string) => void;
   /** Rendered on the archive screen, where the box is the whole page. */
   initialQuestion?: string;
 }) {
@@ -171,7 +171,7 @@ export default function AskArchive({
                     type="button"
                     className="ask-match"
                     onClick={() =>
-                      onOpen?.(m.group_id, m.subgroup_id, m.where?.start_s)
+                      onOpen?.(m.group_id, m.subgroup_id, m.where?.start_s, m.clip_id)
                     }
                     disabled={!onOpen}
                   >

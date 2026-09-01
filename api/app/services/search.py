@@ -30,10 +30,10 @@ a fixed shape answers the questions people ask and cannot be talked into
 answering others. Who executes it, and as whom, is about blast radius. Doing
 both properly costs nothing and the earlier version did neither.
 
-The direct client remains as a fallback for one case: the MCP subprocess failing
-to start. A search that cannot run should say so, but a search that falls back
-to a path with the same guarantees is better than an error page — and the
-guarantees are the same because the statement was already ours.
+There is no direct-client fallback. If the official read-only MCP path cannot
+run, the API reports search unavailable. An outage and an empty archive are
+different facts, and silently bypassing the declared runtime boundary would make
+the public evidence endpoint untrue.
 """
 
 from __future__ import annotations
@@ -42,9 +42,12 @@ import logging
 import re
 from typing import Any
 
-from .analytics import client
-
 log = logging.getLogger(__name__)
+
+
+class SearchUnavailable(RuntimeError):
+    """The official read-only MCP path did not answer; never a false empty."""
+
 
 # Beyond this the result is a listing, not an answer. An editor scanning two
 # hundred rows has been handed the problem back.
@@ -100,6 +103,11 @@ async def run(
     is worth more than one they have to trust, and this system's whole argument
     is that the reasoning should be visible.
     """
+    # Descriptions and semantic intent belong to moments, not whole decision
+    # rows. A result therefore carries the segment's exact playable range.
+    if plan.get("text") or plan.get("semantic") or embedding:
+        return await _run_moments(project_id, plan, embedding)
+
     conditions = ["d.project_id = {project_id:UInt32}"]
     params: dict[str, Any] = {"project_id": project_id}
 
@@ -124,7 +132,10 @@ async def run(
         params["decided_by"] = str(plan["decided_by"])
 
     if plan.get("finding"):
-        conditions.append("has(d.finding_codes, {finding:String})")
+        conditions.append(
+            "d.clip_id IN (SELECT clip_id FROM current_findings "
+            "WHERE project_id = {project_id:UInt32} AND code = {finding:String})"
+        )
         params["finding"] = _code_value(plan["finding"])
 
     text = (plan.get("text") or "").strip()
@@ -193,17 +204,7 @@ async def run(
 
 
 async def _execute(sql: str, params: dict[str, Any], project_id: int) -> tuple[list[dict], int]:
-    """Run the statement through MCP, falling back to the direct client.
-
-    MCP first, because that is how this project is required to reach ClickHouse
-    at runtime and because the reader user it connects as is a real boundary.
-    The direct client is used only when the subprocess will not start.
-
-    The fallback is honest rather than convenient: the statement is identical
-    and was composed here either way, so nothing about what runs changes — only
-    which connection carries it. It is logged, because a deployment silently
-    never using MCP is exactly the kind of thing that goes unnoticed for weeks.
-    """
+    """Run only through the official read-only MCP path, and fail closed."""
     import time
 
     started = time.perf_counter()
@@ -219,17 +220,109 @@ async def _execute(sql: str, params: dict[str, Any], project_id: int) -> tuple[l
 
     except ReaderMissing as exc:
         log.error("MCP not started: %s", exc)
-    except Exception:
-        log.exception("MCP query failed; falling back to the direct client")
+        raise SearchUnavailable("The read-only ClickHouse MCP reader is not configured.") from exc
+    except Exception as exc:
+        log.exception("MCP query failed")
+        raise SearchUnavailable("Archive search is temporarily unavailable.") from exc
 
-    ch = await client()
-    started = time.perf_counter()
-    result = await ch.query(sql, parameters=params)
-    elapsed_ms = int((time.perf_counter() - started) * 1000)
 
-    rows = [dict(zip(result.column_names, row, strict=True)) for row in result.result_rows]
-    log.info("search via the direct client: %d rows in %dms", len(rows), elapsed_ms)
-    return rows, elapsed_ms
+async def _run_moments(
+    project_id: int,
+    plan: dict[str, Any],
+    embedding: list[float] | None,
+) -> tuple[list[dict], str, int]:
+    """Search current analysis segments and return the exact playable span."""
+    conditions = ["s.project_id = {project_id:UInt32}"]
+    params: dict[str, Any] = {"project_id": project_id}
+    if plan.get("scene") is not None:
+        conditions.append("c.group_id = {scene:UInt32}")
+        params["scene"] = int(plan["scene"])
+    if plan.get("setup") is not None:
+        conditions.append("c.subgroup_id = {setup:UInt32}")
+        params["setup"] = int(plan["setup"])
+    if plan.get("take") is not None:
+        conditions.append("c.take_no = {take:UInt16}")
+        params["take"] = int(plan["take"])
+
+    if plan.get("outcome"):
+        conditions.append("d.outcome = {outcome:String}")
+        params["outcome"] = str(plan["outcome"])
+    if plan.get("decided_by"):
+        conditions.append("d.decided_by = {decided_by:String}")
+        params["decided_by"] = str(plan["decided_by"])
+    if plan.get("finding"):
+        conditions.append(
+            "s.clip_id IN (SELECT clip_id FROM current_findings "
+            "WHERE project_id = {project_id:UInt32} AND code = {finding:String})"
+        )
+        params["finding"] = _code_value(plan["finding"])
+
+    text = str(plan.get("text") or (plan.get("semantic") if not embedding else "") or "").strip()
+    if text:
+        params["text"] = text
+        conditions.append(
+            "(positionCaseInsensitive(s.description, {text:String}) > 0 "
+            "OR positionCaseInsensitive(s.transcript, {text:String}) > 0 "
+            "OR arrayExists(x -> positionCaseInsensitive(x, {text:String}) > 0, s.actions) "
+            "OR arrayExists(x -> positionCaseInsensitive(x, {text:String}) > 0, s.objects) "
+            "OR positionCaseInsensitive(d.reason, {text:String}) > 0)"
+        )
+
+    score_parts: list[str] = []
+    if text:
+        score_parts.append(
+            f"{TEXT_WEIGHT} * "
+            "(positionCaseInsensitive(s.description, {text:String}) > 0 ? 1 : 0.75)"
+        )
+    if embedding:
+        params["vec"] = embedding
+        score_parts.append(
+            f"{SEMANTIC_WEIGHT} * (1 - cosineDistance(s.embedding, {{vec:Array(Float32)}}))"
+        )
+    relevance = " + ".join(score_parts) if score_parts else "1"
+    params["limit"] = min(int(plan.get("limit", 20)), HARD_LIMIT)
+
+    sql = f"""
+        WITH latest_decision AS
+        (
+            SELECT clip_id,
+                   argMax(outcome, decided_at) AS outcome,
+                   argMax(reason, decided_at) AS reason,
+                   argMax(decided_by, decided_at) AS decided_by,
+                   argMax(actor_id, decided_at) AS actor,
+                   argMax(score, decided_at) AS score
+            FROM decisions
+            WHERE project_id = {{project_id:UInt32}}
+            GROUP BY clip_id
+        )
+        SELECT
+            toString(s.clip_id) AS clip_id,
+            c.group_id AS scene,
+            c.subgroup_id AS setup,
+            c.take_no AS take_no,
+            ifNull(d.outcome, 'analysed') AS outcome,
+            s.description AS reason,
+            'segment.match' AS reason_code,
+            ifNull(d.decided_by, 'agent') AS decided_by,
+            ifNull(d.actor, '') AS actor,
+            ifNull(d.score, 0) AS score,
+            ['segment.match'] AS finding_codes,
+            [s.start_s] AS finding_starts_s,
+            round(c.duration_ms / 1000, 2) AS duration_s,
+            c.proxy_uri AS proxy_uri,
+            s.start_s AS usable_from_s,
+            s.end_s AS usable_to_s,
+            {relevance} AS relevance
+        FROM current_clip_segments AS s
+        INNER JOIN current_clip_placement AS c
+            ON c.project_id = s.project_id AND c.clip_id = s.clip_id
+        LEFT JOIN latest_decision AS d ON d.clip_id = s.clip_id
+        WHERE {" AND ".join(conditions)}
+        ORDER BY relevance DESC, s.start_s
+        LIMIT {{limit:UInt16}}
+    """
+    rows, elapsed_ms = await _execute(sql, params, project_id)
+    return rows, _readable(sql), elapsed_ms
 
 
 def _interpolated(sql: str, params: dict[str, Any]) -> str:

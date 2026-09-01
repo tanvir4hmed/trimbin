@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/public/mcp-evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mcp Evidence
+         * @description Public, checkable statement of the runtime search boundary.
+         */
+        get: operations["mcp_evidence_public_mcp_evidence_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/public/accuracy": {
         parameters: {
             query?: never;
@@ -435,6 +455,43 @@ export interface paths {
          */
         get: operations["job_status_uploads_jobs__job_id__get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/uploads/jobs/{job_id}/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Commit Ingest
+         * @description Commit verified assignments and only then start full-take analysis.
+         */
+        post: operations["commit_ingest_uploads_jobs__job_id__commit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/uploads/jobs/{job_id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save Ingest Draft */
+        put: operations["save_ingest_draft_uploads_jobs__job_id__draft_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1109,7 +1166,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Change Project
+         * @description Owner-only lifecycle. A guest has full authority over their own project.
+         */
+        patch: operations["change_project_projects__project_id__patch"];
         trace?: never;
     };
     "/projects/{project_id}/members": {
@@ -1485,6 +1546,28 @@ export interface components {
              */
             is_reply: boolean;
         };
+        /** CommitIngest */
+        CommitIngest: {
+            /** Items */
+            items: components["schemas"]["IngestResolution"][];
+        };
+        /** CoverageItem */
+        CoverageItem: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "selected" | "gap";
+            /** Scene */
+            scene: number;
+            /** Shot */
+            shot: number;
+            /** Slug */
+            slug: string;
+            /** Duration S */
+            duration_s: number;
+            entry?: components["schemas"]["StringoutEntry"] | null;
+        };
         /** DashboardScreen */
         DashboardScreen: {
             /** You */
@@ -1649,6 +1732,111 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** IngestDraft */
+        IngestDraft: {
+            item: components["schemas"]["IngestResolution"];
+        };
+        /** IngestItem */
+        IngestItem: {
+            /** Clip Id */
+            clip_id: string;
+            /** Filename */
+            filename: string;
+            /** Scene */
+            scene: number;
+            /** Shot */
+            shot: number;
+            /** Take No */
+            take_no: number;
+            /** Slate Raw */
+            slate_raw: string;
+            /** Confident */
+            confident: boolean;
+            /**
+             * Confidence
+             * @default 0
+             */
+            confidence: number;
+            /**
+             * Mismatch
+             * @default
+             */
+            mismatch: string;
+            /**
+             * Duration S
+             * @default 0
+             */
+            duration_s: number;
+            /**
+             * Camera
+             * @default
+             */
+            camera: string;
+            /**
+             * Slate Uri
+             * @default
+             */
+            slate_uri: string;
+            /**
+             * Duplicate Of
+             * @default
+             */
+            duplicate_of: string;
+            /**
+             * Verified
+             * @default false
+             */
+            verified: boolean;
+            /** Status */
+            status: string;
+            /** Draft */
+            draft?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** IngestResolution */
+        IngestResolution: {
+            /**
+             * Clip Id
+             * Format: uuid
+             */
+            clip_id: string;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "move" | "keep" | "unassign" | "create";
+            /**
+             * Scene
+             * @default 0
+             */
+            scene: number;
+            /**
+             * Shot
+             * @default 0
+             */
+            shot: number;
+            /**
+             * Heading
+             * @default
+             */
+            heading: string;
+            /**
+             * Slug
+             * @default
+             */
+            slug: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
         /** JobStatus */
         JobStatus: {
             /** Job Id */
@@ -1679,6 +1867,11 @@ export interface components {
             started_at: string;
             /** Finished At */
             finished_at?: string | null;
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["IngestItem"][];
         };
         /** Limits */
         Limits: {
@@ -1922,6 +2115,17 @@ export interface components {
             you_are_owner: boolean;
             /** You Can Upload */
             you_can_upload: boolean;
+            /**
+             * State
+             * @default active
+             * @enum {string}
+             */
+            state: "active" | "archived" | "trashed" | "deleted";
+            /**
+             * Rev
+             * @default 0
+             */
+            rev: number;
             /** Scenes */
             scenes?: number | null;
             /** Shots */
@@ -1953,6 +2157,17 @@ export interface components {
             you_are_owner: boolean;
             /** You Can Upload */
             you_can_upload: boolean;
+            /**
+             * State
+             * @default active
+             * @enum {string}
+             */
+            state: "active" | "archived" | "trashed" | "deleted";
+            /**
+             * Rev
+             * @default 0
+             */
+            rev: number;
             /** Scenes */
             scenes?: number | null;
             /** Shots */
@@ -1970,6 +2185,74 @@ export interface components {
              * @default 1
              */
             members: number;
+        };
+        /** ProjectCommand */
+        ProjectCommand: {
+            /** Rev */
+            rev: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "rename" | "archive" | "trash" | "restore" | "delete";
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+        };
+        /** ProjectCreated */
+        ProjectCreated: {
+            /** Project Id */
+            project_id: number;
+            /** Name */
+            name: string;
+            /** Owner Email */
+            owner_email: string;
+            /** Member Emails */
+            member_emails: string[];
+            /** Is Public */
+            is_public: boolean;
+            /** Created At */
+            created_at: string;
+            /** You Are Owner */
+            you_are_owner: boolean;
+            /** You Can Upload */
+            you_can_upload: boolean;
+            /**
+             * State
+             * @default active
+             * @enum {string}
+             */
+            state: "active" | "archived" | "trashed" | "deleted";
+            /**
+             * Rev
+             * @default 0
+             */
+            rev: number;
+            /** Scenes */
+            scenes?: number | null;
+            /** Shots */
+            shots?: number | null;
+            /** Takes */
+            takes?: number | null;
+            /** Settled */
+            settled?: number | null;
+            /** Waiting */
+            waiting?: number | null;
+            /** Progress Pct */
+            progress_pct?: number | null;
+            limits: components["schemas"]["Limits"];
+        };
+        /** ProjectList */
+        ProjectList: {
+            /** You */
+            you?: string | null;
+            /** Role */
+            role: string;
+            limits: components["schemas"]["Limits"];
+            /** Projects */
+            projects: components["schemas"]["Project"][];
         };
         /**
          * ProjectScreen
@@ -2120,6 +2403,32 @@ export interface components {
              */
             note: string;
         };
+        /** SceneFinding */
+        SceneFinding: {
+            /** Clip Id */
+            clip_id: string;
+            /** Shot */
+            shot: number;
+            /** Take No */
+            take_no: number;
+            /** Code */
+            code: string;
+            /** Start S */
+            start_s: number;
+            /** End S */
+            end_s: number;
+            /** Detail */
+            detail: string;
+            /** Severity */
+            severity: string;
+        };
+        /** SceneList */
+        SceneList: {
+            /** Project Id */
+            project_id: number;
+            /** Scenes */
+            scenes: number[];
+        };
         /** SceneNode */
         SceneNode: {
             /** Scene */
@@ -2131,6 +2440,19 @@ export interface components {
             scene_code: string;
             /** Shots */
             shots: components["schemas"]["ShotNode"][];
+        };
+        /** SceneNote */
+        SceneNote: {
+            /** Clip Id */
+            clip_id: string;
+            /** Author */
+            author: string;
+            /** Body */
+            body: string;
+            /** At S */
+            at_s: number;
+            /** To S */
+            to_s: number;
         };
         /** SetState */
         SetState: {
@@ -2244,6 +2566,11 @@ export interface components {
         ShotScreen: {
             verdicts?: components["schemas"]["Verdicts"] | null;
             brief: components["schemas"]["Brief"];
+            /**
+             * Analyses
+             * @default []
+             */
+            analyses: components["schemas"]["TakeAnalysis"][];
             /** Comments */
             comments: components["schemas"]["Comment"][];
             /** Open Comments */
@@ -2275,6 +2602,26 @@ export interface components {
              * @default 0
              */
             export_fps: number;
+            /**
+             * Timeline
+             * @default []
+             */
+            timeline: components["schemas"]["CoverageItem"][];
+            /**
+             * Findings
+             * @default []
+             */
+            findings: components["schemas"]["SceneFinding"][];
+            /**
+             * Notes
+             * @default []
+             */
+            notes: components["schemas"]["SceneNote"][];
+            /**
+             * Activity
+             * @default []
+             */
+            activity: components["schemas"]["Activity"][];
         };
         /** StringoutEntry */
         StringoutEntry: {
@@ -2622,6 +2969,28 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    mcp_evidence_public_mcp_evidence_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     accuracy_public_accuracy_get: {
         parameters: {
             query?: never;
@@ -3074,6 +3443,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    commit_ingest_uploads_jobs__job_id__commit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommitIngest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_ingest_draft_uploads_jobs__job_id__draft_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IngestDraft"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -3622,9 +4065,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SceneList"];
                 };
             };
             /** @description Validation Error */
@@ -4056,6 +4497,7 @@ export interface operations {
         parameters: {
             query?: {
                 detail?: boolean;
+                state_filter?: "active" | "archived" | "trashed";
             };
             header?: never;
             path?: never;
@@ -4069,9 +4511,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ProjectList"];
                 };
             };
             /** @description Validation Error */
@@ -4104,9 +4544,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ProjectCreated"];
                 };
             };
             /** @description Validation Error */
@@ -4137,9 +4575,42 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_project_projects__project_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectCommand"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
                 };
             };
             /** @description Validation Error */
