@@ -144,3 +144,58 @@ class TestTheDashboardRoute:
         """Kept from the service's own rule: null, not nought per cent."""
         body = client.get("/dashboard").json()
         assert all(card["progress_pct"] is not None for card in body["projects"])
+
+
+class TestSomebodyWithNoProjects:
+    """The first screen a new person sees, and the one after deleting the last
+    project.
+
+    This failed with `KeyError: 'queue_total'`. `for_projects` wrote its answer
+    shape twice — once for real and once as a short-circuit for an empty id list
+    — and the two drifted. The earlier tests here stubbed the service, so they
+    proved the route could assemble a response and never that the service gave
+    it the keys it reads.
+
+    These use the real service. An empty id list makes no database call, so
+    nothing needs stubbing for that part, which is exactly why there was no
+    excuse for not testing it.
+    """
+
+    @pytest.fixture
+    def no_projects(self, monkeypatch: pytest.MonkeyPatch):
+        async def none(email: str):
+            return []
+
+        async def nothing(ids):
+            return []
+
+        monkeypatch.setattr(dashboard_route.projects, "visible_to", none)
+        monkeypatch.setattr(dashboard_route.dashboard_service, "recent_decisions", nothing)
+        monkeypatch.setattr(dashboard_route.dashboard_service, "recent_notes", nothing)
+        monkeypatch.setattr(dashboard_route.activity, "for_projects", nothing)
+
+    def test_home_loads(self, client: TestClient, signed_in, no_projects) -> None:
+        assert client.get("/dashboard").status_code == 200
+
+    def test_it_is_empty_rather_than_absent(
+        self, client: TestClient, signed_in, no_projects
+    ) -> None:
+        body = client.get("/dashboard").json()
+        assert body["projects"] == []
+        assert body["queue"] == []
+        assert body["queue_total"] == 0
+        assert body["totals"]["projects"] == 0
+
+    @pytest.mark.asyncio
+    async def test_both_paths_answer_in_the_same_shape(self) -> None:
+        """The property that was broken, asserted directly.
+
+        Whatever `for_projects` returns for nobody must have the same keys as
+        what it returns for somebody, or a caller reading one will crash on the
+        other.
+        """
+        from app.services import dashboard as service
+
+        empty = await service.for_projects([], "someone@example.com")
+        full = service._assembled([], [{"shots": 0}], "someone@example.com")
+        assert set(empty) == set(full)

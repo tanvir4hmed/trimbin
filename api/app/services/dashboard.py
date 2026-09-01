@@ -68,6 +68,32 @@ class Waiting:
         }
 
 
+def _assembled(waiting: list[Waiting], projects: list[dict], viewer: str) -> dict:
+    """The answer, built in one place.
+
+    There used to be two returns here writing the shape by hand: the real one
+    and a short-circuit for somebody with no projects. They drifted — the empty
+    one carried `recent` and `notes`, which this function does not produce, and
+    omitted `queue_total`, which it does. Deleting every project turned Home and
+    Review into a 500 with `KeyError: 'queue_total'`, on the one screen a new
+    person sees first.
+
+    One construction, so the empty case cannot have a different shape from the
+    full one again.
+    """
+    return {
+        "queue": waiting[:QUEUE_LIMIT],
+        "queue_total": len(waiting),
+        "projects": projects,
+        "totals": {
+            "waiting": len(waiting),
+            "yours": sum(1 for w in waiting if w.assignee == viewer),
+            "unassigned": sum(1 for w in waiting if not w.assignee),
+            "projects": len([p for p in projects if p["shots"]]),
+        },
+    }
+
+
 async def for_projects(project_ids: list[int], viewer: str) -> dict:
     """The whole morning, for one person.
 
@@ -76,13 +102,8 @@ async def for_projects(project_ids: list[int], viewer: str) -> dict:
     the scene is nearly done.
     """
     if not project_ids:
-        return {
-            "queue": [],
-            "projects": [],
-            "recent": [],
-            "notes": [],
-            "totals": {"waiting": 0, "yours": 0, "unassigned": 0, "projects": 0},
-        }
+        # No database call to make, but the same answer shape as if there were.
+        return _assembled([], [], viewer)
 
     rows = await _shot_rows(project_ids)
     meta = await shots_service.for_projects(project_ids)
@@ -163,17 +184,7 @@ async def for_projects(project_ids: list[int], viewer: str) -> dict:
         for pid, data in per_project.items()
     ]
 
-    return {
-        "queue": waiting[:QUEUE_LIMIT],
-        "queue_total": len(waiting),
-        "projects": projects,
-        "totals": {
-            "waiting": len(waiting),
-            "yours": sum(1 for w in waiting if w.assignee == viewer),
-            "unassigned": sum(1 for w in waiting if not w.assignee),
-            "projects": len([p for p in projects if p["shots"]]),
-        },
-    }
+    return _assembled(waiting, projects, viewer)
 
 
 async def recent_decisions(project_ids: list[int], limit: int = 12) -> list[dict]:
