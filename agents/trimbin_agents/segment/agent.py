@@ -6,13 +6,36 @@ from pathlib import Path
 
 from google import genai
 from google.genai import types
+from pydantic import BaseModel
 
 from ..common.errors import AgentFailure, text_of
 from ..config import settings
+from ..contracts.base import Finding
 from ..contracts.segments import SegmentObservation
 
 PROMPT_VERSION = "segment/v1"
 PROMPT = (Path(__file__).parent / "prompt_v1.md").read_text(encoding="utf-8")
+
+
+class SegmentModelResponse(BaseModel):
+    """Constraint-light wire schema accepted by Vertex structured output.
+
+    ``SegmentObservation`` remains the durable contract and validates the
+    answer below. Passing that model directly asks Vertex to compile Pydantic's
+    defaults plus every ``maxLength``/``maxItems`` constraint; the current
+    Gemini endpoint rejects that otherwise-valid schema with a bare 400.  Keep
+    the provider-facing schema required and simple, then enforce the stricter
+    archive contract after generation.
+    """
+
+    description: str
+    transcript: str
+    actions: list[str]
+    objects: list[str]
+    speakers: list[str]
+    shot_size: str
+    camera_motion: str
+    findings: list[Finding]
 
 
 class SegmentAgent:
@@ -50,11 +73,10 @@ class SegmentAgent:
                 contents=contents,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
-                    response_schema=SegmentObservation,
+                    response_schema=SegmentModelResponse,
                     temperature=0.1,
                 ),
             )
+            return SegmentObservation.model_validate_json(text_of(response, "segment observer"))
         except Exception as exc:
             raise AgentFailure(f"segment observation failed: {exc}") from exc
-
-        return SegmentObservation.model_validate_json(text_of(response, "segment observer"))
