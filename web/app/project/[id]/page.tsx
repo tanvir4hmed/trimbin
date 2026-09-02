@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AskArchive from "@/components/AskArchive";
 import PlacementBanner from "@/components/PlacementBanner";
+import ProjectOverview from "@/components/ProjectOverview";
 import SceneTree from "@/components/SceneTree";
 import ShotReviewCockpit from "@/components/ShotReviewCockpit";
 import { ApiError } from "@/lib/api";
@@ -62,6 +63,13 @@ export default function ProjectPage({
   // What to open, derived rather than stored. A link from the queue names a
   // shot; otherwise the first thing that needs a person, because the point of
   // the queue is that it puts the work in front of you.
+  // Which shot the cockpit is on — or null, which means "show the production".
+  //
+  // This used to fall back to the first shot needing a person and, failing
+  // that, simply the first shot. So opening a project dropped you into a
+  // cockpit for a shot you had not chosen, with no view of what the project
+  // contained. A shot is opened deliberately now: from the URL, or by picking
+  // one.
   const open = useMemo(() => {
     if (!tree) return null;
     if (selected) return selected;
@@ -72,20 +80,7 @@ export default function ProjectPage({
       wantScene && wantShot
         ? tree.scenes.find((s) => s.scene === wantScene)?.shots.find((h) => h.shot === wantShot)
         : undefined;
-    if (asked) return { scene: wantScene, shot: wantShot };
-
-    const waiting = tree.scenes
-      .flatMap((s) => s.shots.map((x) => ({ scene: s.scene, ...x })))
-      .find(
-        (s) =>
-          s.status === "differs_from_circle" ||
-          s.status === "needs_review" ||
-          s.status === "not_judged",
-      );
-    if (waiting) return { scene: waiting.scene, shot: waiting.shot };
-
-    const first = tree.scenes[0]?.shots[0];
-    return first ? { scene: tree.scenes[0].scene, shot: first.shot } : null;
+    return asked ? { scene: wantScene, shot: wantShot } : null;
   }, [tree, selected, search]);
 
   // The slugline lives on the plan, not on the tree — the tree is what footage
@@ -188,10 +183,38 @@ export default function ProjectPage({
           {open && (
             <>
               <span aria-hidden>›</span>
-              <span className="crumb-shot">
-                Scene {openScene?.scene_code || open.scene} ·{" "}
-                {openShot?.slug || `Shot ${open.shot}`}
-              </span>
+              {/* The scene is a choice, not a label. With one scene it read as
+                  decoration; with several there was no way to move between them
+                  from here at all. */}
+              <label className="crumb-scene">
+                <select
+                  aria-label="Scene"
+                  value={open.scene}
+                  onChange={(event) => {
+                    const scene = Number(event.target.value);
+                    const first = tree.scenes.find((s) => s.scene === scene)?.shots[0];
+                    if (first) setSelected({ scene, shot: first.shot });
+                  }}
+                >
+                  {tree.scenes.map((scene) => (
+                    <option key={scene.scene} value={scene.scene}>
+                      Scene {scene.scene_code || scene.scene}
+                      {headings.get(scene.scene) ? ` · ${headings.get(scene.scene)}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <span aria-hidden>›</span>
+              <span className="crumb-shot">{openShot?.slug || `Shot ${open.shot}`}</span>
+              {/* Out of the shot and back to the production, which otherwise
+                  needed the browser's back button. */}
+              <button
+                type="button"
+                className="linkish crumb-close"
+                onClick={() => { setSelected(null); router.push(`/project/${projectId}`); }}
+              >
+                close shot
+              </button>
             </>
           )}
         </div>
@@ -299,6 +322,15 @@ export default function ProjectPage({
           )}
           {!filtered && canCurate && <Link className="primary" href={`/project/${projectId}/ingest`}>Add scenes, shots &amp; footage</Link>}
         </div>
+      ) : !open ? (
+        // Arriving at the production: its scenes, its shots, and a way into any
+        // of them. The rail and the cockpit appear once a shot is chosen.
+        <ProjectOverview
+          projectId={projectId}
+          scenes={tree.scenes}
+          headings={headings}
+          canCurate={canCurate}
+        />
       ) : (
         <div className="workspace-split">
           <div className="rail">

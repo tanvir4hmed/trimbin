@@ -40,6 +40,28 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [identity, isApp]);
   useEffect(() => { setSwitching(false); setSettingsOpen(false); }, [pathname]);
 
+  // Escape, and a click anywhere else. An open menu that only closes by
+  // pressing the same button again traps whoever opened it by accident.
+  useEffect(() => {
+    if (!switching && !settingsOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setSwitching(false); setSettingsOpen(false); }
+    };
+    const onDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".switch-wrap")) return;
+      if (target?.closest(".app-sidebar footer")) return;
+      setSwitching(false);
+      setSettingsOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("mousedown", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("mousedown", onDown);
+    };
+  }, [switching, settingsOpen]);
+
   const currentId = Number(pathname.match(/\/project\/(\d+)/)?.[1] || 0);
   const current = projects.find((project) => project.project_id === currentId);
   const filtered = useMemo(() => projects.filter((project) => project.name.toLowerCase().includes(projectQuery.toLowerCase())), [projects, projectQuery]);
