@@ -228,6 +228,21 @@ class Take(Model):
     shot_code: str = ""
 
 
+class SourceClip(Model):
+    clip_id: str
+    scene: int
+    shot: int
+    take_no: int
+    duration_s: float
+    proxy_uri: str = ""
+    sprite_uri: str = ""
+    description: str = ""
+    camera: str = ""
+    fps: float = 0.0
+    scene_code: str = ""
+    shot_code: str = ""
+
+
 class Verdicts(Model):
     project_id: int
     scene: int
@@ -241,6 +256,7 @@ class Verdicts(Model):
     state: ShotState
     rev: int = 0
     selection_archive_state: str = ""
+    coverage_segments: list[CoverageSegment] = []
 
 
 # ---------------------------------------------------------------------------
@@ -534,6 +550,25 @@ class ShotScreen(Model):
     open_comments: int
 
 
+class CoverageSegment(Model):
+    segment_id: str
+    clip_id: str
+    take_no: int = 0
+    source_in_s: float
+    source_out_s: float
+    position: int
+    reason: str = ""
+    created_by: str = ""
+
+
+class ShotCoverage(Model):
+    project_id: int
+    scene: int
+    shot: int
+    rev: int
+    segments: list[CoverageSegment]
+
+
 class StringoutEntry(Model):
     scene: int
     shot: int
@@ -556,6 +591,8 @@ class StringoutEntry(Model):
     fps: float = 0.0
     scene_code: str = ""
     shot_code: str = ""
+    segment_id: str = ""
+    position: int = 0
 
 
 class CoverageItem(Model):
@@ -565,6 +602,7 @@ class CoverageItem(Model):
     slug: str
     duration_s: float
     entry: StringoutEntry | None = None
+    entries: list[StringoutEntry] = []
 
 
 class SceneFinding(Model):
@@ -670,6 +708,7 @@ class IngestItem(Model):
     duration_s: float = 0.0
     camera: str = ""
     slate_uri: str = ""
+    slate_candidates: list[str] = []
     duplicate_of: str = ""
     verified: bool = False
     status: str

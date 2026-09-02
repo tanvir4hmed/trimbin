@@ -162,7 +162,7 @@ def markers(
     difference between markers that land on the frame and markers that land
     somewhere in the general area.
     """
-    offsets: dict[str, tuple[float, float, float]] = {}
+    offsets: dict[str, list[tuple[float, float, float]]] = {}
     record_s = 0.0
     for entry in entries:
         start = float(entry.get("start_s", 0.0))
@@ -170,7 +170,7 @@ def markers(
         length = max(0.0, end - start)
         if length <= 0:
             continue
-        offsets[str(entry.get("clip_id", ""))] = (record_s, start, length)
+        offsets.setdefault(str(entry.get("clip_id", "")), []).append((record_s, start, length))
         record_s += length
 
     buffer = io.StringIO()
@@ -223,7 +223,7 @@ def markers(
 
 
 def _place(
-    item: dict, offsets: dict[str, tuple[float, float, float]], fps: float
+    item: dict, offsets: dict[str, list[tuple[float, float, float]]], fps: float
 ) -> tuple[str, str, str] | None:
     """Move a source-time span onto the assembled timeline.
 
@@ -236,9 +236,21 @@ def _place(
     if clip_id not in offsets:
         return None
 
-    record_start, source_start, length = offsets[clip_id]
     at_s = float(item.get("start_s", item.get("at_s", 0.0)) or 0.0)
     to_s = float(item.get("end_s", item.get("to_s", 0.0)) or 0.0)
+
+    # The same take may contribute several ranges. Put the marker on the first
+    # selected range that actually contains it, rather than overwriting the
+    # earlier offset with the last occurrence of the clip.
+    candidates = offsets[clip_id]
+    record_start, source_start, length = next(
+        (
+            candidate
+            for candidate in candidates
+            if candidate[1] <= at_s <= candidate[1] + candidate[2]
+        ),
+        candidates[0],
+    )
 
     # Clamp into the part of the take that was actually used. A finding at 0:52
     # of a take trimmed at 0:30 did happen, and the honest place for it on this

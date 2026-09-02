@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import AppBar from "@/components/AppBar";
+import AppShell from "@/components/AppShell";
 import Providers from "@/components/Providers";
 import "./globals.css";
 
@@ -30,11 +30,7 @@ export default function RootLayout({
       </head>
       <body>
         <Providers>
-          {/* One bar, both states. A visitor who signs in finds the same
-              product with more of it available, rather than being moved to
-              another one. */}
-          <AppBar />
-          {children}
+          <AppShell>{children}</AppShell>
         </Providers>
       </body>
     </html>

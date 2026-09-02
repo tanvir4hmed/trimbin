@@ -62,6 +62,7 @@ class Identity:
     shot_code: str = ""
 
     embedding: list[float] = field(default_factory=list)
+    slate_candidate_names: list[str] = field(default_factory=list)
 
     @property
     def read_a_board(self) -> bool:
@@ -174,6 +175,8 @@ async def read_slate(source: Path, work: Path, clip_id: UUID, project_id: int) -
     # editor deciding whether the board or the reader was wrong has to see the
     # board; a confidence score is not a substitute for looking at it.
     await still_from(head, work / "slate.jpg")
+    candidates = await extract_frames(head, work / "slate_candidates", 4, SLATE_WINDOW_S)
+    identity.slate_candidate_names = [path.name for path in candidates]
     log.info(
         "clip %s: board reads %r -> scene %d, shot %d, take %d",
         clip_id,

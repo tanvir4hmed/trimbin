@@ -92,7 +92,7 @@ def _as_dict(project, viewer_email: str | None) -> dict:
 
 @router.get("", response_model=schemas.ProjectList)
 async def mine(
-    principal: Annotated[Principal, Depends(require_signed_in)],
+    principal: Annotated[Principal, Depends(current_principal)],
     detail: bool = False,
     state_filter: Literal["active", "archived", "trashed", "deleted"] = "active",
 ) -> dict:
@@ -115,6 +115,9 @@ async def mine(
         else await projects.for_member(principal.email or "", states={state_filter})
     )
     rows = [_as_dict(p, principal.email) for p in found]
+    if principal.is_anonymous:
+        for row in rows:
+            row.update(owner_email="", member_emails=[], you_are_owner=False, you_can_upload=False)
 
     if detail and found:
         stats = await dashboard_service.for_projects(

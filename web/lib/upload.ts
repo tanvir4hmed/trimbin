@@ -29,8 +29,49 @@ export interface Progress {
   filename: string;
   sent: number;
   total: number;
-  state: "waiting" | "uploading" | "done" | "failed";
+  state: "waiting" | "uploading" | "paused" | "done" | "failed" | "cancelled";
   error?: string;
+}
+
+export interface UploadSnapshot {
+  id: string;
+  rows: Progress[];
+  state: "uploading" | "paused" | "done" | "cancelled" | "failed";
+  updatedAt: number;
+}
+
+type Listener = () => void;
+const snapshots = new Map<string, UploadSnapshot>();
+let snapshotList: UploadSnapshot[] = [];
+const listeners = new Set<Listener>();
+const controls = new Map<string, UploadControl>();
+
+function publish(id: string, rows: Progress[], state?: UploadSnapshot["state"]) {
+  const previous = snapshots.get(id);
+  snapshots.set(id, { id, rows: [...rows], state: state ?? previous?.state ?? "uploading", updatedAt: Date.now() });
+  snapshotList = Array.from(snapshots.values()).sort((a, b) => b.updatedAt - a.updatedAt);
+  listeners.forEach((listener) => listener());
+}
+
+export function uploadSnapshots(): UploadSnapshot[] {
+  return snapshotList;
+}
+export function subscribeUploads(listener: Listener) { listeners.add(listener); return () => listeners.delete(listener); }
+export function pauseUpload(id: string) { controls.get(id)?.pause(); }
+export function resumeUpload(id: string) { controls.get(id)?.resume(); }
+export function cancelUpload(id: string) { controls.get(id)?.cancel(); }
+export function dismissUpload(id: string) { snapshots.delete(id); snapshotList = Array.from(snapshots.values()).sort((a, b) => b.updatedAt - a.updatedAt); listeners.forEach((listener) => listener()); }
+
+class UploadControl {
+  paused = false;
+  cancelled = false;
+  controller = new AbortController();
+  private wake: (() => void)[] = [];
+  constructor(readonly id: string) {}
+  pause() { if (this.cancelled) return; this.paused = true; this.controller.abort(); const snap = snapshots.get(this.id); if (snap) publish(this.id, snap.rows.map((r) => r.state === "uploading" ? { ...r, state: "paused" } : r), "paused"); }
+  resume() { if (!this.paused || this.cancelled) return; this.paused = false; this.controller = new AbortController(); this.wake.splice(0).forEach((fn) => fn()); const snap = snapshots.get(this.id); if (snap) publish(this.id, snap.rows, "uploading"); }
+  cancel() { this.cancelled = true; this.paused = false; this.controller.abort(); this.wake.splice(0).forEach((fn) => fn()); const snap = snapshots.get(this.id); if (snap) publish(this.id, snap.rows.map((r) => r.state === "done" ? r : { ...r, state: "cancelled" }), "cancelled"); }
+  async ready() { if (this.cancelled) throw new DOMException("Upload cancelled", "AbortError"); if (this.paused) await new Promise<void>((resolve) => this.wake.push(resolve)); if (this.cancelled) throw new DOMException("Upload cancelled", "AbortError"); }
 }
 
 /** How many files move at once.
@@ -103,20 +144,22 @@ async function uploadOne(
   ticket: Ticket,
   file: File,
   onProgress: (sent: number) => void,
+  control: UploadControl,
 ): Promise<void> {
   const session = await openSession(ticket);
   let offset = await bytesReceived(session, file.size);
   onProgress(offset);
 
   while (offset < file.size) {
+    await control.ready();
     const end = Math.min(offset + CHUNK, file.size);
-    const response = await fetch(session, {
-      method: "PUT",
-      headers: {
-        "Content-Range": `bytes ${offset}-${end - 1}/${file.size}`,
-      },
-      body: file.slice(offset, end),
-    });
+    let response: Response;
+    try {
+      response = await fetch(session, { method: "PUT", headers: { "Content-Range": `bytes ${offset}-${end - 1}/${file.size}` }, body: file.slice(offset, end), signal: control.controller.signal });
+    } catch (error) {
+      if (control.paused && !control.cancelled) { await control.ready(); offset = await bytesReceived(session, file.size); onProgress(offset); continue; }
+      throw error;
+    }
 
     if (response.status === 200 || response.status === 201) {
       offset = file.size;
@@ -146,7 +189,8 @@ export async function uploadAll(
   tickets: Ticket[],
   files: File[],
   onProgress: (rows: Progress[]) => void,
-): Promise<{ arrived: string[]; names: Record<string, string> }> {
+  batchId = crypto.randomUUID(),
+): Promise<{ arrived: string[]; names: Record<string, string>; cancelled: boolean }> {
   const byName = new Map(files.map((f) => [f.name, f]));
   const rows: Progress[] = tickets.map((t) => ({
     clipId: t.clip_id,
@@ -156,7 +200,9 @@ export async function uploadAll(
     state: "waiting",
   }));
 
-  const report = () => onProgress([...rows]);
+  const control = new UploadControl(batchId);
+  controls.set(batchId, control);
+  const report = () => { onProgress([...rows]); publish(batchId, rows); };
   report();
 
   const arrived: string[] = [];
@@ -183,14 +229,14 @@ export async function uploadAll(
         await uploadOne(ticket, file, (sent) => {
           rows[index] = { ...rows[index], sent };
           report();
-        });
+        }, control);
         rows[index] = { ...rows[index], state: "done", sent: file.size };
         arrived.push(ticket.clip_id);
         names[ticket.clip_id] = ticket.filename;
       } catch (e) {
         rows[index] = {
           ...rows[index],
-          state: "failed",
+          state: control.cancelled ? "cancelled" : "failed",
           error: e instanceof Error ? e.message : "upload failed",
         };
       }
@@ -199,5 +245,7 @@ export async function uploadAll(
   }
 
   await Promise.all(Array.from({ length: Math.min(PARALLEL, tickets.length) }, worker));
-  return { arrived, names };
+  publish(batchId, rows, control.cancelled ? "cancelled" : rows.some((row) => row.state === "failed") ? "failed" : "done");
+  controls.delete(batchId);
+  return { arrived, names, cancelled: control.cancelled };
 }

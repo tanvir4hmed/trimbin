@@ -113,7 +113,7 @@ function Archive() {
       {projectId === null ? (
         <p className="hint">
           Nothing to search yet. Make a project and put some footage in it, or{" "}
-          <Link href="/project/1">open one of ours</Link>.
+          <Link href="/projects">open a public project</Link>.
         </p>
       ) : (
         <AskArchive

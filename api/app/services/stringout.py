@@ -51,6 +51,8 @@ class Entry:
     fps: float = 0.0
     scene_code: str = ""
     shot_code: str = ""
+    segment_id: str = ""
+    position: int = 0
 
     @property
     def duration_s(self) -> float:
@@ -83,6 +85,8 @@ class Entry:
             "fps": round(self.fps, 3),
             "scene_code": self.scene_code,
             "shot_code": self.shot_code,
+            "segment_id": self.segment_id,
+            "position": self.position,
         }
 
 
@@ -189,6 +193,78 @@ async def scene(project_id: int, scene_id: int) -> dict:
             )
         )
 
+    # A human-built ordered coverage list supersedes the legacy one-take row
+    # for that shot. Placement remains canonical; using a clip here never moves
+    # it, and repeated clip ids deliberately produce repeated source ranges.
+    covered_shots = {
+        shot_id
+        for (scene_no, shot_id), shot in meta.items()
+        if scene_no == scene_id and shot.coverage_segments
+    }
+    if covered_shots:
+        entries = [entry for entry in entries if entry.shot not in covered_shots]
+        clip_ids = sorted(
+            {
+                str(segment.get("clip_id"))
+                for (scene_no, _), shot in meta.items()
+                if scene_no == scene_id
+                for segment in shot.coverage_segments
+                if segment.get("clip_id")
+            }
+        )
+        clip_rows: dict[str, tuple] = {}
+        if clip_ids:
+            clips_result = await ch.query(
+                """
+                SELECT toString(clip_id), take_no, proxy_uri, sprite_uri,
+                       duration_ms, fps, scene_code, shot_code
+                FROM current_clip_placement
+                WHERE project_id = {p:UInt32} AND clip_id IN {clips:Array(UUID)}
+                """,
+                parameters={"p": project_id, "clips": clip_ids},
+            )
+            clip_rows = {str(row[0]): row for row in clips_result.result_rows}
+        for (scene_no, shot_id), described in meta.items():
+            if scene_no != scene_id or not described.coverage_segments:
+                continue
+            for position, segment in enumerate(described.coverage_segments):
+                clip_id = str(segment.get("clip_id") or "")
+                row = clip_rows.get(clip_id)
+                if row is None:
+                    continue
+                start = max(0.0, float(segment.get("source_in_s", 0) or 0))
+                duration = float(int(row[4] or 0) / 1000)
+                end = min(duration, float(segment.get("source_out_s", duration) or duration))
+                if end <= start:
+                    continue
+                entries.append(
+                    Entry(
+                        scene=scene_id,
+                        shot=shot_id,
+                        slug=described.slug or f"{scene_id}{_letter(shot_id)}",
+                        clip_id=clip_id,
+                        take_no=int(segment.get("take_no") or row[1] or 0),
+                        start_s=start,
+                        end_s=end,
+                        proxy_uri=row[2] or "",
+                        sprite_uri=row[3] or "",
+                        reason=str(segment.get("reason") or "Human coverage selection"),
+                        decided_by="human",
+                        actor=str(segment.get("created_by") or ""),
+                        margin=0,
+                        needs_review=False,
+                        circled_take=described.circled_take,
+                        open_comments=open_counts.get((scene_id, shot_id), {}).get("open", 0),
+                        fps=float(row[5] or 0),
+                        scene_code=row[6] or "",
+                        shot_code=row[7] or "",
+                        segment_id=str(segment.get("segment_id") or ""),
+                        position=int(segment.get("position", position)),
+                    )
+                )
+
+    entries.sort(key=lambda entry: (entry.shot, entry.position))
+
     measured_rates = sorted({round(e.fps, 3) for e in entries if e.fps > 0})
 
     timeline = coverage_timeline(scene_id, entries, meta, observed_shots)
@@ -219,13 +295,16 @@ def coverage_timeline(
         (shot for (scene_no, _), shot in meta.items() if scene_no == scene_id),
         key=lambda shot: shot.shot,
     )
-    entry_by_shot = {entry.shot: entry for entry in entries}
+    entries_by_shot: dict[int, list[Entry]] = {}
+    for entry in entries:
+        entries_by_shot.setdefault(entry.shot, []).append(entry)
     ordered_shots = sorted(
-        set(entry_by_shot) | {shot.shot for shot in planned} | (observed_shots or set())
+        set(entries_by_shot) | {shot.shot for shot in planned} | (observed_shots or set())
     )
     timeline = []
     for shot_id in ordered_shots:
-        entry = entry_by_shot.get(shot_id)
+        shot_entries = sorted(entries_by_shot.get(shot_id, []), key=lambda item: item.position)
+        entry = shot_entries[0] if shot_entries else None
         described = meta.get((scene_id, shot_id))
         timeline.append(
             {
@@ -233,8 +312,9 @@ def coverage_timeline(
                 "scene": scene_id,
                 "shot": shot_id,
                 "slug": (described.slug if described else "") or f"{scene_id}{_letter(shot_id)}",
-                "duration_s": entry.duration_s if entry else 0.0,
+                "duration_s": sum(item.duration_s for item in shot_entries),
                 "entry": entry.as_dict() if entry else None,
+                "entries": [item.as_dict() for item in shot_entries],
             }
         )
 

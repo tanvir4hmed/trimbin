@@ -239,6 +239,14 @@ async def process(
         if slate_frame.exists():
             storage.upload_file(slate_frame, f"{prefix}/slate.jpg")
             slate_url = storage.proxy_url(f"{prefix}/slate.jpg")
+        slate_candidates: list[str] = []
+        for candidate_name in identity.slate_candidate_names:
+            candidate = work / "slate_candidates" / candidate_name
+            if not candidate.exists():
+                continue
+            object_name = f"{prefix}/slate-candidates/{candidate_name}"
+            storage.upload_file(candidate, object_name)
+            slate_candidates.append(storage.proxy_url(object_name))
 
         await clips.write(
             project_id=project_id,
@@ -305,6 +313,7 @@ async def process(
         slate_uri=slate_url,
         confidence=identity.placement_confidence,
         duplicate_of=duplicate_of[0] if duplicate_of else "",
+        slate_candidates=slate_candidates,
     )
     # Full-take work starts after verification. Until then this is staged
     # footage, not a take in a canonical shot.

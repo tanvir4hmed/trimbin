@@ -134,6 +134,21 @@ class TestMarkers:
         )
         assert "00:00:11:00" in csv_text
 
+    def test_a_reused_take_places_a_finding_in_the_range_that_contains_it(self) -> None:
+        entries = [
+            _entry(clip_id="aaa", start_s=2.0, end_s=5.0),
+            _entry(clip_id="aaa", start_s=10.0, end_s=14.0),
+        ]
+        csv_text = exports.markers(
+            entries,
+            [{"clip_id": "aaa", "start_s": 11.0, "end_s": 11.5, "code": "focus.lost"}],
+            [],
+            fps=24,
+        )
+        # The second select begins at record 00:03 and its 11-second source
+        # finding is one second in: record 00:04, not pinned to select one.
+        assert "00:00:04:00" in csv_text
+
     def test_a_finding_on_a_take_that_is_not_in_the_cut_is_left_out(self) -> None:
         """It is real and it stays in the archive. Putting it on a timeline that
         does not contain that take would place it on whatever happens to be

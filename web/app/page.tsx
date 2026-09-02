@@ -74,8 +74,6 @@ export default function Home() {
         )}
 
         <p className="door-links">
-          <Link href="/project/1">Look without signing in</Link>
-          <span aria-hidden>·</span>
           <Link href="/about">About</Link>
           <span aria-hidden>·</span>
           <Link href="/guide">Guide</Link>

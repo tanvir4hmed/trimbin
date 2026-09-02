@@ -17,7 +17,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import NewProject from "@/components/NewProject";
 import type { Limits, Project, Role } from "@/lib/api";
 import { ApiError, api } from "@/lib/api";
-import { currentIdentity } from "@/lib/auth";
 
 type SortKey = "name" | "waiting" | "progress" | "created";
 
@@ -54,10 +53,9 @@ export default function ProjectsPage() {
   }, [router, scope]);
 
   useEffect(() => {
-    if (!currentIdentity()) {
-      router.replace("/");
-      return;
-    }
+    // Signed-out visitors may browse public productions. The API redacts team
+    // details and capabilities for them; forcing them back to the login door
+    // made the "look without signing in" path a loop.
     void load();
   }, [load, router]);
 
@@ -120,7 +118,7 @@ export default function ProjectsPage() {
             open
           </p>
         </div>
-        {limits && (
+        {limits && you && (
           <NewProject
             limits={limits}
             role={role}
@@ -161,65 +159,12 @@ export default function ProjectsPage() {
       {shown.length === 0 ? (
         <p className="hint">
           {projects.length === 0
-            ? "No projects yet. Make one, or open one of ours from the front page."
+            ? you
+              ? "No projects yet. Make one and add the first shoot day."
+              : "No public projects are available. Sign in as Guest to open the working application."
             : "Nothing matches that."}
         </p>
-      ) : (
-        <div className="scroll-x">
-          <table className="projects">
-            <thead>
-              <tr>
-                <th>Project</th>
-                <th>Scenes</th>
-                <th>Shots</th>
-                <th>Takes</th>
-                <th>Progress</th>
-                <th>Waiting</th>
-                <th>Who</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((p) => (
-                <tr key={p.project_id}>
-                  <th scope="row">
-                    <Link href={`/project/${p.project_id}`}>{p.name}</Link>
-                    {p.is_public && <span className="tag">public</span>}
-                    {!p.you_can_upload && (
-                      // Said rather than discovered at the upload button. A
-                      // guest reading our productions should know which ones
-                      // they can add footage to before they try.
-                      <span className="tag quiet">read and comment</span>
-                    )}
-                  </th>
-                  <td>{p.scenes ?? "—"}</td>
-                  <td>{p.shots ?? "—"}</td>
-                  <td>{p.takes ?? "—"}</td>
-                  <td>
-                    {p.progress_pct === null || p.progress_pct === undefined ? (
-                      <span className="dim">—</span>
-                    ) : (
-                      <>
-                        <span className="bar inline">
-                          <span style={{ width: `${p.progress_pct}%` }} />
-                        </span>{" "}
-                        {p.progress_pct}%
-                      </>
-                    )}
-                  </td>
-                  <td className={p.waiting ? "bad" : ""}>{p.waiting ?? 0}</td>
-                  <td className="dim small">
-                    {p.owner_email === you ? "you" : p.owner_email.split("@")[0]}
-                    {p.member_emails.length > 0 &&
-                      ` +${p.member_emails.length}`}
-                  </td>
-                  <td>{p.you_are_owner ? <div className="project-actions">{scope === "active" && <><button onClick={() => void command(p, "rename")}>Rename</button><button onClick={() => void command(p, "archive")}>Archive</button><button onClick={() => void command(p, "trash")}>Trash</button></>}{scope === "archived" && <><button onClick={() => void command(p, "restore")}>Restore</button><button onClick={() => void command(p, "trash")}>Trash</button></>}{scope === "trashed" && <><button onClick={() => void command(p, "restore")}>Restore</button><button className="danger" onClick={() => void command(p, "delete")}>Delete</button></>}{scope === "deleted" && <button onClick={() => void command(p, "restore")}>Restore</button>}</div> : <span className="dim">—</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      ) : <div className="project-showcase-grid">{shown.map((p, index) => <article className="project-showcase" key={p.project_id}><Link className={`project-cover cover-${index % 6}`} href={`/project/${p.project_id}`}><span>{p.you_are_owner ? "Owner" : p.you_can_upload ? "Editor" : "Guest"}</span></Link><div className="project-showcase-body"><header><Link href={`/project/${p.project_id}`}>{p.name}</Link>{p.is_public && <span className="tag">public</span>}</header><div className="project-facts"><span><b>{p.scenes ?? "—"}</b> scenes</span><span><b>{p.shots ?? "—"}</b> shots</span><span><b>{p.takes ?? "—"}</b> clips</span><span className={p.waiting ? "bad" : ""}><b>{p.waiting ?? 0}</b> decisions</span></div>{p.progress_pct !== null && p.progress_pct !== undefined && <div className="project-progress"><i style={{ width: `${p.progress_pct}%` }}/><span>{p.progress_pct}% settled</span></div>}<footer><small>{p.owner_email === you ? "You" : p.owner_email.split("@")[0]}{p.member_emails.length ? ` + ${p.member_emails.length} editors` : ""}</small><Link href={`/project/${p.project_id}`}>Open project →</Link></footer>{p.you_are_owner && <div className="project-actions">{scope === "active" && <><button onClick={() => void command(p,"rename")}>Rename</button><button onClick={() => void command(p,"archive")}>Archive</button><button onClick={() => void command(p,"trash")}>Trash</button></>}{scope === "archived" && <><button onClick={() => void command(p,"restore")}>Restore</button><button onClick={() => void command(p,"trash")}>Trash</button></>}{scope === "trashed" && <><button onClick={() => void command(p,"restore")}>Restore</button><button className="danger" onClick={() => void command(p,"delete")}>Delete</button></>}{scope === "deleted" && <button onClick={() => void command(p,"restore")}>Restore</button>}</div>}</div></article>)}</div>}
     </main>
   );
 }

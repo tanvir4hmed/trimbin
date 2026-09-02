@@ -37,6 +37,8 @@ const Player = forwardRef<
 ) {
   const video = useRef<HTMLVideoElement>(null);
   const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState("");
+  const [retry, setRetry] = useState(0);
 
   useImperativeHandle(ref, () => ({
     seek: (to: number, play = false) => {
@@ -56,13 +58,18 @@ const Player = forwardRef<
     const el = video.current;
     if (!el || !src) return;
     setFailed(false);
+    setFailure("");
 
     // Safari, and iOS anything. Native is better: hardware decode, no second
     // buffer, and no library to keep current.
     if (el.canPlayType("application/vnd.apple.mpegurl")) {
       el.src = src;
-      onReady?.();
-      return;
+      const ready = () => onReady?.();
+      const fail = () => { setFailed(true); setFailure("The proxy playlist or one of its media segments could not be loaded."); };
+      el.addEventListener("loadedmetadata", ready, { once: true });
+      el.addEventListener("error", fail, { once: true });
+      el.load();
+      return () => { el.removeEventListener("loadedmetadata", ready); el.removeEventListener("error", fail); };
     }
 
     let destroyed = false;
@@ -75,7 +82,9 @@ const Player = forwardRef<
           setFailed(true);
           return;
         }
-        const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+        const hls = new Hls({ enableWorker: true, lowLatencyMode: false, manifestLoadingMaxRetry: 3, fragLoadingMaxRetry: 4 });
+        let networkRecoveries = 0;
+        let mediaRecoveries = 0;
         instance = hls;
         hls.loadSource(src);
         hls.attachMedia(el);
@@ -83,7 +92,11 @@ const Player = forwardRef<
         hls.on(Hls.Events.ERROR, (_e, data) => {
           // Only fatal errors are worth showing. Recoverable ones happen on
           // every seek across a segment boundary and mean nothing to a viewer.
-          if (data.fatal) setFailed(true);
+          if (!data.fatal) return;
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && networkRecoveries++ < 2) { hls.startLoad(); return; }
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR && mediaRecoveries++ < 2) { hls.recoverMediaError(); return; }
+          setFailure(data.type === Hls.ErrorTypes.NETWORK_ERROR ? "The proxy playlist or media segment could not be reached." : "The browser could not decode this proxy.");
+          setFailed(true);
         });
       })
       .catch(() => setFailed(true));
@@ -95,7 +108,7 @@ const Player = forwardRef<
     // onReady is intentionally not a dependency: it changes identity on every
     // render of the parent and would tear down the media engine each time.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [src]);
+  }, [src, retry]);
 
   return (
     <>
@@ -110,11 +123,8 @@ const Player = forwardRef<
         onTimeUpdate={(e) => onTimeUpdate?.(e.currentTarget.currentTime)}
         onEnded={onEnded}
       />
-      {failed && (
-        <p className="hint small">
-          This clip could not be played. The proxy may still be building.
-        </p>
-      )}
+      {!src && <p className="hint small">Proxy is still processing. Playback will appear when it is ready.</p>}
+      {failed && <p className="hint small player-error">{failure || "This clip could not be played."} <button type="button" onClick={() => setRetry((value) => value + 1)}>Retry playback</button></p>}
     </>
   );
 });

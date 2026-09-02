@@ -93,6 +93,8 @@ class Shot:
     previous_selected_clip_id: str = ""
     selection_event_id: str = ""
     selection_archive_state: str = ""
+    coverage_segments: list[dict] = field(default_factory=list)
+    previous_coverage_segments: list[dict] = field(default_factory=list)
 
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_by: str = ""
@@ -128,6 +130,7 @@ class Shot:
             "previous_selected_clip_id": self.previous_selected_clip_id,
             "selection_event_id": self.selection_event_id,
             "selection_archive_state": self.selection_archive_state,
+            "coverage_segments": self.coverage_segments,
             "updated_at": self.updated_at.isoformat(),
             "updated_by": self.updated_by,
             "rev": self.rev,
@@ -178,6 +181,8 @@ def _from_doc(project_id: int, scene: int, shot: int, d: dict) -> Shot:
         previous_selected_clip_id=d.get("previous_selected_clip_id", ""),
         selection_event_id=d.get("selection_event_id", ""),
         selection_archive_state=d.get("selection_archive_state", ""),
+        coverage_segments=list(d.get("coverage_segments") or []),
+        previous_coverage_segments=list(d.get("previous_coverage_segments") or []),
         updated_at=d.get("updated_at") or datetime.now(UTC),
         updated_by=d.get("updated_by", ""),
         rev=int(d.get("rev", 0) or 0),

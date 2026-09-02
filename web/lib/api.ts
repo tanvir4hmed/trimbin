@@ -46,6 +46,9 @@ export type ProjectScreen = S["ProjectScreen"];
 export type ShotScreen = S["ShotScreen"];
 export type TakeAnalysis = S["TakeAnalysis"];
 export type FindingEvent = S["FindingEvent"];
+export type CoverageSegment = S["CoverageSegment"];
+export type ShotCoverage = S["ShotCoverage"];
+export type SourceClip = S["SourceClip"];
 
 // Read off the generated shapes rather than restated. These three are closed
 // sets on the server; writing them out again here is how the interface ends up
@@ -357,6 +360,9 @@ export const api = {
   verdicts: (projectId: number, scene: number, shot: number) =>
     request<Verdicts>(`/review/${projectId}/${scene}/${shot}`),
 
+  projectSources: (projectId: number, q = "") =>
+    request<SourceClip[]>(`/review/${projectId}/sources?q=${encodeURIComponent(q)}`),
+
   /** Ask the panel to judge a shot. Spends money; hence a POST. */
   judge: (projectId: number, scene: number, shot: number) =>
     request<{ status: string; margin?: number; needs_review?: boolean; rationale?: string }>(
@@ -394,6 +400,17 @@ export const api = {
       headers: { "Idempotency-Key": crypto.randomUUID() },
       body: JSON.stringify(body),
     }),
+
+  saveCoverage: (
+    projectId: number,
+    scene: number,
+    shot: number,
+    body: { rev: number; reason: string; segments: { segment_id?: string; clip_id: string; source_in_s: number; source_out_s: number }[] },
+  ) => request<ShotCoverage>(`/review/${projectId}/${scene}/${shot}/coverage`, {
+    method: "PUT",
+    headers: { "Idempotency-Key": crypto.randomUUID() },
+    body: JSON.stringify(body),
+  }),
 
   /** Put back what stood before the last human decision. Written forward, never deleted. */
   undo: (projectId: number, scene: number, shot: number, rev: number) =>
@@ -563,6 +580,11 @@ export const api = {
     ),
 
   jobStatus: (jobId: string) => request<JobStatus>(`/uploads/jobs/${jobId}`),
+
+  cancelUpload: (jobId: string) =>
+    request<{ status: string; job_id: string }>(`/uploads/jobs/${jobId}/cancel`, {
+      method: "POST",
+    }),
 
   commitIngest: (
     jobId: string,

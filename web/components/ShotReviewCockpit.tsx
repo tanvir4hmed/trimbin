@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Comments from "@/components/Comments";
 import Player, { type PlayerHandle } from "@/components/Player";
-import type { FindingEvent, Take, TakeAnalysis } from "@/lib/api";
+import { api, type CoverageSegment, type FindingEvent, type SourceClip, type Take, type TakeAnalysis } from "@/lib/api";
 import {
   conflictMessage,
-  useChooseTake,
+  useSaveCoverage,
   useFindingAction,
   useJudge,
   useShotEdits,
@@ -32,6 +32,12 @@ function tc(value: number) {
 
 function label(code: string) {
   return code.replaceAll(".", " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function persistedSegmentId(value: string): string | undefined {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    ? value
+    : undefined;
 }
 
 function findingSeverity(value: string): "note" | "attention" | "blocking" {
@@ -76,10 +82,15 @@ export default function ShotReviewCockpit({
   const [reason, setReason] = useState<string>("better performance");
   const [notice, setNotice] = useState("");
   const [adjusting, setAdjusting] = useState(false);
+  const [sourceQuery, setSourceQuery] = useState("");
+  const [sourceRows, setSourceRows] = useState<SourceClip[]>([]);
+  const [sourcePreview, setSourcePreview] = useState<SourceClip | null>(null);
+  const [sourceBusy, setSourceBusy] = useState(false);
   const [commentAt, setCommentAt] = useState<{ clipId: string; at: number } | null>(null);
   const [playheads, setPlayheads] = useState<Record<string, number>>({});
   const playerA = useRef<PlayerHandle>(null);
   const playerB = useRef<PlayerHandle>(null);
+  const selectPlayer = useRef<PlayerHandle>(null);
 
   useEffect(() => {
     if (!takes.length) return;
@@ -99,7 +110,9 @@ export default function ShotReviewCockpit({
   const b = takes.find((take) => take.clip_id === bId) ?? takes[1] ?? takes[0];
   const selected = activeSide === "a" ? a : b;
   const selectedAnalysis = selected ? analysisFor(analyses, selected.clip_id) : undefined;
-  const choose = useChooseTake(projectId, scene, shot, verdicts?.rev ?? 0);
+  const saveCoverage = useSaveCoverage(projectId, scene, shot, verdicts?.rev ?? 0);
+  const [selects, setSelects] = useState<CoverageSegment[]>([]);
+  const [selectPreviewIndex, setSelectPreviewIndex] = useState<number | null>(null);
   const findingAction = useFindingAction(projectId, scene, shot);
   const judge = useJudge(projectId, scene, shot);
   const edits = useShotEdits(projectId, scene, shot, screen.data?.brief);
@@ -115,6 +128,10 @@ export default function ShotReviewCockpit({
       to: primary?.end_s ?? selected.usable_to_s ?? selected.duration_s,
     });
   }, [selected, analyses]);
+
+  useEffect(() => {
+    setSelects((verdicts?.coverage_segments ?? []).map((item, position) => ({ ...item, position })));
+  }, [verdicts?.coverage_segments]);
 
   const activePlayer = (clipId: string) => (clipId === a?.clip_id ? playerA.current : playerB.current);
   const inspect = (clipId: string, finding: FindingEvent) => {
@@ -149,19 +166,56 @@ export default function ShotReviewCockpit({
     }
   };
 
-  const selectTake = async () => {
+  const addRange = () => {
     if (!selected) return;
+    if (!(range.to > range.from)) return;
+    setSelects((current) => [...current, {
+      segment_id: crypto.randomUUID(), clip_id: selected.clip_id,
+      take_no: selected.take_no, source_in_s: range.from, source_out_s: range.to,
+      position: current.length, reason, created_by: you,
+    }]);
+    setNotice(`Take ${selected.take_no} ${tc(range.from)}–${tc(range.to)} added. Save the shot selects when ready.`);
+  };
+
+  const saveSelects = async () => {
     try {
-      await choose.mutateAsync({
-        clip_id: selected.clip_id,
-        reason: selected.clip_id === verdicts?.recommended ? "confirmed the technical recommendation" : reason,
-        in_point_s: range.from,
-        out_point_s: range.to,
+      await saveCoverage.mutateAsync({
+        reason: reason || "human coverage selection",
+        segments: selects.map((item) => ({
+          segment_id: persistedSegmentId(item.segment_id), clip_id: item.clip_id,
+          source_in_s: item.source_in_s, source_out_s: item.source_out_s,
+        })),
       });
-      setNotice(`Take ${selected.take_no} now stands for this shot.`);
+      setNotice(`${selects.length} source range${selects.length === 1 ? "" : "s"} now stand for this shot.`);
     } catch (error) {
-      setNotice(conflictMessage(error) ?? (error instanceof Error ? error.message : "Could not select that take."));
+      setNotice(conflictMessage(error) ?? (error instanceof Error ? error.message : "Could not save shot selects."));
     }
+  };
+
+  const previewSegment = selectPreviewIndex === null ? null : selects[selectPreviewIndex];
+  const previewSource = previewSegment
+    ? takes.find((take) => take.clip_id === previewSegment.clip_id)
+      ?? sourceRows.find((source) => source.clip_id === previewSegment.clip_id)
+    : null;
+
+  const findSources = async () => {
+    setSourceBusy(true);
+    try {
+      setSourceRows(await api.projectSources(projectId, sourceQuery));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not search project footage.");
+    } finally {
+      setSourceBusy(false);
+    }
+  };
+
+  const addSource = (source: SourceClip) => {
+    setSelects((current) => [...current, {
+      segment_id: crypto.randomUUID(), clip_id: source.clip_id, take_no: source.take_no,
+      source_in_s: 0, source_out_s: source.duration_s, position: current.length,
+      reason: "reused project source", created_by: you,
+    }]);
+    setNotice(`Scene ${source.scene} / Shot ${source.shot} / Take ${source.take_no} added as a reusable source. Its slate placement did not move.`);
   };
 
   if (screen.isPending) return <div className="cockpit-state">Loading shot intelligence…</div>;
@@ -257,11 +311,16 @@ export default function ShotReviewCockpit({
             </div>
             <p className="policy-note">Technical, continuity and completion evidence only. Performance remains your decision.</p>
             {selected && <div className="selection-card">
-              <h3>Your choice</h3>
+              <h3>Add source range</h3>
               <div className="selection-take">Take {selected.take_no}<span>{selected.clip_id === recommended?.clip_id ? "AI suggestion" : "Alternative"}</span></div>
               <label>Use range<div className="range-inputs"><input type="number" step="0.01" min="0" max={selected.duration_s} value={range.from} onChange={(event) => setRange({ ...range, from: Number(event.target.value) })} /><span>→</span><input type="number" step="0.01" min="0" max={selected.duration_s} value={range.to} onChange={(event) => setRange({ ...range, to: Number(event.target.value) })} /></div></label>
               {selected.clip_id !== recommended?.clip_id && <div className="reason-chips">{HUMAN_REASONS.map((item) => <button key={item} className={reason === item ? "chip on" : "chip"} onClick={() => setReason(item)}>{item}</button>)}</div>}
-              <button className="primary cockpit-confirm" disabled={!canComment || choose.isPending || !(range.to > range.from)} onClick={() => void selectTake()}>{canComment ? (selected.clip_id === recommended?.clip_id ? `Confirm Take ${selected.take_no}` : "Modify & Select") : "Sign in to select a take"}</button>
+              <button className="ghost cockpit-confirm" disabled={!canComment || !(range.to > range.from)} onClick={addRange}>{canComment ? `Add Take ${selected.take_no} range` : "Sign in to select ranges"}</button>
+              <div className="shot-selects"><div className="shot-selects-head"><b>Shot selects</b><span>{selects.length} range{selects.length === 1 ? "" : "s"}</span></div>{selects.map((item, index) => <div className="shot-select-row" key={item.segment_id}><span><b>{index + 1}. Take {item.take_no}</b><span className="select-range-inputs"><input aria-label={`Select ${index + 1} in`} type="number" min="0" step="0.01" value={item.source_in_s} onChange={(event) => setSelects((rows) => rows.map((row, at) => at === index ? { ...row, source_in_s: Number(event.target.value) } : row))} /><i>→</i><input aria-label={`Select ${index + 1} out`} type="number" min="0" step="0.01" value={item.source_out_s} onChange={(event) => setSelects((rows) => rows.map((row, at) => at === index ? { ...row, source_out_s: Number(event.target.value) } : row))} /></span></span><span className="select-order"><button disabled={!index} onClick={() => setSelects((rows) => { const next = [...rows]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; })}>↑</button><button disabled={index === selects.length - 1} onClick={() => setSelects((rows) => { const next = [...rows]; [next[index + 1], next[index]] = [next[index], next[index + 1]]; return next; })}>↓</button><button onClick={() => setSelects((rows) => rows.filter((_, at) => at !== index))}>Remove</button></span></div>)}</div>
+              <details className="source-library"><summary>Reuse footage from another shot or scene</summary><p className="policy-note">Adds a source range here without changing where its slate placed the clip.</p><div className="source-search"><input value={sourceQuery} onChange={(event) => setSourceQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void findSources(); }} placeholder="Scene, shot, description or clip ID"/><button className="ghost" disabled={sourceBusy} onClick={() => void findSources()}>{sourceBusy ? "Finding…" : "Find"}</button></div>{sourcePreview?.proxy_uri && <Player className="source-preview" src={sourcePreview.proxy_uri} poster={sourcePreview.sprite_uri} />}{sourceRows.map((source) => <div className="source-row" key={source.clip_id}><button className="source-ident" onClick={() => setSourcePreview(source)}><b>Scene {source.scene_code || source.scene} · Shot {source.shot_code || source.shot} · Take {source.take_no}</b><small>{tc(source.duration_s)}{source.description ? ` · ${source.description}` : ""}</small></button><button className="ghost" disabled={!canComment} onClick={() => addSource(source)}>Add range</button></div>)}</details>
+              {previewSegment && previewSource?.proxy_uri && <div className="shot-select-preview"><Player key={previewSegment.segment_id} ref={selectPlayer} src={previewSource.proxy_uri} poster={previewSource.sprite_uri} onReady={() => selectPlayer.current?.seek(previewSegment.source_in_s, true)} onTimeUpdate={(at) => { if (at >= previewSegment.source_out_s - .05) setSelectPreviewIndex((index) => index !== null && index + 1 < selects.length ? index + 1 : null); }} /><small>Playing select {(selectPreviewIndex ?? 0) + 1} of {selects.length} · Take {previewSegment.take_no} · {tc(previewSegment.source_in_s)}–{tc(previewSegment.source_out_s)}</small></div>}
+              <button className="ghost cockpit-confirm" disabled={!selects.length} onClick={() => setSelectPreviewIndex(0)}>▶ Play this shot</button>
+              <button className="primary cockpit-confirm" disabled={!canComment || saveCoverage.isPending} onClick={() => void saveSelects()}>{saveCoverage.isPending ? "Saving…" : `Save ${selects.length} shot select${selects.length === 1 ? "" : "s"}`}</button>
             </div>}
             <WhoIsOnIt
               assignee={screen.data?.brief.assignee ?? ""}

@@ -462,6 +462,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/uploads/jobs/{job_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Ingest
+         * @description Abandon an upload batch without deleting any bytes that already arrived.
+         */
+        post: operations["cancel_ingest_uploads_jobs__job_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/uploads/jobs/{job_id}/commit": {
         parameters: {
             query?: never;
@@ -492,6 +512,26 @@ export interface paths {
         get?: never;
         /** Save Ingest Draft */
         put: operations["save_ingest_draft_uploads_jobs__job_id__draft_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/review/{project_id}/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Project Sources
+         * @description A bounded source picker for reusing footage without moving its slate placement.
+         */
+        get: operations["project_sources_review__project_id__sources_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -554,6 +594,24 @@ export interface paths {
          *     already arrived.
          */
         post: operations["judge_review__project_id___group_id___subgroup_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/review/{project_id}/{group_id}/{subgroup_id}/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coverage */
+        get: operations["coverage_review__project_id___group_id___subgroup_id__coverage_get"];
+        /** Set Coverage */
+        put: operations["set_coverage_review__project_id___group_id___subgroup_id__coverage_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1557,6 +1615,15 @@ export interface components {
             /** Items */
             items: components["schemas"]["IngestResolution"][];
         };
+        /** CoverageCommand */
+        CoverageCommand: {
+            /** Rev */
+            rev: number;
+            /** Segments */
+            segments: components["schemas"]["CoverageSegmentInput"][];
+            /** Reason */
+            reason: string;
+        };
         /** CoverageItem */
         CoverageItem: {
             /**
@@ -1573,6 +1640,53 @@ export interface components {
             /** Duration S */
             duration_s: number;
             entry?: components["schemas"]["StringoutEntry"] | null;
+            /**
+             * Entries
+             * @default []
+             */
+            entries: components["schemas"]["StringoutEntry"][];
+        };
+        /** CoverageSegment */
+        CoverageSegment: {
+            /** Segment Id */
+            segment_id: string;
+            /** Clip Id */
+            clip_id: string;
+            /**
+             * Take No
+             * @default 0
+             */
+            take_no: number;
+            /** Source In S */
+            source_in_s: number;
+            /** Source Out S */
+            source_out_s: number;
+            /** Position */
+            position: number;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /**
+             * Created By
+             * @default
+             */
+            created_by: string;
+        };
+        /** CoverageSegmentInput */
+        CoverageSegmentInput: {
+            /** Segment Id */
+            segment_id?: string | null;
+            /**
+             * Clip Id
+             * Format: uuid
+             */
+            clip_id: string;
+            /** Source In S */
+            source_in_s: number;
+            /** Source Out S */
+            source_out_s: number;
         };
         /** DashboardScreen */
         DashboardScreen: {
@@ -1787,6 +1901,11 @@ export interface components {
              */
             slate_uri: string;
             /**
+             * Slate Candidates
+             * @default []
+             */
+            slate_candidates: string[];
+            /**
              * Duplicate Of
              * @default
              */
@@ -1850,6 +1969,11 @@ export interface components {
              * @default
              */
             note: string;
+            /**
+             * Evidence Uri
+             * @default
+             */
+            evidence_uri: string;
         };
         /** JobStatus */
         JobStatus: {
@@ -2534,6 +2658,19 @@ export interface components {
              */
             look: string;
         };
+        /** ShotCoverage */
+        ShotCoverage: {
+            /** Project Id */
+            project_id: number;
+            /** Scene */
+            scene: number;
+            /** Shot */
+            shot: number;
+            /** Rev */
+            rev: number;
+            /** Segments */
+            segments: components["schemas"]["CoverageSegment"][];
+        };
         /** ShotNode */
         ShotNode: {
             /** Shot */
@@ -2592,6 +2729,54 @@ export interface components {
             comments: components["schemas"]["Comment"][];
             /** Open Comments */
             open_comments: number;
+        };
+        /** SourceClip */
+        SourceClip: {
+            /** Clip Id */
+            clip_id: string;
+            /** Scene */
+            scene: number;
+            /** Shot */
+            shot: number;
+            /** Take No */
+            take_no: number;
+            /** Duration S */
+            duration_s: number;
+            /**
+             * Proxy Uri
+             * @default
+             */
+            proxy_uri: string;
+            /**
+             * Sprite Uri
+             * @default
+             */
+            sprite_uri: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Camera
+             * @default
+             */
+            camera: string;
+            /**
+             * Fps
+             * @default 0
+             */
+            fps: number;
+            /**
+             * Scene Code
+             * @default
+             */
+            scene_code: string;
+            /**
+             * Shot Code
+             * @default
+             */
+            shot_code: string;
         };
         /** Stringout */
         Stringout: {
@@ -2693,6 +2878,16 @@ export interface components {
              * @default
              */
             shot_code: string;
+            /**
+             * Segment Id
+             * @default
+             */
+            segment_id: string;
+            /**
+             * Position
+             * @default 0
+             */
+            position: number;
         };
         /** Take */
         Take: {
@@ -2981,6 +3176,11 @@ export interface components {
              * @default
              */
             selection_archive_state: string;
+            /**
+             * Coverage Segments
+             * @default []
+             */
+            coverage_segments: components["schemas"]["CoverageSegment"][];
         };
     };
     responses: never;
@@ -3478,6 +3678,39 @@ export interface operations {
             };
         };
     };
+    cancel_ingest_uploads_jobs__job_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     commit_ingest_uploads_jobs__job_id__commit_post: {
         parameters: {
             query?: never;
@@ -3539,6 +3772,40 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    project_sources_review__project_id__sources_get: {
+        parameters: {
+            query?: {
+                q?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceClip"][];
                 };
             };
             /** @description Validation Error */
@@ -3642,6 +3909,78 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coverage_review__project_id___group_id___subgroup_id__coverage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                group_id: number;
+                subgroup_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShotCoverage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_coverage_review__project_id___group_id___subgroup_id__coverage_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                project_id: number;
+                group_id: number;
+                subgroup_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoverageCommand"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShotCoverage"];
                 };
             };
             /** @description Validation Error */

@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import logging
 from typing import Annotated, Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
@@ -92,6 +92,72 @@ class UndoRequest(Revised):
     """Undo is a new selection and has the same concurrency contract."""
 
     rev: int = Field(ge=0)
+
+
+class CoverageSegmentInput(BaseModel):
+    segment_id: UUID | None = None
+    clip_id: UUID
+    source_in_s: float = Field(ge=0)
+    source_out_s: float = Field(gt=0)
+
+
+class CoverageCommand(Revised):
+    rev: int = Field(ge=0)
+    segments: list[CoverageSegmentInput] = Field(max_length=60)
+    reason: str = Field(min_length=3, max_length=400)
+
+    @field_validator("reason")
+    @classmethod
+    def _coverage_reason(cls, value: str) -> str:
+        cleaned = " ".join(value.split())
+        if len(cleaned) < 3:
+            raise ValueError("Say why, even briefly.")
+        return cleaned
+
+
+@router.get("/{project_id}/sources", response_model=list[schemas.SourceClip])
+async def project_sources(
+    project_id: int,
+    principal: Annotated[Principal, Depends(current_principal)],
+    q: str = "",
+    limit: int = 20,
+) -> list[dict]:
+    """A bounded source picker for reusing footage without moving its slate placement."""
+    await principal.assert_can_read(project_id)
+    needle = " ".join(q.split())[:100].lower()
+    result = await (await client()).query(
+        """
+        SELECT toString(clip_id), group_id, subgroup_id, take_no,
+               duration_ms / 1000, proxy_uri, sprite_uri, description,
+               camera, fps, scene_code, shot_code
+        FROM current_clip_placement
+        WHERE project_id = {p:UInt32}
+          AND ({q:String} = '' OR positionCaseInsensitive(description, {q:String}) > 0
+               OR positionCaseInsensitive(scene_code, {q:String}) > 0
+               OR positionCaseInsensitive(shot_code, {q:String}) > 0
+               OR positionCaseInsensitive(toString(clip_id), {q:String}) > 0)
+        ORDER BY group_id, subgroup_id, take_no
+        LIMIT {limit:UInt16}
+        """,
+        parameters={"p": project_id, "q": needle, "limit": min(50, max(1, limit))},
+    )
+    return [
+        {
+            "clip_id": str(row[0]),
+            "scene": int(row[1]),
+            "shot": int(row[2]),
+            "take_no": int(row[3]),
+            "duration_s": float(row[4]),
+            "proxy_uri": row[5] or "",
+            "sprite_uri": row[6] or "",
+            "description": row[7] or "",
+            "camera": row[8] or "",
+            "fps": float(row[9] or 0),
+            "scene_code": row[10] or "",
+            "shot_code": row[11] or "",
+        }
+        for row in result.result_rows
+    ]
 
 
 def _findings_from(codes, starts, ends, severities) -> list[dict]:
@@ -328,7 +394,150 @@ async def verdicts(
         "state": brief.state,
         "rev": brief.rev,
         "selection_archive_state": brief.selection_archive_state,
+        "coverage_segments": _coverage_for_screen(brief, takes),
     }
+
+
+def _coverage_for_screen(brief, takes: list[dict]) -> list[dict]:
+    """Current ordered selects, with a lazy one-segment legacy bridge."""
+    if brief.coverage_segments:
+        return list(brief.coverage_segments)
+    chosen = next((take for take in takes if take["outcome"] == "selected"), None)
+    if not chosen:
+        return []
+    start = float(chosen.get("usable_from_s", 0) or 0)
+    end = float(chosen.get("usable_to_s", 0) or 0)
+    if end <= start:
+        end = float(chosen.get("duration_s", 0) or 0)
+    return [
+        {
+            "segment_id": f"legacy-{chosen['clip_id']}",
+            "clip_id": chosen["clip_id"],
+            "take_no": int(chosen.get("take_no", 0) or 0),
+            "source_in_s": start,
+            "source_out_s": end,
+            "position": 0,
+            "reason": chosen.get("reason", "Legacy standing take"),
+            "created_by": chosen.get("actor", ""),
+        }
+    ]
+
+
+@router.get(
+    "/{project_id}/{group_id}/{subgroup_id}/coverage",
+    response_model=schemas.ShotCoverage,
+)
+async def coverage(
+    project_id: int,
+    group_id: int,
+    subgroup_id: int,
+    principal: Annotated[Principal, Depends(current_principal)],
+) -> dict:
+    await principal.assert_can_read(project_id)
+    brief = await shots.get(project_id, group_id, subgroup_id)
+    verdicts_now = await _verdicts_for(project_id, group_id, subgroup_id)
+    return {
+        "project_id": project_id,
+        "scene": group_id,
+        "shot": subgroup_id,
+        "rev": brief.rev,
+        "segments": _coverage_for_screen(brief, verdicts_now),
+    }
+
+
+@router.put(
+    "/{project_id}/{group_id}/{subgroup_id}/coverage",
+    response_model=schemas.ShotCoverage,
+)
+async def set_coverage(
+    project_id: int,
+    group_id: int,
+    subgroup_id: int,
+    body: CoverageCommand,
+    principal: Annotated[Principal, Depends(require_signed_in)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> dict:
+    await principal.assert_can_comment(project_id)
+    replayed = await revisions.replay(idempotency_key or "", principal.email or "")
+    if replayed is not None:
+        return replayed
+
+    takes = await _verdicts_for(project_id, group_id, subgroup_id)
+    by_clip = {str(take["clip_id"]): take for take in takes}
+    missing_ids = sorted({str(item.clip_id) for item in body.segments} - set(by_clip))
+    if missing_ids:
+        source_rows = await (await client()).query(
+            """
+            SELECT toString(clip_id), take_no, duration_ms / 1000
+            FROM current_clip_placement
+            WHERE project_id = {p:UInt32} AND clip_id IN {clips:Array(UUID)}
+            """,
+            parameters={"p": project_id, "clips": missing_ids},
+        )
+        by_clip.update(
+            {
+                str(row[0]): {
+                    "clip_id": str(row[0]),
+                    "take_no": int(row[1]),
+                    "duration_s": float(row[2]),
+                }
+                for row in source_rows.result_rows
+            }
+        )
+    prepared: list[dict] = []
+    for position, requested in enumerate(body.segments):
+        clip_id = str(requested.clip_id)
+        take = by_clip.get(clip_id)
+        if take is None:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, "A selected clip is not a take of this shot."
+            )
+        duration = float(take.get("duration_s", 0) or 0)
+        if requested.source_out_s <= requested.source_in_s:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY, "Every selection needs a positive range."
+            )
+        if duration and requested.source_out_s > duration + 0.05:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY, "A selection ends after its source clip."
+            )
+        prepared.append(
+            {
+                "segment_id": str(requested.segment_id or UUID(int=0))
+                if requested.segment_id
+                else uuid4().hex,
+                "clip_id": clip_id,
+                "take_no": int(take.get("take_no", 0) or 0),
+                "source_in_s": round(requested.source_in_s, 3),
+                "source_out_s": round(requested.source_out_s, 3),
+                "position": position,
+                "reason": body.reason,
+                "created_by": principal.email or "",
+            }
+        )
+
+    committed = await selections.commit_coverage(
+        project_id,
+        group_id,
+        subgroup_id,
+        segments=prepared,
+        reason=body.reason,
+        actor=principal.email or "",
+        expected_rev=body.rev,
+    )
+    try:
+        await selections.deliver(committed.event_id)
+    except Exception:
+        log.exception("coverage saved; event %s remains pending", committed.event_id)
+    result = {
+        "project_id": project_id,
+        "scene": group_id,
+        "shot": subgroup_id,
+        "rev": committed.rev,
+        "segments": prepared,
+    }
+    await revisions.remember(idempotency_key or "", principal.email or "", result)
+    return result
 
 
 @router.post(

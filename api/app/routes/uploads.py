@@ -104,6 +104,7 @@ class IngestResolution(BaseModel):
     slug: str = Field(default="", max_length=80)
     description: str = Field(default="", max_length=500)
     note: str = Field(default="", max_length=200)
+    evidence_uri: str = Field(default="", max_length=2000)
 
 
 class CommitIngest(BaseModel):
@@ -358,6 +359,21 @@ async def job_status(
     }
 
 
+@router.post("/jobs/{job_id}/cancel")
+async def cancel_ingest(
+    job_id: UUID,
+    principal: Annotated[Principal, Depends(require_signed_in)],
+) -> dict[str, str]:
+    """Abandon an upload batch without deleting any bytes that already arrived."""
+    job = await jobs.get_job(job_id)
+    if job is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such ingest batch.")
+    await principal.assert_can_upload(job.project_id)
+    if job.state not in jobs.TERMINAL:
+        await jobs.abandon(job_id, "Cancelled by uploader")
+    return {"status": "cancelled", "job_id": str(job_id)}
+
+
 @router.post("/jobs/{job_id}/commit", status_code=status.HTTP_201_CREATED)
 async def commit_ingest(
     job_id: UUID,
@@ -420,6 +436,8 @@ async def commit_ingest(
             if decision.action == "unassign"
             else f"verified and placed in scene {scene} shot {shot}"
         )
+        if decision.evidence_uri:
+            detail = f"{detail}; selected slate evidence {decision.evidence_uri[-80:]}"
         if limits.takes_per_shot and scene and shot:
             key = (scene, shot)
             held = await quota.takes_in_shot(job.project_id, scene, shot)

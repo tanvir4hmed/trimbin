@@ -158,6 +158,17 @@ export function useChooseTake(projectId: number, scene: number, shot: number, re
   });
 }
 
+export function useSaveCoverage(projectId: number, scene: number, shot: number, rev: number) {
+  const invalidate = useShotInvalidation(projectId, scene, shot);
+  return useMutation({
+    mutationFn: (input: {
+      reason: string;
+      segments: { segment_id?: string; clip_id: string; source_in_s: number; source_out_s: number }[];
+    }) => api.saveCoverage(projectId, scene, shot, { ...input, rev }),
+    onSuccess: invalidate,
+  });
+}
+
 export function useUndo(projectId: number, scene: number, shot: number, rev: number) {
   const invalidate = useShotInvalidation(projectId, scene, shot);
   return useMutation({

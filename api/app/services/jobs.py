@@ -266,6 +266,7 @@ async def record_placement(
     slate_uri: str = "",
     confidence: float = 0.0,
     duplicate_of: str = "",
+    slate_candidates: list[str] | None = None,
 ) -> None:
     """Where one clip ended up, and whether that is where it was sent.
 
@@ -295,6 +296,7 @@ async def record_placement(
                             "slate_uri": slate_uri,
                             "confidence": round(float(confidence), 3),
                             "duplicate_of": duplicate_of,
+                            "slate_candidates": slate_candidates or [],
                             "verified": False,
                         }
                     ]

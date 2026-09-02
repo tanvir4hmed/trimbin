@@ -59,7 +59,7 @@ export default async function StatusPage() {
             projects, a shot screen with per-criterion reasoning and timecoded
             findings, timecoded comments, assignment and set status, the scene
             as a stringout, and EDL and marker export.{" "}
-            <Link href="/project/1">Open a project</Link>.
+            <Link href="/projects">Open a public project</Link>.
           </li>
           <li>
             <strong>The archive and its queries.</strong> ClickHouse with vector
@@ -90,13 +90,15 @@ export default async function StatusPage() {
             real rows and not the synthetic ones.
           </li>
           <li>
-            <strong>Frame rate.</strong> Exports declare it rather than measure
-            it — nothing in the archive records what the original was shot at.
+            <strong>Suggested Assembly.</strong> Trimbin provides ordered human
+            selects and a Coverage Reel, not an automatic multi-shot edit. It
+            stays out until editors explicitly approve that product boundary.
           </li>
           <li>
-            <strong>The panel window.</strong> Specialists watch the first
-            thirty seconds of each take. A continuity error at 0:58 of a 1:10
-            take will be missed.
+            <strong>Performance judgement.</strong> AI recommendations use
+            observable technical, continuity and completion evidence. Acting
+            and rhythm remain human reasons and are never presented as measured
+            facts.
           </li>
         </ul>
         <p className="dim small">

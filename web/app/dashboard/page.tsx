@@ -103,14 +103,11 @@ export default function DashboardPage() {
   const waiting = data.totals.waiting;
 
   return (
-    <main className="shell dash">
+    <main className="shell dash home-command">
       <div className="dash-top">
         <div>
-          <h1>Your work</h1>
-          <p className="dim">
-            {data.projects.length} project{data.projects.length === 1 ? "" : "s"}
-            {waiting > 0 && ` · ${waiting} shot${waiting === 1 ? "" : "s"} need you`}
-          </p>
+          <p className="eyebrow">EDITORIAL WORKSPACE</p><h1>Good morning</h1>
+          <p className="dim">Continue where you stopped, or open the next shot that needs a human decision.</p>
         </div>
         <div className="dash-actions">
           {waiting > 0 && (
@@ -133,8 +130,8 @@ export default function DashboardPage() {
           <p>Make one and drop a shoot folder into it.</p>
         </div>
       ) : (
-        <div className="pgrid">
-          {data.projects.map((p, i) => (
+        <><div className="home-section-head"><h2>Continue working</h2><Link href="/projects">View all projects →</Link></div><div className="pgrid home-projects">
+          {data.projects.slice(0, 3).map((p, i) => (
             <Link key={p.project_id} href={`/project/${p.project_id}`} className="pcard">
               <div className="pthumb" style={{ background: THUMBS[i % THUMBS.length] }}>
                 <span className="ptag">
@@ -169,37 +166,9 @@ export default function DashboardPage() {
               </div>
             </Link>
           ))}
-        </div>
+        </div></>
       )}
-
-      {data.activity.length > 0 && (
-        <section className="block">
-          <div className="sect">Activity</div>
-          <ul className="activity">
-            {data.activity.slice(0, 12).map((a, i) => (
-              <li key={i}>
-                <Link
-                  href={
-                    a.shot
-                      ? `/project/${a.project_id}?scene=${a.scene}&shot=${a.shot}`
-                      : `/project/${a.project_id}`
-                  }
-                >
-                  <span className="who">{a.actor.split("@")[0]}</span>{" "}
-                  <span className="what">{say(a.verb, a.quantity)}</span>{" "}
-                  <span className="where">
-                    {a.project_name}
-                    {a.scene ? ` · scene ${a.scene}` : ""}
-                    {a.shot ? `, shot ${a.shot}` : ""}
-                  </span>
-                  {a.detail && <span className="why">{a.detail}</span>}
-                </Link>
-                <span className="ago">{ago(a.at)}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <div className="home-lower"><section><div className="home-section-head"><h2>Needs your decision</h2><Link href="/review">View all {waiting} →</Link></div><div className="home-decisions">{data.queue.slice(0,4).map((item) => <Link key={`${item.project_id}-${item.scene}-${item.shot}`} href={`/project/${item.project_id}?scene=${item.scene}&shot=${item.shot}`}><span><b>{item.project_name}</b><small>Scene {item.scene} · {item.slug || `Shot ${item.shot}`}</small></span><span>{item.reason.replaceAll("_", " ")}<small>{item.takes} takes · {item.assignee ? `owner ${item.assignee.split("@")[0]}` : "unassigned"}</small></span><i>Review →</i></Link>)}</div></section><section><div className="home-section-head"><h2>Recent activity</h2><Link href="/activity">View all activity →</Link></div><ul className="activity home-activity">{data.activity.slice(0,4).map((a,i) => <li key={i}><Link href={a.shot ? `/project/${a.project_id}?scene=${a.scene}&shot=${a.shot}` : `/project/${a.project_id}`}><span className="who">{a.actor.split("@")[0]}</span> <span className="what">{say(a.verb,a.quantity)}</span><span className="where">{a.project_name}</span></Link><span className="ago">{ago(a.at)}</span></li>)}</ul></section></div>
     </main>
   );
 }

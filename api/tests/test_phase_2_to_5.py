@@ -11,7 +11,7 @@ from uuid import UUID
 
 import pytest
 
-from app.routes import ask, uploads
+from app.routes import ask, review, uploads
 from app.routes import projects as project_routes
 from app.services import analytics, jobs, search, stringout
 
@@ -52,6 +52,15 @@ def test_coverage_timeline_keeps_a_missing_shot_as_a_gap() -> None:
     assert timeline[1]["slug"] == "12B"
 
 
+def test_coverage_timeline_keeps_multiple_ordered_ranges_for_one_shot() -> None:
+    meta = {(12, 1): SimpleNamespace(shot=1, slug="12A")}
+    first = replace(entry(1), segment_id="a", position=0, start_s=2, end_s=7)
+    second = replace(entry(1), segment_id="b", position=1, start_s=18, end_s=21)
+    timeline = stringout.coverage_timeline(12, [second, first], meta)
+    assert [row["segment_id"] for row in timeline[0]["entries"]] == ["a", "b"]
+    assert timeline[0]["duration_s"] == 8
+
+
 def test_a_segment_match_at_zero_still_has_an_exact_playable_range() -> None:
     match = ask._as_match(
         {
@@ -75,6 +84,44 @@ def test_a_segment_match_at_zero_still_has_an_exact_playable_range() -> None:
     assert match.where.start_s == 0
     assert match.where.end_s == 8.5
     assert match.description == "The actor crosses to the window."
+
+
+@pytest.mark.asyncio
+async def test_source_picker_can_return_a_clip_from_another_shot(monkeypatch) -> None:
+    class Principal:
+        async def assert_can_read(self, project_id: int) -> None:
+            assert project_id == 7
+
+    class Archive:
+        async def query(self, sql, parameters):
+            assert "current_clip_placement" in sql
+            assert parameters["q"] == "window"
+            return SimpleNamespace(
+                result_rows=[
+                    [
+                        CLIP,
+                        12,
+                        3,
+                        4,
+                        70.0,
+                        "proxy",
+                        "sprite",
+                        "crosses window",
+                        "B",
+                        24.0,
+                        "12",
+                        "12C",
+                    ]
+                ]
+            )
+
+    async def archive():
+        return Archive()
+
+    monkeypatch.setattr(review, "client", archive)
+    rows = await review.project_sources(7, Principal(), q="window", limit=20)
+    assert rows[0]["shot"] == 3
+    assert rows[0]["clip_id"] == str(CLIP)
 
 
 @pytest.mark.asyncio
