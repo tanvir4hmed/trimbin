@@ -2335,11 +2335,23 @@ body{background:var(--bg);color:var(--ink)}
 /* ---------- issues, moved under the clock they belong to ----------
    The bar showing where the issues are and the list naming them used to sit in
    opposite columns, so only one could be read at a time. */
-.finding-list-panel{margin-top:16px;padding:14px;background:var(--cockpit-panel,#0c192a);border:1px solid var(--cockpit-line,#243750);border-radius:8px}
-.finding-list-panel>header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+/* Sits on the cockpit's own ground rather than a lighter panel — a pale slab
+   under the dark lanes read as a different application. Tabs per take, because
+   two takes' issues stacked already filled it. */
+.finding-list-panel{margin-top:14px;padding:0;background:transparent;border:0}
+.finding-list-panel>header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
 .finding-list-panel>header span{color:var(--cockpit-dim,#8ea2bb);font-size:11px}
 .finding-list-panel .finding-list h3{display:none}
 .finding-list-panel .finding-list button.open{background:#16304f;border-color:#3f6fa8}
+.finding-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;border-bottom:1px solid var(--cockpit-line,#243750)}
+.finding-tab{display:flex;gap:6px;align-items:center;padding:6px 11px;color:var(--cockpit-dim,#8ea2bb);background:transparent;border:0;border-bottom:2px solid transparent;font-size:11.5px}
+.finding-tab span{padding:1px 6px;background:#16283f;border-radius:20px;font-size:11px}
+.finding-tab:hover{color:var(--cockpit-text,#edf5ff)}
+.finding-tab.on{color:var(--cockpit-text,#edf5ff);border-bottom-color:#4c88ef}
+.finding-tab.on span{background:#26507f;color:#dceaff}
+/* Tighter rows: this list is scanned, not read. */
+.finding-list-panel .finding-list>button{padding:7px 8px}
+.finding-list-panel .finding-list>button small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* The finding that is currently open, marked in both places it appears. */
 .lane-finding.open{outline:2px solid #6fa2fa;outline-offset:1px;z-index:2}
@@ -2382,9 +2394,7 @@ body{background:var(--bg);color:var(--ink)}
 .node-take{padding:3px 9px;color:var(--low);background:var(--surface-2);border:1px solid var(--line);border-radius:20px;font-size:11px}
 .node-take:hover{color:var(--ink);border-color:var(--blue)}
 .node-take.on{color:#fff;background:#1c3b63;border-color:#4c88ef}
-.finding-take-group{margin-bottom:10px}
-.finding-take-group h4{display:flex;justify-content:space-between;margin:0 0 4px;color:var(--cockpit-dim,#8ea2bb);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
-.finding-take-group h4 span{color:var(--faint)}
+
 .rail-scene-search{width:100%;margin-bottom:7px;padding:7px 9px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:5px;font-size:11.5px}
 
 /* Uploaded but not placed. A count and a route, so a shoot day's worth of
@@ -2395,3 +2405,12 @@ body{background:var(--bg);color:var(--ink)}
 .placement-banner b{display:block;font-size:12px}
 .placement-banner small{color:#c9b07a;font-size:11px}
 .placement-banner i{margin-left:auto;font-style:normal;font-size:11px;white-space:nowrap}
+
+/* One choice drives the stage: the take under review, and the take before it. */
+.compare-hint{color:var(--cockpit-dim,#8ea2bb);font-size:11px}
+.compare-player.active{outline:2px solid #4c88ef;outline-offset:-2px;border-radius:8px}
+
+/* An empty column beside a full one looked like a panel that failed to load. */
+.home-empty{display:grid;gap:4px;align-content:center;justify-items:start;min-height:120px;padding:16px;background:var(--surface);border:1px dashed var(--line);border-radius:8px}
+.home-empty b{font-size:12.5px}
+.home-empty small{color:var(--low);font-size:11.5px}

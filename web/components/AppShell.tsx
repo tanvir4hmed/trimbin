@@ -64,7 +64,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <p className="eyebrow">ACCOUNT</p>
             <label>Name<input value={identity.name} readOnly /></label>
             <label>Email<input value={identity.email} readOnly /></label>
-            <p className="policy-note">Your name and address come from the sign-in you used. Editing them is not built yet.</p>
+            {/* Deliberately inert. The field is here so the shape of the screen
+                is honest about what will live on it; changing a password is not
+                built, and a control that looks live and does nothing is worse
+                than one that says so. */}
+            <label>New password<input type="password" value="" placeholder="Not available yet" disabled readOnly /></label>
+            <p className="policy-note">Your name and address come from the sign-in you used. Changing them, and setting a password, are not built yet.</p>
             <button className="ghost small" onClick={() => { signOut(); setIdentity(null); router.push("/"); }}>Sign out</button>
           </div>}
           <button className="app-user" onClick={() => setSettingsOpen((open) => !open)} title="Account and settings" aria-expanded={settingsOpen}>

@@ -95,8 +95,6 @@ export default function ShotReviewCockpit({
     ? takes.find((take) => take.clip_id === verdicts?.recommended) ?? takes[0]
     : undefined;
   const [aId, setAId] = useState("");
-  const [bId, setBId] = useState("");
-  const [activeSide, setActiveSide] = useState<"a" | "b">("a");
   const [focus, setFocus] = useState<Focus | null>(null);
   const [range, setRange] = useState<Range>({ from: 0, to: 0 });
   const [reason, setReason] = useState<string>("better performance");
@@ -114,25 +112,31 @@ export default function ShotReviewCockpit({
 
   useEffect(() => {
     if (!takes.length) return;
-    setAId((current) => current || recommended?.clip_id || takes[0].clip_id);
-    setBId((current) => {
-      if (current) return current;
-      const a = recommended?.clip_id || takes[0].clip_id;
-      return takes.find((take) => take.clip_id !== a)?.clip_id || takes[0].clip_id;
-    });
+    // Open on the recommended take when there is one, otherwise the last take
+    // shot — which is the one an editor is usually coming to look at.
+    setAId((current) => current || recommended?.clip_id || takes[takes.length - 1].clip_id);
   }, [takes, recommended]);
 
   useEffect(() => {
     if (!initialClipId || !takes.some((take) => take.clip_id === initialClipId)) return;
     setAId(initialClipId);
-    setActiveSide("a");
     const timer = window.setTimeout(() => playerA.current?.seek(initialAt, true), 350);
     return () => window.clearTimeout(timer);
   }, [initialAt, initialClipId, takes]);
 
-  const a = takes.find((take) => take.clip_id === aId) ?? takes[0];
-  const b = takes.find((take) => take.clip_id === bId) ?? takes[1] ?? takes[0];
-  const selected = activeSide === "a" ? a : b;
+  // One number decides the stage. `chosen` is the take being reviewed and
+  // `previous` is the one before it, which is what it gets compared against.
+  const chosenTakeNo = takes.find((take) => take.clip_id === aId)?.take_no ?? takes[0]?.take_no ?? 0;
+  const chosen = takes.find((take) => take.take_no === chosenTakeNo) ?? takes[0];
+  const chosenIndex = takes.findIndex((take) => take.take_no === chosenTakeNo);
+  const previous = chosenIndex > 0 ? takes[chosenIndex - 1] : undefined;
+  const chooseTake = (takeNo: number) => {
+    const wanted = takes.find((take) => take.take_no === takeNo);
+    if (wanted) setAId(wanted.clip_id);
+  };
+  const a = previous ?? chosen;
+  const b = chosen;
+  const selected = chosen;
   const selectedAnalysis = selected ? analysisFor(analyses, selected.clip_id) : undefined;
   // The brief's revision, which is the shot document's revision — the same one
   // `commit_coverage` checks. `verdicts.rev` is a copy of it and is null when
@@ -203,6 +207,11 @@ export default function ShotReviewCockpit({
     selectPlayer.current?.seek(segment.source_in_s, true);
   }, [selectPreviewIndex, selects]);
 
+  const [issueTab, setIssueTab] = useState(0);
+  useEffect(() => {
+    if (chosenTakeNo) setIssueTab(chosenTakeNo);
+  }, [chosenTakeNo]);
+
   const stageOf = (clipId: string) => screen.data?.analysis_state?.[clipId] ?? "";
 
   // A take picked in the rail opens on the A side, swapping B out of the way
@@ -210,11 +219,8 @@ export default function ShotReviewCockpit({
   useEffect(() => {
     if (!focusTake) return;
     const wanted = takes.find((take) => take.take_no === focusTake);
-    if (!wanted || wanted.clip_id === aId) return;
-    if (wanted.clip_id === bId) setBId(aId);
-    setAId(wanted.clip_id);
-    setActiveSide("a");
-  }, [focusTake, takes, aId, bId]);
+    if (wanted) setAId(wanted.clip_id);
+  }, [focusTake, takes]);
 
   const activePlayer = (clipId: string) => (clipId === a?.clip_id ? playerA.current : playerB.current);
   const inspect = (clipId: string, finding: FindingEvent) => {
@@ -227,8 +233,9 @@ export default function ShotReviewCockpit({
       return;
     }
     setFocus({ clipId, finding });
-    if (clipId === a?.clip_id) setActiveSide("a");
-    else if (clipId === b?.clip_id) setActiveSide("b");
+    // Opening a finding brings its take to the front of the stage.
+    const owner = takes.find((take) => take.clip_id === clipId);
+    if (owner) setAId(owner.clip_id);
     activePlayer(clipId)?.seek(finding.start_s, true);
   };
 
@@ -339,28 +346,39 @@ export default function ShotReviewCockpit({
         {/* A comparison needs two takes. With one, the A/B chooser offered the
             same clip on both sides and the stage drew it twice — two identical
             videos side by side, each half the width it deserved. */}
-        {takes.length > 1 && <div className="compare-toolbar" aria-label="A B comparison">
-          <label>A<select value={a?.clip_id} onChange={(event) => { const next = event.target.value; if (next === bId) setBId(aId); setAId(next); setActiveSide("a"); }}>
-            {takes.map((take) => <option key={take.clip_id} value={take.clip_id}>Take {take.take_no}</option>)}
-          </select></label>
-          <button className={activeSide === "a" ? "compare-side on" : "compare-side"} onClick={() => setActiveSide("a")}>Listen to A</button>
-          <span className="compare-vs">A / B</span>
-          <button className={activeSide === "b" ? "compare-side on" : "compare-side"} onClick={() => setActiveSide("b")}>Listen to B</button>
-          <label>B<select value={b?.clip_id} onChange={(event) => { const next = event.target.value; if (next === aId) setAId(bId); setBId(next); setActiveSide("b"); }}>
-            {takes.map((take) => <option key={take.clip_id} value={take.clip_id}>Take {take.take_no}</option>)}
-          </select></label>
+        {takes.length > 1 && <div className="compare-toolbar" aria-label="Which take">
+          {/* One choice, not two. Two independent A/B pickers meant the pair
+              could hold the same take, or a pair nobody meant to compare; and
+              which box below was "selected" answered neither. Choosing take N
+              shows take N with the take before it, which is the comparison an
+              editor actually makes. */}
+          <span className="compare-vs">Comparing</span>
+          {takes.map((take) => (
+            <button
+              key={take.clip_id}
+              className={take.take_no === chosenTakeNo ? "compare-side on" : "compare-side"}
+              aria-current={take.take_no === chosenTakeNo ? "true" : undefined}
+              onClick={() => chooseTake(take.take_no)}
+            >
+              Take {take.take_no}
+            </button>
+          ))}
+          {previous && <span className="compare-hint">with take {previous.take_no}</span>}
         </div>}
 
-        <div className={takes.length > 1 ? "compare-players" : "compare-players single"}>
-          {(takes.length > 1
-            ? [{ side: "a" as const, take: a, ref: playerA }, { side: "b" as const, take: b, ref: playerB }]
-            : [{ side: "a" as const, take: a, ref: playerA }]
+        <div className={previous ? "compare-players" : "compare-players single"}>
+          {/* Take 1 stands alone — there is nothing before it to compare
+              against. Every later take sits on the right with its predecessor
+              on the left, which is the direction a shoot runs in. */}
+          {(previous
+            ? [{ side: "a" as const, take: previous, ref: playerA }, { side: "b" as const, take: chosen, ref: playerB }]
+            : [{ side: "a" as const, take: chosen, ref: playerA }]
           ).map(({ side, take, ref }) => take && (
-            <div key={side} className={activeSide === side ? "compare-player active" : "compare-player"} onClick={() => setActiveSide(side)}>
-              <span className="player-badge">{takes.length > 1 ? `${side.toUpperCase()} · ` : ""}TAKE {take.take_no}</span>
+            <div key={side} className={take.take_no === chosenTakeNo ? "compare-player active" : "compare-player"} onClick={() => chooseTake(take.take_no)}>
+              <span className="player-badge">TAKE {take.take_no}{take.take_no === chosenTakeNo && previous ? " · chosen" : ""}</span>
               <Player ref={ref} className="player" src={take.proxy_uri} poster={take.sprite_uri} onTimeUpdate={(at) => {
                 setPlayheads((current) => ({ ...current, [take.clip_id]: at }));
-                if (activeSide === side) setCommentAt((old) => old && old.clipId === take.clip_id ? { ...old, at } : old);
+                if (take.take_no === chosenTakeNo) setCommentAt((old) => old && old.clipId === take.clip_id ? { ...old, at } : old);
               }} />
             </div>
           ))}
@@ -371,7 +389,7 @@ export default function ShotReviewCockpit({
             const analysis = analysisFor(analyses, take.clip_id);
             const issueCount = analysis?.findings.length ?? take.findings.length;
             const stage = stageOf(take.clip_id);
-            return <button key={take.clip_id} className={selected?.clip_id === take.clip_id ? "take-card selected" : "take-card"} onClick={() => { if (take.clip_id === a?.clip_id) setActiveSide("a"); else if (take.clip_id === b?.clip_id) setActiveSide("b"); else { if (take.clip_id === aId) setAId(bId); setBId(take.clip_id); setActiveSide("b"); } }}>
+            return <button key={take.clip_id} className={take.take_no === chosenTakeNo ? "take-card selected" : "take-card"} onClick={() => chooseTake(take.take_no)}>
               <span className="take-card-no">Take {take.take_no}</span>
               <span className="take-badges"><b>PROXY</b><b>{take.fps ? `${Math.round(take.fps)} FPS` : "FPS UNMEASURED"}</b></span>
               <span className="take-score">{compared ? <>{Math.round(take.score * 100)} <small>technical</small></> : <small>not compared</small>}</span>
@@ -389,7 +407,7 @@ export default function ShotReviewCockpit({
             const findings = analysis?.findings ?? [];
             const safe = analysis?.safe_ranges ?? take.safe_ranges;
             return <div className={selected?.clip_id === take.clip_id ? "issue-lane selected" : "issue-lane"} key={take.clip_id}>
-              <button className="lane-label" onClick={() => { if (take.clip_id === aId) setAId(bId); setBId(take.clip_id); setActiveSide("b"); }}>T{take.take_no}<small>{tc(take.duration_s)}</small></button>
+              <button className="lane-label" onClick={() => chooseTake(take.take_no)}>T{take.take_no}<small>{tc(take.duration_s)}</small></button>
               <div className="lane-track">
                 <span className="lane-empty" style={{ width: pct(take.duration_s) }} />
                 {safe.map((item, index) => <button key={`safe-${index}`} className="lane-safe" style={{ left: pct(item.start_s), width: pct(item.end_s - item.start_s) }} onClick={() => activePlayer(take.clip_id)?.seek(item.start_s, true)} title={`Clean ${tc(item.start_s)}–${tc(item.end_s)}`} />)}
@@ -405,14 +423,30 @@ export default function ShotReviewCockpit({
             read at a time. */}
         <section className="finding-list-panel">
           <header><p className="eyebrow">ISSUES ON THIS SHOT</p><span>{openFindings.length} to verify</span></header>
-            <div className="finding-list">{takes.map((take) => {
-            const rows = openFindings.filter(({ analysis }) => String(analysis.clip_id) === take.clip_id);
-            if (!rows.length) return null;
-            return <div className="finding-take-group" key={take.clip_id}>
-              <h4>Take {take.take_no}<span>{rows.length} issue{rows.length === 1 ? "" : "s"}</span></h4>
-              {rows.map(({ analysis, finding }) => <button key={String(finding.finding_id)} className={focus && String(focus.finding.finding_id) === String(finding.finding_id) ? "open" : ""} onClick={() => inspect(String(analysis.clip_id), finding)}><span className={`finding-dot severity-${finding.severity}`} /><span><b>{tc(finding.start_s)}–{tc(finding.end_s)} {label(finding.code)}</b><small>{finding.detail}</small></span><i>›</i></button>)}
-            </div>;
-          })}{!openFindings.length && <p className="empty-panel">No issues found yet.</p>}</div>
+            <div className="finding-list">
+            {/* Tabs per take rather than every take's issues stacked. Two takes
+                already filled the panel; six would have been a page of its own. */}
+            <div className="finding-tabs" role="tablist">
+              {takes.map((take) => {
+                const count = openFindings.filter(({ analysis }) => String(analysis.clip_id) === take.clip_id).length;
+                return <button
+                  key={take.clip_id}
+                  role="tab"
+                  aria-selected={take.take_no === issueTab}
+                  className={take.take_no === issueTab ? "finding-tab on" : "finding-tab"}
+                  onClick={() => setIssueTab(take.take_no)}
+                >Take {take.take_no}<span>{count}</span></button>;
+              })}
+            </div>
+            {(() => {
+              const rows = openFindings.filter(({ analysis }) => {
+                const take = takes.find((t) => t.clip_id === String(analysis.clip_id));
+                return take?.take_no === issueTab;
+              });
+              if (!rows.length) return <p className="empty-panel">No issues on take {issueTab}.</p>;
+              return rows.map(({ analysis, finding }) => <button key={String(finding.finding_id)} className={focus && String(focus.finding.finding_id) === String(finding.finding_id) ? "open" : ""} onClick={() => inspect(String(analysis.clip_id), finding)}><span className={`finding-dot severity-${finding.severity}`} /><span><b>{tc(finding.start_s)}–{tc(finding.end_s)} {label(finding.code)}</b><small>{finding.detail}</small></span><i>›</i></button>);
+            })()}
+          </div>
         </section>
       </section>
 
