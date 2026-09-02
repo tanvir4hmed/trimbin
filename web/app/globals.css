@@ -2314,8 +2314,11 @@ body{background:var(--bg);color:var(--ink)}
 
 /* One take is one player, at full width. The A/B stage drew the same clip on
    both sides when there was nothing to compare against. */
-.compare-players.single{grid-template-columns:1fr}
-.compare-players.single .compare-player{max-width:900px;margin:auto}
+/* One pane keeps a pane's width. Letting it fill the row meant take 1 played
+   at twice the size of every other take, which read as take 1 being special
+   rather than as take 1 having nothing before it to sit beside. */
+.compare-players.single{grid-template-columns:1fr 1fr}
+.compare-players.single .compare-player{grid-column:1}
 
 /* The note composer, folded. It used to sit open at the bottom of the
    inspector — anchor line, textarea and button — taking the same room whether
@@ -2438,3 +2441,16 @@ body{background:var(--bg);color:var(--ink)}
 /* The scene in the crumb is a choice, and there is a way back out of a shot. */
 .crumb-scene select{padding:4px 7px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:5px;font-size:11.5px}
 .crumb-close{margin-left:10px;font-size:11px}
+
+/* Scenes as rows. A production is stepped through a scene at a time — the unit
+   people actually talk in — rather than shown as every shot at once. */
+.scene-rows{display:grid;gap:8px}
+.scene-row{display:grid;grid-template-columns:1fr auto auto auto;gap:16px;align-items:center;padding:13px 16px;background:var(--surface);border:1px solid var(--line);border-radius:9px;color:var(--ink);text-decoration:none}
+.scene-row:hover{border-color:var(--blue)}
+.scene-row-name .eyebrow{margin:0 0 2px}
+.scene-row-name b{font-size:14px}
+.scene-row-meta{color:var(--low);font-size:11.5px}
+.scene-row-waiting{padding:3px 9px;border:1px solid var(--line);border-radius:20px;color:var(--faint);font-size:11px}
+.scene-row-waiting.on{color:var(--amber);border-color:rgba(242,182,77,.4)}
+.scene-row i{color:var(--faint);font-style:normal}
+@media(max-width:700px){.scene-row{grid-template-columns:1fr auto}.scene-row-meta{grid-column:1/-1}}

@@ -323,6 +323,19 @@ export default function ShotReviewCockpit({
   // compared against.
   if (!takes.length) return <div className="cockpit-state"><div><p>No footage has been placed in this shot yet.</p><p className="policy-note">Upload takes, or move a clip here from the placement inbox.</p></div></div>;
 
+  // The shot's standing decision, in one phrase.
+  //
+  // A shot used to have one winning take, so "Take 4" said everything. Ranges
+  // from several takes have no single winner, and calling that "Take 4"
+  // because take 4 happened to be first would be a lie about what plays.
+  const standing = useMemo(() => {
+    if (!selects.length) return "";
+    const used = Array.from(new Set(selects.map((item) => item.take_no))).sort((x, y) => x - y);
+    const ranges = `${selects.length} range${selects.length === 1 ? "" : "s"}`;
+    if (used.length === 1) return `Take ${used[0]} · ${ranges}`;
+    return `Custom · ${ranges} from take${used.length === 1 ? "" : "s"} ${used.join(", ")}`;
+  }, [selects]);
+
   const humanChoiceRecorded = (verdicts?.rev ?? 0) > 0 || selects.length > 0 || takes.some(
     (take) => take.outcome === "selected" && take.decided_by === "human",
   );
@@ -339,7 +352,7 @@ export default function ShotReviewCockpit({
           <div className="cockpit-summary">
             <span>{takes.length} takes</span>
             <span>{analyses.filter((item) => item.coverage_complete).length}/{takes.length} fully analysed</span>
-            <span className={humanChoiceRecorded ? "live-dot complete" : "live-dot"}>{humanChoiceRecorded ? "Human choice recorded" : "Human decision required"}</span>
+            <span className={humanChoiceRecorded ? "live-dot complete" : "live-dot"} title={standing || undefined}>{standing || "No take chosen yet"}</span>
           </div>
         </header>
 

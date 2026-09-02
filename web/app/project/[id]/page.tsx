@@ -39,6 +39,7 @@ export default function ProjectPage({
   // Which scene the rail is showing. 0 is every scene, which is right for a
   // three-scene project and wrong for a thirty-scene one — so it is a choice
   // rather than a fixed answer.
+  const urlScene = Number(search.get("scene")) || 0;
   const [railScene, setRailScene] = useState(0);
   const [sceneQuery, setSceneQuery] = useState("");
   const [railTake, setRailTake] = useState(0);
@@ -107,11 +108,11 @@ export default function ProjectPage({
   // The rail's scenes, narrowed to one when a scene is chosen. The tree keeps
   // every shot of it; narrowing the column is about finding a scene quickly,
   // not about hiding work.
-  const railScenes = useMemo(
-    () =>
-      !tree ? [] : railScene ? tree.scenes.filter((s) => s.scene === railScene) : tree.scenes,
-    [tree, railScene],
-  );
+  const railScenes = useMemo(() => {
+    if (!tree) return [];
+    const wanted = railScene || urlScene;
+    return wanted ? tree.scenes.filter((s) => s.scene === wanted) : tree.scenes;
+  }, [tree, railScene, urlScene]);
 
   // Scenes matching what was typed, by number or by slugline.
   const searchedScenes = useMemo(() => {
@@ -180,7 +181,7 @@ export default function ProjectPage({
             <small>project</small>
             {project?.name ?? `Project ${projectId}`}
           </Link>
-          {open && (
+          {(open || urlScene) && (
             <>
               <span aria-hidden>›</span>
               {/* The scene is a choice, not a label. With one scene it read as
@@ -189,11 +190,13 @@ export default function ProjectPage({
               <label className="crumb-scene">
                 <select
                   aria-label="Scene"
-                  value={open.scene}
+                  value={open?.scene ?? urlScene}
                   onChange={(event) => {
-                    const scene = Number(event.target.value);
-                    const first = tree.scenes.find((s) => s.scene === scene)?.shots[0];
-                    if (first) setSelected({ scene, shot: first.shot });
+                    // Changing scene lands on the scene, not on a shot inside
+                    // it that nobody picked.
+                    setSelected(null);
+                    setRailTake(0);
+                    router.push(`/project/${projectId}?scene=${event.target.value}`);
                   }}
                 >
                   {tree.scenes.map((scene) => (
@@ -204,17 +207,25 @@ export default function ProjectPage({
                   ))}
                 </select>
               </label>
-              <span aria-hidden>›</span>
-              <span className="crumb-shot">{openShot?.slug || `Shot ${open.shot}`}</span>
-              {/* Out of the shot and back to the production, which otherwise
-                  needed the browser's back button. */}
-              <button
-                type="button"
-                className="linkish crumb-close"
-                onClick={() => { setSelected(null); router.push(`/project/${projectId}`); }}
-              >
-                close shot
-              </button>
+              {open && (
+                <>
+                  <span aria-hidden>›</span>
+                  <span className="crumb-shot">{openShot?.slug || `Shot ${open.shot}`}</span>
+                  {/* Back to the scene, which otherwise needed the browser's
+                      back button. */}
+                  <button
+                    type="button"
+                    className="linkish crumb-close"
+                    onClick={() => {
+                      setSelected(null);
+                      setRailTake(0);
+                      router.push(`/project/${projectId}?scene=${open.scene}`);
+                    }}
+                  >
+                    close shot
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>
@@ -322,14 +333,14 @@ export default function ProjectPage({
           )}
           {!filtered && canCurate && <Link className="primary" href={`/project/${projectId}/ingest`}>Add scenes, shots &amp; footage</Link>}
         </div>
-      ) : !open ? (
-        // Arriving at the production: its scenes, its shots, and a way into any
-        // of them. The rail and the cockpit appear once a shot is chosen.
+      ) : !open && !urlScene ? (
+        // The production: its scenes. A scene is the unit people talk in.
         <ProjectOverview
           projectId={projectId}
           scenes={tree.scenes}
           headings={headings}
           canCurate={canCurate}
+          scene={0}
         />
       ) : (
         <div className="workspace-split">
@@ -405,7 +416,13 @@ export default function ProjectPage({
                 focusTake={railTake}
               />
             ) : (
-              <p className="hint">Choose a shot.</p>
+              <ProjectOverview
+                projectId={projectId}
+                scenes={tree.scenes}
+                headings={headings}
+                canCurate={canCurate}
+                scene={urlScene}
+              />
             )}
           </section>
         </div>
