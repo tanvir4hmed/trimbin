@@ -30,9 +30,11 @@ const Player = forwardRef<
     onTimeUpdate?: (t: number) => void;
     onEnded?: () => void;
     onReady?: () => void;
+    /** Shown instead of the video when there is no source. Say why. */
+    emptyLabel?: string;
   }
 >(function Player(
-  { src, poster, className, onTimeUpdate, onEnded, onReady },
+  { src, poster, className, onTimeUpdate, onEnded, onReady, emptyLabel },
   ref,
 ) {
   const video = useRef<HTMLVideoElement>(null);
@@ -123,7 +125,11 @@ const Player = forwardRef<
         onTimeUpdate={(e) => onTimeUpdate?.(e.currentTarget.currentTime)}
         onEnded={onEnded}
       />
-      {!src && <p className="hint small">Proxy is still processing. Playback will appear when it is ready.</p>}
+      {/* No source is not the same as a source that is not ready yet. The scene
+          reel passes an empty src when no range has been chosen for a shot, and
+          this blamed the encoder for a decision nobody had made. The caller
+          says which it is; the honest default is neither. */}
+      {!src && <p className="hint small">{emptyLabel ?? "Nothing to play here yet."}</p>}
       {failed && <p className="hint small player-error">{failure || "This clip could not be played."} <button type="button" onClick={() => setRetry((value) => value + 1)}>Retry playback</button></p>}
     </>
   );

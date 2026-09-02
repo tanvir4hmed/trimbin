@@ -1785,6 +1785,13 @@ select {
    Shot review cockpit — the operational surface, not a marketing page.
    -------------------------------------------------------------------------- */
 
+/* The cockpit is measured against the space it is actually given, not the
+   viewport. At 1440px the shell sidebar takes 216 and the scene rail another
+   260, so a 640px minimum on the main column overflowed the inspector off the
+   right edge — the range inputs and "0 ranges" were sliced in half. A viewport
+   media query cannot see that; a container query can. */
+.pane { container-type: inline-size; }
+
 .shot-cockpit {
   --cockpit-bg: #07111f;
   --cockpit-panel: #0c192a;
@@ -1796,7 +1803,7 @@ select {
   --cockpit-cyan: #56d7e5;
   --cockpit-amber: #f5b74b;
   display: grid;
-  grid-template-columns: minmax(640px, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
   min-height: 760px;
   color: var(--cockpit-text);
   background: var(--cockpit-bg);
@@ -1889,6 +1896,11 @@ select {
 .cockpit-notice { padding: 9px; background: #142c39; border-radius: 5px; color: #aee7d5; font-size: 10px; }
 .cockpit-inspector .comments { margin-top: 22px; border-top: 1px solid var(--cockpit-line); padding-top: 16px; }.cockpit-inspector .comments h3 { color: var(--cockpit-text); }.cockpit-inspector .comment-list { padding: 0; }.cockpit-inspector textarea { width: 100%; color: var(--cockpit-text); background: #091524; border-color: var(--cockpit-line); }
 .cockpit-state { min-height: 480px; display: grid; place-items: center; background: #07111f; color: #93a9c2; }
+
+@container (max-width: 1000px) {
+  .shot-cockpit { grid-template-columns: 1fr; }
+  .cockpit-inspector { border-left: 0; border-top: 1px solid var(--cockpit-line); }
+}
 
 @media (max-width: 1180px) {
   .shot-cockpit { grid-template-columns: 1fr; }
@@ -2298,3 +2310,8 @@ body{background:var(--bg);color:var(--ink)}
 .public-bar nav a[aria-current="page"]{color:#fff;background:#142b49}
 .public-scroll{min-width:0;overflow:auto;overscroll-behavior:contain}
 @media(max-width:700px){.public-bar{gap:10px;padding:0 12px}.public-bar nav{gap:0}.public-bar nav a{padding:7px 6px;font-size:10px}}
+
+/* One take is one player, at full width. The A/B stage drew the same clip on
+   both sides when there was nothing to compare against. */
+.compare-players.single{grid-template-columns:1fr}
+.compare-players.single .compare-player{max-width:900px;margin:auto}

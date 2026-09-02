@@ -56,10 +56,16 @@ export default function SceneTree({
     );
   }
 
+  // A shot nobody has chosen a take for is unfinished, whatever its comparison
+  // status says. `too_few_takes` was excluded, so a shot holding one clip and
+  // no selection read as "Everything is decided" in this column while the
+  // cockpit beside it said "Human decision required" and the scene page said
+  // one shot needed a decision. Three surfaces, three answers, one shot.
   const waiting = scenes
     .flatMap((s) => s.shots)
     .filter(
       (s) =>
+        s.chosen_take === 0 ||
         s.status === "needs_review" ||
         s.status === "not_judged" ||
         s.status === "differs_from_circle",

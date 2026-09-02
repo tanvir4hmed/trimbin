@@ -252,7 +252,10 @@ export default function ShotReviewCockpit({
           </div>
         </header>
 
-        <div className="compare-toolbar" aria-label="A B comparison">
+        {/* A comparison needs two takes. With one, the A/B chooser offered the
+            same clip on both sides and the stage drew it twice — two identical
+            videos side by side, each half the width it deserved. */}
+        {takes.length > 1 && <div className="compare-toolbar" aria-label="A B comparison">
           <label>A<select value={a?.clip_id} onChange={(event) => { setAId(event.target.value); setActiveSide("a"); }}>
             {takes.map((take) => <option key={take.clip_id} value={take.clip_id}>Take {take.take_no}</option>)}
           </select></label>
@@ -262,12 +265,15 @@ export default function ShotReviewCockpit({
           <label>B<select value={b?.clip_id} onChange={(event) => { setBId(event.target.value); setActiveSide("b"); }}>
             {takes.map((take) => <option key={take.clip_id} value={take.clip_id}>Take {take.take_no}</option>)}
           </select></label>
-        </div>
+        </div>}
 
-        <div className="compare-players">
-          {[{ side: "a" as const, take: a, ref: playerA }, { side: "b" as const, take: b, ref: playerB }].map(({ side, take, ref }) => take && (
+        <div className={takes.length > 1 ? "compare-players" : "compare-players single"}>
+          {(takes.length > 1
+            ? [{ side: "a" as const, take: a, ref: playerA }, { side: "b" as const, take: b, ref: playerB }]
+            : [{ side: "a" as const, take: a, ref: playerA }]
+          ).map(({ side, take, ref }) => take && (
             <div key={side} className={activeSide === side ? "compare-player active" : "compare-player"} onClick={() => setActiveSide(side)}>
-              <span className="player-badge">{side.toUpperCase()} · TAKE {take.take_no}</span>
+              <span className="player-badge">{takes.length > 1 ? `${side.toUpperCase()} · ` : ""}TAKE {take.take_no}</span>
               <Player ref={ref} className="player" src={take.proxy_uri} poster={take.sprite_uri} onTimeUpdate={(at) => {
                 setPlayheads((current) => ({ ...current, [take.clip_id]: at }));
                 if (activeSide === side) setCommentAt((old) => old && old.clipId === take.clip_id ? { ...old, at } : old);
