@@ -112,7 +112,11 @@ export default function ShotReviewCockpit({
   useEffect(() => {
     if (!takes.length) return;
     setAId((current) => current || recommended?.clip_id || takes[0].clip_id);
-    setBId((current) => current || takes.find((take) => take.clip_id !== recommended?.clip_id)?.clip_id || takes[0].clip_id);
+    setBId((current) => {
+      if (current) return current;
+      const a = recommended?.clip_id || takes[0].clip_id;
+      return takes.find((take) => take.clip_id !== a)?.clip_id || takes[0].clip_id;
+    });
   }, [takes, recommended]);
 
   useEffect(() => {
@@ -356,7 +360,7 @@ export default function ShotReviewCockpit({
             return <button key={take.clip_id} className={selected?.clip_id === take.clip_id ? "take-card selected" : "take-card"} onClick={() => { if (take.clip_id === a?.clip_id) setActiveSide("a"); else if (take.clip_id === b?.clip_id) setActiveSide("b"); else { setBId(take.clip_id); setActiveSide("b"); } }}>
               <span className="take-card-no">Take {take.take_no}</span>
               <span className="take-badges"><b>PROXY</b><b>{take.fps ? `${Math.round(take.fps)} FPS` : "FPS UNMEASURED"}</b></span>
-              <span className="take-score">{compared ? <>{Math.round(take.score * 100)} <small>technical</small></> : <small>{stageLabel(stageOf(take.clip_id))}</small>}</span>
+              <span className="take-score">{compared ? <>{Math.round(take.score * 100)} <small>technical</small></> : <small>not compared</small>}</span>
               {/* "Clean" and "not looked at yet" drew identically. */}
               <span className={issueCount ? "issue-count" : stage === "completed" ? "issue-count clean" : "issue-count pending"}>{issueCount ? `${issueCount} issue${issueCount === 1 ? "" : "s"}` : stage === "completed" ? "clean" : stageLabel(stage)}</span>
             </button>;
