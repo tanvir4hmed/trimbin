@@ -2331,3 +2331,22 @@ body{background:var(--bg);color:var(--ink)}
 .plan-takes{margin-left:auto;padding:2px 7px;border:1px solid var(--line);border-radius:20px;color:var(--low);font-size:10px}
 .plan-add{align-items:center}
 .plan-add-label{color:var(--faint);font-size:10px;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+
+/* ---------- issues, moved under the clock they belong to ----------
+   The bar showing where the issues are and the list naming them used to sit in
+   opposite columns, so only one could be read at a time. */
+.finding-list-panel{margin-top:16px;padding:14px;background:var(--cockpit-panel,#0c192a);border:1px solid var(--cockpit-line,#243750);border-radius:8px}
+.finding-list-panel>header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.finding-list-panel>header span{color:var(--cockpit-dim,#8ea2bb);font-size:10px}
+.finding-list-panel .finding-list h3{display:none}
+.finding-list-panel .finding-list button.open{background:#16304f;border-color:#3f6fa8}
+
+/* The finding that is currently open, marked in both places it appears. */
+.lane-finding.open{outline:2px solid #6fa2fa;outline-offset:1px;z-index:2}
+
+/* A way out. Opening a finding replaced the whole column and nothing closed
+   it — not the shot, not Escape, not the issue itself. */
+.finding-inspector{padding:12px;margin-bottom:14px;background:#0d1f34;border:1px solid #35577f;border-radius:8px}
+.finding-inspector-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px}
+.finding-close{padding:4px 9px;color:#cfe0f3;background:#17324f;border:1px solid #3a5f8a;border-radius:5px;font-size:10px}
+.finding-close:hover{background:#1e4066;color:#fff}

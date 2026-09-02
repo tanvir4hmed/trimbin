@@ -149,8 +149,33 @@ export default function ShotReviewCockpit({
     setSelects((screen.data?.coverage_segments ?? []).map((item, position) => ({ ...item, position })));
   }, [screen.data?.coverage_segments]);
 
+  // Every open finding across every take, flattened once so the count in the
+  // header and the rows beneath it cannot disagree.
+  const openFindings = useMemo(
+    () => analyses.flatMap((analysis) => analysis.findings.map((finding) => ({ analysis, finding }))),
+    [analyses],
+  );
+
+  // Escape closes the finding. It was the first thing tried and did nothing.
+  useEffect(() => {
+    if (!focus) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setFocus(null); setAdjusting(false); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [focus]);
+
   const activePlayer = (clipId: string) => (clipId === a?.clip_id ? playerA.current : playerB.current);
   const inspect = (clipId: string, finding: FindingEvent) => {
+    // A second click on the finding already open closes it — the same gesture
+    // that opened it, which is what a person reaches for before they look for
+    // a button.
+    if (focus && String(focus.finding.finding_id) === String(finding.finding_id)) {
+      setFocus(null);
+      setAdjusting(false);
+      return;
+    }
     setFocus({ clipId, finding });
     if (clipId === a?.clip_id) setActiveSide("a");
     else if (clipId === b?.clip_id) setActiveSide("b");
@@ -316,17 +341,31 @@ export default function ShotReviewCockpit({
               <div className="lane-track">
                 <span className="lane-empty" style={{ width: pct(take.duration_s) }} />
                 {safe.map((item, index) => <button key={`safe-${index}`} className="lane-safe" style={{ left: pct(item.start_s), width: pct(item.end_s - item.start_s) }} onClick={() => activePlayer(take.clip_id)?.seek(item.start_s, true)} title={`Clean ${tc(item.start_s)}–${tc(item.end_s)}`} />)}
-                {findings.map((finding) => <button key={String(finding.finding_id)} className={`lane-finding severity-${finding.severity}`} style={{ left: pct(finding.start_s), width: pct(Math.max(.4, finding.end_s - finding.start_s)) }} onClick={() => inspect(take.clip_id, finding)} title={`${label(finding.code)} ${tc(finding.start_s)}–${tc(finding.end_s)}`}><span>{label(finding.code)}</span></button>)}
+                {findings.map((finding) => <button key={String(finding.finding_id)} className={`lane-finding severity-${finding.severity}${focus && String(focus.finding.finding_id) === String(finding.finding_id) ? " open" : ""}`} style={{ left: pct(finding.start_s), width: pct(Math.max(.4, finding.end_s - finding.start_s)) }} onClick={() => inspect(take.clip_id, finding)} title={`${label(finding.code)} ${tc(finding.start_s)}–${tc(finding.end_s)}`}><span>{label(finding.code)}</span></button>)}
               </div>
             </div>;
           })}
         </section>
+
+        {/* Beneath the clock it belongs to. This sat in the right-hand column,
+            so the bar showing where the issues are and the list naming them
+            were on opposite sides of the screen and only one of them could be
+            read at a time. */}
+        <section className="finding-list-panel">
+          <header><p className="eyebrow">ISSUES ON THIS SHOT</p><span>{openFindings.length} to verify</span></header>
+            <div className="finding-list"><h3>Findings to verify</h3>{openFindings.slice(0, 8).map(({ analysis, finding }) => <button key={String(finding.finding_id)} className={focus && String(focus.finding.finding_id) === String(finding.finding_id) ? "open" : ""} onClick={() => inspect(String(analysis.clip_id), finding)}><span className={`finding-dot severity-${finding.severity}`} /><span><b>{tc(finding.start_s)}–{tc(finding.end_s)} {label(finding.code)}</b><small>Take {analysis.clip.take_no} · {finding.detail}</small></span><i>›</i></button>)}</div>
+        </section>
       </section>
 
       <aside className="cockpit-inspector">
-        {focus ? (
-          <FindingInspector focus={focus} take={takes.find((take) => take.clip_id === focus.clipId)} adjusting={adjusting} setAdjusting={setAdjusting} onChange={(start, end) => setFocus({ ...focus, finding: { ...focus.finding, start_s: start, end_s: end } })} onConfirm={() => void act("confirm")} onDismiss={() => void act("dismiss")} onCorrect={(detail, severity) => void act("correct", { detail, severity })} onAdjust={() => void act("adjust_range")} pending={findingAction.isPending} canAct={canComment} />
-        ) : (
+        {/* Shown *above* the shot's own controls, never instead of them. It
+            used to replace the entire column, so opening an issue took away
+            Add range, Shot selects and every way back — and nothing closed it:
+            not the shot, not Escape, not clicking the issue again. */}
+        {focus && (
+          <FindingInspector focus={focus} onClose={() => { setFocus(null); setAdjusting(false); }} take={takes.find((take) => take.clip_id === focus.clipId)} adjusting={adjusting} setAdjusting={setAdjusting} onChange={(start, end) => setFocus({ ...focus, finding: { ...focus.finding, start_s: start, end_s: end } })} onConfirm={() => void act("confirm")} onDismiss={() => void act("dismiss")} onCorrect={(detail, severity) => void act("correct", { detail, severity })} onAdjust={() => void act("adjust_range")} pending={findingAction.isPending} canAct={canComment} />
+        )}
+        <>
           <>
             <p className="eyebrow">{compared ? "AI RECOMMENDATION" : "NOT COMPARED"}</p>
             {/* A field of one has no winner, and a score of 0% beside the only
@@ -398,9 +437,8 @@ export default function ShotReviewCockpit({
                 onSave={(fields) => edits.saveBrief.mutateAsync(fields)}
               />
             )}
-            <div className="finding-list"><h3>Findings to verify</h3>{analyses.flatMap((analysis) => analysis.findings.map((finding) => ({ analysis, finding }))).slice(0, 8).map(({ analysis, finding }) => <button key={String(finding.finding_id)} onClick={() => inspect(String(analysis.clip_id), finding)}><span className={`finding-dot severity-${finding.severity}`} /><span><b>{tc(finding.start_s)}–{tc(finding.end_s)} {label(finding.code)}</b><small>Take {analysis.clip.take_no} · {finding.detail}</small></span><i>›</i></button>)}</div>
           </>
-        )}
+        </>
         {notice && <p className="cockpit-notice">{notice}</p>}
         {canComment && selected && <button className="ghost note-at-playhead" onClick={() => setCommentAt({ clipId: selected.clip_id, at: selectedAt })}>＋ Add note at {tc(selectedAt)}</button>}
         <Comments projectId={projectId} scene={scene} shot={shot} canComment={canComment} comments={screen.data?.comments ?? []} takes={takes.map((take) => ({ clip_id: take.clip_id, take_no: take.take_no }))} pending={commentAt} onConsumedPending={() => setCommentAt(null)} />
@@ -409,7 +447,7 @@ export default function ShotReviewCockpit({
   );
 }
 
-function FindingInspector({ focus, take, adjusting, setAdjusting, onChange, onConfirm, onDismiss, onCorrect, onAdjust, pending, canAct }: { focus: Focus; take?: Take; adjusting: boolean; setAdjusting: (value: boolean) => void; onChange: (start: number, end: number) => void; onConfirm: () => void; onDismiss: () => void; onCorrect: (detail: string, severity: "note" | "attention" | "blocking") => void; onAdjust: () => void; pending: boolean; canAct: boolean }) {
+function FindingInspector({ focus, take, adjusting, setAdjusting, onChange, onConfirm, onDismiss, onCorrect, onAdjust, pending, canAct, onClose }: { focus: Focus; onClose: () => void; take?: Take; adjusting: boolean; setAdjusting: (value: boolean) => void; onChange: (start: number, end: number) => void; onConfirm: () => void; onDismiss: () => void; onCorrect: (detail: string, severity: "note" | "attention" | "blocking") => void; onAdjust: () => void; pending: boolean; canAct: boolean }) {
   const finding = focus.finding;
   const evidence = useRef<PlayerHandle>(null);
   const [correcting, setCorrecting] = useState(false);
@@ -421,7 +459,12 @@ function FindingInspector({ focus, take, adjusting, setAdjusting, onChange, onCo
     setSeverity(findingSeverity(finding.severity));
   }, [finding.finding_id, finding.detail, finding.severity]);
   return <div className="finding-inspector">
-    <p className="eyebrow">FINDING · TAKE {take?.take_no ?? "—"}</p>
+    <header className="finding-inspector-head">
+      <p className="eyebrow">FINDING · TAKE {take?.take_no ?? "—"}</p>
+      <button type="button" className="finding-close" onClick={onClose} aria-label="Close this finding">
+        ✕ Close
+      </button>
+    </header>
     <h2>{tc(finding.start_s)}–{tc(finding.end_s)} {label(finding.code)}</h2>
     {take?.proxy_uri ? <Player ref={evidence} className="evidence-player" src={take.proxy_uri} poster={take.sprite_uri} onReady={() => evidence.current?.seek(finding.start_s)} /> : <div className="evidence-placeholder">Evidence frame unavailable</div>}
     <div className="frame-meta">
@@ -432,6 +475,13 @@ function FindingInspector({ focus, take, adjusting, setAdjusting, onChange, onCo
     {adjusting && <div className="range-inputs"><input aria-label="Finding start" type="number" step="0.01" value={finding.start_s} onChange={(event) => onChange(Number(event.target.value), finding.end_s)} /><span>→</span><input aria-label="Finding end" type="number" step="0.01" value={finding.end_s} onChange={(event) => onChange(finding.start_s, Number(event.target.value))} /></div>}
     {correcting && <div className="finding-correction"><label>Correct technical note<textarea value={detail} maxLength={500} onChange={(event) => setDetail(event.target.value)} /></label><label>Severity<select value={severity} onChange={(event) => setSeverity(event.target.value as typeof severity)}><option value="note">Note</option><option value="attention">Attention</option><option value="blocking">Blocking</option></select></label><button className="primary" disabled={pending || !detail.trim()} onClick={() => onCorrect(detail.trim(), severity)}>Save correction</button></div>}
     <div className="finding-actions"><button className="primary" disabled={!canAct || pending} onClick={onConfirm}>Issue is correct</button><button className="ghost" disabled={!canAct || pending} onClick={onDismiss}>Dismiss issue</button><button className="ghost" disabled={!canAct || pending} onClick={() => setCorrecting((value) => !value)}>{correcting ? "Cancel correction" : "Correct finding"}</button>{adjusting ? <button className="ghost" disabled={!canAct || pending} onClick={onAdjust}>Save adjusted range</button> : <button className="ghost" disabled={!canAct} onClick={() => setAdjusting(true)}>Adjust range</button>}</div>
+    {/* Two controls with nearly the same name do two unrelated things, and the
+        only way to tell was to press one. */}
+    <p className="policy-note">
+      This corrects <b>where the problem is</b> — it moves the issue&rsquo;s own
+      timecodes, and changes no footage. Choosing which parts of a take you
+      actually use is <b>Add range</b>, under Shot selects.
+    </p>
     {!canAct && <p className="policy-note">Sign in to confirm, correct, dismiss, or adjust this finding.</p>}
   </div>;
 }
