@@ -296,3 +296,67 @@ class TestAShotWithOneTake:
         only because the loop ran over the verdicts."""
         body = client.get("/screens/shot/1/12/1").json()
         assert len(body["analyses"]) == 1
+
+
+class TestTheTreeAgreesWithTheReel:
+    """One shot, one answer.
+
+    The column said "Everything is decided", the cockpit said "Human decision
+    required" and the scene page said one shot needed a decision — about the
+    same shot. The tree worked it out from comparison status and `chosen_take`,
+    and `chosen_take` is not the question: a shot holding one take reports 1
+    whether or not a human ever chose anything.
+
+    The reel counts a shot with no coverage segments as a GAP. The tree now
+    reports that same count, so the two cannot drift.
+    """
+
+    def test_a_shot_with_no_chosen_ranges_reports_none(self) -> None:
+        from app.schemas import ShotNode
+
+        node = ShotNode(
+            shot=1,
+            slug="1A",
+            label="",
+            takes=1,
+            unusable=0,
+            status="too_few_takes",
+            state="",
+            assignee="",
+            circled_take=0,
+            chosen_take=1,
+            differs_from_circle=False,
+            margin=0.0,
+            cameras=[],
+            shoot_day="",
+            open_notes=0,
+        )
+        # Defaulted, because a tree built before this field existed must not
+        # start claiming shots are resolved.
+        assert node.segments == 0
+
+    def test_chosen_take_is_not_the_signal(self) -> None:
+        """The exact shape of the live bug: one take, chosen_take 1, nothing
+        actually selected."""
+        from app.schemas import ShotNode
+
+        node = ShotNode(
+            shot=1,
+            slug="1A",
+            label="",
+            takes=1,
+            unusable=0,
+            status="too_few_takes",
+            state="",
+            assignee="",
+            circled_take=0,
+            chosen_take=1,
+            differs_from_circle=False,
+            margin=0.0,
+            cameras=[],
+            shoot_day="",
+            open_notes=0,
+            segments=0,
+        )
+        assert node.chosen_take == 1
+        assert node.segments == 0

@@ -164,6 +164,10 @@ class ShotNode(Model):
     cameras: list[str]
     shoot_day: str
     open_notes: int
+    # Source ranges a human has chosen. Zero is an unresolved shot, whatever the
+    # comparison thinks — and it is the same number the scene reel counts as a
+    # GAP, so the two surfaces cannot disagree.
+    segments: int = 0
 
 
 class SceneNode(Model):

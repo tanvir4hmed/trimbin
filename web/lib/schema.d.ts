@@ -2709,6 +2709,11 @@ export interface components {
             shoot_day: string;
             /** Open Notes */
             open_notes: number;
+            /**
+             * Segments
+             * @default 0
+             */
+            segments: number;
         };
         /**
          * ShotScreen

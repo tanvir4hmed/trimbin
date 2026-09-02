@@ -65,7 +65,11 @@ export default function SceneTree({
     .flatMap((s) => s.shots)
     .filter(
       (s) =>
-        s.chosen_take === 0 ||
+        // No chosen source range is an unresolved shot. `chosen_take` looked
+        // like the right field and is not: a one-take shot reports 1 whether or
+        // not a human chose anything, which is why this column claimed
+        // everything was decided beside a cockpit asking for a decision.
+        s.segments === 0 ||
         s.status === "needs_review" ||
         s.status === "not_judged" ||
         s.status === "differs_from_circle",

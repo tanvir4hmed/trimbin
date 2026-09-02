@@ -1033,6 +1033,14 @@ async def tree(
                 "cameras": cams,
                 "shoot_day": str(day) if day else "",
                 "open_notes": notes["open"],
+                # How many source ranges a human has chosen for this shot, from
+                # the same Firestore coverage the cockpit writes and the scene
+                # reel plays. The column used to work this out from comparison
+                # status and `chosen_take`, and disagreed with both of them: a
+                # one-take shot reports `chosen_take` 1 whether or not anybody
+                # chose anything, so the tree said "Everything is decided" beside
+                # a cockpit saying a decision was required.
+                "segments": len(meta.coverage_segments) if meta else 0,
             }
         )
 
