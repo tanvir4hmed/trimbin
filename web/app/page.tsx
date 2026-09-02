@@ -27,8 +27,6 @@ import { useEffect, useState } from "react";
 import SignInPanel from "@/components/SignInPanel";
 import { currentIdentity } from "@/lib/auth";
 
-const TRIAL_PASS = process.env.NEXT_PUBLIC_TRIAL_PASS ?? "";
-
 export default function Home() {
   const router = useRouter();
   const [leaving, setLeaving] = useState(false);
@@ -59,19 +57,6 @@ export default function Home() {
         </div>
 
         <div className="door-workflow" aria-label="What Trimbin does"><span><b>01</b> Verify ingest</span><span><b>02</b> Review every take</span><span><b>03</b> Play scene coverage</span></div>
-
-        {TRIAL_PASS && (
-          <dl className="creds under-door">
-            <div>
-              <dt>Guest user</dt>
-              <dd className="mono">Guest</dd>
-            </div>
-            <div>
-              <dt>Password</dt>
-              <dd className="mono">{TRIAL_PASS}</dd>
-            </div>
-          </dl>
-        )}
 
         <p className="door-links">
           <Link href="/about">About</Link>
