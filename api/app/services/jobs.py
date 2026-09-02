@@ -521,3 +521,38 @@ async def record_analysis_state(
             merge=True,
         )
     )
+
+
+async def analysis_states(project_id: int, clip_ids: list[str]) -> dict[str, dict]:
+    """Where each clip is in the pipeline, for the clips asked about.
+
+    These rows have been written since full-take analysis shipped — pending,
+    processing, completed, failed — and nothing has ever read them. So an
+    editor who uploaded a take watched the upload finish, waited, and had no
+    way to tell whether the system was working on it, had finished, or had
+    dropped it. The lanes drew an empty bar and the take card said "clean",
+    which is indistinguishable from "analysed and found nothing".
+
+    Read by id rather than by collection scan: a project accumulates one of
+    these per clip forever, and the screen only ever needs the handful it is
+    drawing.
+    """
+    if not clip_ids:
+        return {}
+
+    refs = [
+        db().collection(ANALYSIS_QUEUE_COLLECTION).document(f"p{project_id}_{clip_id}")
+        for clip_id in clip_ids
+    ]
+    # `get_all` does not promise order, so each row is keyed by its own document
+    # id rather than by position in the request.
+    found: dict[str, dict] = {}
+    async for snapshot in db().get_all(refs):
+        if not snapshot.exists:
+            continue
+        data = snapshot.to_dict() or {}
+        found[snapshot.id.split("_", 1)[-1]] = {
+            "state": str(data.get("state") or ""),
+            "error": str(data.get("error") or ""),
+        }
+    return found

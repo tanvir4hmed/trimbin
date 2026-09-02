@@ -933,6 +933,10 @@ async def tree(
             maxIf(l.margin, l.outcome = 'selected')          AS margin,
             maxIf(c.take_no, l.outcome = 'selected')         AS chosen_take,
             arrayDistinct(groupArray(c.camera))              AS cameras,
+            -- The take numbers themselves, not only how many. The rail could
+            -- say "3 takes" and offer no way to reach take 2 except by
+            -- clicking through the player.
+            arraySort(arrayDistinct(groupArray(c.take_no)))  AS take_numbers,
             toString(min(toDate(c.captured_at)))             AS shoot_day,
             anyIf(c.scene_code, c.scene_code != '')          AS scene_code,
             anyIf(c.shot_code, c.shot_code != '')            AS shot_code
@@ -968,6 +972,7 @@ async def tree(
             margin,
             chosen_take,
             cameras,
+            take_numbers,
             day,
             scene_code,
             shot_code,
@@ -1032,6 +1037,7 @@ async def tree(
                 ),
                 "margin": round(float(margin), 4),
                 "cameras": cams,
+                "take_numbers": [int(t) for t in take_numbers if int(t) > 0],
                 "shoot_day": str(day) if day else "",
                 "open_notes": notes["open"],
                 # How many source ranges a human has chosen for this shot, from

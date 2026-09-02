@@ -2735,6 +2735,11 @@ export interface components {
             /** Open Notes */
             open_notes: number;
             /**
+             * Take Numbers
+             * @default []
+             */
+            take_numbers: number[];
+            /**
              * Segments
              * @default 0
              */
@@ -2760,6 +2765,13 @@ export interface components {
              * @default []
              */
             coverage_segments: components["schemas"]["CoverageSegment"][];
+            /**
+             * Analysis State
+             * @default {}
+             */
+            analysis_state: {
+                [key: string]: string;
+            };
             /**
              * Analyses
              * @default []

@@ -45,6 +45,15 @@ function findingSeverity(value: string): "note" | "attention" | "blocking" {
   return value === "note" || value === "blocking" ? value : "attention";
 }
 
+/** What the pipeline is doing, in words a person can act on. */
+function stageLabel(stage: string) {
+  if (stage === "processing") return "analysing…";
+  if (stage === "pending") return "queued for analysis";
+  if (stage === "failed") return "analysis failed";
+  if (stage === "completed") return "analysed";
+  return "not analysed yet";
+}
+
 function analysisFor(analyses: TakeAnalysis[], clipId: string) {
   return analyses.find((row) => String(row.clip_id) === clipId);
 }
@@ -165,6 +174,29 @@ export default function ShotReviewCockpit({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [focus]);
+
+  // Whether the tray differs from what is stored. The Save button stayed lit
+  // after a successful save, so the only way to know whether a change had been
+  // written was to reload and look.
+  const savedSelects = screen.data?.coverage_segments ?? [];
+  const dirty = useMemo(() => {
+    const shape = (rows: CoverageSegment[]) =>
+      rows.map((r) => `${r.clip_id}:${r.source_in_s}:${r.source_out_s}`).join("|");
+    return shape(selects) !== shape(savedSelects as CoverageSegment[]);
+  }, [selects, savedSelects]);
+
+  // Two ranges from the same take share a proxy URL, so the player's own
+  // load effect does not fire between them. Seek on the segment changing
+  // rather than on the source changing, or the second range plays from
+  // wherever the first one ended.
+  useEffect(() => {
+    if (selectPreviewIndex === null) return;
+    const segment = selects[selectPreviewIndex];
+    if (!segment) return;
+    selectPlayer.current?.seek(segment.source_in_s, true);
+  }, [selectPreviewIndex, selects]);
+
+  const stageOf = (clipId: string) => screen.data?.analysis_state?.[clipId] ?? "";
 
   const activePlayer = (clipId: string) => (clipId === a?.clip_id ? playerA.current : playerB.current);
   const inspect = (clipId: string, finding: FindingEvent) => {
@@ -320,11 +352,13 @@ export default function ShotReviewCockpit({
           {takes.map((take) => {
             const analysis = analysisFor(analyses, take.clip_id);
             const issueCount = analysis?.findings.length ?? take.findings.length;
+            const stage = stageOf(take.clip_id);
             return <button key={take.clip_id} className={selected?.clip_id === take.clip_id ? "take-card selected" : "take-card"} onClick={() => { if (take.clip_id === a?.clip_id) setActiveSide("a"); else if (take.clip_id === b?.clip_id) setActiveSide("b"); else { setBId(take.clip_id); setActiveSide("b"); } }}>
               <span className="take-card-no">Take {take.take_no}</span>
               <span className="take-badges"><b>PROXY</b><b>{take.fps ? `${Math.round(take.fps)} FPS` : "FPS UNMEASURED"}</b></span>
-              <span className="take-score">{compared ? <>{Math.round(take.score * 100)} <small>technical</small></> : <small>not compared</small>}</span>
-              <span className={issueCount ? "issue-count" : "issue-count clean"}>{issueCount ? `${issueCount} issue${issueCount === 1 ? "" : "s"}` : "clean"}</span>
+              <span className="take-score">{compared ? <>{Math.round(take.score * 100)} <small>technical</small></> : <small>{stageLabel(stageOf(take.clip_id))}</small>}</span>
+              {/* "Clean" and "not looked at yet" drew identically. */}
+              <span className={issueCount ? "issue-count" : stage === "completed" ? "issue-count clean" : "issue-count pending"}>{issueCount ? `${issueCount} issue${issueCount === 1 ? "" : "s"}` : stage === "completed" ? "clean" : stageLabel(stage)}</span>
             </button>;
           })}
         </div>
@@ -380,7 +414,7 @@ export default function ShotReviewCockpit({
             </> : <>
               <div className="recommendation not-compared">
                 <span className="recommend-icon">◇</span>
-                <div><h2>{takes.length === 1 ? "One take in this shot" : `${takes.length} takes, not yet compared`}</h2><p>{takes.length === 1 ? "There is nothing to compare it against. Watch it, review its findings and cut the ranges you want." : "Run the comparison to get a suggestion, or select ranges yourself."}</p></div>
+                <div><h2>{takes.length === 1 ? "One take — nothing to compare" : `${takes.length} takes, not compared`}</h2><p>{takes.length === 1 ? "Cut the ranges you want." : "Compare them, or cut ranges yourself."}</p></div>
               </div>
               {canCurate && takes.length > 1 && <button className="primary" disabled={judge.isPending} onClick={() => void judge.mutateAsync()}>{judge.isPending ? "Comparing full takes…" : "Analyse & compare takes"}</button>}
             </>}
@@ -392,9 +426,9 @@ export default function ShotReviewCockpit({
               <button className="ghost cockpit-confirm" disabled={!canComment || !(range.to > range.from)} onClick={addRange}>{canComment ? `Add Take ${selected.take_no} range` : "Sign in to select ranges"}</button>
               <div className="shot-selects"><div className="shot-selects-head"><b>Shot selects</b><span>{selects.length} range{selects.length === 1 ? "" : "s"}</span></div>{selects.map((item, index) => <div className="shot-select-row" key={item.segment_id}><span><b>{index + 1}. Take {item.take_no}</b><span className="select-range-inputs"><input aria-label={`Select ${index + 1} in`} type="number" min="0" step="0.01" value={item.source_in_s} onChange={(event) => setSelects((rows) => rows.map((row, at) => at === index ? { ...row, source_in_s: Number(event.target.value) } : row))} /><i>→</i><input aria-label={`Select ${index + 1} out`} type="number" min="0" step="0.01" value={item.source_out_s} onChange={(event) => setSelects((rows) => rows.map((row, at) => at === index ? { ...row, source_out_s: Number(event.target.value) } : row))} /></span></span><span className="select-order"><button disabled={!index} onClick={() => setSelects((rows) => { const next = [...rows]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; })}>↑</button><button disabled={index === selects.length - 1} onClick={() => setSelects((rows) => { const next = [...rows]; [next[index + 1], next[index]] = [next[index], next[index + 1]]; return next; })}>↓</button><button onClick={() => setSelects((rows) => rows.filter((_, at) => at !== index))}>Remove</button></span></div>)}</div>
               <details className="source-library"><summary>Reuse footage from another shot or scene</summary><p className="policy-note">Adds a source range here without changing where its slate placed the clip.</p><div className="source-search"><input value={sourceQuery} onChange={(event) => setSourceQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void findSources(); }} placeholder="Scene, shot, description or clip ID"/><button className="ghost" disabled={sourceBusy} onClick={() => void findSources()}>{sourceBusy ? "Finding…" : "Find"}</button></div>{sourcePreview?.proxy_uri && <Player className="source-preview" src={sourcePreview.proxy_uri} poster={sourcePreview.sprite_uri} />}{sourceRows.map((source) => <div className="source-row" key={source.clip_id}><button className="source-ident" onClick={() => setSourcePreview(source)}><b>Scene {source.scene_code || source.scene} · Shot {source.shot_code || source.shot} · Take {source.take_no}</b><small>{tc(source.duration_s)}{source.description ? ` · ${source.description}` : ""}</small></button><button className="ghost" disabled={!canComment} onClick={() => addSource(source)}>Add range</button></div>)}</details>
-              {previewSegment && previewSource?.proxy_uri && <div className="shot-select-preview"><Player key={previewSegment.segment_id} ref={selectPlayer} src={previewSource.proxy_uri} poster={previewSource.sprite_uri} onReady={() => selectPlayer.current?.seek(previewSegment.source_in_s, true)} onTimeUpdate={(at) => { if (at >= previewSegment.source_out_s - .05) setSelectPreviewIndex((index) => index !== null && index + 1 < selects.length ? index + 1 : null); }} /><small>Playing select {(selectPreviewIndex ?? 0) + 1} of {selects.length} · Take {previewSegment.take_no} · {tc(previewSegment.source_in_s)}–{tc(previewSegment.source_out_s)}</small></div>}
+              {previewSegment && previewSource?.proxy_uri && <div className="shot-select-preview"><Player ref={selectPlayer} src={previewSource.proxy_uri} poster={previewSource.sprite_uri} onReady={() => selectPlayer.current?.seek(previewSegment.source_in_s, true)} onTimeUpdate={(at) => { if (at >= previewSegment.source_out_s - .05) setSelectPreviewIndex((index) => index !== null && index + 1 < selects.length ? index + 1 : null); }} /><small>Playing select {(selectPreviewIndex ?? 0) + 1} of {selects.length} · Take {previewSegment.take_no} · {tc(previewSegment.source_in_s)}–{tc(previewSegment.source_out_s)}</small></div>}
               <button className="ghost cockpit-confirm" disabled={!selects.length} onClick={() => setSelectPreviewIndex(0)}>▶ Play this shot</button>
-              <button className="primary cockpit-confirm" disabled={!canComment || saveCoverage.isPending} onClick={() => void saveSelects()}>{saveCoverage.isPending ? "Saving…" : `Save ${selects.length} shot select${selects.length === 1 ? "" : "s"}`}</button>
+              <button className="primary cockpit-confirm" disabled={!canComment || saveCoverage.isPending || !dirty} onClick={() => void saveSelects()}>{saveCoverage.isPending ? "Saving…" : !dirty ? (selects.length ? `✓ ${selects.length} range${selects.length === 1 ? "" : "s"} saved` : "Nothing to save") : `Save ${selects.length} shot select${selects.length === 1 ? "" : "s"}`}</button>
             </div>}
             <WhoIsOnIt
               assignee={screen.data?.brief.assignee ?? ""}
@@ -441,7 +475,7 @@ export default function ShotReviewCockpit({
         </>
         {notice && <p className="cockpit-notice">{notice}</p>}
         {canComment && selected && <button className="ghost note-at-playhead" onClick={() => setCommentAt({ clipId: selected.clip_id, at: selectedAt })}>＋ Add note at {tc(selectedAt)}</button>}
-        <Comments projectId={projectId} scene={scene} shot={shot} canComment={canComment} comments={screen.data?.comments ?? []} takes={takes.map((take) => ({ clip_id: take.clip_id, take_no: take.take_no }))} pending={commentAt} onConsumedPending={() => setCommentAt(null)} />
+        <Comments hideOwnTrigger projectId={projectId} scene={scene} shot={shot} canComment={canComment} comments={screen.data?.comments ?? []} takes={takes.map((take) => ({ clip_id: take.clip_id, take_no: take.take_no }))} pending={commentAt} onConsumedPending={() => setCommentAt(null)} />
       </aside>
     </div>
   );
@@ -566,11 +600,7 @@ function WhoIsOnIt({
           <option value="approved">Approved</option>
         </select>
       </div>
-      <p className="policy-note">
-        Claiming takes this shot out of everyone else&apos;s unclaimed queue, so
-        two people do not review the same takes. Approved removes it from the
-        queue entirely.
-      </p>
+      <p className="policy-note">Claiming hides it from everyone else&apos;s queue. Approved closes it.</p>
     </div>
   );
 }

@@ -25,6 +25,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [switching, setSwitching] = useState(false);
   const [projectQuery, setProjectQuery] = useState("");
   const [search, setSearch] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     setIdentity(currentIdentity());
@@ -37,7 +38,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (!isApp) return;
     void api.projects().then((result) => setProjects(result.projects)).catch(() => setProjects([]));
   }, [identity, isApp]);
-  useEffect(() => setSwitching(false), [pathname]);
+  useEffect(() => { setSwitching(false); setSettingsOpen(false); }, [pathname]);
 
   const currentId = Number(pathname.match(/\/project\/(\d+)/)?.[1] || 0);
   const current = projects.find((project) => project.project_id === currentId);
@@ -54,7 +55,33 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <aside className="app-sidebar">
       <header><Link href="/dashboard" className="app-wordmark"><span>◩</span><b>TRIMBIN</b></Link><button aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} onClick={() => { const next = !collapsed; setCollapsed(next); localStorage.setItem("trimbin.sidebar.collapsed", next ? "1" : "0"); }}>{collapsed ? "»" : "«"}</button></header>
       <nav>{NAV.map(([href, icon, label]) => <Link key={href} href={href} aria-current={active(href) ? "page" : undefined} title={label}><i>{icon}</i><span>{label}</span></Link>)}</nav>
-      <footer>{identity ? <button className="app-user" onClick={() => { signOut(); setIdentity(null); router.push("/"); }} title="Sign out"><i>{identity.name.slice(0, 1).toUpperCase()}</i><span><b>{identity.name}</b><small>Sign out</small></span></button> : <Link href="/">Sign in</Link>}</footer>
+      <footer>
+        {/* Clicking your own name signed you out with no warning and no way
+            back. It opens your account now; signing out is a separate,
+            deliberate row underneath it. */}
+        {identity ? <>
+          {settingsOpen && <div className="app-settings">
+            <p className="eyebrow">ACCOUNT</p>
+            <label>Name<input value={identity.name} readOnly /></label>
+            <label>Email<input value={identity.email} readOnly /></label>
+            <p className="policy-note">Your name and address come from the sign-in you used. Editing them is not built yet.</p>
+            <button className="ghost small" onClick={() => { signOut(); setIdentity(null); router.push("/"); }}>Sign out</button>
+          </div>}
+          <button className="app-user" onClick={() => setSettingsOpen((open) => !open)} title="Account and settings" aria-expanded={settingsOpen}>
+            <i>{identity.name.slice(0, 1).toUpperCase()}</i>
+            <span><b>{identity.name}</b><small>Account &amp; settings</small></span>
+          </button>
+        </> : <Link href="/">Sign in</Link>}
+        {/* A second collapse control down here, because the first one is at the
+            top of a full-height column and this is where the cursor already is. */}
+        <button
+          className="app-collapse-foot"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          onClick={() => { const next = !collapsed; setCollapsed(next); localStorage.setItem("trimbin.sidebar.collapsed", next ? "1" : "0"); }}
+        >
+          {collapsed ? "»" : "«  Collapse"}
+        </button>
+      </footer>
     </aside>
     <div className="app-stage">
       <header className="app-topbar">

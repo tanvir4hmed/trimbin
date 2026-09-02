@@ -45,6 +45,7 @@ export default function Comments({
   takes,
   pending,
   onConsumedPending,
+  hideOwnTrigger = false,
 }: {
   projectId: number;
   scene: number;
@@ -58,6 +59,12 @@ export default function Comments({
   /** A timecode handed over from the player, so "note at 0:04" lands here. */
   pending: { clipId: string; at: number } | null;
   onConsumedPending: () => void;
+  /**
+   * The caller already draws an "add a note" control — the cockpit's carries
+   * the playhead timecode, which this one cannot. Two buttons for one job, a
+   * few pixels apart, was the clutter.
+   */
+  hideOwnTrigger?: boolean;
 }) {
   const [body, setBody] = useState("");
   const [anchor, setAnchor] = useState<{ clipId: string; at: number } | null>(null);
@@ -217,7 +224,7 @@ export default function Comments({
         </ul>
       )}
 
-      {canComment && !composing ? (
+      {canComment && !composing && hideOwnTrigger ? null : canComment && !composing ? (
         // One line until it is wanted. The box, its anchor line and its button
         // used to sit open permanently at the bottom of the inspector, taking
         // the same room whether or not anybody was writing anything.

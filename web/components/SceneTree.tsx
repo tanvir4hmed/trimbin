@@ -132,6 +132,14 @@ export default function SceneTree({
                       </span>
                       <span className="node-meta">
                         {shot.takes} take{shot.takes === 1 ? "" : "s"}
+                        {shot.take_numbers.length > 1 && (
+                          // Which takes, not only how many. Reaching take 2
+                          // meant opening the shot and hunting in the player.
+                          <span className="node-takes">
+                            {" "}
+                            · {shot.take_numbers.map((t) => `T${t}`).join(" ")}
+                          </span>
+                        )}
                         {shot.cameras.length > 1 && (
                           <span className="node-cam">
                             {" "}

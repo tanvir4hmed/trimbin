@@ -164,6 +164,9 @@ class ShotNode(Model):
     cameras: list[str]
     shoot_day: str
     open_notes: int
+    # The take numbers present, not only the count. The rail said "3 takes" and
+    # gave no way to reach take 2 except through the player.
+    take_numbers: list[int] = []
     # Source ranges a human has chosen. Zero is an unresolved shot, whatever the
     # comparison thinks — and it is the same number the scene reel counts as a
     # GAP, so the two surfaces cannot disagree.
@@ -557,6 +560,12 @@ class ShotScreen(Model):
     # range disappeared on refresh. The ranges were never lost; the screen just
     # stopped asking for them.
     coverage_segments: list[CoverageSegment] = []
+    # Where each take is in the pipeline, keyed by clip id: pending,
+    # processing, completed, failed. Written since full-take analysis shipped
+    # and never once read, so an editor who uploaded a take could not tell
+    # "still working" from "finished and found nothing". On the screen for the
+    # same reason as the ranges above: it must survive having no comparison.
+    analysis_state: dict[str, str] = {}
     # Full-take read models are bundled with the screen. The browser can switch
     # takes, seek findings and redraw every lane without a ClickHouse request in
     # the interaction path.

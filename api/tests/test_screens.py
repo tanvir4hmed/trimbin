@@ -110,6 +110,11 @@ def stubbed(monkeypatch: pytest.MonkeyPatch):
         stub that omitted this reached for ClickHouse and answered 503."""
         return []
 
+    async def stages(project_id, clip_ids):
+        """Pipeline state, which is a Firestore read like every other store
+        here and has to be stubbed for the same reason."""
+        return {}
+
     monkeypatch.setattr(screens.review_routes, "tree", tree)
     monkeypatch.setattr(screens.review_routes, "verdicts", verdicts)
     monkeypatch.setattr(screens.review_routes.review_service, "takes_in_shot", takes_in_shot)
@@ -117,6 +122,7 @@ def stubbed(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(screens.projects, "get", project)
     monkeypatch.setattr(screens.shots, "get", shot)
     monkeypatch.setattr(screens.comments_service, "for_shot", comments)
+    monkeypatch.setattr("app.services.jobs.analysis_states", stages)
 
 
 class TestTheProjectScreen:

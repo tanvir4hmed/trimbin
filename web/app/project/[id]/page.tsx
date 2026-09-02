@@ -18,7 +18,6 @@ import AskArchive from "@/components/AskArchive";
 import PlacementInbox from "@/components/PlacementInbox";
 import SceneTree from "@/components/SceneTree";
 import ShotReviewCockpit from "@/components/ShotReviewCockpit";
-import Structure from "@/components/Structure";
 import { ApiError } from "@/lib/api";
 import { useProjectScreen } from "@/lib/queries";
 
@@ -40,7 +39,6 @@ export default function ProjectPage({
   // three-scene project and wrong for a thirty-scene one — so it is a choice
   // rather than a fixed answer.
   const [railScene, setRailScene] = useState(0);
-  const [planning, setPlanning] = useState(false);
 
   const screen = useProjectScreen(projectId, {
     camera: camera || undefined,
@@ -158,17 +156,21 @@ export default function ProjectPage({
     <main className="workspace">
       <header className="project-head">
         <div className="crumbs">
-          <Link href={me?.signed_in ? "/dashboard" : "/"}>
-            {me?.signed_in ? "Dashboard" : "Trimbin"}
+          {/* The way back is the list this project came from, not the home
+              screen. The first crumb used to be Dashboard, which is a jump out
+              of the production rather than a step up from the shot. */}
+          <Link href={me?.signed_in ? "/projects" : "/"}>
+            {me?.signed_in ? "Projects" : "Trimbin"}
           </Link>
           <span aria-hidden>›</span>
           {/* Labelled, because these productions are *named* after scenes —
               "Scene 2 - two perspectives" holding scene 1 put two different
-              scene numbers side by side in one line and read as a fault. */}
-          <span className="crumb-project">
+              scene numbers side by side in one line and read as a fault.
+              A link, because it is the step back from a shot to its project. */}
+          <Link className="crumb-project" href={`/project/${projectId}`}>
             <small>project</small>
             {project?.name ?? `Project ${projectId}`}
-          </span>
+          </Link>
           {open && (
             <>
               <span aria-hidden>›</span>
@@ -284,16 +286,7 @@ export default function ProjectPage({
               first and let the slate sort the footage.
             </p>
           )}
-          {!filtered && canCurate && <Link className="primary" href={`/project/${projectId}/ingest`}>Add footage</Link>}
-          {!filtered && canCurate && (
-            <Structure
-              projectId={projectId}
-              scenes={data.plan.scenes}
-              canEdit={canCurate}
-              onChanged={() => void screen.refetch()}
-              takesByShot={takesByShot}
-            />
-          )}
+          {!filtered && canCurate && <Link className="primary" href={`/project/${projectId}/ingest`}>Add scenes, shots &amp; footage</Link>}
         </div>
       ) : (
         <div className="workspace-split">
@@ -336,29 +329,14 @@ export default function ProjectPage({
             />
 
             {canCurate && (
-              // The scene and shot list has always been editable and the editor
-              // was never placed on a page, so a production could be created
-              // and then had nowhere to declare its scenes — which is also why
-              // ingest's "I know scene / shot / take" had an empty menu.
-              <div className="rail-plan">
-                <button
-                  type="button"
-                  className="linkish rail-plan-toggle"
-                  onClick={() => setPlanning((value) => !value)}
-                  aria-expanded={planning}
-                >
-                  {planning ? "Done planning" : "Add scenes & shots"}
-                </button>
-                {planning && (
-                  <Structure
-                    projectId={projectId}
-                    scenes={data.plan.scenes}
-                    canEdit={canCurate}
-                    onChanged={() => void screen.refetch()}
-                    takesByShot={takesByShot}
-                  />
-                )}
-              </div>
+              // Declaring scenes and shots now lives with adding footage,
+              // which is when a destination is actually needed. Two menus in
+              // one column — a tree of what exists and a form for what is
+              // planned — read as one confused list, and the form's placeholder
+              // rows looked like real shots.
+              <Link className="rail-plan-link" href={`/project/${projectId}/ingest`}>
+                Add scenes, shots &amp; footage →
+              </Link>
             )}
           </div>
 

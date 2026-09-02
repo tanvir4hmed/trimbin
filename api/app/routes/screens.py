@@ -141,11 +141,18 @@ async def shot_screen(
     # that has not report their chosen ranges identically.
     coverage = review_routes._coverage_for_screen(brief, [take.model_dump() for take in takes])
 
+    # What the pipeline is doing to each take, so a bar with no issues on it can
+    # say whether that means "not looked at yet" or "looked at and clean".
+    from ..services import jobs as jobs_service
+
+    stages = await jobs_service.analysis_states(project_id, [take.clip_id for take in takes])
+
     return schemas.ShotScreen(
         verdicts=verdicts,
         brief=schemas.Brief(**brief.as_dict(), is_empty=brief.is_empty),
         takes=takes,
         coverage_segments=[schemas.CoverageSegment(**row) for row in coverage],
+        analysis_state={clip: row["state"] for clip, row in stages.items()},
         analyses=analyses,
         comments=[schemas.Comment(**c) for c in notes],
         open_comments=sum(1 for c in notes if not c["resolved"]),
