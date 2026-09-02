@@ -29,6 +29,7 @@ def _assess(**overrides):
         circled_take=0,
         chosen_take=1,
         state="",
+        segments=0,
         threshold=THRESHOLD,
     )
     base.update(overrides)
@@ -69,12 +70,38 @@ class TestWhetherAShotNeedsAPerson:
         assert result.waiting_reason == "not compared yet"
         assert result.status == "not_judged"
 
-    def test_one_take_is_a_fact_rather_than_work(self) -> None:
-        """Nothing to compare. Putting it in the queue would fill the morning
-        with rows whose only possible action is to shrug."""
+    def test_one_take_still_needs_a_range_chosen(self) -> None:
+        """This asserted the opposite, and the reasoning expired.
+
+        It said a one-take shot was "a fact, not work" whose only possible
+        action was to shrug — true when the only thing a person could do to a
+        shot was pick a winner between takes. A range can now be chosen and
+        trimmed from a single take, so there is a real action and the queue was
+        hiding it: the cockpit asked for a decision on exactly the shot the
+        review page reported as settled.
+        """
         result = _assess(takes=1, has_verdict=False)
-        assert result.waiting_reason is None
+        assert result.waiting_reason == "choose a range to use"
         assert result.status == "too_few_takes"
+
+    def test_a_chosen_range_settles_a_single_take(self) -> None:
+        """And once somebody has chosen one, it leaves the queue for good."""
+        result = _assess(takes=1, has_verdict=False, segments=1)
+        assert result.waiting_reason is None
+        assert result.status == "confirmed"
+
+    def test_a_chosen_range_settles_a_shot_nobody_compared(self) -> None:
+        """The other direction of the same bug. A person who picked their
+        ranges by hand has decided; telling them it is "not compared yet" is
+        the system asking for permission it already has."""
+        result = _assess(has_verdict=False, segments=3)
+        assert result.waiting_reason is None
+        assert result.status == "confirmed"
+
+    def test_someone_working_a_single_take_says_so(self) -> None:
+        """Same courtesy the multi-take path already extended: shown, not
+        hidden, so a second editor does not start the same shot."""
+        assert _assess(takes=1, state="in_progress").waiting_reason == "someone is on it"
 
     def test_a_confirmed_shot_leaves_the_queue(self) -> None:
         result = _assess(confirmed=True, margin=0.01)
@@ -112,8 +139,10 @@ class TestTheTwoAnswersAgree:
     state that means "settled" must produce none. Exhaustively, not by example.
     """
 
-    NEEDS_A_PERSON = {"not_judged", "needs_review", "differs_from_circle"}
-    SETTLED = {"too_few_takes", "confirmed"}
+    # `too_few_takes` moved across. It is only ever reached with no chosen
+    # range, and in that state there is always something for a person to do.
+    NEEDS_A_PERSON = {"not_judged", "needs_review", "differs_from_circle", "too_few_takes"}
+    SETTLED = {"confirmed"}
 
     def _every_case(self):
         for takes in (1, 4):
@@ -122,15 +151,17 @@ class TestTheTwoAnswersAgree:
                     for margin in (0.01, 0.9):
                         for circled, chosen in ((0, 1), (3, 1), (2, 2)):
                             for state in ("", "needs_review", "in_progress", "approved"):
-                                yield _assess(
-                                    takes=takes,
-                                    has_verdict=has_verdict,
-                                    confirmed=confirmed,
-                                    margin=margin,
-                                    circled_take=circled,
-                                    chosen_take=chosen,
-                                    state=state,
-                                )
+                                for segments in (0, 2):
+                                    yield _assess(
+                                        takes=takes,
+                                        has_verdict=has_verdict,
+                                        confirmed=confirmed,
+                                        margin=margin,
+                                        circled_take=circled,
+                                        chosen_take=chosen,
+                                        state=state,
+                                        segments=segments,
+                                    )
 
     def test_a_status_that_needs_a_person_always_carries_a_reason(self) -> None:
         for result in self._every_case():

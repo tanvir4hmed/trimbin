@@ -23,11 +23,19 @@ export default function Structure({
   scenes,
   canEdit,
   onChanged,
+  takesByShot,
 }: {
   projectId: number;
   scenes: PlannedScene[];
   canEdit: boolean;
   onChanged: () => void;
+  /**
+   * How many takes have actually landed in each planned shot, keyed
+   * `scene:shot`. A plan is what somebody intends to shoot and the tree is what
+   * arrived; drawn without this they look like one list, and a scene planned
+   * months ago is indistinguishable from one that wrapped yesterday.
+   */
+  takesByShot?: Map<string, number>;
 }) {
   const [openScene, setOpenScene] = useState<number | null>(null);
   const [newScene, setNewScene] = useState("");
@@ -100,6 +108,16 @@ export default function Structure({
             <span className="desc">{s.heading}</span>
             <span className="scount">
               {s.shots.length} shot{s.shots.length === 1 ? "" : "s"}
+              {takesByShot && (
+                <em className="plan-footage">
+                  {s.shots.reduce(
+                    (total, h) => total + (takesByShot.get(`${s.scene}:${h.shot}`) ?? 0),
+                    0,
+                  ) === 0
+                    ? " · no footage yet"
+                    : ` · ${s.shots.reduce((total, h) => total + (takesByShot.get(`${s.scene}:${h.shot}`) ?? 0), 0)} takes`}
+                </em>
+              )}
             </span>
           </button>
 
@@ -109,6 +127,13 @@ export default function Structure({
                 <div key={h.shot} className="plan-shot">
                   <span className="mono">{h.slug || `${s.scene}${letter(h.shot)}`}</span>
                   <span className="desc">{h.description}</span>
+                  {takesByShot && (
+                    <span className="plan-takes">
+                      {takesByShot.get(`${s.scene}:${h.shot}`)
+                        ? `${takesByShot.get(`${s.scene}:${h.shot}`)} take${takesByShot.get(`${s.scene}:${h.shot}`) === 1 ? "" : "s"}`
+                        : "empty"}
+                    </span>
+                  )}
                   {canEdit && (
                     <button
                       type="button"
@@ -132,6 +157,7 @@ export default function Structure({
 
               {canEdit && (
                 <div className="plan-add">
+                  <span className="plan-add-label">Add a shot</span>
                   <input
                     type="text"
                     value={shotSlug}
@@ -163,6 +189,7 @@ export default function Structure({
 
       {canEdit && (
         <div className="plan-add">
+          <span className="plan-add-label">Add a scene</span>
           <input
             type="number"
             min={1}

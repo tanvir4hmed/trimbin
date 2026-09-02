@@ -183,6 +183,7 @@ async def scene(project_id: int, scene_id: int) -> dict:
                     circled_take=described.circled_take if described else 0,
                     chosen_take=int(r[2] or 0),
                     state=described.state if described else "",
+                    segments=len(described.coverage_segments) if described else 0,
                     threshold=margin,
                 ).needs_a_person,
                 circled_take=described.circled_take if described else 0,

@@ -38,8 +38,11 @@ class FakeProject:
 
 
 class FakeShot:
-    def __init__(self) -> None:
+    def __init__(self, coverage_segments: list | None = None) -> None:
         self.rev = 3
+        # The real `Shot` carries these; the screen reads chosen ranges off the
+        # shot now rather than out of a comparison that may not exist.
+        self.coverage_segments = coverage_segments or []
 
     @property
     def is_empty(self) -> bool:
@@ -360,3 +363,71 @@ class TestTheTreeAgreesWithTheReel:
         )
         assert node.chosen_take == 1
         assert node.segments == 0
+
+
+class TestChosenRangesSurviveWithoutAComparison:
+    """The bug an editor hit: add ranges, save, refresh, and they are gone.
+
+    They were never gone. `commit_coverage` writes them to the shot in
+    Firestore and does not care whether anything has been compared — but the
+    screen only ever returned them nested inside `verdicts`, and `verdicts` is
+    null until a comparison runs. A comparison needs two takes. So on a
+    one-take shot the ranges saved correctly, came back unread, and the tray
+    redrew itself empty.
+
+    The same omission as the takes and the analyses before it: three things
+    that belong to the shot, read out of the one object that is allowed to not
+    exist.
+    """
+
+    @pytest.fixture
+    def with_saved_ranges(self, monkeypatch: pytest.MonkeyPatch, stubbed):
+        clip = "62469df0-9ca9-465c-b345-a709080552c1"
+
+        async def shot(project_id, scene, shot):
+            return FakeShot(
+                coverage_segments=[
+                    {
+                        "segment_id": "a3f1c2d4-0000-4000-8000-000000000001",
+                        "clip_id": clip,
+                        "take_no": 1,
+                        "source_in_s": 4.0,
+                        "source_out_s": 11.0,
+                        "position": 0,
+                        "reason": "better performance",
+                        "created_by": "editor@example.com",
+                    },
+                    {
+                        "segment_id": "a3f1c2d4-0000-4000-8000-000000000002",
+                        "clip_id": clip,
+                        "take_no": 1,
+                        "source_in_s": 17.0,
+                        "source_out_s": 25.0,
+                        "position": 1,
+                        "reason": "better performance",
+                        "created_by": "editor@example.com",
+                    },
+                ]
+            )
+
+        monkeypatch.setattr(screens.shots, "get", shot)
+
+    def test_they_come_back_on_an_uncompared_shot(
+        self, client: TestClient, with_saved_ranges
+    ) -> None:
+        body = client.get("/screens/shot/1/12/1").json()
+        assert body["verdicts"] is None
+        assert len(body["coverage_segments"]) == 2
+
+    def test_their_order_is_preserved(self, client: TestClient, with_saved_ranges) -> None:
+        """Two ranges from one take, and which comes first is a decision
+        somebody made — not something to re-derive from the timecodes."""
+        segments = client.get("/screens/shot/1/12/1").json()["coverage_segments"]
+        assert [s["position"] for s in segments] == [0, 1]
+        assert segments[0]["source_in_s"] == 4.0
+        assert segments[1]["source_in_s"] == 17.0
+
+    def test_a_shot_with_none_reports_an_empty_list(self, client: TestClient, stubbed) -> None:
+        """Empty, never absent — the same rule the crew fields follow."""
+        body = client.get("/screens/shot/1/12/1").json()
+        assert body["coverage_segments"] == []

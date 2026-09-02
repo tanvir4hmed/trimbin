@@ -138,6 +138,9 @@ async def for_projects(project_ids: list[int], viewer: str) -> dict:
             circled_take=circled,
             chosen_take=row["chosen_take"],
             state=state,
+            # The source ranges a human has chosen, from the same Firestore
+            # coverage the cockpit writes and the scene reel plays.
+            segments=len(described.coverage_segments) if described else 0,
             threshold=margin_threshold,
         ).waiting_reason
 

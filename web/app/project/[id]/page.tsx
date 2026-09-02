@@ -95,6 +95,17 @@ export default function ProjectPage({
     [data],
   );
 
+  // What actually arrived, keyed the way the plan asks for it. The plan lists
+  // what somebody intends to shoot; without this the two read as one list and
+  // a scene nobody has shot looks identical to one that wrapped.
+  const takesByShot = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const scene of tree?.scenes ?? []) {
+      for (const shot of scene.shots) counts.set(`${scene.scene}:${shot.shot}`, shot.takes);
+    }
+    return counts;
+  }, [tree]);
+
   const openScene = tree?.scenes.find((s) => s.scene === open?.scene);
   const openShot = openScene?.shots.find((s) => s.shot === open?.shot);
 
@@ -280,6 +291,7 @@ export default function ProjectPage({
               scenes={data.plan.scenes}
               canEdit={canCurate}
               onChanged={() => void screen.refetch()}
+              takesByShot={takesByShot}
             />
           )}
         </div>
@@ -343,6 +355,7 @@ export default function ProjectPage({
                     scenes={data.plan.scenes}
                     canEdit={canCurate}
                     onChanged={() => void screen.refetch()}
+                    takesByShot={takesByShot}
                   />
                 )}
               </div>

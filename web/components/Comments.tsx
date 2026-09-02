@@ -64,6 +64,7 @@ export default function Comments({
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyBody, setReplyBody] = useState("");
   const [showResolved, setShowResolved] = useState(false);
+  const [composing, setComposing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { add, resolve } = useComment(projectId, scene, shot);
@@ -73,6 +74,7 @@ export default function Comments({
   useEffect(() => {
     if (!pending) return;
     setAnchor(pending);
+    setComposing(true);
     onConsumedPending();
     document.getElementById("comment-body")?.focus();
   }, [pending, onConsumedPending]);
@@ -88,6 +90,7 @@ export default function Comments({
       });
       setBody("");
       setAnchor(null);
+      setComposing(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save that note.");
     }
@@ -214,7 +217,21 @@ export default function Comments({
         </ul>
       )}
 
-      {canComment ? (
+      {canComment && !composing ? (
+        // One line until it is wanted. The box, its anchor line and its button
+        // used to sit open permanently at the bottom of the inspector, taking
+        // the same room whether or not anybody was writing anything.
+        <button
+          type="button"
+          className="ghost comment-open"
+          onClick={() => {
+            setComposing(true);
+            window.setTimeout(() => document.getElementById("comment-body")?.focus(), 0);
+          }}
+        >
+          ＋ Add a note{anchor ? ` at ${seconds(anchor.at)}` : ""}
+        </button>
+      ) : canComment ? (
         <div className="comment-new">
           {anchor && (
             <p className="c-anchor">
@@ -241,14 +258,27 @@ export default function Comments({
             }
             aria-label="New note"
           />
-          <button
-            type="button"
-            className="primary"
-            disabled={add.isPending || body.trim().length === 0}
-            onClick={() => void post()}
-          >
-            {add.isPending ? "Saving…" : "Leave the note"}
-          </button>
+          <div className="comment-new-actions">
+            <button
+              type="button"
+              className="primary"
+              disabled={add.isPending || body.trim().length === 0}
+              onClick={() => void post()}
+            >
+              {add.isPending ? "Saving…" : "Leave the note"}
+            </button>
+            <button
+              type="button"
+              className="linkish"
+              onClick={() => {
+                setComposing(false);
+                setBody("");
+                setAnchor(null);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       ) : (
         <p className="hint">Sign in to leave a note.</p>

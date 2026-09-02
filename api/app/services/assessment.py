@@ -74,6 +74,7 @@ def assess(
     circled_take: int = 0,
     chosen_take: int = 0,
     state: str = "",
+    segments: int = 0,
     threshold: float | None = None,
 ) -> Assessment:
     """The one rule.
@@ -84,26 +85,42 @@ def assess(
     1. A person who marked it approved has ended it, whatever the margin says.
        A set status is a claim by somebody with a name; a derived one is a claim
        about the system's confidence, and the first outranks the second.
-    2. A shot with one take has nothing to compare. That is a fact, not work.
-    3. A shot nothing has compared needs the comparison run.
-    4. A shot where the room circled a different take than the measurements
+    2. A person who has chosen at least one source range for this shot has also
+       ended it — the same kind of claim as (1), by the same kind of person.
+       This used to not exist, and it was wrong in two directions at once: a
+       one-take shot with a chosen range reported "too few takes" forever,
+       because nothing here knew a shot could be settled without a comparison;
+       and a many-take shot chosen without running the panel reported "not
+       compared yet" for a choice that had already been made.
+    3. A shot with one take has nothing to *compare* — but it still has
+       something to *decide*, now that a range can be chosen and trimmed from
+       a single take. Before multi-select coverage existed this really was
+       nothing but a fact, and the queue skipped it outright; it no longer is.
+    4. A shot nothing has compared needs the comparison run.
+    5. A shot where the room circled a different take than the measurements
        chose needs a person whether or not the call was close — the circle knows
        about performance, which this system deliberately never judges.
-    5. Somebody already working on it is shown, not hidden, so a second editor
+    6. Somebody already working on it is shown, not hidden, so a second editor
        does not start the same shot.
-    6. A confirmed shot is done.
-    7. A close call needs a person.
+    7. A confirmed shot is done.
+    8. A close call needs a person.
 
-    Keyword-only, because four of these are booleans and integers in a row and a
-    positional call site is one transposition away from being confidently wrong.
+    Keyword-only, because several of these are booleans and integers in a row
+    and a positional call site is one transposition away from being confidently
+    wrong.
     """
     limit = review_margin() if threshold is None else threshold
 
     if state == APPROVED:
         return Assessment("confirmed", None)
 
+    if segments > 0:
+        return Assessment("confirmed", None)
+
     if takes < 2:
-        return Assessment("too_few_takes", None)
+        if state == IN_PROGRESS:
+            return Assessment("too_few_takes", "someone is on it")
+        return Assessment("too_few_takes", "choose a range to use")
 
     if not has_verdict:
         return Assessment("not_judged", "not compared yet")

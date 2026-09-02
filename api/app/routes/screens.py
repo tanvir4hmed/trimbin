@@ -136,10 +136,16 @@ async def shot_screen(
     )
     analyses = [schemas.TakeAnalysis(**row) for row in loaded]
 
+    # Read from the shot itself, not from the verdicts it may not have. The
+    # same helper the comparison uses, so a shot that has been compared and one
+    # that has not report their chosen ranges identically.
+    coverage = review_routes._coverage_for_screen(brief, [take.model_dump() for take in takes])
+
     return schemas.ShotScreen(
         verdicts=verdicts,
         brief=schemas.Brief(**brief.as_dict(), is_empty=brief.is_empty),
         takes=takes,
+        coverage_segments=[schemas.CoverageSegment(**row) for row in coverage],
         analyses=analyses,
         comments=[schemas.Comment(**c) for c in notes],
         open_comments=sum(1 for c in notes if not c["resolved"]),

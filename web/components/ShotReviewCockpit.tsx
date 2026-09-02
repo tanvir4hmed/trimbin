@@ -118,7 +118,12 @@ export default function ShotReviewCockpit({
   const b = takes.find((take) => take.clip_id === bId) ?? takes[1] ?? takes[0];
   const selected = activeSide === "a" ? a : b;
   const selectedAnalysis = selected ? analysisFor(analyses, selected.clip_id) : undefined;
-  const saveCoverage = useSaveCoverage(projectId, scene, shot, verdicts?.rev ?? 0);
+  // The brief's revision, which is the shot document's revision — the same one
+  // `commit_coverage` checks. `verdicts.rev` is a copy of it and is null when
+  // nothing has been compared, so on a one-take shot this sent 0 forever: the
+  // first save succeeded, bumped the shot to rev 1, and every save after it
+  // was refused as a stale write.
+  const saveCoverage = useSaveCoverage(projectId, scene, shot, screen.data?.brief.rev ?? 0);
   const [selects, setSelects] = useState<CoverageSegment[]>([]);
   const [selectPreviewIndex, setSelectPreviewIndex] = useState<number | null>(null);
   const findingAction = useFindingAction(projectId, scene, shot);
@@ -138,8 +143,11 @@ export default function ShotReviewCockpit({
   }, [selected, analyses]);
 
   useEffect(() => {
-    setSelects((verdicts?.coverage_segments ?? []).map((item, position) => ({ ...item, position })));
-  }, [verdicts?.coverage_segments]);
+    // From the shot, not from a comparison it may never have had. Reading this
+    // off `verdicts` meant every saved range vanished on refresh for any shot
+    // with fewer than two takes — saved correctly, then never asked for.
+    setSelects((screen.data?.coverage_segments ?? []).map((item, position) => ({ ...item, position })));
+  }, [screen.data?.coverage_segments]);
 
   const activePlayer = (clipId: string) => (clipId === a?.clip_id ? playerA.current : playerB.current);
   const inspect = (clipId: string, finding: FindingEvent) => {

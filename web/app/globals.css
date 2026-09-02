@@ -2316,3 +2316,18 @@ body{background:var(--bg);color:var(--ink)}
    both sides when there was nothing to compare against. */
 .compare-players.single{grid-template-columns:1fr}
 .compare-players.single .compare-player{max-width:900px;margin:auto}
+
+/* The note composer, folded. It used to sit open at the bottom of the
+   inspector — anchor line, textarea and button — taking the same room whether
+   or not anybody was writing. */
+.comment-open{width:100%;text-align:left;font-size:11px}
+.comment-new-actions{display:flex;gap:10px;align-items:center}
+
+/* A plan is what somebody intends to shoot; the tree is what arrived. Drawn
+   without the difference, an unshot scene looked identical to a wrapped one —
+   and the add-forms' placeholders ("1B", "wide, Maya CU, reverse") read as
+   real shots that did not exist. */
+.plan-footage{font-style:normal;color:var(--faint)}
+.plan-takes{margin-left:auto;padding:2px 7px;border:1px solid var(--line);border-radius:20px;color:var(--low);font-size:10px}
+.plan-add{align-items:center}
+.plan-add-label{color:var(--faint);font-size:10px;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}

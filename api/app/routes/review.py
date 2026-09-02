@@ -1021,6 +1021,7 @@ async def tree(
                     circled,
                     int(chosen_take or 0),
                     meta.state if meta else "",
+                    len(meta.coverage_segments) if meta else 0,
                 ),
                 "state": meta.state if meta else "",
                 "assignee": meta.assignee if meta else "",
@@ -1064,6 +1065,7 @@ def _status(
     circled: int = 0,
     chosen: int = 0,
     state: str = "",
+    segments: int = 0,
 ) -> str:
     """The dot beside a shot, from the one rule in services/assessment.py."""
     return assessment.assess(
@@ -1074,6 +1076,7 @@ def _status(
         circled_take=circled,
         chosen_take=chosen,
         state=state,
+        segments=segments,
     ).status
 
 

@@ -2756,6 +2756,11 @@ export interface components {
              */
             takes: components["schemas"]["Take"][];
             /**
+             * Coverage Segments
+             * @default []
+             */
+            coverage_segments: components["schemas"]["CoverageSegment"][];
+            /**
              * Analyses
              * @default []
              */

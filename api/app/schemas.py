@@ -550,6 +550,13 @@ class ShotScreen(Model):
     # comparison needs two takes and footage does not, and reading the takes out
     # of the verdicts meant a shot holding one clip drew no player at all.
     takes: list[Take] = []
+    # The ordered source ranges a human has chosen, for the same reason. These
+    # live in Firestore and never needed a comparison to exist — but they were
+    # only ever returned nested inside `verdicts`, so on an uncompared shot the
+    # cockpit read `verdicts?.coverage_segments` as undefined and every saved
+    # range disappeared on refresh. The ranges were never lost; the screen just
+    # stopped asking for them.
+    coverage_segments: list[CoverageSegment] = []
     # Full-take read models are bundled with the screen. The browser can switch
     # takes, seek findings and redraw every lane without a ClickHouse request in
     # the interaction path.
