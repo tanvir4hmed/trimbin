@@ -15,7 +15,7 @@ import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AskArchive from "@/components/AskArchive";
-import PlacementInbox from "@/components/PlacementInbox";
+import PlacementBanner from "@/components/PlacementBanner";
 import SceneTree from "@/components/SceneTree";
 import ShotReviewCockpit from "@/components/ShotReviewCockpit";
 import { ApiError } from "@/lib/api";
@@ -274,14 +274,11 @@ export default function ProjectPage({
         </div>
       )}
 
-      {/* Draws nothing until a clip is actually waiting, so it costs an empty
-          project nothing and cannot be missed on a project where ingest found
-          a file in the wrong folder. */}
-      <PlacementInbox
-        projectId={projectId}
-        plan={data.plan.scenes}
-        canResolve={canCurate}
-      />
+      {/* A count and a route to the work, not the work itself. The whole inbox
+          rendered here — every waiting clip with its slate frame and its three
+          buttons — which is right for two clips and would bury the workspace
+          under forty. Settling happens on the ingest page, once. */}
+      <PlacementBanner projectId={projectId} />
 
       {!empty && (
         <AskArchive

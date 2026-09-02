@@ -2386,3 +2386,12 @@ body{background:var(--bg);color:var(--ink)}
 .finding-take-group h4{display:flex;justify-content:space-between;margin:0 0 4px;color:var(--cockpit-dim,#8ea2bb);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
 .finding-take-group h4 span{color:var(--faint)}
 .rail-scene-search{width:100%;margin-bottom:7px;padding:7px 9px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:5px;font-size:11.5px}
+
+/* Uploaded but not placed. A count and a route, so a shoot day's worth of
+   clips cannot bury the workspace under its own inbox. */
+.placement-banner{display:flex;gap:12px;align-items:center;margin:12px 0;padding:12px 14px;background:#2a2412;border:1px solid #7a6428;border-radius:8px;color:#f0d79a;text-decoration:none}
+.placement-banner:hover{border-color:#a2862f}
+.placement-banner-count{min-width:30px;height:30px;display:grid;place-items:center;background:#5c4a17;border-radius:50%;color:#ffe6ad;font-weight:700;font-size:12px}
+.placement-banner b{display:block;font-size:12px}
+.placement-banner small{color:#c9b07a;font-size:11px}
+.placement-banner i{margin-left:auto;font-style:normal;font-size:11px;white-space:nowrap}

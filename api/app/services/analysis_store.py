@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
@@ -196,70 +197,41 @@ async def finding_event_exists(project_id: int, event_id: UUID) -> bool:
     return bool(result.result_rows and result.result_rows[0][0])
 
 
-async def read(project_id: int, clip_id: UUID) -> dict:
-    ch = await client()
-    clip_result = await ch.query(
-        """
+_CLIP_SQL = """
         SELECT group_id, subgroup_id, take_no, duration_ms / 1000 AS duration_s,
                proxy_uri, sprite_uri, fps, scene_code, shot_code
         FROM current_clip_placement
         WHERE project_id={p:UInt32} AND clip_id={c:UUID} AND status='active'
         ORDER BY ingested_at DESC
         LIMIT 1
-        """,
-        parameters={"p": project_id, "c": clip_id},
-    )
-    clip = {}
-    if clip_result.result_rows:
-        clip = dict(zip(clip_result.column_names, clip_result.result_rows[0], strict=True))
-
-    run_result = await ch.query(
         """
+
+_RUN_SQL = """
         SELECT run_id, run_key, state, duration_s, covered_until_s, window_count,
                segment_count, finding_count, model_id, prompt_version, error, occurred_at
         FROM current_analysis_runs
         WHERE project_id={p:UInt32} AND clip_id={c:UUID}
-        """,
-        parameters={"p": project_id, "c": clip_id},
-    )
-    run = {}
-    if run_result.result_rows:
-        run = dict(zip(run_result.column_names, run_result.result_rows[0], strict=True))
-
-    segment_result = await ch.query(
         """
+
+_SEGMENT_SQL = """
         SELECT segment_id, run_id, start_s, end_s, description, transcript,
                actions, objects, speakers, shot_size, camera_motion,
                arrayExists(x -> x != 0, embedding) AS has_embedding
         FROM current_clip_segments
         WHERE project_id={p:UInt32} AND clip_id={c:UUID}
         ORDER BY start_s, segment_id
-        """,
-        parameters={"p": project_id, "c": clip_id},
-    )
-    segments = [
-        dict(zip(segment_result.column_names, row, strict=True))
-        for row in segment_result.result_rows
-    ]
-
-    finding_result = await ch.query(
         """
+
+_FINDING_SQL = """
         SELECT clip_id, finding_id, event_id, run_id, revision, action, code, detail,
                severity, start_s, end_s, evidence_segment_ids, sources, actor_id,
                actor_role, occurred_at
         FROM current_findings
         WHERE project_id={p:UInt32} AND clip_id={c:UUID}
         ORDER BY start_s, finding_id
-        """,
-        parameters={"p": project_id, "c": clip_id},
-    )
-    findings = [
-        dict(zip(finding_result.column_names, row, strict=True))
-        for row in finding_result.result_rows
-    ]
-
-    history_result = await ch.query(
         """
+
+_HISTORY_SQL = """
         SELECT *
         FROM
         (
@@ -272,9 +244,52 @@ async def read(project_id: int, clip_id: UUID) -> dict:
             LIMIT 1 BY event_id
         )
         ORDER BY finding_id, revision, occurred_at, event_id
-        """,
-        parameters={"p": project_id, "c": clip_id},
+        """
+
+
+async def read(project_id: int, clip_id: UUID) -> dict:
+    """One clip's analysis, in one wait rather than five.
+
+    These five statements share their parameters and none reads another's
+    result, but they were awaited in a row — five sequential round trips to a
+    cloud database per clip. The shot screen runs this once per take, so a
+    two-take shot paid ten sequential hops and a six-take shot thirty. It
+    measured 1.15s for two takes and grew with the take count.
+
+    Same statements, same parameters, same results; only the waiting is shared.
+    """
+    ch = await client()
+    params = {"p": project_id, "c": clip_id}
+    clip_result, run_result, segment_result, finding_result, history_result = await asyncio.gather(
+        ch.query(_CLIP_SQL, parameters=params),
+        ch.query(_RUN_SQL, parameters=params),
+        ch.query(_SEGMENT_SQL, parameters=params),
+        ch.query(_FINDING_SQL, parameters=params),
+        ch.query(_HISTORY_SQL, parameters=params),
     )
+    # clip_result is awaited together with the others above
+    clip = {}
+    if clip_result.result_rows:
+        clip = dict(zip(clip_result.column_names, clip_result.result_rows[0], strict=True))
+
+    # run_result is awaited together with the others above
+    run = {}
+    if run_result.result_rows:
+        run = dict(zip(run_result.column_names, run_result.result_rows[0], strict=True))
+
+    # segment_result is awaited together with the others above
+    segments = [
+        dict(zip(segment_result.column_names, row, strict=True))
+        for row in segment_result.result_rows
+    ]
+
+    # finding_result is awaited together with the others above
+    findings = [
+        dict(zip(finding_result.column_names, row, strict=True))
+        for row in finding_result.result_rows
+    ]
+
+    # history_result is awaited together with the others above
     history = [
         dict(zip(history_result.column_names, row, strict=True))
         for row in history_result.result_rows
