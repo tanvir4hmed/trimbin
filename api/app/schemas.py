@@ -759,6 +759,13 @@ class PlacementItem(Model):
     duration_s: float
     camera: str
     filename: str
+    # The take these bytes already occupy, if a settled one exists. Empty when
+    # there is none — never re-parsed out of `detail`, so the interface can
+    # offer Replace on a structural fact rather than a free-text guess.
+    duplicate_of: str = ""
+    duplicate_scene: int = 0
+    duplicate_shot: int = 0
+    duplicate_take: int = 0
 
 
 class PlacementInbox(Model):

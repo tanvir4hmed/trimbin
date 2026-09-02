@@ -2196,6 +2196,26 @@ export interface components {
             camera: string;
             /** Filename */
             filename: string;
+            /**
+             * Duplicate Of
+             * @default
+             */
+            duplicate_of: string;
+            /**
+             * Duplicate Scene
+             * @default 0
+             */
+            duplicate_scene: number;
+            /**
+             * Duplicate Shot
+             * @default 0
+             */
+            duplicate_shot: number;
+            /**
+             * Duplicate Take
+             * @default 0
+             */
+            duplicate_take: number;
         };
         /** PlacementResolved */
         PlacementResolved: {
@@ -2538,6 +2558,11 @@ export interface components {
              * @default 0
              */
             shot: number;
+            /**
+             * Take
+             * @default 0
+             */
+            take: number;
             /**
              * Note
              * @default

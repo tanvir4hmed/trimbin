@@ -79,7 +79,10 @@ export default function PlacementInbox({
           shot: row.declared_shot || row.shot,
         };
         const shots = plan.find((s) => s.scene === chosen.scene)?.shots ?? [];
-        const duplicate = row.detail.startsWith("same content");
+        // Structural now, not a guess at the wording of `detail`. Empty when
+        // the bytes exist only here, or when the other copy is itself still
+        // unresolved — there is nothing settled yet to replace.
+        const duplicate = Boolean(row.duplicate_of);
 
         return (
           <div key={row.clip_id} className="inbox-row">
@@ -212,10 +215,28 @@ export default function PlacementInbox({
               )}
 
               {duplicate && (
-                <p className="hint small">
-                  Kept, not deleted. Somebody uploading the same file twice may
-                  have meant to.
-                </p>
+                <div className="ir-duplicate">
+                  <p className="hint small">
+                    Same bytes as the clip already standing in{" "}
+                    <b className="mono">
+                      {row.duplicate_scene}/{row.duplicate_shot} take {row.duplicate_take}
+                    </b>
+                    . Kept, not deleted — replacing only changes which of the
+                    two is current for that take.
+                  </p>
+                  {canResolve && (
+                    <button
+                      type="button"
+                      className="ghost small"
+                      disabled={resolve.isPending}
+                      onClick={() =>
+                        resolve.mutate({ clipId: row.clip_id, body: { action: "replace" } })
+                      }
+                    >
+                      Replace the existing take with this one
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>

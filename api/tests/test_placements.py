@@ -46,10 +46,10 @@ class TestTheVocabularyIsClosed:
 
 
 class TestTheActionsAreClosed:
-    """Three things a person can say, and no fourth."""
+    """Four things a person can say, and no fifth."""
 
-    def test_only_three_actions_are_accepted(self) -> None:
-        for action in ("move", "keep", "unassign"):
+    def test_only_four_actions_are_accepted(self) -> None:
+        for action in ("move", "keep", "unassign", "replace"):
             routes.Resolution(action=action, scene=12, shot=3)
 
     def test_anything_else_is_refused(self) -> None:
@@ -118,10 +118,10 @@ class TestKeepCannotBecomeAMove:
             return None
 
         async def inbox(project_id):
-            return [{"clip_id": str(clip), "scene": 12, "shot": 3}]
+            return [{"clip_id": str(clip), "scene": 12, "shot": 3, "take_no": 4}]
 
-        async def resolve(project_id, clip_id, scene, shot, actor, detail=""):
-            recorded.update(scene=scene, shot=shot)
+        async def resolve(project_id, clip_id, scene, shot, actor, detail="", *, take_no=0):
+            recorded.update(scene=scene, shot=shot, take_no=take_no)
 
         async def noted(*args, **kwargs):
             return None
@@ -138,7 +138,7 @@ class TestKeepCannotBecomeAMove:
             routes.Resolution(action="keep", scene=99, shot=99),
             Principal(email="editor@example.com"),
         )
-        assert recorded == {"scene": 12, "shot": 3}
+        assert recorded == {"scene": 12, "shot": 3, "take_no": 4}
 
     @pytest.mark.asyncio
     async def test_keeping_something_already_settled_is_a_conflict(
@@ -177,6 +177,91 @@ class TestDuplicateDetection:
         """A clip whose bytes could not be hashed is not a duplicate of
         everything else that could not be hashed."""
         assert await placements.duplicates_of(1, "") == []
+
+
+class TestReplacingADuplicate:
+    """Never a delete. Two clips, two sets of bytes, two histories — only
+    which one is *current* for a take changes."""
+
+    @pytest.mark.asyncio
+    async def test_replace_without_a_duplicate_is_refused(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Nothing to replace, so nothing happens. The 409 is the same shape as
+        `keep` on an already-settled clip: a decision that no longer applies."""
+        import uuid
+
+        from fastapi import HTTPException
+
+        from app.auth import Principal
+
+        async def allowed(self, project_id):
+            return None
+
+        async def none(project_id, clip_id):
+            return None
+
+        monkeypatch.setattr(Principal, "assert_can_curate", allowed)
+        monkeypatch.setattr(routes.placements, "settled_duplicate", none)
+
+        with pytest.raises(HTTPException) as raised:
+            await routes.resolve(
+                1,
+                uuid.uuid4(),
+                routes.Resolution(action="replace"),
+                Principal(email="editor@example.com"),
+            )
+        assert raised.value.status_code == 409
+
+    @pytest.mark.asyncio
+    async def test_replace_settles_the_new_clip_and_retires_the_old_one(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """One call places the new clip where the old one sat; a second
+        retires the old one to unassigned. Neither clip, its bytes, or its
+        history is ever removed — only which is current for that take."""
+        import uuid
+
+        from app.auth import Principal
+
+        new_clip = uuid.uuid4()
+        old_clip = uuid.uuid4()
+        resolved: list[tuple] = []
+
+        async def allowed(self, project_id):
+            return None
+
+        async def duplicate(project_id, clip_id):
+            assert clip_id == new_clip
+            return {"clip_id": str(old_clip), "scene": 12, "shot": 3, "take_no": 2}
+
+        async def resolve(project_id, clip_id, scene, shot, actor, detail="", *, take_no=0):
+            resolved.append((clip_id, scene, shot, take_no, detail))
+
+        async def noted(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(Principal, "assert_can_curate", allowed)
+        monkeypatch.setattr(routes.placements, "settled_duplicate", duplicate)
+        monkeypatch.setattr(routes.placements, "resolve", resolve)
+        monkeypatch.setattr(routes.activity, "record", noted)
+
+        await routes.resolve(
+            1,
+            new_clip,
+            routes.Resolution(action="replace"),
+            Principal(email="editor@example.com"),
+        )
+
+        by_clip = {
+            clip_id: (scene, shot, take_no, detail)
+            for clip_id, scene, shot, take_no, detail in resolved
+        }
+        # The new clip takes the old one's exact slot.
+        assert by_clip[new_clip] == (12, 3, 2, f"replaces duplicate {str(old_clip)[:8]}")
+        # The old clip is parked, not deleted — the same shape "unassign" uses.
+        assert by_clip[old_clip][:3] == (0, 0, 0)
+        assert str(new_clip)[:8] in by_clip[old_clip][3]
 
 
 class TestPlacementEventsAreTotallyOrdered:

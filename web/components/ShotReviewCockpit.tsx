@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Comments from "@/components/Comments";
 import Player, { type PlayerHandle } from "@/components/Player";
+import ShotBrief from "@/components/ShotBrief";
 import { api, type CoverageSegment, type FindingEvent, type SourceClip, type Take, type TakeAnalysis } from "@/lib/api";
 import {
   conflictMessage,
@@ -372,6 +373,23 @@ export default function ShotReviewCockpit({
                 }
               }}
             />
+            {screen.data?.brief && (
+              // Built and wired to both agents from the start — the analyst's
+              // briefing already renders these five fields into the model's
+              // context, with its own rule stated beside them: "It tells you
+              // where to look; the footage tells you what is there, and where
+              // they disagree the footage is right." Nobody could ever reach
+              // the editor for it, so no shot has ever been analysed against
+              // a script line.
+              <ShotBrief
+                projectId={projectId}
+                scene={scene}
+                shot={shot}
+                brief={screen.data.brief}
+                canEdit={canCurate}
+                onSave={(fields) => edits.saveBrief.mutateAsync(fields)}
+              />
+            )}
             <div className="finding-list"><h3>Findings to verify</h3>{analyses.flatMap((analysis) => analysis.findings.map((finding) => ({ analysis, finding }))).slice(0, 8).map(({ analysis, finding }) => <button key={String(finding.finding_id)} onClick={() => inspect(String(analysis.clip_id), finding)}><span className={`finding-dot severity-${finding.severity}`} /><span><b>{tc(finding.start_s)}–{tc(finding.end_s)} {label(finding.code)}</b><small>Take {analysis.clip.take_no} · {finding.detail}</small></span><i>›</i></button>)}</div>
           </>
         )}

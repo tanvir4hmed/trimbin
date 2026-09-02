@@ -627,11 +627,18 @@ export const api = {
       `/placements/${projectId}`,
     ),
 
-  /** Settle one. Move, keep where it is, or park it — never automatic. */
+  /** Settle one. Move, keep where it is, park it, or replace a duplicate —
+   *  never automatic, and never a delete. */
   resolvePlacement: (
     projectId: number,
     clipId: string,
-    body: { action: "move" | "keep" | "unassign"; scene?: number; shot?: number; note?: string },
+    body: {
+      action: "move" | "keep" | "unassign" | "replace";
+      scene?: number;
+      shot?: number;
+      take?: number;
+      note?: string;
+    },
   ) =>
     request<{ status: string; scene: number; shot: number; detail: string }>(
       `/placements/${projectId}/${clipId}`,

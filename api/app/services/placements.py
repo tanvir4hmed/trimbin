@@ -188,12 +188,25 @@ async def inbox(project_id: int) -> list[dict]:
                p.source, p.actor, p.confidence, p.state, p.slate_raw,
                p.declared_group, p.declared_shot, p.detail, p.decided_at,
                c.proxy_uri, c.sprite_uri, c.slate_uri, c.duration_ms, c.camera,
-               c.storage_uri
+               c.storage_uri,
+               -- The take these bytes already occupy, if a settled one exists.
+               -- Structural, not re-parsed out of `detail`, so the interface
+               -- can offer Replace without guessing at free text. Only a
+               -- *settled* duplicate counts: two unresolved copies sitting in
+               -- the inbox together are not occupying anything yet.
+               dup.clip_id, dup.group_id, dup.subgroup_id, dup.take_no
         FROM placement_inbox AS p
         LEFT JOIN clips AS c
             ON c.clip_id = p.clip_id AND c.project_id = p.project_id
+        LEFT JOIN current_clip_placement AS dup
+            ON dup.project_id = p.project_id
+            AND dup.content_hash = c.content_hash
+            AND dup.content_hash != ''
+            AND dup.clip_id != p.clip_id
+            AND dup.group_id > 0 AND dup.subgroup_id > 0
         WHERE p.project_id = {p:UInt32}
         ORDER BY p.decided_at DESC
+        LIMIT 1 BY p.clip_id
         LIMIT 500
         """,
         parameters={"p": project_id},
@@ -222,6 +235,14 @@ async def inbox(project_id: int) -> list[dict]:
             # The filename the editor dragged in, recovered from the object
             # path. A uuid tells them nothing about which file to look at.
             "filename": (r[18] or "").rsplit("/", 1)[-1],
+            # A LEFT JOIN with no match gives the UUID column's zero value, not
+            # NULL — the same sentinel this system already uses elsewhere for
+            # "no placement event exists". `duplicate_scene` is the honest
+            # signal; it is 0 exactly when the join found nothing.
+            "duplicate_of": str(r[19]) if int(r[20]) > 0 else "",
+            "duplicate_scene": int(r[20]),
+            "duplicate_shot": int(r[21]),
+            "duplicate_take": int(r[22]),
         }
         for r in result.result_rows
     ]
@@ -267,3 +288,45 @@ async def duplicates_of(project_id: int, content_hash: str) -> list[str]:
         parameters={"p": project_id, "h": content_hash},
     )
     return [r[0] for r in result.result_rows]
+
+
+async def settled_duplicate(project_id: int, clip_id: UUID) -> dict | None:
+    """The take this clip's bytes are already occupying, if any.
+
+    Reported at ingest as a flag in a job that expires; the inbox needed the
+    same fact structurally, not re-parsed out of a detail string, so a
+    "Replace" action can act on it. Only a *settled* duplicate counts — a
+    second copy still waiting in the inbox itself is not occupying a shot, and
+    there is nothing yet to replace.
+
+    Looked up fresh rather than trusted from an earlier listing: the duplicate
+    could have been moved, replaced, or unassigned between the inbox being read
+    and this clip being resolved, and acting on a stale answer is exactly the
+    silent-relocation mistake this whole table exists to prevent.
+    """
+    ch = await client()
+    result = await ch.query(
+        """
+        SELECT toString(dup.clip_id), dup.group_id, dup.subgroup_id, dup.take_no
+        FROM clips AS c
+        INNER JOIN current_clip_placement AS dup
+            ON dup.project_id = c.project_id
+            AND dup.content_hash = c.content_hash
+        WHERE c.project_id = {p:UInt32} AND c.clip_id = {id:UUID}
+          AND c.content_hash != ''
+          AND dup.clip_id != c.clip_id
+          AND dup.group_id > 0 AND dup.subgroup_id > 0
+        ORDER BY dup.ingested_at DESC
+        LIMIT 1
+        """,
+        parameters={"p": project_id, "id": str(clip_id)},
+    )
+    if not result.result_rows:
+        return None
+    row = result.result_rows[0]
+    return {
+        "clip_id": row[0],
+        "scene": int(row[1]),
+        "shot": int(row[2]),
+        "take_no": int(row[3]),
+    }
