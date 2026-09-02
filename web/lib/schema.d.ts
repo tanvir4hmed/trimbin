@@ -2721,6 +2721,11 @@ export interface components {
             verdicts?: components["schemas"]["Verdicts"] | null;
             brief: components["schemas"]["Brief"];
             /**
+             * Takes
+             * @default []
+             */
+            takes: components["schemas"]["Take"][];
+            /**
              * Analyses
              * @default []
              */

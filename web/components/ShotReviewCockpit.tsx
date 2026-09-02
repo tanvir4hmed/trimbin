@@ -72,8 +72,15 @@ export default function ShotReviewCockpit({
   const screen = useShotScreen(projectId, scene, shot);
   const verdicts = screen.data?.verdicts;
   const analyses = screen.data?.analyses ?? [];
-  const takes = verdicts?.takes ?? [];
-  const recommended = takes.find((take) => take.clip_id === verdicts?.recommended) ?? takes[0];
+  // The shot's footage, which exists whether or not a comparison does. Reading
+  // takes out of the verdicts meant a shot holding one clip drew nothing at
+  // all — no player, no lanes, no way to cut a range — while its proxy sat
+  // built and reachable.
+  const takes = screen.data?.takes ?? [];
+  const compared = Boolean(verdicts && verdicts.takes.length);
+  const recommended = compared
+    ? takes.find((take) => take.clip_id === verdicts?.recommended) ?? takes[0]
+    : undefined;
   const [aId, setAId] = useState("");
   const [bId, setBId] = useState("");
   const [activeSide, setActiveSide] = useState<"a" | "b">("a");
@@ -220,9 +227,12 @@ export default function ShotReviewCockpit({
 
   if (screen.isPending) return <div className="cockpit-state">Loading shot intelligence…</div>;
   if (screen.isError) return <div className="cockpit-state error">Could not load this shot. <button onClick={() => void screen.refetch()}>Retry</button></div>;
-  if (!verdicts || !takes.length) return <div className="cockpit-state"><div><p>No takes have been compared for this shot yet.</p>{canCurate && <button className="primary" disabled={judge.isPending} onClick={() => void judge.mutateAsync()}>{judge.isPending ? "Comparing full takes…" : "Analyse & compare takes"}</button>}</div></div>;
+  // Only a shot with no footage at all is empty. One take is a shot you can
+  // watch, analyse and cut a range from; it is merely a shot nothing can be
+  // compared against.
+  if (!takes.length) return <div className="cockpit-state"><div><p>No footage has been placed in this shot yet.</p><p className="policy-note">Upload takes, or move a clip here from the placement inbox.</p></div></div>;
 
-  const humanChoiceRecorded = verdicts.rev > 0 || takes.some(
+  const humanChoiceRecorded = (verdicts?.rev ?? 0) > 0 || selects.length > 0 || takes.some(
     (take) => take.outcome === "selected" && take.decided_by === "human",
   );
   const selectedAt = selected ? playheads[selected.clip_id] ?? 0 : 0;
@@ -273,7 +283,7 @@ export default function ShotReviewCockpit({
             return <button key={take.clip_id} className={selected?.clip_id === take.clip_id ? "take-card selected" : "take-card"} onClick={() => { if (take.clip_id === a?.clip_id) setActiveSide("a"); else if (take.clip_id === b?.clip_id) setActiveSide("b"); else { setBId(take.clip_id); setActiveSide("b"); } }}>
               <span className="take-card-no">Take {take.take_no}</span>
               <span className="take-badges"><b>PROXY</b><b>{take.fps ? `${Math.round(take.fps)} FPS` : "FPS UNMEASURED"}</b></span>
-              <span className="take-score">{Math.round(take.score * 100)} <small>technical</small></span>
+              <span className="take-score">{compared ? <>{Math.round(take.score * 100)} <small>technical</small></> : <small>not compared</small>}</span>
               <span className={issueCount ? "issue-count" : "issue-count clean"}>{issueCount ? `${issueCount} issue${issueCount === 1 ? "" : "s"}` : "clean"}</span>
             </button>;
           })}
@@ -303,16 +313,26 @@ export default function ShotReviewCockpit({
           <FindingInspector focus={focus} take={takes.find((take) => take.clip_id === focus.clipId)} adjusting={adjusting} setAdjusting={setAdjusting} onChange={(start, end) => setFocus({ ...focus, finding: { ...focus.finding, start_s: start, end_s: end } })} onConfirm={() => void act("confirm")} onDismiss={() => void act("dismiss")} onCorrect={(detail, severity) => void act("correct", { detail, severity })} onAdjust={() => void act("adjust_range")} pending={findingAction.isPending} canAct={canComment} />
         ) : (
           <>
-            <p className="eyebrow">AI RECOMMENDATION</p>
-            <div className="recommendation">
-              <span className="recommend-icon">✦</span>
-              <div><h2>Take {recommended?.take_no} suggested</h2><p>{recommended?.reason || "Best observable technical coverage."}</p></div>
-              <b>{recommended ? Math.round(recommended.score * 100) : 0}%</b>
-            </div>
-            <p className="policy-note">Technical, continuity and completion evidence only. Performance remains your decision.</p>
+            <p className="eyebrow">{compared ? "AI RECOMMENDATION" : "NOT COMPARED"}</p>
+            {/* A field of one has no winner, and a score of 0% beside the only
+                take reads as a verdict against it. Say what is true instead. */}
+            {compared && recommended ? <>
+              <div className="recommendation">
+                <span className="recommend-icon">✦</span>
+                <div><h2>Take {recommended.take_no} suggested</h2><p>{recommended.reason || "Best observable technical coverage."}</p></div>
+                <b>{Math.round(recommended.score * 100)}%</b>
+              </div>
+              <p className="policy-note">Technical, continuity and completion evidence only. Performance remains your decision.</p>
+            </> : <>
+              <div className="recommendation not-compared">
+                <span className="recommend-icon">◇</span>
+                <div><h2>{takes.length === 1 ? "One take in this shot" : `${takes.length} takes, not yet compared`}</h2><p>{takes.length === 1 ? "There is nothing to compare it against. Watch it, review its findings and cut the ranges you want." : "Run the comparison to get a suggestion, or select ranges yourself."}</p></div>
+              </div>
+              {canCurate && takes.length > 1 && <button className="primary" disabled={judge.isPending} onClick={() => void judge.mutateAsync()}>{judge.isPending ? "Comparing full takes…" : "Analyse & compare takes"}</button>}
+            </>}
             {selected && <div className="selection-card">
               <h3>Add source range</h3>
-              <div className="selection-take">Take {selected.take_no}<span>{selected.clip_id === recommended?.clip_id ? "AI suggestion" : "Alternative"}</span></div>
+              <div className="selection-take">Take {selected.take_no}<span>{!compared ? "Only take" : selected.clip_id === recommended?.clip_id ? "AI suggestion" : "Alternative"}</span></div>
               <label>Use range<div className="range-inputs"><input type="number" step="0.01" min="0" max={selected.duration_s} value={range.from} onChange={(event) => setRange({ ...range, from: Number(event.target.value) })} /><span>→</span><input type="number" step="0.01" min="0" max={selected.duration_s} value={range.to} onChange={(event) => setRange({ ...range, to: Number(event.target.value) })} /></div></label>
               {selected.clip_id !== recommended?.clip_id && <div className="reason-chips">{HUMAN_REASONS.map((item) => <button key={item} className={reason === item ? "chip on" : "chip"} onClick={() => setReason(item)}>{item}</button>)}</div>}
               <button className="ghost cockpit-confirm" disabled={!canComment || !(range.to > range.from)} onClick={addRange}>{canComment ? `Add Take ${selected.take_no} range` : "Sign in to select ranges"}</button>

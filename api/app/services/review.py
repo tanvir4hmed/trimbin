@@ -436,3 +436,81 @@ def _merge_findings(measured: list[dict], observed, duration_s: float) -> list[d
         )
 
     return out
+
+
+async def takes_in_shot(project_id: int, group_id: int, subgroup_id: int) -> list[dict]:
+    """Every take in this shot, whether or not anything has judged it.
+
+    A comparison needs two takes. Footage does not. The cockpit was built to
+    read its takes out of the verdicts, so a shot holding one clip returned no
+    verdicts, drew no player, and an editor who had just uploaded a take could
+    not watch it — the proxy was built and reachable the whole time.
+
+    It also blocked the thing verdicts have nothing to do with: choosing source
+    ranges. A single take is a perfectly good thing to select a range from.
+
+    So this answers "what footage is in this shot", and the verdicts answer
+    "what a comparison concluded about it". The fields a decision would have
+    filled are left empty rather than invented: no score, no outcome, no
+    recommendation.
+    """
+    ch = await client()
+    result = await ch.query(
+        """
+        SELECT toString(clip_id), take_no, duration_ms / 1000,
+               proxy_uri, sprite_uri, camera, fps, scene_code, shot_code,
+               captured_at, finding_codes, finding_starts_s, finding_ends_s
+        FROM current_clip_placement
+        WHERE project_id = {p:UInt32} AND group_id = {g:UInt32}
+          AND subgroup_id = {s:UInt32} AND status = 'active'
+        ORDER BY take_no, clip_id
+        """,
+        parameters={"p": project_id, "g": group_id, "s": subgroup_id},
+    )
+
+    takes = []
+    for row in result.result_rows:
+        duration_s = max(float(row[2]), 0.001)
+        takes.append(
+            {
+                "clip_id": str(row[0]),
+                "take_no": int(row[1]),
+                "outcome": "",
+                "score": 0.0,
+                "margin": 0.0,
+                "reason": "",
+                "reason_code": "",
+                "findings": [
+                    {
+                        "code": str(code),
+                        "start_s": float(start),
+                        "end_s": float(end),
+                        "severity": "attention",
+                        "detail": "",
+                    }
+                    for code, start, end in zip(row[10], row[11], row[12], strict=True)
+                ],
+                # The whole clip, because nothing has yet said any part of it is
+                # unusable. An editor trims from the full duration.
+                "usable_from_s": 0.0,
+                "usable_to_s": duration_s,
+                "decided_by": "",
+                "actor": "",
+                "model_id": "",
+                "prompt_version": "",
+                "panel_convened": False,
+                "decided_at": None,
+                "proxy_uri": str(row[3] or ""),
+                "sprite_uri": str(row[4] or ""),
+                "criteria": {},
+                "safe_ranges": [{"start_s": 0.0, "end_s": duration_s}],
+                "trim_reasons": [],
+                "duration_s": duration_s,
+                "camera": str(row[5] or ""),
+                "captured_at": row[9].isoformat() if row[9] else None,
+                "fps": float(row[6] or 0),
+                "scene_code": str(row[7] or ""),
+                "shot_code": str(row[8] or ""),
+            }
+        )
+    return takes

@@ -102,8 +102,14 @@ def stubbed(monkeypatch: pytest.MonkeyPatch):
 
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No verdicts for this shot yet")
 
+    async def takes_in_shot(project_id, scene, shot):
+        """No footage. The shot screen reads the shot's takes directly now, so a
+        stub that omitted this reached for ClickHouse and answered 503."""
+        return []
+
     monkeypatch.setattr(screens.review_routes, "tree", tree)
     monkeypatch.setattr(screens.review_routes, "verdicts", verdicts)
+    monkeypatch.setattr(screens.review_routes.review_service, "takes_in_shot", takes_in_shot)
     monkeypatch.setattr(screens.structure, "for_project", plan)
     monkeypatch.setattr(screens.projects, "get", project)
     monkeypatch.setattr(screens.shots, "get", shot)
@@ -188,3 +194,105 @@ class TestEveryScreenRouteConstructsItsResponse:
         )
         for url in paths.values():
             assert client.get(url).status_code == 200, url
+
+
+class TestAShotWithOneTake:
+    """Footage exists before a comparison does.
+
+    An editor uploaded one clip into a new project, the proxy built, the
+    analysis ran — and the cockpit drew "No takes have been compared for this
+    shot yet" with no player. The takes were read out of the verdicts, and a
+    comparison needs two takes, so a shot holding one had nothing to draw.
+
+    The proxy was healthy the entire time. `/media/.../index.m3u8` answered 200
+    with the right content type and its segments played; nothing ever asked for
+    them.
+    """
+
+    @pytest.fixture
+    def one_take(self, monkeypatch: pytest.MonkeyPatch, stubbed):
+        async def takes_in_shot(project_id, scene, shot):
+            return [
+                {
+                    "clip_id": "62469df0-9ca9-465c-b345-a709080552c1",
+                    "take_no": 1,
+                    "outcome": "",
+                    "score": 0.0,
+                    "margin": 0.0,
+                    "reason": "",
+                    "reason_code": "",
+                    "findings": [],
+                    "usable_from_s": 0.0,
+                    "usable_to_s": 59.6,
+                    "decided_by": "",
+                    "actor": "",
+                    "model_id": "",
+                    "prompt_version": "",
+                    "panel_convened": False,
+                    "decided_at": None,
+                    "proxy_uri": "/media/p6/62469df0/proxy/index.m3u8",
+                    "sprite_uri": "/media/p6/62469df0/sprite.jpg",
+                    "criteria": {},
+                    "safe_ranges": [{"start_s": 0.0, "end_s": 59.6}],
+                    "trim_reasons": [],
+                    "duration_s": 59.6,
+                    "camera": "",
+                    "captured_at": None,
+                    "fps": 25.0,
+                    "scene_code": "",
+                    "shot_code": "",
+                }
+            ]
+
+        async def read(project_id, clip_id):
+            return {
+                "project_id": project_id,
+                "clip_id": str(clip_id),
+                "clip": {
+                    "scene": 12,
+                    "shot": 1,
+                    "take_no": 1,
+                    "duration_s": 59.6,
+                    "proxy_uri": "/media/p6/62469df0/proxy/index.m3u8",
+                    "sprite_uri": "/media/p6/62469df0/sprite.jpg",
+                    "fps": 25.0,
+                    "scene_code": "",
+                    "shot_code": "",
+                },
+                "run": None,
+                "status": "current",
+                "coverage_complete": True,
+                "description": "",
+                "segments": [],
+                "findings": [],
+                "history": [],
+                "safe_ranges": [],
+                "primary_usable_range": None,
+            }
+
+        monkeypatch.setattr(screens.review_routes.review_service, "takes_in_shot", takes_in_shot)
+        monkeypatch.setattr(screens.analysis_routes, "_read", read)
+
+    def test_the_take_is_there_to_play(self, client: TestClient, one_take) -> None:
+        body = client.get("/screens/shot/1/12/1").json()
+        assert len(body["takes"]) == 1
+        assert body["takes"][0]["proxy_uri"].endswith(".m3u8")
+
+    def test_the_verdicts_are_still_null(self, client: TestClient, one_take) -> None:
+        """Nothing was compared, and the screen says so rather than inventing a
+        recommendation for a field of one."""
+        body = client.get("/screens/shot/1/12/1").json()
+        assert body["verdicts"] is None
+
+    def test_the_whole_clip_is_selectable(self, client: TestClient, one_take) -> None:
+        """No judgement has called any part of it unusable, so the range an
+        editor trims from is the full duration."""
+        take = client.get("/screens/shot/1/12/1").json()["takes"][0]
+        assert take["usable_from_s"] == 0.0
+        assert take["usable_to_s"] == take["duration_s"]
+
+    def test_its_analysis_is_loaded_too(self, client: TestClient, one_take) -> None:
+        """Analysis is per clip and never needed a comparison. It was skipped
+        only because the loop ran over the verdicts."""
+        body = client.get("/screens/shot/1/12/1").json()
+        assert len(body["analyses"]) == 1

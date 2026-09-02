@@ -113,22 +113,33 @@ async def shot_screen(
     """
     await principal.assert_can_read(project_id)
 
-    verdicts, brief, notes = await asyncio.gather(
+    verdicts, brief, notes, present = await asyncio.gather(
         _verdicts_or_none(project_id, scene, shot, principal),
         shots.get(project_id, scene, shot),
         comments_service.for_shot(project_id, scene, shot),
+        review_routes.review_service.takes_in_shot(project_id, scene, shot),
     )
 
-    analyses: list[schemas.TakeAnalysis] = []
-    if verdicts:
-        loaded = await asyncio.gather(
-            *(analysis_routes._read(project_id, UUID(take.clip_id)) for take in verdicts.takes)
-        )
-        analyses = [schemas.TakeAnalysis(**row) for row in loaded]
+    # The judged takes when there are any, the footage itself when there are
+    # not. A comparison needs two takes; watching one, analysing it and cutting
+    # a range out of it do not. Reading the takes only out of the verdicts is
+    # why a freshly uploaded clip had no player, no lanes and no way to be
+    # selected — while its proxy sat built and reachable.
+    takes = (
+        list(verdicts.takes)
+        if verdicts and verdicts.takes
+        else [schemas.Take(**row) for row in present]
+    )
+
+    loaded = await asyncio.gather(
+        *(analysis_routes._read(project_id, UUID(take.clip_id)) for take in takes)
+    )
+    analyses = [schemas.TakeAnalysis(**row) for row in loaded]
 
     return schemas.ShotScreen(
         verdicts=verdicts,
         brief=schemas.Brief(**brief.as_dict(), is_empty=brief.is_empty),
+        takes=takes,
         analyses=analyses,
         comments=[schemas.Comment(**c) for c in notes],
         open_comments=sum(1 for c in notes if not c["resolved"]),

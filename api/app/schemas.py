@@ -542,6 +542,10 @@ class ShotScreen(Model):
 
     verdicts: Verdicts | None = None
     brief: Brief
+    # The shot's footage, always. Separate from the verdicts on purpose: a
+    # comparison needs two takes and footage does not, and reading the takes out
+    # of the verdicts meant a shot holding one clip drew no player at all.
+    takes: list[Take] = []
     # Full-take read models are bundled with the screen. The browser can switch
     # takes, seek findings and redraw every lane without a ClickHouse request in
     # the interaction path.

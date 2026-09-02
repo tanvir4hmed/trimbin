@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import PublicShell from "@/components/PublicShell";
 import UploadTray from "@/components/UploadTray";
 import type { Project } from "@/lib/api";
 import { api } from "@/lib/api";
@@ -44,7 +45,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const active = (href: string) => pathname === href || pathname.startsWith(`${href}/`) || (href === "/projects" && pathname.startsWith("/project/"));
   const submitSearch = (event: FormEvent) => { event.preventDefault(); if (search.trim()) router.push(`/archive?q=${encodeURIComponent(search.trim())}`); };
 
-  if (!isApp) return <>{children}</>;
+  // The entry page is its own thing — one screen, two buttons, no chrome. The
+  // evidence pages get the public bar; before this they got nothing at all,
+  // which left /accuracy with no way back to the product it measures.
+  if (pathname === "/") return <>{children}</>;
+  if (!isApp) return <PublicShell>{children}</PublicShell>;
   return <div className={collapsed ? "app-frame sidebar-collapsed" : "app-frame"}>
     <aside className="app-sidebar">
       <header><Link href="/dashboard" className="app-wordmark"><span>◩</span><b>TRIMBIN</b></Link><button aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} onClick={() => { const next = !collapsed; setCollapsed(next); localStorage.setItem("trimbin.sidebar.collapsed", next ? "1" : "0"); }}>{collapsed ? "»" : "«"}</button></header>

@@ -65,31 +65,77 @@ interface Corpus {
   };
 }
 
+/** A sleeping archive, which is a wait rather than a failure. */
+class Waking extends Error {}
+
 export function AccuracyDashboard() {
   const [accuracy, setAccuracy] = useState<AccuracyBody | null>(null);
   const [corpus, setCorpus] = useState<Corpus | null>(null);
   const [evaluation, setEvaluation] = useState<EvalState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [waking, setWaking] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
   useEffect(() => {
+    // Every one of these checked `r.json()` and nothing else. A 503 body is
+    // valid JSON — `{detail, waking}` — so a sleeping archive was stored as if
+    // it were the numbers, passed the null guard below, and the page died on
+    // `corpus.real.clips`. The person who hit that most often is the one who
+    // arrived first: a judge, on the page that publishes our own error rate.
+    let live = true;
+    const read = async <T,>(path: string): Promise<T> => {
+      const response = await fetch(path);
+      if (response.status === 503) throw new Waking();
+      if (!response.ok) throw new Error(`${path} answered ${response.status}`);
+      return (await response.json()) as T;
+    };
+
+    setError(null);
     Promise.all([
-      fetch("/api/public/accuracy").then((r) => r.json() as Promise<AccuracyBody>),
-      fetch("/api/public/scale").then((r) => r.json() as Promise<Corpus>),
-      fetch("/api/public/eval").then((r) => r.json() as Promise<EvalState>),
+      read<AccuracyBody>("/api/public/accuracy"),
+      read<Corpus>("/api/public/scale"),
+      read<EvalState>("/api/public/eval"),
     ])
       .then(([a, c, e]) => {
+        if (!live) return;
+        setWaking(false);
         setAccuracy(a);
         setCorpus(c);
         setEvaluation(e);
       })
-      .catch((e: Error) => setError(e.message));
-  }, []);
+      .catch((cause: Error) => {
+        if (!live) return;
+        // Asleep is a wait, not a fault, and it ends by itself.
+        if (cause instanceof Waking) {
+          setWaking(true);
+          window.setTimeout(() => setAttempt((value) => value + 1), 6000);
+          return;
+        }
+        setError(cause.message);
+      });
+    return () => {
+      live = false;
+    };
+  }, [attempt]);
 
   if (error) {
     return (
       <div className="state">
         <h2>Could not load the numbers</h2>
         <p>{error}</p>
+        <button className="ghost" onClick={() => setAttempt((value) => value + 1)}>
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  if (waking) {
+    return (
+      <div className="state">
+        <p>The archive is waking up — it sleeps when nobody is using it.</p>
+        <p className="dim small">This takes about half a minute.</p>
       </div>
     );
   }
