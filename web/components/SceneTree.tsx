@@ -42,11 +42,16 @@ export default function SceneTree({
   selected,
   onSelect,
   onOpenScene,
+  openTake,
+  onSelectTake,
 }: {
   scenes: SceneNode[];
   selected: { scene: number; shot: number } | null;
   onSelect: (scene: number, shot: number) => void;
   onOpenScene?: (scene: number) => void;
+  /** Which take the cockpit is showing, and how to change it from here. */
+  openTake?: number;
+  onSelectTake?: (scene: number, shot: number, takeNo: number) => void;
 }) {
   if (scenes.length === 0) {
     return (
@@ -132,14 +137,7 @@ export default function SceneTree({
                       </span>
                       <span className="node-meta">
                         {shot.takes} take{shot.takes === 1 ? "" : "s"}
-                        {shot.take_numbers.length > 1 && (
-                          // Which takes, not only how many. Reaching take 2
-                          // meant opening the shot and hunting in the player.
-                          <span className="node-takes">
-                            {" "}
-                            · {shot.take_numbers.map((t) => `T${t}`).join(" ")}
-                          </span>
-                        )}
+
                         {shot.cameras.length > 1 && (
                           <span className="node-cam">
                             {" "}
@@ -183,6 +181,24 @@ export default function SceneTree({
                       </span>
                       <span className="sr-only">{STATUS_LABEL[shot.status]}</span>
                     </button>
+                    {/* The takes themselves, reachable from here. The rail
+                        listed them as text, so getting to take 2 still meant
+                        opening the shot and hunting through the player. */}
+                    {isOpen && onSelectTake && shot.take_numbers.length > 1 && (
+                      <div className="node-take-row">
+                        {shot.take_numbers.map((takeNo) => (
+                          <button
+                            key={takeNo}
+                            type="button"
+                            className={openTake === takeNo ? "node-take on" : "node-take"}
+                            aria-current={openTake === takeNo ? "true" : undefined}
+                            onClick={() => onSelectTake(scene.scene, shot.shot, takeNo)}
+                          >
+                            T{takeNo}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </li>
                 );
               })}

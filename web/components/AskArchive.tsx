@@ -115,9 +115,7 @@ export default function AskArchive({
       <section className="ask ask-folded">
         <button type="button" className="ask-open" onClick={() => setOpen(true)}>
           <span className="ask-open-label">Ask the archive</span>
-          <span className="ask-open-hint">
-            {suggestions[0] ? `e.g. ${suggestions[0]}` : "Search every decision and its reason"}
-          </span>
+          <span className="ask-open-hint">Search every decision and its reason</span>
           <i aria-hidden>+</i>
         </button>
       </section>

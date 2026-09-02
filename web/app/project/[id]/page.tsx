@@ -39,6 +39,8 @@ export default function ProjectPage({
   // three-scene project and wrong for a thirty-scene one — so it is a choice
   // rather than a fixed answer.
   const [railScene, setRailScene] = useState(0);
+  const [sceneQuery, setSceneQuery] = useState("");
+  const [railTake, setRailTake] = useState(0);
 
   const screen = useProjectScreen(projectId, {
     camera: camera || undefined,
@@ -115,6 +117,18 @@ export default function ProjectPage({
       !tree ? [] : railScene ? tree.scenes.filter((s) => s.scene === railScene) : tree.scenes,
     [tree, railScene],
   );
+
+  // Scenes matching what was typed, by number or by slugline.
+  const searchedScenes = useMemo(() => {
+    const q = sceneQuery.trim().toLowerCase();
+    if (!q || !tree) return tree?.scenes ?? [];
+    return tree.scenes.filter(
+      (scene) =>
+        String(scene.scene).includes(q) ||
+        (scene.scene_code || "").toLowerCase().includes(q) ||
+        (headings.get(scene.scene) || "").toLowerCase().includes(q),
+    );
+  }, [tree, sceneQuery, headings]);
 
   const canComment = Boolean(me?.signed_in);
   // Told by the API rather than worked out here. A page that decides this by
@@ -296,6 +310,17 @@ export default function ProjectPage({
                 the alternative was scrolling a flat list of every shot in the
                 production to reach the next one. */}
             <div className="rail-scene">
+              {tree.scenes.length > 6 && (
+                // A dropdown is fine for six scenes and useless for sixty.
+                <input
+                  className="rail-scene-search"
+                  type="search"
+                  value={sceneQuery}
+                  placeholder="Find a scene…"
+                  onChange={(event) => setSceneQuery(event.target.value)}
+                  aria-label="Find a scene"
+                />
+              )}
               <label>
                 Scene
                 <select
@@ -303,7 +328,7 @@ export default function ProjectPage({
                   onChange={(event) => setRailScene(Number(event.target.value))}
                 >
                   <option value={0}>All scenes ({tree.scenes.length})</option>
-                  {tree.scenes.map((scene) => (
+                  {searchedScenes.map((scene) => (
                     <option key={scene.scene} value={scene.scene}>
                       {scene.scene_code || `Scene ${scene.scene}`}
                       {headings.get(scene.scene) ? ` · ${headings.get(scene.scene)}` : ""}
@@ -324,20 +349,12 @@ export default function ProjectPage({
             <SceneTree
               scenes={railScenes}
               selected={open}
-              onSelect={(scene, shot) => setSelected({ scene, shot })}
+              openTake={railTake}
+              onSelect={(scene, shot) => { setSelected({ scene, shot }); setRailTake(0); }}
+              onSelectTake={(scene, shot, takeNo) => { setSelected({ scene, shot }); setRailTake(takeNo); }}
               onOpenScene={(scene) => router.push(`/project/${projectId}/scene/${scene}`)}
             />
 
-            {canCurate && (
-              // Declaring scenes and shots now lives with adding footage,
-              // which is when a destination is actually needed. Two menus in
-              // one column — a tree of what exists and a form for what is
-              // planned — read as one confused list, and the form's placeholder
-              // rows looked like real shots.
-              <Link className="rail-plan-link" href={`/project/${projectId}/ingest`}>
-                Add scenes, shots &amp; footage →
-              </Link>
-            )}
           </div>
 
           <section className="pane">
@@ -356,6 +373,7 @@ export default function ProjectPage({
                 teamEmails={teamEmails}
                 initialClipId={search.get("clip") ?? ""}
                 initialAt={Number(search.get("at") ?? 0)}
+                focusTake={railTake}
               />
             ) : (
               <p className="hint">Choose a shot.</p>
