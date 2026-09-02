@@ -212,6 +212,19 @@ export default function ShotReviewCockpit({
     if (chosenTakeNo) setIssueTab(chosenTakeNo);
   }, [chosenTakeNo]);
 
+  // The shot's standing decision, in one phrase.
+  //
+  // A shot used to have one winning take, so "Take 4" said everything. Ranges
+  // from several takes have no single winner, and calling that "Take 4"
+  // because take 4 happened to be first would be a lie about what plays.
+  const standing = useMemo(() => {
+    if (!selects.length) return "";
+    const used = Array.from(new Set(selects.map((item) => item.take_no))).sort((x, y) => x - y);
+    const ranges = `${selects.length} range${selects.length === 1 ? "" : "s"}`;
+    if (used.length === 1) return `Take ${used[0]} · ${ranges}`;
+    return `Custom · ${ranges} from take${used.length === 1 ? "" : "s"} ${used.join(", ")}`;
+  }, [selects]);
+
   const stageOf = (clipId: string) => screen.data?.analysis_state?.[clipId] ?? "";
 
   // A take picked in the rail opens on the A side, swapping B out of the way
@@ -322,19 +335,6 @@ export default function ShotReviewCockpit({
   // watch, analyse and cut a range from; it is merely a shot nothing can be
   // compared against.
   if (!takes.length) return <div className="cockpit-state"><div><p>No footage has been placed in this shot yet.</p><p className="policy-note">Upload takes, or move a clip here from the placement inbox.</p></div></div>;
-
-  // The shot's standing decision, in one phrase.
-  //
-  // A shot used to have one winning take, so "Take 4" said everything. Ranges
-  // from several takes have no single winner, and calling that "Take 4"
-  // because take 4 happened to be first would be a lie about what plays.
-  const standing = useMemo(() => {
-    if (!selects.length) return "";
-    const used = Array.from(new Set(selects.map((item) => item.take_no))).sort((x, y) => x - y);
-    const ranges = `${selects.length} range${selects.length === 1 ? "" : "s"}`;
-    if (used.length === 1) return `Take ${used[0]} · ${ranges}`;
-    return `Custom · ${ranges} from take${used.length === 1 ? "" : "s"} ${used.join(", ")}`;
-  }, [selects]);
 
   const humanChoiceRecorded = (verdicts?.rev ?? 0) > 0 || selects.length > 0 || takes.some(
     (take) => take.outcome === "selected" && take.decided_by === "human",
