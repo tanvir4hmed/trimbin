@@ -171,6 +171,17 @@ async def read_slate(source: Path, work: Path, clip_id: UUID, project_id: int) -
     identity.scene_code = (result.reading.scene or "").strip()[:40]
     identity.shot_code = (result.reading.shot or "").strip()[:40]
 
+    # Codes on a board are production names. Resolve them against the declared
+    # plan instead of treating an encoded number as a durable database id.
+    from . import structure
+
+    resolved_scene, resolved_shot = await structure.resolve_codes(
+        project_id, identity.scene_code, identity.shot_code
+    )
+    if resolved_scene:
+        identity.group_id = resolved_scene
+        identity.subgroup_id = resolved_shot
+
     # One still from the head, kept as the evidence behind the reading. An
     # editor deciding whether the board or the reader was wrong has to see the
     # board; a confidence score is not a substitute for looking at it.
@@ -178,7 +189,7 @@ async def read_slate(source: Path, work: Path, clip_id: UUID, project_id: int) -
     candidates = await extract_frames(head, work / "slate_candidates", 4, SLATE_WINDOW_S)
     identity.slate_candidate_names = [path.name for path in candidates]
     log.info(
-        "clip %s: board reads %r -> scene %d, shot %d, take %d",
+        "clip %s: board reads %r -> internal scene %d, shot %d, take %d",
         clip_id,
         result.reading.raw.replace("\n", " / "),
         result.group_id,

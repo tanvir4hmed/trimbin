@@ -137,6 +137,13 @@ async def grant_upload(
     # behind to clean up.
     await quota.check_room_for(request.project_id, len(request.filenames))
     max_bytes = await quota.max_bytes_for(request.project_id)
+    if members.role_of(principal.email) == "guest":
+        if len(request.filenames) > 5:
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                "Upload up to five test clips at a time in the example project.",
+            )
+        max_bytes = min(max_bytes, quota.MAX_GUEST_BYTES)
 
     job_id = await jobs.open_job(
         project_id=request.project_id,
@@ -356,6 +363,7 @@ async def job_status(
         "started_at": job.started_at.isoformat(),
         "finished_at": job.finished_at.isoformat() if job.finished_at else None,
         "items": items,
+        "stages": job.stages,
     }
 
 
@@ -448,15 +456,24 @@ async def commit_ingest(
                 )
             batch_counts[key] = batch_counts.get(key, 0) + 1
         take_no = int(decision.take or proposed.get("take_no", 0) or 0)
-        await placements.resolve(
-            job.project_id,
-            decision.clip_id,
-            scene,
-            shot,
-            principal.email or "",
-            detail,
-            take_no=take_no,
-        )
+        if decision.action == "unassign":
+            await placements.unassign(
+                job.project_id,
+                decision.clip_id,
+                principal.email or "",
+                detail,
+                take_no=take_no,
+            )
+        else:
+            await placements.resolve(
+                job.project_id,
+                decision.clip_id,
+                scene,
+                shot,
+                principal.email or "",
+                detail,
+                take_no=take_no,
+            )
         committed.add(str(decision.clip_id))
         await activity.record(
             job.project_id,
@@ -473,7 +490,8 @@ async def commit_ingest(
 
     await jobs.mark_verified(job_id, committed)
     candidates = await analysis_store.active_clips_without_analysis(job.project_id)
-    to_queue = [row for row in candidates if str(row["clip_id"]) in committed]
+    assigned = {str(item.clip_id) for item in body.items if item.action != "unassign"}
+    to_queue = [row for row in candidates if str(row["clip_id"]) in committed & assigned]
     queued = await jobs.enqueue_analysis(job.project_id, to_queue) if to_queue else 0
     return {
         "status": "committed",

@@ -36,7 +36,7 @@ export interface Progress {
 export interface UploadSnapshot {
   id: string;
   rows: Progress[];
-  state: "uploading" | "paused" | "done" | "cancelled" | "failed";
+  state: "uploading" | "paused" | "interrupted" | "done" | "cancelled" | "failed";
   updatedAt: number;
 }
 
@@ -50,6 +50,27 @@ function publish(id: string, rows: Progress[], state?: UploadSnapshot["state"]) 
   const previous = snapshots.get(id);
   snapshots.set(id, { id, rows: [...rows], state: state ?? previous?.state ?? "uploading", updatedAt: Date.now() });
   snapshotList = Array.from(snapshots.values()).sort((a, b) => b.updatedAt - a.updatedAt);
+  try {
+    window.localStorage.setItem(`trimbin.upload.snapshot.${id}`, JSON.stringify(snapshots.get(id)));
+  } catch { /* progress still works when storage is unavailable */ }
+  listeners.forEach((listener) => listener());
+}
+
+let restored = false;
+export function restoreUploadSnapshots(): void {
+  if (restored || typeof window === "undefined") return;
+  restored = true;
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+    if (!key?.startsWith("trimbin.upload.snapshot.")) continue;
+    try {
+      const value = JSON.parse(window.localStorage.getItem(key) || "") as UploadSnapshot;
+      if (!value?.id || !Array.isArray(value.rows)) continue;
+      if (value.state === "uploading" || value.state === "paused") value.state = "interrupted";
+      snapshots.set(value.id, value);
+    } catch { window.localStorage.removeItem(key); }
+  }
+  snapshotList = Array.from(snapshots.values()).sort((a, b) => b.updatedAt - a.updatedAt);
   listeners.forEach((listener) => listener());
 }
 
@@ -60,7 +81,7 @@ export function subscribeUploads(listener: Listener) { listeners.add(listener); 
 export function pauseUpload(id: string) { controls.get(id)?.pause(); }
 export function resumeUpload(id: string) { controls.get(id)?.resume(); }
 export function cancelUpload(id: string) { controls.get(id)?.cancel(); }
-export function dismissUpload(id: string) { snapshots.delete(id); snapshotList = Array.from(snapshots.values()).sort((a, b) => b.updatedAt - a.updatedAt); listeners.forEach((listener) => listener()); }
+export function dismissUpload(id: string) { snapshots.delete(id); try { window.localStorage.removeItem(`trimbin.upload.snapshot.${id}`); } catch {} snapshotList = Array.from(snapshots.values()).sort((a, b) => b.updatedAt - a.updatedAt); listeners.forEach((listener) => listener()); }
 
 class UploadControl {
   paused = false;
@@ -191,12 +212,22 @@ export async function uploadAll(
   onProgress: (rows: Progress[]) => void,
   batchId = crypto.randomUUID(),
 ): Promise<{ arrived: string[]; names: Record<string, string>; cancelled: boolean }> {
-  const byName = new Map(files.map((f) => [f.name, f]));
+  // Camera cards can contain the same basename in different folders. Keep
+  // every occurrence and pair them with same-named tickets in selection order;
+  // a Map<string, File> silently uploaded the first file twice.
+  const byName = new Map<string, File[]>();
+  for (const file of files) byName.set(file.name, [...(byName.get(file.name) ?? []), file]);
+  const fileForTicket = new Map<string, File>();
+  for (const ticket of tickets) {
+    const candidates = byName.get(ticket.filename) ?? [];
+    const file = candidates.shift();
+    if (file) fileForTicket.set(ticket.clip_id, file);
+  }
   const rows: Progress[] = tickets.map((t) => ({
     clipId: t.clip_id,
     filename: t.filename,
     sent: 0,
-    total: byName.get(t.filename)?.size ?? 0,
+    total: fileForTicket.get(t.clip_id)?.size ?? 0,
     state: "waiting",
   }));
 
@@ -215,7 +246,7 @@ export async function uploadAll(
       if (index >= tickets.length) return;
 
       const ticket = tickets[index];
-      const file = byName.get(ticket.filename);
+      const file = fileForTicket.get(ticket.clip_id);
       if (!file) {
         rows[index] = { ...rows[index], state: "failed", error: "file not found" };
         report();

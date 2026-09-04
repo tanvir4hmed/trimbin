@@ -80,7 +80,8 @@ def _as_dict(project, viewer_email: str | None) -> dict:
         "you_can_upload": bool(
             viewer_email
             and (
-                viewer_email.lower() == project.owner_email.lower()
+                project.project_id == settings.demo_project_id
+                or viewer_email.lower() == project.owner_email.lower()
                 or viewer_email.lower() in {m.lower() for m in project.member_emails}
                 or (members.is_staff(viewer_email) and members.is_staff(project.owner_email))
             )

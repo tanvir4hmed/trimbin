@@ -18,6 +18,7 @@ from .config import settings
 from .routes import (
     analysis,
     ask,
+    clips,
     dashboard,
     maintenance,
     placements,
@@ -76,6 +77,7 @@ app.add_middleware(
 
 app.include_router(public.router)
 app.include_router(analysis.router)
+app.include_router(clips.router)
 app.include_router(session.router)
 app.include_router(dashboard.router)
 app.include_router(uploads.router)

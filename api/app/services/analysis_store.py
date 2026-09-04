@@ -47,6 +47,22 @@ SEGMENT_COLUMNS = [
     "occurred_at",
 ]
 
+MOMENT_COLUMNS = [
+    "moment_id",
+    "run_id",
+    "project_id",
+    "clip_id",
+    "kind",
+    "start_s",
+    "end_s",
+    "text",
+    "evidence_segment_ids",
+    "embedding",
+    "model_id",
+    "prompt_version",
+    "occurred_at",
+]
+
 FINDING_COLUMNS = [
     "event_id",
     "finding_id",
@@ -153,6 +169,32 @@ async def record_segments(segments: list[dict]) -> int:
         for s in segments
     ]
     await (await client()).insert("clip_segments", rows, column_names=SEGMENT_COLUMNS)
+    return len(rows)
+
+
+async def record_moments(moments: list[dict]) -> int:
+    if not moments:
+        return 0
+    now = datetime.now(UTC)
+    rows = [
+        [
+            moment["moment_id"],
+            moment["run_id"],
+            moment["project_id"],
+            moment["clip_id"],
+            moment["kind"],
+            float(moment["start_s"]),
+            float(moment["end_s"]),
+            str(moment.get("text") or "")[:300],
+            list(moment.get("evidence_segment_ids", [])),
+            list(moment.get("embedding", [])),
+            moment.get("model_id", ""),
+            moment.get("prompt_version", ""),
+            moment.get("occurred_at") or now,
+        ]
+        for moment in moments
+    ]
+    await (await client()).insert("clip_moments", rows, column_names=MOMENT_COLUMNS)
     return len(rows)
 
 

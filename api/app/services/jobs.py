@@ -99,6 +99,7 @@ class Job:
     target_take: int = 0
     # One entry per clip: what happened to it, and where it landed.
     items: list[dict] = field(default_factory=list)
+    stages: dict[str, dict] = field(default_factory=dict)
 
 
 async def open_job(
@@ -136,6 +137,7 @@ async def open_job(
                 "target_shot": target_shot,
                 "target_take": target_take,
                 "items": [],
+                "stages": {},
             }
         )
     )
@@ -164,6 +166,30 @@ async def get_job(job_id: UUID) -> Job | None:
         target_shot=int(d.get("target_shot", 0) or 0),
         target_take=int(d.get("target_take", 0) or 0),
         items=d.get("items", []),
+        stages=d.get("stages", {}),
+    )
+
+
+async def record_stage(job_id: UUID, clip_id: UUID, stage: str, filename: str = "") -> None:
+    """Expose the worker's real current operation instead of one opaque spinner."""
+    # Firestore treats dots as map separators and only accepts simple field
+    # path segments here. UUIDs contain hyphens, so use their hex form as the
+    # durable map key and keep the real UUID inside the value.
+    stage_key = clip_id.hex
+    await (
+        db()
+        .collection(COLLECTION)
+        .document(str(job_id))
+        .update(
+            {
+                f"stages.{stage_key}": {
+                    "clip_id": str(clip_id),
+                    "filename": filename,
+                    "stage": stage,
+                    "updated_at": datetime.now(UTC),
+                }
+            }
+        )
     )
 
 

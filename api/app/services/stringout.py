@@ -18,6 +18,7 @@ has no standing to answer them. A stringout is the raw material an editor cuts
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from . import assessment
@@ -131,14 +132,17 @@ async def scene(project_id: int, scene_id: int) -> dict:
     )
     observed_result = await ch.query(
         """
-        SELECT DISTINCT subgroup_id
+        SELECT subgroup_id, toString(clip_id)
         FROM current_clip_placement
         WHERE project_id = {p:UInt32} AND group_id = {g:UInt32}
-        ORDER BY subgroup_id
+        ORDER BY subgroup_id, clip_id
         """,
         parameters={"p": project_id, "g": scene_id},
     )
-    observed_shots = {int(row[0]) for row in observed_result.result_rows}
+    observed_by_shot: dict[int, list[str]] = {}
+    for row in observed_result.result_rows:
+        observed_by_shot.setdefault(int(row[0]), []).append(str(row[1]))
+    observed_shots = set(observed_by_shot)
 
     meta = await shots_service.for_project(project_id)
     open_counts = await comments_service.counts_for_project(project_id)
@@ -184,6 +188,11 @@ async def scene(project_id: int, scene_id: int) -> dict:
                     chosen_take=int(r[2] or 0),
                     state=described.state if described else "",
                     segments=len(described.coverage_segments) if described else 0,
+                    decision_fresh=(
+                        not described
+                        or not described.coverage_segments
+                        or bool(described.observed_source_set_hash)
+                    ),
                     threshold=margin,
                 ).needs_a_person,
                 circled_take=described.circled_take if described else 0,
@@ -213,7 +222,7 @@ async def scene(project_id: int, scene_id: int) -> dict:
                 if segment.get("clip_id")
             }
         )
-        clip_rows: dict[str, tuple] = {}
+        clip_rows: dict[str, Sequence] = {}
         if clip_ids:
             clips_result = await ch.query(
                 """
@@ -238,6 +247,11 @@ async def scene(project_id: int, scene_id: int) -> dict:
                 end = min(duration, float(segment.get("source_out_s", duration) or duration))
                 if end <= start:
                     continue
+                decision_fresh = bool(
+                    described.observed_source_set_hash
+                    and described.observed_source_set_hash
+                    == assessment.source_set_hash(observed_by_shot.get(shot_id, []))
+                )
                 entries.append(
                     Entry(
                         scene=scene_id,
@@ -253,7 +267,7 @@ async def scene(project_id: int, scene_id: int) -> dict:
                         decided_by="human",
                         actor=str(segment.get("created_by") or ""),
                         margin=0,
-                        needs_review=False,
+                        needs_review=not decision_fresh,
                         circled_take=described.circled_take,
                         open_comments=open_counts.get((scene_id, shot_id), {}).get("open", 0),
                         fps=float(row[5] or 0),
@@ -271,13 +285,15 @@ async def scene(project_id: int, scene_id: int) -> dict:
     timeline = coverage_timeline(scene_id, entries, meta, observed_shots)
     ordered_shots = [item["shot"] for item in timeline]
 
+    stale_shots = {entry.shot for entry in entries if entry.needs_review}
+    gap_shots = {int(item["shot"]) for item in timeline if item["kind"] == "gap"}
     return {
         "project_id": project_id,
         "scene": scene_id,
         "entries": [e.as_dict() for e in entries],
         "duration_s": round(sum(e.duration_s for e in entries), 2),
         "shots": len(ordered_shots),
-        "unresolved": sum(1 for item in timeline if item["kind"] == "gap"),
+        "unresolved": len(gap_shots | stale_shots),
         "disagreements": sum(1 for e in entries if e.circled_take and e.circled_take != e.take_no),
         "source_fps": measured_rates,
         "export_fps": measured_rates[0] if len(measured_rates) == 1 else 0.0,
@@ -305,16 +321,16 @@ def coverage_timeline(
     timeline = []
     for shot_id in ordered_shots:
         shot_entries = sorted(entries_by_shot.get(shot_id, []), key=lambda item: item.position)
-        entry = shot_entries[0] if shot_entries else None
+        head = shot_entries[0] if shot_entries else None
         described = meta.get((scene_id, shot_id))
         timeline.append(
             {
-                "kind": "selected" if entry else "gap",
+                "kind": "selected" if head else "gap",
                 "scene": scene_id,
                 "shot": shot_id,
                 "slug": (described.slug if described else "") or f"{scene_id}{_letter(shot_id)}",
                 "duration_s": sum(item.duration_s for item in shot_entries),
-                "entry": entry.as_dict() if entry else None,
+                "entry": head.as_dict() if head else None,
                 "entries": [item.as_dict() for item in shot_entries],
             }
         )

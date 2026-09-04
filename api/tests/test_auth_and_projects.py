@@ -248,11 +248,24 @@ class TestUploading:
         monkeypatch.setattr(auth.projects, "get", company_project)
 
         with pytest.raises(HTTPException) as raised:
-            await Principal(email="a-judge@example.com").assert_can_upload(1)
+            await Principal(email="a-judge@example.com").assert_can_upload(7)
         assert raised.value.status_code == 403
         # The refusal has to say what they can do instead, or it reads as a
         # wall rather than as a rule.
         assert "your own project" in raised.value.detail.lower()
+
+    @pytest.mark.asyncio
+    async def test_a_guest_may_upload_a_bounded_sample_into_the_public_example(
+        self, monkeypatch
+    ) -> None:
+        async def company_project(project_id):
+            project = FakeProject(project_id, is_public=True)
+            project.owner_email = members.LEAD_EDITOR
+            return project
+
+        monkeypatch.setattr(auth.projects, "get", company_project)
+        monkeypatch.setattr(auth.settings, "demo_project_id", 1)
+        await Principal(email="a-judge@example.com").assert_can_upload(1)
 
     @pytest.mark.asyncio
     async def test_a_guest_uploads_into_their_own_project(self, monkeypatch) -> None:

@@ -37,6 +37,15 @@ class TestSafeRanges:
         found, _ = ranges.safe_ranges(70.0, [finding("slate.present", 0.0, 4.5)])
         assert [(r.start_s, r.end_s) for r in found] == [(4.5, 70.0)]
 
+    def test_subject_exit_blocks_the_dead_tail(self) -> None:
+        found, _ = ranges.safe_ranges(70.0, [finding("frame.subject_exits", 54.0, 56.0)])
+        assert [(r.start_s, r.end_s) for r in found] == [(0.0, 54.0)]
+
+    def test_explicit_post_roll_blocks_the_dead_tail(self) -> None:
+        found, trims = ranges.safe_ranges(86.0, [finding("action.post_roll", 83.2, 85.0)])
+        assert [(r.start_s, r.end_s) for r in found] == [(0.0, 83.2)]
+        assert trims == ["action.post_roll"]
+
     def test_camera_shake_is_reported_but_never_cut(self) -> None:
         """A note, not a trim. Handheld movement is a choice as often as it is a
         mistake, and cutting it out would quietly delete the energy somebody

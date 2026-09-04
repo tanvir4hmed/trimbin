@@ -38,6 +38,7 @@ class PlannedShot:
 class Scene:
     project_id: int
     scene: int
+    scene_code: str = ""
     heading: str = ""
     shots: list[PlannedShot] = field(default_factory=list)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -45,6 +46,7 @@ class Scene:
     def as_dict(self) -> dict:
         return {
             "scene": self.scene,
+            "scene_code": self.scene_code or str(self.scene),
             "heading": self.heading,
             "shots": [
                 {"shot": s.shot, "slug": s.slug, "description": s.description} for s in self.shots
@@ -60,7 +62,7 @@ def _clean(value, limit: int) -> str:
     return " ".join(str(value or "").split())[:limit]
 
 
-async def add_scene(project_id: int, scene: int, heading: str) -> Scene:
+async def add_scene(project_id: int, scene: int, heading: str, scene_code: str = "") -> Scene:
     ref = _doc(project_id, scene)
     snapshot = await ref.get()
     existing = snapshot.to_dict() or {} if snapshot.exists else {}
@@ -69,6 +71,7 @@ async def add_scene(project_id: int, scene: int, heading: str) -> Scene:
         {
             "project_id": project_id,
             "scene": scene,
+            "scene_code": _clean(scene_code, MAX_SLUG) or existing.get("scene_code") or str(scene),
             "heading": _clean(heading, MAX_HEADING),
             "shots": existing.get("shots", []),
             "created_at": existing.get("created_at") or datetime.now(UTC),
@@ -98,6 +101,7 @@ async def add_shot(project_id: int, scene: int, shot: int, slug: str, descriptio
         {
             "project_id": project_id,
             "scene": scene,
+            "scene_code": existing.get("scene_code") or str(scene),
             "heading": existing.get("heading", ""),
             "shots": shots,
             "created_at": existing.get("created_at") or datetime.now(UTC),
@@ -136,6 +140,7 @@ def _from_doc(project_id: int, d: dict) -> Scene:
     return Scene(
         project_id=project_id,
         scene=int(d.get("scene", 0)),
+        scene_code=d.get("scene_code", "") or str(d.get("scene", 0)),
         heading=d.get("heading", ""),
         shots=[
             PlannedShot(
@@ -157,3 +162,38 @@ async def next_scene_number(project_id: int) -> int:
 async def next_shot_number(project_id: int, scene: int) -> int:
     found = await get(project_id, scene)
     return max((s.shot for s in found.shots), default=0) + 1
+
+
+def _normalise_code(value: str) -> str:
+    """Compare production codes without changing what the user sees."""
+    return "".join(ch for ch in (value or "").strip().upper() if ch.isalnum())
+
+
+async def resolve_codes(project_id: int, scene_code: str, shot_code: str) -> tuple[int, int]:
+    """Resolve slate strings to existing internal ids, never inventing structure.
+
+    An empty shot code may resolve only when the matched scene has one declared
+    shot.  Anything ambiguous remains zero and is sent to human verification.
+    """
+    wanted_scene = _normalise_code(scene_code)
+    wanted_shot = _normalise_code(shot_code)
+    if not wanted_scene:
+        return 0, 0
+
+    scenes = await for_project(project_id)
+    matches = [
+        item
+        for item in scenes
+        if _normalise_code(item.scene_code or str(item.scene)) == wanted_scene
+    ]
+    if len(matches) != 1:
+        return 0, 0
+
+    scene = matches[0]
+    if not wanted_shot:
+        return (scene.scene, scene.shots[0].shot) if len(scene.shots) == 1 else (scene.scene, 0)
+
+    shots = [
+        item for item in scene.shots if _normalise_code(item.slug or str(item.shot)) == wanted_shot
+    ]
+    return (scene.scene, shots[0].shot) if len(shots) == 1 else (scene.scene, 0)

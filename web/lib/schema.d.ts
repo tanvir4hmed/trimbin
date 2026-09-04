@@ -279,6 +279,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/clips/{project_id}/{clip_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Clip */
+        delete: operations["remove_clip_clips__project_id___clip_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/clips/{project_id}/{clip_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Clip */
+        post: operations["restore_clip_clips__project_id___clip_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/options": {
         parameters: {
             query?: never;
@@ -1511,6 +1545,11 @@ export interface components {
              * @default
              */
             selection_archive_state: string;
+            /**
+             * Observed Source Set Hash
+             * @default
+             */
+            observed_source_set_hash: string;
             /** Note */
             note?: string | null;
         };
@@ -2010,6 +2049,15 @@ export interface components {
              * @default []
              */
             items: components["schemas"]["IngestItem"][];
+            /**
+             * Stages
+             * @default {}
+             */
+            stages: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
         };
         /** Limits */
         Limits: {
@@ -2093,8 +2141,16 @@ export interface components {
         };
         /** NewScene */
         NewScene: {
-            /** Scene */
+            /**
+             * Scene
+             * @default 0
+             */
             scene: number;
+            /**
+             * Scene Code
+             * @default
+             */
+            scene_code: string;
             /**
              * Heading
              * @default
@@ -2155,6 +2211,16 @@ export interface components {
             waiting: components["schemas"]["PlacementItem"][];
             /** Count */
             count: number;
+            /**
+             * Unassigned
+             * @default []
+             */
+            unassigned: components["schemas"]["UnassignedPlacementItem"][];
+            /**
+             * Unassigned Count
+             * @default 0
+             */
+            unassigned_count: number;
         };
         /** PlacementItem */
         PlacementItem: {
@@ -2227,6 +2293,11 @@ export interface components {
             shot: number;
             /** Detail */
             detail: string;
+            /**
+             * Analysis Queued
+             * @default 0
+             */
+            analysis_queued: number;
         };
         /** Plan */
         Plan: {
@@ -2241,6 +2312,8 @@ export interface components {
         PlannedScene: {
             /** Scene */
             scene: number;
+            /** Scene Code */
+            scene_code: string;
             /** Heading */
             heading: string;
             /** Shots */
@@ -2695,6 +2768,11 @@ export interface components {
             rev: number;
             /** Segments */
             segments: components["schemas"]["CoverageSegment"][];
+            /**
+             * Decision Fresh
+             * @default true
+             */
+            decision_fresh: boolean;
         };
         /** ShotNode */
         ShotNode: {
@@ -2781,6 +2859,16 @@ export interface components {
             comments: components["schemas"]["Comment"][];
             /** Open Comments */
             open_comments: number;
+            /**
+             * Decision Fresh
+             * @default true
+             */
+            decision_fresh: boolean;
+            /**
+             * Decision Freshness Reason
+             * @default
+             */
+            decision_freshness_reason: string;
         };
         /** SourceClip */
         SourceClip: {
@@ -3011,6 +3099,21 @@ export interface components {
              * @default
              */
             shot_code: string;
+            /**
+             * Uploaded By
+             * @default
+             */
+            uploaded_by: string;
+            /**
+             * Can Delete
+             * @default false
+             */
+            can_delete: boolean;
+            /**
+             * Filename
+             * @default
+             */
+            filename: string;
         };
         /** TakeAnalysis */
         TakeAnalysis: {
@@ -3069,6 +3172,37 @@ export interface components {
             shoot_days: string[];
             /** Review Margin */
             review_margin: number;
+        };
+        /** UnassignedPlacementItem */
+        UnassignedPlacementItem: {
+            /** Clip Id */
+            clip_id: string;
+            /** Proxy Uri */
+            proxy_uri: string;
+            /** Sprite Uri */
+            sprite_uri: string;
+            /** Slate Uri */
+            slate_uri: string;
+            /** Duration S */
+            duration_s: number;
+            /** Camera */
+            camera: string;
+            /** Fps */
+            fps: number;
+            /** Take No */
+            take_no: number;
+            /** Actor */
+            actor: string;
+            /** Detail */
+            detail: string;
+            /** Decided At */
+            decided_at?: string | null;
+            /** Filename */
+            filename: string;
+            /** Scene Code */
+            scene_code: string;
+            /** Shot Code */
+            shot_code: string;
         };
         /**
          * UndoRequest
@@ -3519,6 +3653,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnalysisQueued"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_clip_clips__project_id___clip_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                clip_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_clip_clips__project_id___clip_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                clip_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

@@ -21,7 +21,6 @@ from tempfile import TemporaryDirectory
 from uuid import UUID
 
 from . import analysis_store, assessment, criteria, storage
-from . import clips as clips_service
 from . import decisions as decisions_service
 from . import ranges as ranges_service
 from . import shots as shots_service
@@ -95,12 +94,11 @@ async def judge(
 ) -> dict:
     """Compare every take of one setup and record what was decided.
 
-    Normalisation runs first, every time. The ratios the panel reads are only
-    correct against the takes that exist now, and a setup that gained a take
-    since the last run would otherwise be judged on stale ones.
+    Relative measurements are derived in memory from the takes that exist now.
+    Interactive review must never launch a ClickHouse mutation.
     """
-    normalised = await clips_service.normalise_group(project_id, group_id, subgroup_id)
     takes = await _load(project_id, group_id, subgroup_id)
+    normalised = len(takes) if len(takes) >= 2 else 0
 
     if len(takes) < MIN_TAKES:
         raise NotReady(
@@ -239,6 +237,18 @@ def _panel_likely(request) -> bool:
     return bool(any(request.observed_findings.values())) or margin < agent_settings.panel_margin
 
 
+def _median(values: list[float]) -> float:
+    ordered = sorted(values)
+    if not ordered:
+        return 0.0
+    mid = len(ordered) // 2
+    return ordered[mid] if len(ordered) % 2 else (ordered[mid - 1] + ordered[mid]) / 2
+
+
+def _ratio(value: float, median: float) -> float:
+    return round(value / median, 4) if value > 0 and median > 0 else 1.0
+
+
 async def _load(project_id: int, group_id: int, subgroup_id: int) -> list[dict]:
     ch = await client()
     result = await ch.query(
@@ -246,7 +256,8 @@ async def _load(project_id: int, group_id: int, subgroup_id: int) -> list[dict]:
         SELECT clip_id, take_no, storage_uri, duration_ms,
                exposure_rel, clipping_pct, sharpness_rel, motion_rel,
                audio_lufs, noise_floor_db, dropped_frames, normalised_at,
-               finding_codes, finding_starts_s, finding_ends_s
+               finding_codes, finding_starts_s, finding_ends_s,
+               exposure_raw, sharpness_raw, motion_raw
         FROM current_clip_placement
         WHERE project_id = {p:UInt32} AND group_id = {g:UInt32}
           AND subgroup_id = {s:UInt32} AND status = 'active'
@@ -256,17 +267,21 @@ async def _load(project_id: int, group_id: int, subgroup_id: int) -> list[dict]:
     )
 
     takes = []
-    for row in result.result_rows:
+    raw_rows = list(result.result_rows)
+    exposure_median = _median([float(row[15]) for row in raw_rows]) if raw_rows else 0.0
+    sharpness_median = _median([float(row[16]) for row in raw_rows]) if raw_rows else 0.0
+    motion_median = _median([float(row[17]) for row in raw_rows]) if raw_rows else 0.0
+    for row in raw_rows:
         takes.append(
             {
                 "clip_id": UUID(str(row[0])),
                 "take_no": int(row[1]),
                 "storage_uri": str(row[2]),
                 "duration_s": max(int(row[3]) / 1000, 0.001),
-                "exposure_rel": float(row[4]),
+                "exposure_rel": _ratio(float(row[15]), exposure_median),
                 "clipping_pct": min(max(float(row[5]), 0.0), 100.0),
-                "sharpness_rel": float(row[6]),
-                "motion_rel": float(row[7]),
+                "sharpness_rel": _ratio(float(row[16]), sharpness_median),
+                "motion_rel": _ratio(float(row[17]), motion_median),
                 "audio_lufs": float(row[8]),
                 "noise_floor_db": float(row[9]),
                 "dropped_frames": int(row[10]),
@@ -459,7 +474,8 @@ async def takes_in_shot(project_id: int, group_id: int, subgroup_id: int) -> lis
         """
         SELECT toString(clip_id), take_no, duration_ms / 1000,
                proxy_uri, sprite_uri, camera, fps, scene_code, shot_code,
-               captured_at, finding_codes, finding_starts_s, finding_ends_s
+               captured_at, finding_codes, finding_starts_s, finding_ends_s,
+               uploaded_by, storage_uri
         FROM current_clip_placement
         WHERE project_id = {p:UInt32} AND group_id = {g:UInt32}
           AND subgroup_id = {s:UInt32} AND status = 'active'
@@ -511,6 +527,9 @@ async def takes_in_shot(project_id: int, group_id: int, subgroup_id: int) -> lis
                 "fps": float(row[6] or 0),
                 "scene_code": str(row[7] or ""),
                 "shot_code": str(row[8] or ""),
+                "uploaded_by": str(row[13] or ""),
+                "can_delete": False,
+                "filename": str(row[14] or "").rsplit("/", 1)[-1],
             }
         )
     return takes

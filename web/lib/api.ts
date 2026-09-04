@@ -623,7 +623,7 @@ export const api = {
 
   /** Clips whose placement nobody has agreed with, with the evidence. */
   placementInbox: (projectId: number) =>
-    request<{ project_id: number; waiting: PlacementRow[]; count: number }>(
+    request<PlacementInbox>(
       `/placements/${projectId}`,
     ),
 
@@ -649,10 +649,10 @@ export const api = {
   activity: (projectId: number) =>
     request<{ activity: Activity[] }>(`/structure/${projectId}/activity`),
 
-  addScene: (projectId: number, scene: number, heading: string) =>
+  addScene: (projectId: number, sceneCode: string, heading: string) =>
     request<PlannedScene>(`/structure/${projectId}/scenes`, {
       method: "POST",
-      body: JSON.stringify({ scene, heading }),
+      body: JSON.stringify({ scene: 0, scene_code: sceneCode, heading }),
     }),
 
   addShot: (
@@ -671,6 +671,18 @@ export const api = {
     request<PlannedScene>(
       `/structure/${projectId}/scenes/${scene}/shots/${shot}`,
       { method: "DELETE" },
+    ),
+
+  removeClip: (projectId: number, clipId: string) =>
+    request<{ status: string; clip_id: string; recoverable: boolean }>(
+      `/clips/${projectId}/${clipId}`,
+      { method: "DELETE" },
+    ),
+
+  restoreClip: (projectId: number, clipId: string) =>
+    request<{ status: string; clip_id: string }>(
+      `/clips/${projectId}/${clipId}/restore`,
+      { method: "POST" },
     ),
 
   /** Questions worth asking, so an empty box is not a blank page. */

@@ -11,10 +11,10 @@ from pydantic import BaseModel
 from ..common.errors import AgentFailure, text_of
 from ..config import settings
 from ..contracts.base import Finding
-from ..contracts.segments import SegmentObservation
+from ..contracts.segments import Moment, SegmentObservation
 
-PROMPT_VERSION = "segment/v1"
-PROMPT = (Path(__file__).parent / "prompt_v1.md").read_text(encoding="utf-8")
+PROMPT_VERSION = "segment/v2"
+PROMPT = (Path(__file__).parent / "prompt_v2.md").read_text(encoding="utf-8")
 
 
 class SegmentModelResponse(BaseModel):
@@ -35,6 +35,7 @@ class SegmentModelResponse(BaseModel):
     speakers: list[str]
     shot_size: str
     camera_motion: str
+    moments: list[Moment]
     findings: list[Finding]
 
 

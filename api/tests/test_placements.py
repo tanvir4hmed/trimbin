@@ -126,10 +126,14 @@ class TestKeepCannotBecomeAMove:
         async def noted(*args, **kwargs):
             return None
 
+        async def no_candidates(project_id):
+            return []
+
         monkeypatch.setattr(Principal, "assert_can_curate", allowed)
         monkeypatch.setattr(routes.placements, "inbox", inbox)
         monkeypatch.setattr(routes.placements, "resolve", resolve)
         monkeypatch.setattr(routes.activity, "record", noted)
+        monkeypatch.setattr(routes.analysis_store, "active_clips_without_analysis", no_candidates)
 
         await routes.resolve(
             1,
@@ -238,13 +242,21 @@ class TestReplacingADuplicate:
         async def resolve(project_id, clip_id, scene, shot, actor, detail="", *, take_no=0):
             resolved.append((clip_id, scene, shot, take_no, detail))
 
+        async def unassign(project_id, clip_id, actor, detail="", *, take_no=0):
+            resolved.append((clip_id, 0, 0, take_no, detail))
+
         async def noted(*args, **kwargs):
             return None
+
+        async def no_candidates(project_id):
+            return []
 
         monkeypatch.setattr(Principal, "assert_can_curate", allowed)
         monkeypatch.setattr(routes.placements, "settled_duplicate", duplicate)
         monkeypatch.setattr(routes.placements, "resolve", resolve)
+        monkeypatch.setattr(routes.placements, "unassign", unassign)
         monkeypatch.setattr(routes.activity, "record", noted)
+        monkeypatch.setattr(routes.analysis_store, "active_clips_without_analysis", no_candidates)
 
         await routes.resolve(
             1,

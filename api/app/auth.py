@@ -134,6 +134,11 @@ class Principal:
         """
         if self.is_anonymous:
             raise _unauthorised()
+        # The public example is the real product, not a read-only tour. A
+        # signed-in guest may exercise the same additive/reversible workflow as
+        # an editor there; destructive ownership checks remain route-specific.
+        if project_id == settings.demo_project_id:
+            return
         if await self._owns_the_work(project_id):
             return
 
@@ -155,6 +160,8 @@ class Principal:
         """
         if self.is_anonymous:
             raise _unauthorised()
+        if project_id == settings.demo_project_id:
+            return
         if await self._owns_the_work(project_id):
             return
 

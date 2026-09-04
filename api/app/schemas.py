@@ -233,6 +233,9 @@ class Take(Model):
     fps: float = 0.0
     scene_code: str = ""
     shot_code: str = ""
+    uploaded_by: str = ""
+    can_delete: bool = False
+    filename: str = ""
 
 
 class SourceClip(Model):
@@ -395,6 +398,7 @@ class Brief(Model):
     previous_selected_clip_id: str = ""
     selection_event_id: str = ""
     selection_archive_state: str = ""
+    observed_source_set_hash: str = ""
     note: str | None = None
 
 
@@ -516,6 +520,7 @@ class PlannedShot(Model):
 
 class PlannedScene(Model):
     scene: int
+    scene_code: str
     heading: str
     shots: list[PlannedShot]
 
@@ -572,6 +577,8 @@ class ShotScreen(Model):
     analyses: list[TakeAnalysis] = []
     comments: list[Comment]
     open_comments: int
+    decision_fresh: bool = True
+    decision_freshness_reason: str = ""
 
 
 class CoverageSegment(Model):
@@ -591,6 +598,7 @@ class ShotCoverage(Model):
     shot: int
     rev: int
     segments: list[CoverageSegment]
+    decision_fresh: bool = True
 
 
 class StringoutEntry(Model):
@@ -753,6 +761,7 @@ class JobStatus(Model):
     started_at: str
     finished_at: str | None = None
     items: list[IngestItem] = []
+    stages: dict[str, dict] = {}
 
 
 class PlacementItem(Model):
@@ -784,10 +793,29 @@ class PlacementItem(Model):
     duplicate_take: int = 0
 
 
+class UnassignedPlacementItem(Model):
+    clip_id: str
+    proxy_uri: str
+    sprite_uri: str
+    slate_uri: str
+    duration_s: float
+    camera: str
+    fps: float
+    take_no: int
+    actor: str
+    detail: str
+    decided_at: str | None = None
+    filename: str
+    scene_code: str
+    shot_code: str
+
+
 class PlacementInbox(Model):
     project_id: int
     waiting: list[PlacementItem]
     count: int
+    unassigned: list[UnassignedPlacementItem] = []
+    unassigned_count: int = 0
 
 
 class PlacementResolved(Model):
@@ -795,3 +823,4 @@ class PlacementResolved(Model):
     scene: int
     shot: int
     detail: str
+    analysis_queued: int = 0

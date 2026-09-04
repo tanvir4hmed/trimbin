@@ -28,6 +28,7 @@ def test_vertex_wire_schema_stays_constraint_light() -> None:
         "speakers",
         "shot_size",
         "camera_motion",
+        "moments",
         "findings",
     }
 

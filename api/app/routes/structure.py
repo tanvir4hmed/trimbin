@@ -24,7 +24,8 @@ router = APIRouter(prefix="/structure", tags=["structure"])
 
 
 class NewScene(BaseModel):
-    scene: int = Field(ge=1, le=9999)
+    scene: int = Field(default=0, ge=0, le=9999)
+    scene_code: str = Field(default="", min_length=1, max_length=structure.MAX_SLUG)
     heading: str = Field(default="", max_length=structure.MAX_HEADING)
 
 
@@ -56,13 +57,16 @@ async def add_scene(
     principal: Annotated[Principal, Depends(require_signed_in)],
 ) -> dict:
     await principal.assert_can_curate(project_id)
-    scene = await structure.add_scene(project_id, body.scene, body.heading)
+    scene_id = body.scene or await structure.next_scene_number(project_id)
+    scene = await structure.add_scene(
+        project_id, scene_id, body.heading, scene_code=body.scene_code
+    )
     await activity.record(
         project_id,
         principal.email or "",
         "planned",
-        detail=f"scene {body.scene}" + (f" — {body.heading}" if body.heading else ""),
-        scene=body.scene,
+        detail=f"scene {body.scene_code}" + (f" — {body.heading}" if body.heading else ""),
+        scene=scene_id,
         actor_role=members.role_of(principal.email),
     )
     return scene.as_dict()

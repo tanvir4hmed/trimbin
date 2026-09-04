@@ -36,10 +36,9 @@ export default function PlacementInbox({
   const inbox = useQuery({
     queryKey: ["project", projectId, "placements"],
     queryFn: () => api.placementInbox(projectId),
-    refetchInterval: (query) =>
-      // Poll while anything is waiting: the worker is still landing clips and
-      // rows appear as it does. Stop once the inbox is clear.
-      (query.state.data?.count ?? 0) > 0 ? 8000 : false,
+    // Workers can add the first row after this screen initially returned zero.
+    // Polling only when a row already exists makes that first row invisible.
+    refetchInterval: 8000,
   });
 
   const resolve = useMutation({
@@ -61,7 +60,8 @@ export default function PlacementInbox({
   });
 
   const waiting = inbox.data?.waiting ?? [];
-  if (inbox.isPending || waiting.length === 0) return null;
+  const unassigned = inbox.data?.unassigned ?? [];
+  if (inbox.isPending || (waiting.length === 0 && unassigned.length === 0)) return null;
 
   return (
     <section className="inbox">
@@ -242,6 +242,18 @@ export default function PlacementInbox({
           </div>
         );
       })}
+
+      {unassigned.length > 0 && (
+        <div className="unassigned-bin">
+          <div className="sect">Unassigned bin <span className="note">{unassigned.length} clip{unassigned.length === 1 ? "" : "s"} · outside scene and shot counts</span></div>
+          {unassigned.map((row) => (
+            <div className="inbox-row compact" key={`unassigned-${row.clip_id}`}>
+              {row.sprite_uri ? <img className="slate-frame" src={row.sprite_uri} alt="Clip thumbnail" /> : <div className="slate-frame none">no preview</div>}
+              <div className="inbox-main"><div className="ir-head"><span className="mono">{row.filename || row.clip_id.slice(0, 8)}</span><span className="pill quiet">Unassigned</span><span className="dim small">{row.duration_s.toFixed(0)}s</span></div><div className="ir-why">{row.detail || "Waiting for a scene and shot"}</div></div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {resolve.isError && (
         <p className="error small">

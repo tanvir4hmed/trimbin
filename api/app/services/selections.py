@@ -41,6 +41,7 @@ async def commit_coverage(
     reason: str,
     actor: str,
     expected_rev: int,
+    source_set_hash: str = "",
 ) -> Committed:
     """Replace the ordered current coverage for one shot, revision-safely.
 
@@ -80,6 +81,7 @@ async def commit_coverage(
                 "selection_at": now,
                 "selection_event_id": event_id,
                 "selection_archive_state": "pending",
+                "observed_source_set_hash": source_set_hash,
                 "rev": found_rev + 1,
             },
             merge=True,
@@ -97,6 +99,7 @@ async def commit_coverage(
                 "reason": reason,
                 "actor": actor,
                 "segments": segments,
+                "source_set_hash": source_set_hash,
                 "previous_segments": previous_segments,
                 "revision": found_rev + 1,
                 "state": "pending",

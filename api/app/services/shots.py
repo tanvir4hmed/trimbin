@@ -95,6 +95,7 @@ class Shot:
     selection_archive_state: str = ""
     coverage_segments: list[dict] = field(default_factory=list)
     previous_coverage_segments: list[dict] = field(default_factory=list)
+    observed_source_set_hash: str = ""
 
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_by: str = ""
@@ -131,6 +132,7 @@ class Shot:
             "selection_event_id": self.selection_event_id,
             "selection_archive_state": self.selection_archive_state,
             "coverage_segments": self.coverage_segments,
+            "observed_source_set_hash": self.observed_source_set_hash,
             "updated_at": self.updated_at.isoformat(),
             "updated_by": self.updated_by,
             "rev": self.rev,
@@ -183,6 +185,7 @@ def _from_doc(project_id: int, scene: int, shot: int, d: dict) -> Shot:
         selection_archive_state=d.get("selection_archive_state", ""),
         coverage_segments=list(d.get("coverage_segments") or []),
         previous_coverage_segments=list(d.get("previous_coverage_segments") or []),
+        observed_source_set_hash=str(d.get("observed_source_set_hash") or ""),
         updated_at=d.get("updated_at") or datetime.now(UTC),
         updated_by=d.get("updated_by", ""),
         rev=int(d.get("rev", 0) or 0),

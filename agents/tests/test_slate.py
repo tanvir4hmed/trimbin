@@ -26,7 +26,7 @@ from trimbin_agents.slate.agent import (
     SlateAgent,
     _cosine,
     _infer_from_neighbours,
-    _to_ordinal,
+    _plain_integer,
     _typical_similarity,
 )
 
@@ -71,15 +71,17 @@ class TestSlateNumbering:
     def test_letters_survive(self) -> None:
         """Scene 12 and scene 12A are different setups a production named apart.
         Dropping the letter merges them, and the merge is invisible afterwards."""
-        assert _to_ordinal("12") != _to_ordinal("12A")
+        assert _plain_integer("12") == 12
+        assert _plain_integer("12A") == 0
 
     def test_ordering_is_preserved(self) -> None:
-        assert _to_ordinal("12") < _to_ordinal("12A") < _to_ordinal("12B") < _to_ordinal("13")
+        assert _plain_integer("12A-PU") == 0
+        assert _plain_integer("A012C") == 0
 
     def test_missing_field_does_not_raise(self) -> None:
         """An unreadable board leaves fields empty, and that path must not throw
         — it is the ordinary case on an unslated shoot."""
-        assert _to_ordinal("") == 0
+        assert _plain_integer("") == 0
 
 
 class TestNeighbourInference:

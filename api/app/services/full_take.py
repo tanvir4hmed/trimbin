@@ -107,6 +107,67 @@ def _absolute_findings(
     return found
 
 
+def _absolute_moments(
+    observation: Any,
+    window: Window,
+    segment_id: UUID,
+    embedding: list[float],
+) -> list[dict]:
+    """Turn local model spans into bounded source-time events."""
+    found: list[dict] = []
+    for moment in getattr(observation, "moments", []):
+        local_start = max(0.0, min(float(moment.where.start_s), window.duration_s))
+        local_end = max(0.0, min(float(moment.where.end_s), window.duration_s))
+        # A moment without a tight positive span is not exact evidence. Unlike
+        # a whole-take finding, widening it to the processing window would make
+        # the search promise false again.
+        if local_end - local_start < 0.05:
+            continue
+        found.append(
+            {
+                "kind": _value(moment.kind),
+                "text": str(moment.text).strip(),
+                "start_s": round(window.start_s + local_start, 3),
+                "end_s": round(window.start_s + local_end, 3),
+                "evidence_segment_ids": [segment_id],
+                # One embedding call per processing window. Every discrete
+                # moment inherits that visual/context vector; literal moment
+                # text supplies the exact rank without multiplying model calls.
+                "embedding": embedding,
+            }
+        )
+    return found
+
+
+def consolidate_moments(moments: list[dict]) -> list[dict]:
+    """Merge duplicate events emitted by overlapping processing windows."""
+    consolidated: list[dict] = []
+    for candidate in sorted(moments, key=lambda item: (item["start_s"], item["end_s"])):
+        normalized = " ".join(str(candidate["text"]).lower().split())
+        match = next(
+            (
+                current
+                for current in consolidated
+                if current["kind"] == candidate["kind"]
+                and " ".join(str(current["text"]).lower().split()) == normalized
+                and min(current["end_s"], candidate["end_s"])
+                > max(current["start_s"], candidate["start_s"])
+            ),
+            None,
+        )
+        if match is None:
+            consolidated.append(
+                {**candidate, "evidence_segment_ids": list(candidate["evidence_segment_ids"])}
+            )
+            continue
+        match["start_s"] = min(match["start_s"], candidate["start_s"])
+        match["end_s"] = max(match["end_s"], candidate["end_s"])
+        match["evidence_segment_ids"] = list(
+            dict.fromkeys([*match["evidence_segment_ids"], *candidate["evidence_segment_ids"]])
+        )
+    return consolidated
+
+
 _SEVERITY = {"note": 0, "attention": 1, "blocking": 2}
 
 
@@ -195,6 +256,7 @@ async def analyse_clip(
     shot_meta = await shots.get(project_id, scene, shot)
     briefing = shots.briefing(shot_meta, duration_s)
     segments: list[dict] = []
+    moment_candidates: list[dict] = []
     candidates: list[dict] = []
 
     try:
@@ -264,6 +326,9 @@ async def analyse_clip(
                         "prompt_version": PROMPT_VERSION,
                     }
                 )
+                moment_candidates.extend(
+                    _absolute_moments(observation, window, segment_id, embedding)
+                )
                 candidates.extend(_absolute_findings(observation, window, segment_id))
                 source.unlink(missing_ok=True)
 
@@ -288,6 +353,22 @@ async def analyse_clip(
             )
 
         consolidated = consolidate_findings(candidates)
+        moments = consolidate_moments(moment_candidates)
+        for moment in moments:
+            identity = (
+                f"{moment['kind']}/{moment['start_s']:.3f}/{moment['end_s']:.3f}/"
+                f"{moment['text'].strip().lower()}"
+            )
+            moment.update(
+                {
+                    "moment_id": uuid5(run_id, identity),
+                    "run_id": run_id,
+                    "project_id": project_id,
+                    "clip_id": clip_id,
+                    "model_id": agent_settings.analyst_model,
+                    "prompt_version": PROMPT_VERSION,
+                }
+            )
         finding_events = []
         for finding in consolidated:
             identity = (
@@ -313,6 +394,7 @@ async def analyse_clip(
             )
 
         await analysis_store.record_segments(segments)
+        await analysis_store.record_moments(moments)
         await analysis_store.record_finding_events(finding_events)
         await analysis_store.record_run(
             run_id=run_id,
@@ -336,6 +418,7 @@ async def analyse_clip(
             "covered_until_s": windows[-1].end_s,
             "windows": len(windows),
             "segments": len(segments),
+            "moments": len(moments),
             "findings": len(finding_events),
         }
     except Exception as exc:

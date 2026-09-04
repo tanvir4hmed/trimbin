@@ -45,6 +45,13 @@ VERBS = (
     "set_state",
     "planned",
     "placed",
+    "ingest_committed",
+    "human_confirmed",
+    "human_dismissed",
+    "human_corrected",
+    "human_range_adjusted",
+    "deleted_clip",
+    "restored_clip",
 )
 
 

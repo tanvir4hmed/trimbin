@@ -104,6 +104,7 @@ class FindingCode(StrEnum):
     # -- observed, by a specialist, and checkable by a person ---------------
     SLATE_PRESENT = "slate.present"
     ACTION_PRE_ROLL = "action.pre_roll"
+    ACTION_POST_ROLL = "action.post_roll"
     ACTION_INCOMPLETE = "action.incomplete"
     DIALOGUE_INCOMPLETE = "dialogue.incomplete"
     DIALOGUE_FLUFFED = "dialogue.fluffed"

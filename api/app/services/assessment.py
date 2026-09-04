@@ -19,6 +19,7 @@ from the agents package, because the panel and the interface must agree on what
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 from typing import Literal
 
 Status = Literal[
@@ -75,6 +76,7 @@ def assess(
     chosen_take: int = 0,
     state: str = "",
     segments: int = 0,
+    decision_fresh: bool = True,
     threshold: float | None = None,
 ) -> Assessment:
     """The one rule.
@@ -114,6 +116,9 @@ def assess(
     if state == APPROVED:
         return Assessment("confirmed", None)
 
+    if segments > 0 and not decision_fresh:
+        return Assessment("needs_review", "new or moved footage arrived")
+
     if segments > 0:
         return Assessment("confirmed", None)
 
@@ -138,3 +143,9 @@ def assess(
         return Assessment("needs_review", "close call")
 
     return Assessment("decided", None)
+
+
+def source_set_hash(clip_ids: list[str]) -> str:
+    """Stable evidence-set identity for revision-binding a human decision."""
+    canonical = "\n".join(sorted({str(item) for item in clip_ids if item}))
+    return sha256(canonical.encode("utf-8")).hexdigest() if canonical else ""

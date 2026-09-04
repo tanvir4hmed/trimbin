@@ -46,6 +46,7 @@ export default function Comments({
   pending,
   onConsumedPending,
   hideOwnTrigger = false,
+  onOpen,
 }: {
   projectId: number;
   scene: number;
@@ -65,6 +66,8 @@ export default function Comments({
    * few pixels apart, was the clutter.
    */
   hideOwnTrigger?: boolean;
+  /** Open the anchored source in the caller's player. */
+  onOpen?: (clipId: string, at: number) => void;
 }) {
   const [body, setBody] = useState("");
   const [anchor, setAnchor] = useState<{ clipId: string; at: number } | null>(null);
@@ -159,10 +162,10 @@ export default function Comments({
                   <span className="tag quiet">guest</span>
                 )}
                 {c.clip_id && (
-                  <span className="c-where">
+                  <button type="button" className="c-where" onClick={() => onOpen?.(c.clip_id!, c.at_s)} disabled={!onOpen}>
                     take {takeOf(c.clip_id) ?? "?"}
                     {!c.whole_take && ` · ${seconds(c.at_s)}`}
-                  </span>
+                  </button>
                 )}
                 <span className="ago">{when(c.created_at)}</span>
               </div>

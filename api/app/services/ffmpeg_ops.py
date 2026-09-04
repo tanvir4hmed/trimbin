@@ -229,7 +229,12 @@ def _parse_motion(output: str, m: RawMeasurements) -> None:
         return
     m.motion_mean = sum(diffs) / len(diffs)
     m.motion_peak = max(diffs)
-    m.motion_spikes = _spikes(diffs, m.duration_s)
+    # A full-frame difference cannot distinguish a camera lurch from an actor
+    # crossing frame, a practical light, or a cut. Keep the aggregate for
+    # relative take-to-take comparison, but do not manufacture a timecoded
+    # `stability.shake` finding from it. Visual analysis may still report a
+    # checkable shake with frame evidence.
+    m.motion_spikes = []
 
 
 def _parse_spans(stderr: str, m: RawMeasurements) -> None:

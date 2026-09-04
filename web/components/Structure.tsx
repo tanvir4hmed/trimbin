@@ -45,14 +45,12 @@ export default function Structure({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const nextScene = Math.max(0, ...scenes.map((s) => s.scene)) + 1;
-
   const addScene = async () => {
-    const n = Number(newScene || nextScene);
-    if (!n) return;
+    const code = newScene.trim();
+    if (!code) return;
     setBusy(true);
     try {
-      await api.addScene(projectId, n, heading.trim());
+      await api.addScene(projectId, code, heading.trim());
       setNewScene("");
       setHeading("");
       onChanged();
@@ -104,7 +102,7 @@ export default function Structure({
             onClick={() => setOpenScene(openScene === s.scene ? null : s.scene)}
           >
             <span className="chev">{openScene === s.scene ? "▾" : "▸"}</span>
-            <span className="code">SCENE {s.scene}</span>
+            <span className="code">SCENE {s.scene_code || s.scene}</span>
             <span className="desc">{s.heading}</span>
             <span className="scount">
               {s.shots.length} shot{s.shots.length === 1 ? "" : "s"}
@@ -191,10 +189,10 @@ export default function Structure({
         <div className="plan-add">
           <span className="plan-add-label">Add a scene</span>
           <input
-            type="number"
-            min={1}
+            type="text"
             value={newScene}
-            placeholder={String(nextScene)}
+            placeholder="3, 12A-PU, A012C"
+            aria-label="Scene code"
             onChange={(e) => setNewScene(e.target.value)}
           />
           <input

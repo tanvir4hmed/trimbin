@@ -41,6 +41,7 @@ SUBTRACTED = frozenset(
         "focus.lost",
         "slate.present",
         "action.pre_roll",
+        "action.post_roll",
     }
 )
 
@@ -110,6 +111,14 @@ def safe_ranges(
             continue
         start = max(0.0, float(f.get("start_s") or 0.0))
         end = min(duration_s, float(f.get("end_s") or 0.0))
+
+        # Once the subject exits, the following dead tail is not a second clean
+        # performance. Model spans often mark only the exit movement itself;
+        # treating their end as a return to usable action offered post-cut room
+        # as the primary range. Keep everything before the exit, block through
+        # the end of the source.
+        if code in {"frame.subject_exits", "action.post_roll"} and start < duration_s:
+            end = duration_s
 
         # A finding with no span applies to the whole take. Those are real —
         # "underexposed throughout" — and the honest reading is that nothing is

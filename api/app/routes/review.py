@@ -278,7 +278,7 @@ async def verdicts(
                d.criterion_names, d.criterion_scores,
                d.safe_starts_s, d.safe_ends_s, d.trim_reasons,
                c.duration_ms, c.camera, c.captured_at,
-               c.fps, c.scene_code, c.shot_code
+               c.fps, c.scene_code, c.shot_code, c.uploaded_by, c.storage_uri
         FROM decisions AS d
         INNER JOIN current_clip_placement AS c
             ON c.clip_id = d.clip_id AND c.project_id = d.project_id
@@ -333,6 +333,12 @@ async def verdicts(
                 "fps": round(float(r[29] or 0), 3),
                 "scene_code": r[30] or "",
                 "shot_code": r[31] or "",
+                "uploaded_by": r[32] or "",
+                "can_delete": bool(
+                    members.is_staff(principal.email)
+                    or (r[32] or "").lower() == (principal.email or "").lower()
+                ),
+                "filename": (r[33] or "").rsplit("/", 1)[-1],
             }
         )
 
@@ -436,12 +442,20 @@ async def coverage(
     await principal.assert_can_read(project_id)
     brief = await shots.get(project_id, group_id, subgroup_id)
     verdicts_now = await _verdicts_for(project_id, group_id, subgroup_id)
+    current_hash = assessment.source_set_hash(
+        [str(item.get("clip_id") or "") for item in verdicts_now]
+    )
+    fresh = bool(
+        not brief.coverage_segments
+        or (brief.observed_source_set_hash and brief.observed_source_set_hash == current_hash)
+    )
     return {
         "project_id": project_id,
         "scene": group_id,
         "shot": subgroup_id,
         "rev": brief.rev,
         "segments": _coverage_for_screen(brief, verdicts_now),
+        "decision_fresh": fresh,
     }
 
 
@@ -464,6 +478,10 @@ async def set_coverage(
 
     takes = await _verdicts_for(project_id, group_id, subgroup_id)
     by_clip = {str(take["clip_id"]): take for take in takes}
+    # Freshness binds the decision to the coverage that *arrived in this shot*.
+    # A person may reuse a range from elsewhere in the project, but that source
+    # is a choice, not a newly arrived candidate that should reopen the shot.
+    evidence_ids = list(by_clip)
     missing_ids = sorted({str(item.clip_id) for item in body.segments} - set(by_clip))
     if missing_ids:
         source_rows = await (await client()).query(
@@ -524,6 +542,7 @@ async def set_coverage(
         reason=body.reason,
         actor=principal.email or "",
         expected_rev=body.rev,
+        source_set_hash=assessment.source_set_hash(evidence_ids),
     )
     try:
         await selections.deliver(committed.event_id)
@@ -535,6 +554,7 @@ async def set_coverage(
         "shot": subgroup_id,
         "rev": committed.rev,
         "segments": prepared,
+        "decision_fresh": True,
     }
     await revisions.remember(idempotency_key or "", principal.email or "", result)
     return result
@@ -928,15 +948,31 @@ async def tree(
             count()                                          AS takes,
             countIf(c.status = 'failed')                     AS unusable,
             anyIf(c.description, c.description != '')        AS label,
-            max(l.outcome = 'selected')                      AS has_verdict,
-            maxIf(l.decided_by = 'human', l.outcome = 'selected') AS reviewed,
-            maxIf(l.margin, l.outcome = 'selected')          AS margin,
-            maxIf(c.take_no, l.outcome = 'selected')         AS chosen_take,
+            max(
+                l.clip_id != toUUID('00000000-0000-0000-0000-000000000000')
+                AND l.outcome = 'selected'
+            ) AS has_verdict,
+            maxIf(
+                l.decided_by = 'human',
+                l.clip_id != toUUID('00000000-0000-0000-0000-000000000000')
+                AND l.outcome = 'selected'
+            ) AS reviewed,
+            maxIf(
+                l.margin,
+                l.clip_id != toUUID('00000000-0000-0000-0000-000000000000')
+                AND l.outcome = 'selected'
+            ) AS margin,
+            maxIf(
+                c.take_no,
+                l.clip_id != toUUID('00000000-0000-0000-0000-000000000000')
+                AND l.outcome = 'selected'
+            ) AS chosen_take,
             arrayDistinct(groupArray(c.camera))              AS cameras,
             -- The take numbers themselves, not only how many. The rail could
             -- say "3 takes" and offer no way to reach take 2 except by
             -- clicking through the player.
             arraySort(arrayDistinct(groupArray(c.take_no)))  AS take_numbers,
+            arraySort(groupArray(toString(c.clip_id)))       AS clip_ids,
             toString(min(toDate(c.captured_at)))             AS shoot_day,
             anyIf(c.scene_code, c.scene_code != '')          AS scene_code,
             anyIf(c.shot_code, c.shot_code != '')            AS shot_code
@@ -973,6 +1009,7 @@ async def tree(
             chosen_take,
             cameras,
             take_numbers,
+            clip_ids,
             day,
             scene_code,
             shot_code,
@@ -1027,6 +1064,15 @@ async def tree(
                     int(chosen_take or 0),
                     meta.state if meta else "",
                     len(meta.coverage_segments) if meta else 0,
+                    (
+                        not meta
+                        or not meta.coverage_segments
+                        or (
+                            bool(meta.observed_source_set_hash)
+                            and meta.observed_source_set_hash
+                            == assessment.source_set_hash([str(item) for item in clip_ids])
+                        )
+                    ),
                 ),
                 "state": meta.state if meta else "",
                 "assignee": meta.assignee if meta else "",
@@ -1072,6 +1118,7 @@ def _status(
     chosen: int = 0,
     state: str = "",
     segments: int = 0,
+    decision_fresh: bool = True,
 ) -> str:
     """The dot beside a shot, from the one rule in services/assessment.py."""
     return assessment.assess(
@@ -1083,6 +1130,7 @@ def _status(
         chosen_take=chosen,
         state=state,
         segments=segments,
+        decision_fresh=decision_fresh,
     ).status
 
 

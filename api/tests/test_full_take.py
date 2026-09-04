@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from trimbin_agents.contracts.base import Finding, FindingCode, Severity, TimeRange
-from trimbin_agents.contracts.segments import SegmentObservation
+from trimbin_agents.contracts.segments import Moment, MomentKind, SegmentObservation
 
 from app.services import full_take
 from app.services import review as review_service
@@ -37,16 +37,12 @@ class TestRecommendationGate:
     async def test_no_recommendation_is_written_until_every_take_is_fully_analysed(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        async def normalise(*args) -> int:
-            return 2
-
         async def load(*args) -> list[dict]:
             return [
                 {"clip_id": uuid4(), "analysis_complete": True},
                 {"clip_id": uuid4(), "analysis_complete": False},
             ]
 
-        monkeypatch.setattr(review_service.clips_service, "normalise_group", normalise)
         monkeypatch.setattr(review_service, "_load", load)
         with pytest.raises(review_service.NotReady, match="full-take analysis is still pending"):
             await review_service.judge(1, 12, 2)
@@ -72,6 +68,47 @@ def focus(start: float, end: float, detail: str = "Focus drifts off the eyes.") 
         severity=Severity.ATTENTION,
         where=TimeRange(start_s=start, end_s=end),
     )
+
+
+def moment(kind: MomentKind, text: str, start: float, end: float) -> Moment:
+    from trimbin_agents.contracts.base import TimeRange
+
+    return Moment(kind=kind, text=text, where=TimeRange(start_s=start, end_s=end))
+
+
+class TestExactMoments:
+    def test_a_local_action_in_the_second_window_gets_source_time(self) -> None:
+        observed = observation().model_copy(
+            update={"moments": [moment(MomentKind.ACTION, "The woman closes the door.", 6, 8)]}
+        )
+        window = full_take.windows_for(70.0)[1]
+        found = full_take._absolute_moments(observed, window, uuid4(), [0.1] * 768)
+        assert [(row["start_s"], row["end_s"]) for row in found] == [(58.0, 60.0)]
+
+    def test_overlap_dedup_keeps_both_evidence_segments(self) -> None:
+        first, second = uuid4(), uuid4()
+        merged = full_take.consolidate_moments(
+            [
+                {
+                    "kind": "dialogue",
+                    "text": "Call the doctor.",
+                    "start_s": 54.0,
+                    "end_s": 56.0,
+                    "evidence_segment_ids": [first],
+                    "embedding": [],
+                },
+                {
+                    "kind": "dialogue",
+                    "text": "Call the doctor.",
+                    "start_s": 54.5,
+                    "end_s": 56.2,
+                    "evidence_segment_ids": [second],
+                    "embedding": [],
+                },
+            ]
+        )
+        assert len(merged) == 1
+        assert merged[0]["evidence_segment_ids"] == [first, second]
 
 
 class TestAbsoluteFindings:

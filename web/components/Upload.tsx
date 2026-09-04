@@ -7,7 +7,8 @@ import { type Progress, type Ticket, uploadAll } from "@/lib/upload";
 
 type Stage = "add" | "read" | "verify" | "ingest";
 type Resolution = { action: "move" | "keep" | "unassign" | "create"; scene?: number; shot?: number; take?: number; evidence_uri?: string };
-type SavedGrant = { job_id: string; tickets: Ticket[]; filenames: string[]; target?: { scene: number; shot: number; take: number } };
+type SavedFile = { name: string; size: number; lastModified: number };
+type SavedGrant = { job_id: string; tickets: Ticket[]; filenames: string[]; files?: SavedFile[]; mode?: "slate" | "manual"; target?: { scene: number; shot: number; take: number } };
 
 const STAGES: { key: Stage; label: string }[] = [
   { key: "add", label: "Add files" },
@@ -38,6 +39,7 @@ export default function Upload({ projectId, plan, canResolve = true, onFinished 
   const [evidenceUri, setEvidenceUri] = useState("");
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
+  const [interrupted, setInterrupted] = useState<SavedGrant | null>(null);
 
   const shots = plan.find((item) => item.scene === targetScene)?.shots ?? [];
   const items = status?.items ?? [];
@@ -52,11 +54,16 @@ export default function Upload({ projectId, plan, canResolve = true, onFinished 
     try {
       const grant = JSON.parse(saved) as SavedGrant;
       setJobId(grant.job_id);
+      setMode(grant.mode || (grant.target ? "manual" : "slate"));
+      setTargetScene(grant.target?.scene || 0);
+      setTargetShot(grant.target?.shot || 0);
+      setTargetTake(grant.target?.take || 0);
       void api.jobStatus(grant.job_id).then((found) => {
         setStatus(found);
         if (found.state === "committed") setStage("ingest");
         else if (found.done) setStage("verify");
         else if (found.state === "processing") setStage("read");
+        else if (found.state === "uploading") { setStage("add"); setInterrupted(grant); }
       }).catch(() => window.localStorage.removeItem(storageKey));
     } catch { window.localStorage.removeItem(storageKey); }
   }, [storageKey]);
@@ -110,10 +117,12 @@ export default function Upload({ projectId, plan, canResolve = true, onFinished 
       const prior = saved ? JSON.parse(saved) as SavedGrant : null;
       const requestedTarget = mode === "manual" ? { scene: targetScene, shot: targetShot, take: targetTake } : undefined;
       const sameTarget = JSON.stringify(prior?.target) === JSON.stringify(requestedTarget);
-      const sameFiles = prior && sameTarget && prior.filenames.length === files.length && prior.filenames.every((name) => files.some((file) => file.name === name));
+      const fingerprints = files.map((file) => ({ name: file.name, size: file.size, lastModified: file.lastModified }));
+      const sameFiles = Boolean(prior?.files && sameTarget && JSON.stringify(prior.files) === JSON.stringify(fingerprints));
       const grant = sameFiles ? prior : await api.grantUpload(projectId, files.map((file) => file.name), requestedTarget);
       if (!grant) throw new Error("Upload batch could not be restored.");
-      window.localStorage.setItem(storageKey, JSON.stringify({ job_id: grant.job_id, tickets: grant.tickets, filenames: files.map((file) => file.name), target: requestedTarget }));
+      window.localStorage.setItem(storageKey, JSON.stringify({ job_id: grant.job_id, tickets: grant.tickets, filenames: files.map((file) => file.name), files: fingerprints, mode, target: requestedTarget }));
+      setInterrupted(null);
       setJobId(grant.job_id);
       const { arrived, names, cancelled } = await uploadAll(grant.tickets, files, setRows, grant.job_id);
       if (cancelled) {
@@ -179,6 +188,7 @@ export default function Upload({ projectId, plan, canResolve = true, onFinished 
     <ol className="ingest-stepper">{STAGES.map((item, index) => <li key={item.key} className={index === activeIndex ? "active" : index < activeIndex ? "done" : ""}><span>{index < activeIndex ? "✓" : index + 1}</span><b>{item.label}</b></li>)}</ol>
 
     {stage === "add" && <div className="ingest-add">
+      {interrupted && <div className="ingest-recovery"><b>Interrupted upload found</b><p>Reselect the same {interrupted.filenames.length} file{interrupted.filenames.length === 1 ? "" : "s"}. Trimbin verifies name, size and modified time before continuing from bytes already accepted by storage.</p><small>{interrupted.filenames.join(" · ")}</small></div>}
       <div className="source-tiles"><button className="source-tile on"><span>▣</span><b>Computer</b><small>Camera cards or a shoot folder</small></button></div>
       <div className="ingest-mode"><button className={mode === "slate" ? "on" : ""} onClick={() => setMode("slate")}><b>AI reads the slate</b><small>Scene, shot, take and camera from the board</small></button><button className={mode === "manual" ? "on" : ""} onClick={() => setMode("manual")}><b>I know scene / shot / take</b><small>Declare a destination; mismatches are still flagged</small></button></div>
       {mode === "manual" && <div className="manual-target"><label>Scene<select value={targetScene} onChange={(event) => { setTargetScene(Number(event.target.value)); setTargetShot(0); }}><option value={0}>Choose scene</option>{plan.map((item) => <option key={item.scene} value={item.scene}>{item.scene} · {item.heading}</option>)}</select></label><label>Shot<select value={targetShot} onChange={(event) => setTargetShot(Number(event.target.value))}><option value={0}>Slate decides shot</option>{shots.map((item) => <option key={item.shot} value={item.shot}>{item.slug || `Shot ${item.shot}`}</option>)}</select></label><label>Take<input type="number" min="0" value={targetTake || ""} placeholder="Per clip later" onChange={(event) => setTargetTake(Number(event.target.value))} /></label></div>}
@@ -186,7 +196,7 @@ export default function Upload({ projectId, plan, canResolve = true, onFinished 
       {files.length > 0 && <div className="ingest-file-summary"><span><b>{files.length}</b> clips · {bytes(files.reduce((sum, file) => sum + file.size, 0))}</span><button className="primary" disabled={mode === "manual" && !targetScene} onClick={() => void start()}>Upload &amp; read slates</button></div>}
     </div>}
 
-    {stage === "read" && <div className="ingest-reading"><div className="reading-orbit">✦</div><h2>{rows.length && uploaded < total ? "Uploading camera originals" : "Reading slates and building proxies"}</h2><p>{status ? `${status.completed + status.failed} of ${status.total} processed` : rows.length ? `${bytes(uploaded)} of ${bytes(total)}` : "Restoring this batch…"}</p><div className="ingest-progress"><i style={{ width: `${status?.total ? ((status.completed + status.failed) / status.total) * 100 : total ? uploaded / total * 100 : 2}%` }} /></div><p className="hint">This batch is persisted. After a refresh, choose the same local files to continue any interrupted upload.</p></div>}
+    {stage === "read" && <div className="ingest-reading"><div className="reading-orbit">✦</div><h2>{rows.length && uploaded < total ? "Uploading camera originals" : "Preparing footage"}</h2><p>{status ? `${status.completed + status.failed} of ${status.total} processed` : rows.length ? `${bytes(uploaded)} of ${bytes(total)}` : "Restoring this batch…"}</p><div className="ingest-progress"><i style={{ width: `${status?.total ? ((status.completed + status.failed) / status.total) * 100 : total ? uploaded / total * 100 : 2}%` }} /></div>{status && Object.values(status.stages || {}).length > 0 && <div className="processing-stages">{Object.values(status.stages).map((item) => <span key={String(item.clip_id)}><b>{String(item.filename || item.clip_id).slice(0, 42)}</b><small>{String(item.stage).replaceAll("_", " ")}</small></span>)}</div>}<p className="hint">You may work elsewhere while this continues. After a refresh, reselect interrupted local files once; accepted bytes resume.</p></div>}
 
     {(stage === "verify" || stage === "ingest") && <div className="ingest-verify">
       <section className="ingest-table-panel"><header><div><h2>{items.length} clips</h2><p>{items.filter((item) => item.status === "Matched").length} matched · {items.filter((item) => item.status === "Needs review").length} need review · {items.filter((item) => item.status === "Duplicate").length} duplicate</p></div><div className="status-filter">Verify every row before commit</div></header><div className="ingest-table-wrap"><table className="ingest-table"><thead><tr><th>Clip</th><th>Duration</th><th>Camera</th><th>Detected assignment</th><th>Evidence confidence</th><th>Status</th></tr></thead><tbody>{items.map((item) => <tr key={item.clip_id} className={selected?.clip_id === item.clip_id ? "selected" : ""} onClick={() => setSelectedId(item.clip_id)}><td><div className="clip-cell">{item.slate_uri ? <img src={item.slate_uri} alt="Slate frame" /> : <span className="clip-thumb">▶</span>}<span><b>{item.filename || item.clip_id.slice(0, 8)}</b><small>Take {item.take_no || "—"}</small></span></div></td><td>{item.duration_s.toFixed(1)}s</td><td>{item.camera || "—"}</td><td>{item.scene ? `Scene ${item.scene} / Shot ${item.shot || "—"} / Take ${item.take_no || "—"}` : "Unassigned"}</td><td><span className="confidence-meter"><i style={{ width: `${item.confidence * 100}%` }} /></span>{Math.round(item.confidence * 100)}%</td><td><span className={`ingest-status ${item.status.toLowerCase().replace(" ", "-")}`}>{item.status}</span></td></tr>)}</tbody></table></div></section>

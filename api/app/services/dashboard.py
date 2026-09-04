@@ -141,6 +141,15 @@ async def for_projects(project_ids: list[int], viewer: str) -> dict:
             # The source ranges a human has chosen, from the same Firestore
             # coverage the cockpit writes and the scene reel plays.
             segments=len(described.coverage_segments) if described else 0,
+            decision_fresh=(
+                not described
+                or not described.coverage_segments
+                or (
+                    bool(described.observed_source_set_hash)
+                    and described.observed_source_set_hash
+                    == assessment.source_set_hash(row["clip_ids"])
+                )
+            ),
             threshold=margin_threshold,
         ).waiting_reason
 
@@ -261,11 +270,27 @@ async def _shot_rows(project_ids: list[int]) -> list[dict]:
             c.group_id,
             c.subgroup_id,
             count()                                               AS takes,
-            max(l.outcome = 'selected')                           AS has_verdict,
-            maxIf(l.decided_by = 'human', l.outcome = 'selected') AS confirmed,
-            maxIf(l.margin, l.outcome = 'selected')               AS margin,
-            maxIf(c.take_no, l.outcome = 'selected')              AS chosen_take,
-            anyIf(c.shot_code, c.shot_code != '')                 AS shot_code
+            max(
+                l.clip_id != toUUID('00000000-0000-0000-0000-000000000000')
+                AND l.outcome = 'selected'
+            ) AS has_verdict,
+            maxIf(
+                l.decided_by = 'human',
+                l.clip_id != toUUID('00000000-0000-0000-0000-000000000000')
+                AND l.outcome = 'selected'
+            ) AS confirmed,
+            maxIf(
+                l.margin,
+                l.clip_id != toUUID('00000000-0000-0000-0000-000000000000')
+                AND l.outcome = 'selected'
+            ) AS margin,
+            maxIf(
+                c.take_no,
+                l.clip_id != toUUID('00000000-0000-0000-0000-000000000000')
+                AND l.outcome = 'selected'
+            ) AS chosen_take,
+            anyIf(c.shot_code, c.shot_code != '')                 AS shot_code,
+            arraySort(groupArray(toString(c.clip_id)))            AS clip_ids
         FROM current_clip_placement AS c
         LEFT JOIN latest AS l
             ON l.project_id = c.project_id
@@ -290,6 +315,7 @@ async def _shot_rows(project_ids: list[int]) -> list[dict]:
             "margin": float(r[6]),
             "chosen_take": int(r[7] or 0),
             "shot_code": r[8] or "",
+            "clip_ids": [str(item) for item in r[9]],
         }
         for r in result.result_rows
     ]

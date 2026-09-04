@@ -95,7 +95,8 @@ async def dashboard(
                 "you_can_upload": bool(
                     principal.email
                     and (
-                        principal.email.lower() == p.owner_email.lower()
+                        p.project_id == settings.demo_project_id
+                        or principal.email.lower() == p.owner_email.lower()
                         or principal.email.lower() in {m.lower() for m in p.member_emails}
                         or (members.is_staff(principal.email) and members.is_staff(p.owner_email))
                     )

@@ -26,8 +26,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from .. import schemas
 from ..auth import Principal, current_principal
 from ..config import settings
+from ..services import assessment, members, projects, shots, structure
 from ..services import comments as comments_service
-from ..services import members, projects, shots, structure
 from . import analysis as analysis_routes
 from . import review as review_routes
 
@@ -130,6 +130,11 @@ async def shot_screen(
         if verdicts and verdicts.takes
         else [schemas.Take(**row) for row in present]
     )
+    for take in takes:
+        take.can_delete = bool(
+            members.is_staff(principal.email)
+            or (principal.email and take.uploaded_by.lower() == principal.email.lower())
+        )
 
     loaded = await asyncio.gather(
         *(analysis_routes._read(project_id, UUID(take.clip_id)) for take in takes)
@@ -147,6 +152,12 @@ async def shot_screen(
 
     stages = await jobs_service.analysis_states(project_id, [take.clip_id for take in takes])
 
+    current_hash = assessment.source_set_hash([take.clip_id for take in takes])
+    observed_hash = getattr(brief, "observed_source_set_hash", "")
+    decision_fresh = bool(
+        not brief.coverage_segments or (observed_hash and observed_hash == current_hash)
+    )
+
     return schemas.ShotScreen(
         verdicts=verdicts,
         brief=schemas.Brief(**brief.as_dict(), is_empty=brief.is_empty),
@@ -156,6 +167,10 @@ async def shot_screen(
         analyses=analyses,
         comments=[schemas.Comment(**c) for c in notes],
         open_comments=sum(1 for c in notes if not c["resolved"]),
+        decision_fresh=decision_fresh,
+        decision_freshness_reason=(
+            "" if decision_fresh else "New or moved footage arrived after this decision."
+        ),
     )
 
 
@@ -192,7 +207,8 @@ def _project_dict(project, principal: Principal) -> schemas.Project:
         you_can_upload=bool(
             email
             and (
-                email == project.owner_email.lower()
+                project.project_id == settings.demo_project_id
+                or email == project.owner_email.lower()
                 or email in {m.lower() for m in project.member_emails}
                 or (members.is_staff(email) and members.is_staff(project.owner_email))
             )

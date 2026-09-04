@@ -22,10 +22,7 @@ export default function PlacementBanner({ projectId }: { projectId: number }) {
   const inbox = useQuery({
     queryKey: ["project", projectId, "placements"],
     queryFn: () => api.placementInbox(projectId),
-    refetchInterval: (query) =>
-      // Poll while anything is waiting — the worker is still landing clips and
-      // rows appear as it does. Stop once it is clear.
-      (query.state.data?.count ?? 0) > 0 ? 8000 : false,
+    refetchInterval: 8000,
   });
 
   const waiting = inbox.data?.count ?? 0;

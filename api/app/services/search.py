@@ -130,10 +130,12 @@ async def run(
         params["take"] = int(plan["take"])
 
     if plan.get("outcome"):
+        conditions.append("d.has_decision = 1")
         conditions.append("d.outcome = {outcome:String}")
         params["outcome"] = str(plan["outcome"])
 
     if plan.get("decided_by"):
+        conditions.append("d.has_decision = 1")
         conditions.append("d.decided_by = {decided_by:String}")
         params["decided_by"] = str(plan["decided_by"])
 
@@ -266,6 +268,7 @@ async def _run_findings(
         WITH latest_decision AS
         (
             SELECT clip_id,
+                   toUInt8(1) AS has_decision,
                    argMax(outcome, decided_at) AS outcome,
                    argMax(reason, decided_at) AS reason,
                    argMax(decided_by, decided_at) AS decided_by,
@@ -280,12 +283,12 @@ async def _run_findings(
             c.group_id AS scene,
             c.subgroup_id AS setup,
             c.take_no AS take_no,
-            if(d.outcome = '', 'analysed', d.outcome) AS outcome,
+            if(d.has_decision = 1, toString(d.outcome), 'analysed') AS outcome,
             f.detail AS reason,
             'finding.match' AS reason_code,
-            if(d.decided_by = '', 'agent', d.decided_by) AS decided_by,
-            d.actor AS actor,
-            d.score AS score,
+            if(d.has_decision = 1, toString(d.decided_by), '') AS decided_by,
+            if(d.has_decision = 1, d.actor, '') AS actor,
+            if(d.has_decision = 1, d.score, 0) AS score,
             [f.code] AS finding_codes,
             [f.start_s] AS finding_starts_s,
             round(c.duration_ms / 1000, 2) AS duration_s,
@@ -324,9 +327,11 @@ async def _run_moments(
         params["take"] = int(plan["take"])
 
     if plan.get("outcome"):
+        conditions.append("d.has_decision = 1")
         conditions.append("d.outcome = {outcome:String}")
         params["outcome"] = str(plan["outcome"])
     if plan.get("decided_by"):
+        conditions.append("d.has_decision = 1")
         conditions.append("d.decided_by = {decided_by:String}")
         params["decided_by"] = str(plan["decided_by"])
     if plan.get("finding"):
@@ -336,16 +341,21 @@ async def _run_moments(
         )
         params["finding"] = _code_value(plan["finding"])
 
-    text = str(plan.get("text") or (plan.get("semantic") if not embedding else "") or "").strip()
+    text = str(plan.get("text") or plan.get("semantic") or "").strip()
     if text:
         params["text"] = text
-        conditions.append(
-            "(positionCaseInsensitive(s.description, {text:String}) > 0 "
-            "OR positionCaseInsensitive(s.transcript, {text:String}) > 0 "
-            "OR arrayExists(x -> positionCaseInsensitive(x, {text:String}) > 0, s.actions) "
-            "OR arrayExists(x -> positionCaseInsensitive(x, {text:String}) > 0, s.objects) "
-            "OR positionCaseInsensitive(d.reason, {text:String}) > 0)"
-        )
+        # With an embedding this is fused retrieval, not a literal-text gate.
+        # Requiring the same words first made semantic search incapable of
+        # finding a paraphrase. Without an embedding, literal matching remains
+        # the honest boundary.
+        if not embedding:
+            conditions.append(
+                "(positionCaseInsensitive(s.description, {text:String}) > 0 "
+                "OR positionCaseInsensitive(s.transcript, {text:String}) > 0 "
+                "OR arrayExists(x -> positionCaseInsensitive(x, {text:String}) > 0, s.actions) "
+                "OR arrayExists(x -> positionCaseInsensitive(x, {text:String}) > 0, s.objects) "
+                "OR positionCaseInsensitive(d.reason, {text:String}) > 0)"
+            )
 
     score_parts: list[str] = []
     if text:
@@ -365,6 +375,7 @@ async def _run_moments(
         WITH latest_decision AS
         (
             SELECT clip_id,
+                   toUInt8(1) AS has_decision,
                    argMax(outcome, decided_at) AS outcome,
                    argMax(reason, decided_at) AS reason,
                    argMax(decided_by, decided_at) AS decided_by,
@@ -379,12 +390,12 @@ async def _run_moments(
             c.group_id AS scene,
             c.subgroup_id AS setup,
             c.take_no AS take_no,
-            ifNull(d.outcome, 'analysed') AS outcome,
+            if(d.has_decision = 1, toString(d.outcome), 'analysed') AS outcome,
             s.description AS reason,
             'segment.match' AS reason_code,
-            ifNull(d.decided_by, 'agent') AS decided_by,
-            ifNull(d.actor, '') AS actor,
-            ifNull(d.score, 0) AS score,
+            if(d.has_decision = 1, toString(d.decided_by), '') AS decided_by,
+            if(d.has_decision = 1, d.actor, '') AS actor,
+            if(d.has_decision = 1, d.score, 0) AS score,
             ['segment.match'] AS finding_codes,
             [s.start_s] AS finding_starts_s,
             round(c.duration_ms / 1000, 2) AS duration_s,
@@ -401,7 +412,141 @@ async def _run_moments(
         LIMIT {{limit:UInt16}}
     """
     rows, elapsed_ms = await _execute(sql, params, project_id)
-    return rows, _readable(sql), elapsed_ms
+
+    # A processing segment may be sixty seconds long; a current finding is an
+    # event-level span.  Natural text that names the finding must seek to that
+    # tight evidence instead of the containing analysis window.
+    evidence_sql = ""
+    exact_rows: list[dict] = []
+    if text:
+        scope = ["f.project_id = {project_id:UInt32}"]
+        if plan.get("scene") is not None:
+            scope.append("c.group_id = {scene:UInt32}")
+        if plan.get("setup") is not None:
+            scope.append("c.subgroup_id = {setup:UInt32}")
+        if plan.get("take") is not None:
+            scope.append("c.take_no = {take:UInt16}")
+        if plan.get("outcome"):
+            scope.extend(["d.has_decision = 1", "d.outcome = {outcome:String}"])
+        if plan.get("decided_by"):
+            scope.extend(["d.has_decision = 1", "d.decided_by = {decided_by:String}"])
+        scope.append("positionCaseInsensitive(f.detail, {text:String}) > 0")
+        finding_sql = f"""
+            WITH latest_decision AS
+            (
+                SELECT clip_id, toUInt8(1) AS has_decision,
+                       argMax(outcome, decided_at) AS outcome,
+                       argMax(decided_by, decided_at) AS decided_by,
+                       argMax(actor_id, decided_at) AS actor,
+                       argMax(score, decided_at) AS score
+                FROM decisions
+                WHERE project_id = {{project_id:UInt32}}
+                GROUP BY clip_id
+            )
+            SELECT
+                toString(f.clip_id) AS clip_id,
+                c.group_id AS scene,
+                c.subgroup_id AS setup,
+                c.take_no AS take_no,
+                if(d.has_decision = 1, toString(d.outcome), 'analysed') AS outcome,
+                f.detail AS reason,
+                'finding.text' AS reason_code,
+                if(d.has_decision = 1, toString(d.decided_by), '') AS decided_by,
+                if(d.has_decision = 1, d.actor, '') AS actor,
+                if(d.has_decision = 1, d.score, 0) AS score,
+                [f.code] AS finding_codes,
+                [f.start_s] AS finding_starts_s,
+                round(c.duration_ms / 1000, 2) AS duration_s,
+                c.proxy_uri AS proxy_uri,
+                f.start_s AS usable_from_s,
+                f.end_s AS usable_to_s,
+                2 AS relevance
+            FROM current_findings AS f
+            INNER JOIN current_clip_placement AS c
+                ON c.project_id = f.project_id AND c.clip_id = f.clip_id
+            LEFT JOIN latest_decision AS d ON d.clip_id = f.clip_id
+            WHERE {" AND ".join(scope)}
+            ORDER BY (f.end_s - f.start_s), f.start_s
+            LIMIT {{limit:UInt16}}
+        """
+        finding_rows, finding_ms = await _execute(finding_sql, params, project_id)
+        elapsed_ms += finding_ms
+        exact_rows.extend(finding_rows)
+        evidence_sql = "\n\n-- Exact current finding evidence\n" + _readable(finding_sql)
+
+    moment_scope = ["m.project_id = {project_id:UInt32}"]
+    if plan.get("scene") is not None:
+        moment_scope.append("c.group_id = {scene:UInt32}")
+    if plan.get("setup") is not None:
+        moment_scope.append("c.subgroup_id = {setup:UInt32}")
+    if plan.get("take") is not None:
+        moment_scope.append("c.take_no = {take:UInt16}")
+    if plan.get("outcome"):
+        moment_scope.extend(["d.has_decision = 1", "d.outcome = {outcome:String}"])
+    if plan.get("decided_by"):
+        moment_scope.extend(["d.has_decision = 1", "d.decided_by = {decided_by:String}"])
+    if text and not embedding:
+        moment_scope.append("positionCaseInsensitive(m.text, {text:String}) > 0")
+    moment_scores: list[str] = []
+    if text:
+        moment_scores.append("3 * if(positionCaseInsensitive(m.text, {text:String}) > 0, 1, 0)")
+    if embedding:
+        moment_scores.append(
+            f"{SEMANTIC_WEIGHT} * (1 - cosineDistance(m.embedding, {{vec:Array(Float32)}}))"
+        )
+    moment_relevance = " + ".join(moment_scores) if moment_scores else "1"
+    moment_sql = f"""
+        WITH latest_decision AS
+        (
+            SELECT clip_id, toUInt8(1) AS has_decision,
+                   argMax(outcome, decided_at) AS outcome,
+                   argMax(decided_by, decided_at) AS decided_by,
+                   argMax(actor_id, decided_at) AS actor,
+                   argMax(score, decided_at) AS score
+            FROM decisions
+            WHERE project_id = {{project_id:UInt32}}
+            GROUP BY clip_id
+        )
+        SELECT
+            toString(m.clip_id) AS clip_id,
+            c.group_id AS scene,
+            c.subgroup_id AS setup,
+            c.take_no AS take_no,
+            if(d.has_decision = 1, toString(d.outcome), 'analysed') AS outcome,
+            m.text AS reason,
+            concat('moment.', m.kind) AS reason_code,
+            if(d.has_decision = 1, toString(d.decided_by), '') AS decided_by,
+            if(d.has_decision = 1, d.actor, '') AS actor,
+            if(d.has_decision = 1, d.score, 0) AS score,
+            [concat('moment.', m.kind)] AS finding_codes,
+            [m.start_s] AS finding_starts_s,
+            round(c.duration_ms / 1000, 2) AS duration_s,
+            c.proxy_uri AS proxy_uri,
+            m.start_s AS usable_from_s,
+            m.end_s AS usable_to_s,
+            {moment_relevance} AS relevance
+        FROM current_clip_moments AS m
+        INNER JOIN current_clip_placement AS c
+            ON c.project_id = m.project_id AND c.clip_id = m.clip_id
+        LEFT JOIN latest_decision AS d ON d.clip_id = m.clip_id
+        WHERE {" AND ".join(moment_scope)}
+        ORDER BY relevance DESC, (m.end_s - m.start_s), m.start_s
+        LIMIT {{limit:UInt16}}
+    """
+    moment_rows, moment_ms = await _execute(moment_sql, params, project_id)
+    elapsed_ms += moment_ms
+    exact_rows = moment_rows + exact_rows
+    seen: set[tuple] = set()
+    combined = []
+    for row in [*exact_rows, *rows]:
+        key = (row["clip_id"], row["usable_from_s"], row["usable_to_s"])
+        if key in seen:
+            continue
+        seen.add(key)
+        combined.append(row)
+    rows = combined[: int(params["limit"])]
+    evidence_sql += "\n\n-- Exact action/dialogue moments\n" + _readable(moment_sql)
+    return rows, _readable(sql) + evidence_sql, elapsed_ms
 
 
 def _interpolated(sql: str, params: dict[str, Any]) -> str:

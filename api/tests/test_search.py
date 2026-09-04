@@ -37,9 +37,12 @@ def sql_for(plan: dict, embedding: list[float] | None = None) -> tuple[str, dict
         original = search._execute
 
         async def fake_execute(sql, parameters, project_id):
-            captured["sql"] = sql
-            captured["params"] = parameters or {}
-            captured["project_id"] = project_id
+            # Text search performs a second, tighter finding query. These
+            # query-shape tests describe the primary segment query.
+            if "sql" not in captured:
+                captured["sql"] = sql
+                captured["params"] = parameters or {}
+                captured["project_id"] = project_id
             return [], 0
 
         search._execute = fake_execute  # type: ignore[assignment]

@@ -28,13 +28,14 @@ const Player = forwardRef<
     poster?: string;
     className?: string;
     onTimeUpdate?: (t: number) => void;
+    onPlay?: () => void;
     onEnded?: () => void;
     onReady?: () => void;
     /** Shown instead of the video when there is no source. Say why. */
     emptyLabel?: string;
   }
 >(function Player(
-  { src, poster, className, onTimeUpdate, onEnded, onReady, emptyLabel },
+  { src, poster, className, onTimeUpdate, onPlay, onEnded, onReady, emptyLabel },
   ref,
 ) {
   const video = useRef<HTMLVideoElement>(null);
@@ -123,6 +124,7 @@ const Player = forwardRef<
         poster={poster || undefined}
         tabIndex={0}
         onTimeUpdate={(e) => onTimeUpdate?.(e.currentTarget.currentTime)}
+        onPlay={onPlay}
         onEnded={onEnded}
       />
       {/* No source is not the same as a source that is not ready yet. The scene

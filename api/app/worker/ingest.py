@@ -17,7 +17,7 @@ import tempfile
 from pathlib import Path
 from uuid import UUID
 
-from ..services import clips, full_take, identify, jobs, placements, quota, storage
+from ..services import clips, full_take, identify, jobs, members, placements, quota, storage
 from ..services.ffmpeg_ops import UnusableClip, analyse, build_proxy, build_sprite
 
 log = logging.getLogger(__name__)
@@ -119,9 +119,11 @@ async def process(
         work = Path(tmp)
         source = work / "source"
 
+        await jobs.record_stage(job_id, clip_id, "downloading", filename)
         log.info("clip %s: downloading", clip_id)
         storage.download(object_path, source)
 
+        await jobs.record_stage(job_id, clip_id, "measuring", filename)
         log.info("clip %s: measuring", clip_id)
         measurements = await analyse(source)
 
@@ -134,6 +136,8 @@ async def process(
         # that changed with the uploader is one a guest could raise by asking an
         # editor to press the button.
         limits = await quota.limits_for_project(project_id)
+        if members.role_of(uploaded_by) == "guest":
+            limits = members.GUEST_LIMITS
         if quota.clip_is_too_long(measurements.duration_s, limits):
             await clips.write_unusable(
                 project_id=project_id,
@@ -163,6 +167,7 @@ async def process(
         # Who is this clip? Both calls are best-effort and neither can cost the
         # clip: a take with measurements and no slate reading is still a take an
         # editor can use, while a take lost to a model timeout is gone.
+        await jobs.record_stage(job_id, clip_id, "reading_slate", filename)
         log.info("clip %s: reading the slate", clip_id)
         identity = await identify.read_slate(source, work, clip_id, project_id)
         identity.embedding = await identify.embed(source, work, clip_id, measurements.duration_s)
@@ -219,6 +224,7 @@ async def process(
                     f"This shot already has {held} takes, which is the limit for a guest project."
                 )
 
+        await jobs.record_stage(job_id, clip_id, "encoding_proxy", filename)
         log.info("clip %s: encoding proxy", clip_id)
         proxy_dir = work / "proxy"
         await build_proxy(source, proxy_dir)
@@ -315,6 +321,7 @@ async def process(
         duplicate_of=duplicate_of[0] if duplicate_of else "",
         slate_candidates=slate_candidates,
     )
+    await jobs.record_stage(job_id, clip_id, "ready_for_verification", filename)
     # Full-take work starts after verification. Until then this is staged
     # footage, not a take in a canonical shot.
     log.info("clip %s: done", clip_id)

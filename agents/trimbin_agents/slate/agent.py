@@ -216,27 +216,25 @@ class SlateAgent:
 
 
 def _parse_reading(reading: SlateReading) -> tuple[int, int, int]:
-    """Turn what the board said into numbers.
+    """Return only IDs that the board states as plain integers.
 
-    Slates carry letters — scene 12A, shot B — so the alphabetic part is folded
-    into the number rather than discarded. Losing it would merge 12 and 12A into
-    one scene, which are different setups that a production deliberately named
-    apart.
+    A slate code is a name, not a database key.  Folding ``12A`` into ``1201``
+    made it sortable but also made an ordinary ``3`` become ``300`` and unable
+    to match a project whose internal scene id is 3.  The worker retains the
+    raw string codes and resolves them against the project's declared plan.
+    Until that lookup happens, an alphanumeric code is deliberately unresolved.
     """
     return (
-        _to_ordinal(reading.scene),
-        _to_ordinal(reading.shot),
+        _plain_integer(reading.scene),
+        _plain_integer(reading.shot),
         reading.take,
     )
 
 
-def _to_ordinal(value: str) -> int:
-    """`12A` becomes 1201, `12` becomes 1200, so ordering survives the letter."""
-    digits = "".join(c for c in value if c.isdigit())
-    letters = "".join(c for c in value if c.isalpha()).upper()
-    base = int(digits) * 100 if digits else 0
-    suffix = (ord(letters[0]) - ord("A") + 1) if letters else 0
-    return base + suffix
+def _plain_integer(value: str) -> int:
+    """A numeric display code may be a useful proposal; any other code is not an ID."""
+    cleaned = (value or "").strip()
+    return int(cleaned) if cleaned.isdigit() else 0
 
 
 def _infer_from_neighbours(request: SlateRequest) -> tuple[int, int, int]:

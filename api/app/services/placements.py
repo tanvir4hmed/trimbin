@@ -158,6 +158,7 @@ async def resolve(
     detail: str = "",
     *,
     take_no: int = 0,
+    state: str = SETTLED,
 ) -> None:
     """A person settling where a clip belongs.
 
@@ -174,9 +175,65 @@ async def resolve(
         source=HUMAN,
         actor=actor,
         confidence=1.0,
-        state=SETTLED,
+        state=state,
         detail=detail or "resolved by an editor",
     )
+
+
+async def unassign(
+    project_id: int,
+    clip_id: UUID,
+    actor: str,
+    detail: str = "left unassigned",
+    *,
+    take_no: int = 0,
+) -> None:
+    """Park footage outside project structure without inventing Scene 0 / Shot 0."""
+    await resolve(
+        project_id,
+        clip_id,
+        0,
+        0,
+        actor,
+        detail,
+        take_no=take_no,
+        state=IGNORED,
+    )
+
+
+async def unassigned(project_id: int) -> list[dict]:
+    """Footage a human deliberately kept outside canonical scene/shot structure."""
+    result = await (await client()).query(
+        """
+        SELECT toString(clip_id), proxy_uri, sprite_uri, slate_uri, duration_ms,
+               camera, fps, take_no, actor, detail, decided_at, storage_uri,
+               scene_code, shot_code
+        FROM current_unassigned_clips
+        WHERE project_id = {p:UInt32}
+        ORDER BY decided_at DESC
+        LIMIT 500
+        """,
+        parameters={"p": project_id},
+    )
+    return [
+        {
+            "clip_id": r[0],
+            "proxy_uri": r[1] or "",
+            "sprite_uri": r[2] or "",
+            "slate_uri": r[3] or "",
+            "duration_s": round(int(r[4] or 0) / 1000, 2),
+            "camera": r[5] or "",
+            "fps": round(float(r[6] or 0), 3),
+            "take_no": int(r[7] or 0),
+            "actor": r[8] or "",
+            "detail": r[9] or "",
+            "decided_at": r[10].isoformat() if r[10] else None,
+            "filename": (r[11] or "").rsplit("/", 1)[-1],
+            "scene_code": r[12] or "",
+            "shot_code": r[13] or "",
+        }
+        for r in result.result_rows
+    ]
 
 
 async def inbox(project_id: int) -> list[dict]:

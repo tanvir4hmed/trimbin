@@ -279,7 +279,7 @@ class TestCuratingIsNotCommenting:
         monkeypatch.setattr(auth.projects, "get", company_project)
 
         with pytest.raises(HTTPException) as raised:
-            await auth.Principal(email="a-judge@example.com").assert_can_curate(1)
+            await auth.Principal(email="a-judge@example.com").assert_can_curate(7)
         assert raised.value.status_code == 403
         # The refusal has to name what they *can* do, or it reads as a wall.
         assert "overrule" in raised.value.detail.lower()
