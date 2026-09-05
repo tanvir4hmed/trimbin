@@ -21,6 +21,28 @@ function bytes(value: number) {
   return value > 1024 ** 3 ? `${(value / 1024 ** 3).toFixed(2)} GB` : `${(value / 1024 ** 2).toFixed(0)} MB`;
 }
 
+
+/**
+ * Do these files fingerprint as the batch that was interrupted?
+ *
+ * Name, size and modified time, compared as a set. A browser does not promise
+ * the order a picker returns files in, and it cannot hand a page back its file
+ * bytes after a reload — so this is what tells a genuine resume from somebody
+ * selecting different footage that happens to share a filename.
+ */
+function matches(saved: SavedFile[], chosen: SavedFile[]): boolean {
+  if (saved.length !== chosen.length) return false;
+  const key = (file: SavedFile) => `${file.name}:${file.size}:${file.lastModified}`;
+  const remaining = new Map<string, number>();
+  for (const file of saved) remaining.set(key(file), (remaining.get(key(file)) ?? 0) + 1);
+  for (const file of chosen) {
+    const left = remaining.get(key(file)) ?? 0;
+    if (!left) return false;
+    remaining.set(key(file), left - 1);
+  }
+  return true;
+}
+
 export default function Upload({ projectId, plan, canResolve = true, onFinished }: { projectId: number; plan: PlannedScene[]; canResolve?: boolean; onFinished?: () => void }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const storageKey = `trimbin.ingest.${projectId}`;
@@ -118,7 +140,21 @@ export default function Upload({ projectId, plan, canResolve = true, onFinished 
       const requestedTarget = mode === "manual" ? { scene: targetScene, shot: targetShot, take: targetTake } : undefined;
       const sameTarget = JSON.stringify(prior?.target) === JSON.stringify(requestedTarget);
       const fingerprints = files.map((file) => ({ name: file.name, size: file.size, lastModified: file.lastModified }));
-      const sameFiles = Boolean(prior?.files && sameTarget && JSON.stringify(prior.files) === JSON.stringify(fingerprints));
+      // Order-insensitive: a file picker does not promise the order it hands
+      // files back, and comparing the serialised arrays meant reselecting the
+      // same footage in a different order silently abandoned the resumable
+      // session and re-uploaded every byte.
+      const sameFiles = Boolean(prior?.files && sameTarget && matches(prior.files, fingerprints));
+      // Say so rather than starting a second batch behind their back. Resuming
+      // a session with a *different* file of the same name would write the
+      // wrong bytes into an object somebody is waiting on.
+      if (prior?.files && sameTarget && !sameFiles) {
+        setStage("add");
+        setError(
+          `These are not the files that batch was uploading. Reselect the same ${prior.files.length} file(s) to continue it, or clear the batch to start a new one.`,
+        );
+        return;
+      }
       const grant = sameFiles ? prior : await api.grantUpload(projectId, files.map((file) => file.name), requestedTarget);
       if (!grant) throw new Error("Upload batch could not be restored.");
       window.localStorage.setItem(storageKey, JSON.stringify({ job_id: grant.job_id, tickets: grant.tickets, filenames: files.map((file) => file.name), files: fingerprints, mode, target: requestedTarget }));

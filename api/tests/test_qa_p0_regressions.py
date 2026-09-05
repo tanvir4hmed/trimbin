@@ -648,3 +648,111 @@ class TestP07SearchLandsOnTheEvent:
         assert '"by the panel"' not in code
         assert "no decision recorded" in code
         assert "AI suggested" in code
+
+
+class TestD3IngestIsRecoverable:
+    """An interrupted batch has to be resumable, a cancelled one has to leave
+    nothing behind, and every stage in between has to be visible.
+
+    The QA found the middle of that pipeline silent: bytes reached storage and
+    then the interface said nothing for minutes while the worker measured,
+    read the slate and encoded a proxy.
+    """
+
+    def test_the_worker_reports_every_stage(self) -> None:
+        """A stage nobody records is a minute the interface cannot explain."""
+        from pathlib import Path
+
+        source = (Path(__file__).parents[1] / "app" / "worker" / "ingest.py").read_text(
+            encoding="utf-8"
+        )
+        for stage in ("downloading", "measuring", "reading_slate", "encoding_proxy"):
+            assert f'"{stage}"' in source, f"the {stage} stage is no longer reported"
+
+    def test_cancelling_settles_nothing(self) -> None:
+        """The gate: cancel a file mid-batch and no clip enters the project.
+
+        It holds because placement is only canonical once a human commits —
+        an abandoned job never calls the settlement command, so its clips never
+        reach `current_clip_placement`.
+        """
+        from pathlib import Path
+
+        source = (Path(__file__).parents[1] / "app" / "routes" / "uploads.py").read_text(
+            encoding="utf-8"
+        )
+        cancel = source[
+            source.index("async def cancel_ingest") : source.index("/jobs/{job_id}/commit")
+        ]
+        assert "jobs.abandon" in cancel
+        assert "settlement.settle" not in cancel
+        assert "placements." not in cancel
+
+    def test_cancelling_deletes_no_bytes(self) -> None:
+        """Deliberately. Somebody who uploaded forty gigabytes and cancelled the
+        forty-first file has not asked us to throw the forty away."""
+        from pathlib import Path
+
+        source = (Path(__file__).parents[1] / "app" / "routes" / "uploads.py").read_text(
+            encoding="utf-8"
+        )
+        cancel = source[
+            source.index("async def cancel_ingest") : source.index("/jobs/{job_id}/commit")
+        ]
+        assert "storage.delete" not in cancel
+        assert "without deleting any bytes" in cancel
+
+    def test_ingest_activity_is_a_typed_verb(self) -> None:
+        """The QA found ingest commits missing from the activity feed. An
+        unlisted verb is rejected by `activity.record`, so a typo silently
+        drops the event rather than failing loudly."""
+        from app.services import activity
+
+        assert "ingest_committed" in activity.VERBS
+
+    def test_the_inbox_polls_before_it_has_rows(self) -> None:
+        """It polled only while something was already waiting, so the first row
+        a worker produced never arrived — the screen had stopped asking."""
+        from pathlib import Path
+
+        for name in ("PlacementInbox.tsx", "PlacementBanner.tsx"):
+            source = (Path(__file__).parents[2] / "web" / "components" / name).read_text(
+                encoding="utf-8"
+            )
+            assert "refetchInterval: 8000" in source, f"{name} stopped polling unconditionally"
+
+
+class TestD3ResumeMatchesTheRightFiles:
+    """A browser cannot hand a page back its file bytes after a reload, so
+    resuming means asking somebody to reselect the same footage. Which makes
+    "is this the same footage" a correctness question: resuming a session with
+    a different file of the same name writes the wrong bytes into an object
+    somebody is waiting on.
+    """
+
+    def test_the_fingerprint_is_name_size_and_time(self) -> None:
+        from pathlib import Path
+
+        source = (Path(__file__).parents[2] / "web" / "components" / "Upload.tsx").read_text(
+            encoding="utf-8"
+        )
+        assert "type SavedFile = { name: string; size: number; lastModified: number }" in source
+
+    def test_matching_ignores_the_order_a_picker_returns(self) -> None:
+        """Comparing the serialised arrays meant reselecting the same footage in
+        a different order abandoned the session and re-uploaded every byte."""
+        from pathlib import Path
+
+        source = (Path(__file__).parents[2] / "web" / "components" / "Upload.tsx").read_text(
+            encoding="utf-8"
+        )
+        assert "function matches(" in source
+        assert "JSON.stringify(prior.files) === JSON.stringify(fingerprints)" not in source
+
+    def test_a_mismatch_is_stated_rather_than_started_over(self) -> None:
+        from pathlib import Path
+
+        source = (Path(__file__).parents[2] / "web" / "components" / "Upload.tsx").read_text(
+            encoding="utf-8"
+        )
+        assert "These are not the files that batch was uploading" in source
