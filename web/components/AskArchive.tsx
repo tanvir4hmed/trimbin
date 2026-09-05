@@ -23,10 +23,13 @@ interface AskMatch {
   outcome: string;
   reason: string;
   decided_by: string;
+  actor: string;
   description: string;
   duration_s: number;
   playlist_uri: string;
   where: { start_s: number; end_s: number } | null;
+  /** Seek here; `where` still states the real span. */
+  play_from_s: number;
   relevance: number;
 }
 
@@ -39,6 +42,32 @@ interface Answer {
   sql: string;
   filters: Record<string, unknown>;
   elapsed_ms: number;
+}
+
+
+/**
+ * What the archive actually knows about a clip, said in five distinct states.
+ *
+ * Everything that was not decided by a human read "by the panel", which turned
+ * an absent decision into an editorial one: the QA searched for a moment and
+ * got back a take marked *selected · by the panel* when the cockpit said "not
+ * compared", the coverage used a different take, and no decision row existed.
+ * The query fabricated the outcome; this compounded it by attributing it.
+ *
+ * A suggestion is not a choice, and no decision at all is neither.
+ */
+function state(match: AskMatch): { label: string; who: string; tone: string } {
+  if (match.outcome === "analysed") {
+    return { label: "analysed", who: "no decision recorded", tone: "analysed" };
+  }
+  if (match.decided_by === "human") {
+    const label = match.outcome === "selected" ? "human selected" : "human rejected";
+    return { label, who: `by ${match.actor || "an editor"}`, tone: match.outcome };
+  }
+  if (match.outcome === "selected") {
+    return { label: "AI suggested", who: "suggested by the analyst", tone: "suggested" };
+  }
+  return { label: match.outcome, who: "from analysis", tone: match.outcome };
 }
 
 export default function AskArchive({
@@ -201,17 +230,17 @@ export default function AskArchive({
                     type="button"
                     className="ask-match"
                     onClick={() =>
-                      onOpen?.(m.group_id, m.subgroup_id, m.where?.start_s, m.clip_id)
+                      onOpen?.(m.group_id, m.subgroup_id, m.play_from_s || m.where?.start_s, m.clip_id)
                     }
                     disabled={!onOpen}
                   >
                     <span className="where">
                       Scene {m.group_id} · Shot {m.subgroup_id} · Take {m.take_no}
                     </span>
-                    <span className={`outcome ${m.outcome}`}>{m.outcome}</span>
+                    <span className={`outcome ${state(m).tone}`}>{state(m).label}</span>
                     <span className="ask-reason">{m.reason}</span>
                     <span className="dim small">
-                      {m.decided_by === "human" ? `by ${m.decided_by}` : "by the panel"}
+                      {state(m).who}
                       {m.where && ` · ${m.where.start_s.toFixed(1)}s`}
                     </span>
                   </button>

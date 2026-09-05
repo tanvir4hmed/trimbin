@@ -72,6 +72,19 @@ class Match(Strict):
     duration_s: float
     description: str = Field(max_length=300)
 
+    # Where playback should start, which is not where the event starts.
+    #
+    # Cutting in exactly on a line or an action gives an editor no run-up: by
+    # the time they have registered what they are watching it has happened. A
+    # second and a half of lead-in is how anyone reviews footage.
+    #
+    # Kept separate from `where` on purpose. The displayed range stays the true
+    # span of the event, because widening that to be helpful would mean the
+    # archive reporting a moment as longer than it was.
+    play_from_s: float = Field(
+        default=0.0, ge=0.0, description="Seek here; `where` still states the real span."
+    )
+
     outcome: str = Field(description="What was decided about this take.")
     reason: str = Field(max_length=200, description="Why, in the words recorded at the time.")
     decided_by: str = Field(description="agent or a person's name.")

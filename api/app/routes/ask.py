@@ -22,6 +22,10 @@ from ..config import settings
 from ..services import search
 
 log = logging.getLogger(__name__)
+
+# How far before a moment playback starts. Long enough to see it coming, short
+# enough not to land in the previous beat.
+PLAYBACK_PREROLL_S = 1.5
 router = APIRouter(prefix="/ask", tags=["ask"])
 
 
@@ -194,10 +198,15 @@ def _as_match(row: dict):
     starts = row.get("finding_starts_s") or []
     codes = row.get("finding_codes") or []
     where = None
+    play_from = 0.0
     if starts:
         start = float(starts[0])
         end = float(row.get("usable_to_s") or start + 2.0)
         where = TimeRange(start_s=start, end_s=max(start + 0.05, end))
+        # A run-up, not a wider claim. `where` keeps the true span; playback
+        # begins a beat earlier so the moment is not already over by the time
+        # somebody has registered what they are looking at.
+        play_from = max(0.0, start - PLAYBACK_PREROLL_S)
 
     return Match(
         clip_id=row["clip_id"],
@@ -215,5 +224,6 @@ def _as_match(row: dict):
         decided_by=str(row["decided_by"]),
         playlist_uri=str(row.get("proxy_uri") or ""),
         where=where,
+        play_from_s=play_from,
         relevance=min(1.0, max(0.0, float(row.get("relevance") or 0.0))),
     )

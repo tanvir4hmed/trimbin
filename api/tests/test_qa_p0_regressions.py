@@ -538,3 +538,113 @@ class TestTheClientCanDoTheWork:
         )
         assert 'members.role_of(principal.email) == "guest"' in source
         assert 'found["uploaded_by"]' in source
+
+
+class TestP07SearchLandsOnTheEvent:
+    """A search for `off-camera voice calls cut` matched a take at 00:52 when
+    the thing asked for happens at 01:23 — thirty-one seconds early, because
+    the stored spans were the 60-second analysis windows rather than the
+    events inside them.
+
+    Moments are stored separately now, the query prefers the tightest one, and
+    playback gets a run-up without the archive overstating how long the moment
+    was.
+    """
+
+    def test_the_moment_query_prefers_the_tightest_span(self) -> None:
+        from pathlib import Path
+
+        source = (Path(__file__).parents[1] / "app" / "services" / "search.py").read_text(
+            encoding="utf-8"
+        )
+        assert "(m.end_s - m.start_s)" in source, (
+            "moments are no longer ordered shortest-first, so a long window can "
+            "outrank the event inside it again"
+        )
+
+    def test_playback_starts_before_the_moment(self) -> None:
+        from app.routes.ask import PLAYBACK_PREROLL_S, _as_match
+
+        match = _as_match(
+            {
+                "clip_id": "62469df0-9ca9-465c-b345-a709080552c1",
+                "scene": 1,
+                "setup": 2,
+                "take_no": 4,
+                "duration_s": 85.96,
+                "finding_starts_s": [83.2],
+                "usable_to_s": 85.0,
+                "finding_codes": ["moment.dialogue"],
+                "outcome": "analysed",
+                "reason": "he calls cut",
+                "reason_code": "moment.dialogue",
+                "decided_by": "",
+                "proxy_uri": "",
+                "relevance": 0.9,
+            }
+        )
+        assert match.play_from_s == 83.2 - PLAYBACK_PREROLL_S
+
+    def test_the_reported_span_is_not_widened(self) -> None:
+        """The run-up is a seek, not a claim. Widening `where` would make the
+        archive report a moment as longer than it was."""
+        from app.routes.ask import _as_match
+
+        match = _as_match(
+            {
+                "clip_id": "62469df0-9ca9-465c-b345-a709080552c1",
+                "scene": 1,
+                "setup": 2,
+                "take_no": 4,
+                "duration_s": 85.96,
+                "finding_starts_s": [83.2],
+                "usable_to_s": 85.0,
+                "finding_codes": ["moment.dialogue"],
+                "outcome": "analysed",
+                "reason": "he calls cut",
+                "reason_code": "moment.dialogue",
+                "decided_by": "",
+                "proxy_uri": "",
+                "relevance": 0.9,
+            }
+        )
+        assert match.where is not None
+        assert match.where.start_s == 83.2
+
+    def test_a_moment_at_the_very_start_does_not_seek_negative(self) -> None:
+        from app.routes.ask import _as_match
+
+        match = _as_match(
+            {
+                "clip_id": "62469df0-9ca9-465c-b345-a709080552c1",
+                "scene": 1,
+                "setup": 2,
+                "take_no": 1,
+                "duration_s": 30.0,
+                "finding_starts_s": [0.4],
+                "usable_to_s": 2.0,
+                "finding_codes": ["moment.action"],
+                "outcome": "analysed",
+                "reason": "she enters",
+                "reason_code": "moment.action",
+                "decided_by": "",
+                "proxy_uri": "",
+                "relevance": 0.5,
+            }
+        )
+        assert match.play_from_s == 0.0
+
+    def test_an_undecided_clip_is_not_attributed_to_anybody(self) -> None:
+        """The interface said "by the panel" for anything not decided by a
+        human, which turned an absent decision into an editorial one."""
+        from pathlib import Path
+
+        source = (Path(__file__).parents[2] / "web" / "components" / "AskArchive.tsx").read_text(
+            encoding="utf-8"
+        )
+        code = chr(10).join(
+            line for line in source.splitlines() if not line.lstrip().startswith(("*", "//", "/*"))
+        )
+        assert '"by the panel"' not in code
+        assert "no decision recorded" in code
+        assert "AI suggested" in code
