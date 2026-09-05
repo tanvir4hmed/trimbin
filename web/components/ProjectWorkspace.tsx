@@ -11,7 +11,7 @@
  * sign-in is what is *possible*, never what is visible.
  */
 
-import { use, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AskArchive from "@/components/AskArchive";
@@ -22,25 +22,32 @@ import SceneTree from "@/components/SceneTree";
 import ShotReviewCockpit from "@/components/ShotReviewCockpit";
 import { ApiError } from "@/lib/api";
 import { useProjectScreen } from "@/lib/queries";
+import { paths } from "@/lib/slug";
 
-export default function ProjectPage({
-  params,
+export default function ProjectWorkspace({
+  projectId,
+  urlScene,
+  urlShot,
 }: {
-  params: Promise<{ id: string }>;
+  projectId: number;
+  /** The scene in the path, or 0 for the production as a whole. */
+  urlScene: number;
+  /** The shot in the path, or 0 when no shot is open. */
+  urlShot: number;
 }) {
-  const { id } = use(params);
-  const projectId = Number(id);
   const router = useRouter();
-  const search = useSearchParams();
+  // A search result links to a moment: which clip, and where in it. That is a
+  // position inside the shot rather than another resource, so it stays a query
+  // parameter while scene and shot became path segments.
+  const query = useSearchParams();
+  const deepLink = { clip: query.get("clip") ?? "", at: Number(query.get("at") ?? 0) };
 
-  const [selected, setSelected] = useState<{ scene: number; shot: number } | null>(null);
   const [camera, setCamera] = useState("");
   const [shootDay, setShootDay] = useState("");
   const [assignee, setAssignee] = useState("");
   // Which scene the rail is showing. 0 is every scene, which is right for a
   // three-scene project and wrong for a thirty-scene one — so it is a choice
   // rather than a fixed answer.
-  const urlScene = Number(search.get("scene")) || 0;
   const [railScene, setRailScene] = useState(0);
   const [sceneQuery, setSceneQuery] = useState("");
   const [railTake, setRailTake] = useState(0);
@@ -72,18 +79,16 @@ export default function ProjectPage({
   // cockpit for a shot you had not chosen, with no view of what the project
   // contained. A shot is opened deliberately now: from the URL, or by picking
   // one.
+  // Which shot the cockpit is on. The path says it; `selected` is the
+  // in-page choice that has not been navigated to yet.
   const open = useMemo(() => {
     if (!tree) return null;
-    if (selected) return selected;
-
-    const wantScene = Number(search.get("scene"));
-    const wantShot = Number(search.get("shot"));
-    const asked =
-      wantScene && wantShot
-        ? tree.scenes.find((s) => s.scene === wantScene)?.shots.find((h) => h.shot === wantShot)
-        : undefined;
-    return asked ? { scene: wantScene, shot: wantShot } : null;
-  }, [tree, selected, search]);
+    if (!urlScene || !urlShot) return null;
+    const asked = tree.scenes
+      .find((s) => s.scene === urlScene)
+      ?.shots.find((h) => h.shot === urlShot);
+    return asked ? { scene: urlScene, shot: urlShot } : null;
+  }, [tree, urlScene, urlShot]);
 
   // The slugline lives on the plan, not on the tree — the tree is what footage
   // says exists, the plan is what the production declared.
@@ -178,7 +183,7 @@ export default function ProjectPage({
               "Scene 2 - two perspectives" holding scene 1 put two different
               scene numbers side by side in one line and read as a fault.
               A link, because it is the step back from a shot to its project. */}
-          <Link className="crumb-project" href={`/project/${projectId}`}>
+          <Link className="crumb-project" href={`${paths.project(projectId, project?.name)}`}>
             <small>project</small>
             {project?.name ?? `Project ${projectId}`}
           </Link>
@@ -195,9 +200,8 @@ export default function ProjectPage({
                   onChange={(event) => {
                     // Changing scene lands on the scene, not on a shot inside
                     // it that nobody picked.
-                    setSelected(null);
                     setRailTake(0);
-                    router.push(`/project/${projectId}?scene=${event.target.value}`);
+                    router.push(`${paths.scene(projectId, Number(event.target.value), project?.name)}`);
                   }}
                 >
                   {tree.scenes.map((scene) => (
@@ -218,9 +222,8 @@ export default function ProjectPage({
                     type="button"
                     className="linkish crumb-close"
                     onClick={() => {
-                      setSelected(null);
                       setRailTake(0);
-                      router.push(`/project/${projectId}?scene=${open.scene}`);
+                      router.push(`${paths.scene(projectId, open.scene, project?.name)}`);
                     }}
                   >
                     close shot
@@ -234,16 +237,16 @@ export default function ProjectPage({
         <div className="project-tools">
           {project && me && <ProjectTeam project={project} me={me} />}
           {open && (
-            <Link className="ghost" href={`/project/${projectId}/scene/${open.scene}`}>
+            <Link className="ghost" href={`${paths.coverage(projectId, open.scene, project?.name)}`}>
               Play scene {open.scene}
             </Link>
           )}
           {canCurate ? (
-            <Link className="primary" href={`/project/${projectId}/ingest`}>Upload takes</Link>
+            <Link className="primary" href={`${paths.ingest(projectId, project?.name)}`}>Upload takes</Link>
           ) : (
             me?.signed_in && (
               <span className="hint small">
-                Read and comment only. <Link href="/dashboard">Make a project</Link> to
+                Read and comment only. <Link href="/home">Make a project</Link> to
                 upload.
               </span>
             )
@@ -320,7 +323,7 @@ export default function ProjectPage({
         <AskArchive
           collapsible
           projectId={projectId}
-          onOpen={(scene, shot, at, clipId) => router.push(`/project/${projectId}?scene=${scene}&shot=${shot}${at !== undefined ? `&at=${at}` : ""}${clipId ? `&clip=${clipId}` : ""}`)}
+          onOpen={(scene, shot, at, clipId) => router.push(`${paths.shot(projectId, scene, shot, project?.name)}${at !== undefined ? `?at=${at}` : ""}${clipId ? `${at !== undefined ? "&" : "?"}clip=${clipId}` : ""}`)}
         />
       )}
 
@@ -333,7 +336,7 @@ export default function ProjectPage({
               first and let the slate sort the footage.
             </p>
           )}
-          {!filtered && canCurate && <Link className="primary" href={`/project/${projectId}/ingest`}>Add scenes, shots &amp; footage</Link>}
+          {!filtered && canCurate && <Link className="primary" href={`${paths.ingest(projectId, project?.name)}`}>Add scenes, shots &amp; footage</Link>}
         </div>
       ) : !open && !urlScene ? (
         // The production: its scenes. A scene is the unit people talk in.
@@ -381,7 +384,7 @@ export default function ProjectPage({
               {open && (
                 <Link
                   className="ghost small"
-                  href={`/project/${projectId}/scene/${open.scene}`}
+                  href={`${paths.coverage(projectId, open.scene, project?.name)}`}
                 >
                   Play
                 </Link>
@@ -392,9 +395,9 @@ export default function ProjectPage({
               scenes={railScenes}
               selected={open}
               openTake={railTake}
-              onSelect={(scene, shot) => { setSelected({ scene, shot }); setRailTake(0); }}
-              onSelectTake={(scene, shot, takeNo) => { setSelected({ scene, shot }); setRailTake(takeNo); }}
-              onOpenScene={(scene) => router.push(`/project/${projectId}/scene/${scene}`)}
+              onSelect={(scene, shot) => { setRailTake(0); router.push(paths.shot(projectId, scene, shot, project?.name)); }}
+              onSelectTake={(scene, shot, takeNo) => { setRailTake(takeNo); router.push(paths.shot(projectId, scene, shot, project?.name)); }}
+              onOpenScene={(scene) => router.push(`${paths.coverage(projectId, scene, project?.name)}`)}
             />
 
           </div>
@@ -413,8 +416,8 @@ export default function ProjectPage({
                 canCurate={canCurate}
                 you={me?.email ?? ""}
                 teamEmails={teamEmails}
-                initialClipId={search.get("clip") ?? ""}
-                initialAt={Number(search.get("at") ?? 0)}
+                initialClipId={deepLink.clip}
+                initialAt={deepLink.at}
                 focusTake={railTake}
               />
             ) : (

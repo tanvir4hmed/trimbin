@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import NewProject from "@/components/NewProject";
 import type { Limits, Project, Role } from "@/lib/api";
 import { ApiError, api } from "@/lib/api";
+import { paths } from "@/lib/slug";
 
 type SortKey = "name" | "waiting" | "progress" | "created";
 
@@ -123,7 +124,7 @@ export default function ProjectsPage() {
             limits={limits}
             role={role}
             owned={projects.filter((p) => p.you_are_owner).length}
-            onCreated={(id) => router.push(`/project/${id}`)}
+            onCreated={(id) => router.push(`${paths.project(id)}`)}
           />
         )}
       </header>
@@ -164,7 +165,7 @@ export default function ProjectsPage() {
               : "No public projects are available. Sign in as Guest to open the working application."
             : "Nothing matches that."}
         </p>
-      ) : <div className="project-showcase-grid">{shown.map((p, index) => <article className="project-showcase" key={p.project_id}><Link className={`project-cover cover-${index % 6}`} href={`/project/${p.project_id}`}><span>{p.you_are_owner ? "Owner" : p.you_can_upload ? "Editor" : "Guest"}</span></Link><div className="project-showcase-body"><header><Link href={`/project/${p.project_id}`}>{p.name}</Link>{p.is_public && <span className="tag">public</span>}</header><div className="project-facts"><span><b>{p.scenes ?? "—"}</b> scenes</span><span><b>{p.shots ?? "—"}</b> shots</span><span><b>{p.takes ?? "—"}</b> clips</span><span className={p.waiting ? "bad" : ""}><b>{p.waiting ?? 0}</b> decisions</span></div>{p.progress_pct !== null && p.progress_pct !== undefined && <div className="project-progress"><i style={{ width: `${p.progress_pct}%` }}/><span>{p.progress_pct}% settled</span></div>}<footer><small>{p.owner_email === you ? "You" : p.owner_email.split("@")[0]}{p.member_emails.length ? ` + ${p.member_emails.length} editors` : ""}</small><Link href={`/project/${p.project_id}`}>Open project →</Link></footer>{p.you_are_owner && <div className="project-actions">{scope === "active" && <><button onClick={() => void command(p,"rename")}>Rename</button><button onClick={() => void command(p,"archive")}>Archive</button><button onClick={() => void command(p,"trash")}>Trash</button></>}{scope === "archived" && <><button onClick={() => void command(p,"restore")}>Restore</button><button onClick={() => void command(p,"trash")}>Trash</button></>}{scope === "trashed" && <><button onClick={() => void command(p,"restore")}>Restore</button><button className="danger" onClick={() => void command(p,"delete")}>Delete</button></>}{scope === "deleted" && <button onClick={() => void command(p,"restore")}>Restore</button>}</div>}</div></article>)}</div>}
+      ) : <div className="project-showcase-grid">{shown.map((p, index) => <article className="project-showcase" key={p.project_id}><Link className={`project-cover cover-${index % 6}`} href={`${paths.project(p.project_id, p.name)}`}><span>{p.you_are_owner ? "Owner" : p.you_can_upload ? "Editor" : "Guest"}</span></Link><div className="project-showcase-body"><header><Link href={`${paths.project(p.project_id, p.name)}`}>{p.name}</Link>{p.is_public && <span className="tag">public</span>}</header><div className="project-facts"><span><b>{p.scenes ?? "—"}</b> scenes</span><span><b>{p.shots ?? "—"}</b> shots</span><span><b>{p.takes ?? "—"}</b> clips</span><span className={p.waiting ? "bad" : ""}><b>{p.waiting ?? 0}</b> decisions</span></div>{p.progress_pct !== null && p.progress_pct !== undefined && <div className="project-progress"><i style={{ width: `${p.progress_pct}%` }}/><span>{p.progress_pct}% settled</span></div>}<footer><small>{p.owner_email === you ? "You" : p.owner_email.split("@")[0]}{p.member_emails.length ? ` + ${p.member_emails.length} editors` : ""}</small><Link href={`${paths.project(p.project_id, p.name)}`}>Open project →</Link></footer>{p.you_are_owner && <div className="project-actions">{scope === "active" && <><button onClick={() => void command(p,"rename")}>Rename</button><button onClick={() => void command(p,"archive")}>Archive</button><button onClick={() => void command(p,"trash")}>Trash</button></>}{scope === "archived" && <><button onClick={() => void command(p,"restore")}>Restore</button><button onClick={() => void command(p,"trash")}>Trash</button></>}{scope === "trashed" && <><button onClick={() => void command(p,"restore")}>Restore</button><button className="danger" onClick={() => void command(p,"delete")}>Delete</button></>}{scope === "deleted" && <button onClick={() => void command(p,"restore")}>Restore</button>}</div>}</div></article>)}</div>}
     </main>
   );
 }

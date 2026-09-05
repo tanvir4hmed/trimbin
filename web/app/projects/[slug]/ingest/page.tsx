@@ -20,10 +20,11 @@ import PlacementInbox from "@/components/PlacementInbox";
 import Structure from "@/components/Structure";
 import Upload from "@/components/Upload";
 import { useProjectScreen } from "@/lib/queries";
+import { paths, projectIdFromSlug } from "@/lib/slug";
 
-export default function IngestPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  const projectId = Number(id);
+export default function IngestPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = use(params);
+  const projectId = projectIdFromSlug(slug);
   const screen = useProjectScreen(projectId);
 
   // What actually arrived, so a planned shot with no footage is visibly
@@ -56,7 +57,7 @@ export default function IngestPage({ params }: { params: Promise<{ id: string }>
   return (
     <main className="ingest-page">
       <div className="ingest-page-crumb">
-        <Link href={`/project/${projectId}`}>← {screen.data.project.name}</Link>
+        <Link href={`${paths.project(projectId)}`}>← {screen.data.project.name}</Link>
         <span>Footage ingest</span>
       </div>
 

@@ -15,6 +15,7 @@
 
 import Link from "next/link";
 import type { SceneNode, ShotNode, ShotStatus } from "@/lib/api";
+import { paths } from "@/lib/slug";
 
 const STATUS_LABEL: Record<ShotStatus, string> = {
   too_few_takes: "choose a range",
@@ -71,7 +72,7 @@ export default function ProjectOverview({
           <span className={open.shots.filter(unsettled).length ? "overview-waiting" : ""}>
             <b>{open.shots.filter(unsettled).length}</b> waiting
           </span>
-          <Link className="ghost small" href={`/project/${projectId}/scene/${open.scene}`}>
+          <Link className="ghost small" href={`${paths.coverage(projectId, open.scene)}`}>
             Play scene
           </Link>
         </div>
@@ -81,7 +82,7 @@ export default function ProjectOverview({
             <Link
               key={shot.shot}
               className="overview-shot"
-              href={`/project/${projectId}?scene=${open.scene}&shot=${shot.shot}`}
+              href={`${paths.shot(projectId, open.scene, shot.shot)}`}
             >
               <span className="overview-shot-head">
                 <span className={`dot ${shot.status}`} aria-hidden />
@@ -130,7 +131,7 @@ export default function ProjectOverview({
             <Link
               key={item.scene}
               className="scene-row"
-              href={`/project/${projectId}?scene=${item.scene}`}
+              href={`${paths.scene(projectId, item.scene)}`}
             >
               <span className="scene-row-name">
                 <p className="eyebrow">SCENE {item.scene_code || item.scene}</p>
@@ -150,7 +151,7 @@ export default function ProjectOverview({
       </div>
 
       {canCurate && (
-        <Link className="ghost overview-add" href={`/project/${projectId}/ingest`}>
+        <Link className="ghost overview-add" href={`${paths.ingest(projectId)}`}>
           Add scenes, shots &amp; footage →
         </Link>
       )}

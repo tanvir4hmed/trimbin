@@ -21,6 +21,7 @@ import AskArchive from "@/components/AskArchive";
 import type { Project } from "@/lib/api";
 import { ApiError, api } from "@/lib/api";
 import { currentIdentity } from "@/lib/auth";
+import { paths } from "@/lib/slug";
 
 export default function ArchivePage() {
   return (
@@ -123,7 +124,7 @@ function Archive() {
           projectId={projectId}
           initialQuestion={asked}
           onOpen={(scene, shot, at, clipId) =>
-            router.push(`/project/${projectId}?scene=${scene}&shot=${shot}${at !== undefined ? `&at=${at}` : ""}${clipId ? `&clip=${clipId}` : ""}`)
+            router.push(`${paths.shot(projectId, scene, shot)}${at !== undefined ? `?at=${at}` : ""}${clipId ? `${at !== undefined ? "&" : "?"}clip=${clipId}` : ""}`)
           }
         />
       )}

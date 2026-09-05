@@ -17,6 +17,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { paths } from "@/lib/slug";
 
 export default function PlacementBanner({ projectId }: { projectId: number }) {
   const inbox = useQuery({
@@ -29,7 +30,7 @@ export default function PlacementBanner({ projectId }: { projectId: number }) {
   if (!waiting) return null;
 
   return (
-    <Link className="placement-banner" href={`/project/${projectId}/ingest`}>
+    <Link className="placement-banner" href={`${paths.ingest(projectId)}`}>
       <span className="placement-banner-count">{waiting}</span>
       <span>
         <b>

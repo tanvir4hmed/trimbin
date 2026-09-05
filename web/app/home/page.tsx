@@ -11,6 +11,7 @@ import NewProject from "@/components/NewProject";
 import { ApiError } from "@/lib/api";
 import { currentIdentity } from "@/lib/auth";
 import { useDashboard } from "@/lib/queries";
+import { paths } from "@/lib/slug";
 
 const THUMBS = [
   "linear-gradient(135deg,#3a3226,#17140f)",
@@ -119,7 +120,7 @@ export default function DashboardPage() {
             limits={data.limits}
             role={data.role}
             owned={data.projects.filter((p) => p.you_are_owner).length}
-            onCreated={(id) => router.push(`/project/${id}`)}
+            onCreated={(id) => router.push(`${paths.project(id)}`)}
           />
         </div>
       </div>
@@ -132,7 +133,7 @@ export default function DashboardPage() {
       ) : (
         <><div className="home-section-head"><h2>Continue working</h2><Link href="/projects">View all projects →</Link></div><div className="pgrid home-projects">
           {data.projects.slice(0, 3).map((p, i) => (
-            <Link key={p.project_id} href={`/project/${p.project_id}`} className="pcard">
+            <Link key={p.project_id} href={`${paths.project(p.project_id, p.name)}`} className="pcard">
               <div className="pthumb" style={{ background: THUMBS[i % THUMBS.length] }}>
                 <span className="ptag">
                   {p.you_can_upload ? "yours" : "read & comment"}
@@ -168,13 +169,13 @@ export default function DashboardPage() {
           ))}
         </div></>
       )}
-      <div className="home-lower"><section><div className="home-section-head"><h2>Needs your decision</h2><Link href="/review">View all {waiting} →</Link></div><div className="home-decisions">{data.queue.length ? data.queue.slice(0,4).map((item) => <Link key={`${item.project_id}-${item.scene}-${item.shot}`} href={`/project/${item.project_id}?scene=${item.scene}&shot=${item.shot}`}><span><b>{item.project_name}</b><small>Scene {item.scene} · {item.slug || `Shot ${item.shot}`}</small></span><span>{item.reason.replaceAll("_", " ")}<small>{item.takes} takes · {item.assignee ? `owner ${item.assignee.split("@")[0]}` : "unassigned"}</small></span><i>Review →</i></Link>)
+      <div className="home-lower"><section><div className="home-section-head"><h2>Needs your decision</h2><Link href="/review">View all {waiting} →</Link></div><div className="home-decisions">{data.queue.length ? data.queue.slice(0,4).map((item) => <Link key={`${item.project_id}-${item.scene}-${item.shot}`} href={`${paths.shot(item.project_id, item.scene, item.shot, item.project_name)}`}><span><b>{item.project_name}</b><small>Scene {item.scene} · {item.slug || `Shot ${item.shot}`}</small></span><span>{item.reason.replaceAll("_", " ")}<small>{item.takes} takes · {item.assignee ? `owner ${item.assignee.split("@")[0]}` : "unassigned"}</small></span><i>Review →</i></Link>)
         : /* An empty column beside a full one read as something failing to
              load. It says which of the two empties it is instead. */
           <div className="home-empty">{data.projects.some((p) => (p.shots ?? 0) > 0)
             ? <><b>Nothing waiting</b><small>Every shot has a chosen take, or somebody is on it.</small></>
             : <><b>No footage yet</b><small>Shots appear here once takes are uploaded and placed.</small></>}
-          </div>}</div></section><section><div className="home-section-head"><h2>Recent activity</h2><Link href="/activity">View all activity →</Link></div><ul className="activity home-activity">{data.activity.slice(0,4).map((a,i) => <li key={i}><Link href={a.shot ? `/project/${a.project_id}?scene=${a.scene}&shot=${a.shot}` : `/project/${a.project_id}`}><span className="who">{a.actor.split("@")[0]}</span> <span className="what">{say(a.verb,a.quantity)}</span><span className="where">{a.project_name}</span></Link><span className="ago">{ago(a.at)}</span></li>)}</ul></section></div>
+          </div>}</div></section><section><div className="home-section-head"><h2>Recent activity</h2><Link href="/activity">View all activity →</Link></div><ul className="activity home-activity">{data.activity.slice(0,4).map((a,i) => <li key={i}><Link href={a.shot ? `${paths.shot(a.project_id, a.scene, a.shot, a.project_name)}` : `${paths.project(a.project_id, a.project_name)}`}><span className="who">{a.actor.split("@")[0]}</span> <span className="what">{say(a.verb,a.quantity)}</span><span className="where">{a.project_name}</span></Link><span className="ago">{ago(a.at)}</span></li>)}</ul></section></div>
     </main>
   );
 }

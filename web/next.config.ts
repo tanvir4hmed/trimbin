@@ -17,6 +17,31 @@ const config: NextConfig = {
   // Deliberately not the production path: proxying every API call through the
   // Next container adds a hop and its own fetch timeout, which a cold-starting
   // API can exceed — and did.
+  // Every address this application ever published keeps working.
+  //
+  // The scheme changed — `/project/6?scene=1&shot=1` became
+  // `/projects/kill-bill-6/scenes/1/shots/1`, `/archive` became `/search`,
+  // `/dashboard` became `/home` — and a link somebody bookmarked or pasted
+  // into a message should not die because we renamed a route. `/projects/6`
+  // still resolves too: only the trailing number in a slug is read, so the
+  // old id-only form is a valid slug.
+  async redirects() {
+    return [
+      { source: "/dashboard", destination: "/home", permanent: true },
+      { source: "/archive", destination: "/search", permanent: true },
+      // The shot and scene used to be query parameters, and Next cannot read
+      // those in a redirect rule — so the project page itself forwards them,
+      // and these cover the path forms.
+      {
+        source: "/project/:id/scene/:scene",
+        destination: "/projects/:id/scenes/:scene/coverage",
+        permanent: true,
+      },
+      { source: "/project/:id/ingest", destination: "/projects/:id/ingest", permanent: true },
+      { source: "/project/:id", destination: "/projects/:id", permanent: true },
+    ];
+  },
+
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${API_URL}/:path*` }];
   },

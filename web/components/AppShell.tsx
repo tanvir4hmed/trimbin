@@ -8,11 +8,12 @@ import UploadTray from "@/components/UploadTray";
 import type { Project } from "@/lib/api";
 import { api } from "@/lib/api";
 import { currentIdentity, signOut, type Identity } from "@/lib/auth";
+import { paths } from "@/lib/slug";
 
-const APP_PREFIXES = ["/dashboard", "/projects", "/review", "/archive", "/activity", "/project/"];
+const APP_PREFIXES = ["/home", "/projects", "/review", "/search", "/activity"];
 const NAV = [
-  ["/dashboard", "⌂", "Home"], ["/projects", "□", "Projects"],
-  ["/review", "▷", "Review"], ["/archive", "⌕", "Search"], ["/activity", "⌁", "Activity"],
+  ["/home", "⌂", "Home"], ["/projects", "□", "Projects"],
+  ["/review", "▷", "Review"], ["/search", "⌕", "Search"], ["/activity", "⌁", "Activity"],
 ] as const;
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -59,11 +60,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, [switching]);
 
-  const currentId = Number(pathname.match(/\/project\/(\d+)/)?.[1] || 0);
+  // The id is the trailing number of the slug: `kill-bill-6` or plain `6`.
+  const currentId = Number(pathname.match(/\/projects\/(?:[^/]*?-)?(\d+)(?:$|\/)/)?.[1] || 0);
   const current = projects.find((project) => project.project_id === currentId);
   const filtered = useMemo(() => projects.filter((project) => project.name.toLowerCase().includes(projectQuery.toLowerCase())), [projects, projectQuery]);
-  const active = (href: string) => pathname === href || pathname.startsWith(`${href}/`) || (href === "/projects" && pathname.startsWith("/project/"));
-  const submitSearch = (event: FormEvent) => { event.preventDefault(); if (search.trim()) router.push(`/archive?q=${encodeURIComponent(search.trim())}`); };
+  const active = (href: string) => pathname === href || pathname.startsWith(`${href}/`) || (href === "/projects" && pathname.startsWith("/projects/"));
+  const submitSearch = (event: FormEvent) => { event.preventDefault(); if (search.trim()) router.push(`/search?q=${encodeURIComponent(search.trim())}`); };
 
   // The entry page is its own thing — one screen, two buttons, no chrome. The
   // evidence pages get the public bar; before this they got nothing at all,
@@ -72,7 +74,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (!isApp) return <PublicShell>{children}</PublicShell>;
   return <div className={collapsed ? "app-frame sidebar-collapsed" : "app-frame"}>
     <aside className="app-sidebar">
-      <header><Link href="/dashboard" className="app-wordmark"><span>◩</span><b>TRIMBIN</b></Link><button aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} onClick={() => { const next = !collapsed; setCollapsed(next); localStorage.setItem("trimbin.sidebar.collapsed", next ? "1" : "0"); }}>{collapsed ? "»" : "«"}</button></header>
+      <header><Link href="/home" className="app-wordmark"><span>◩</span><b>TRIMBIN</b></Link><button aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} onClick={() => { const next = !collapsed; setCollapsed(next); localStorage.setItem("trimbin.sidebar.collapsed", next ? "1" : "0"); }}>{collapsed ? "»" : "«"}</button></header>
       <nav>{NAV.map(([href, icon, label]) => <Link key={href} href={href} aria-current={active(href) ? "page" : undefined} title={label}><i>{icon}</i><span>{label}</span></Link>)}</nav>
       <footer>
         {identity ? <>
@@ -95,7 +97,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     </aside>
     <div className="app-stage">
       <header className="app-topbar">
-        <div className="switch-wrap"><button className="switch-button" onClick={() => setSwitching((open) => !open)}><small>Switch project</small><b>{current?.name || "All projects"}</b><span>⌄</span></button>{switching && <div className="switch-menu"><input autoFocus placeholder="Search projects…" value={projectQuery} onChange={(event) => setProjectQuery(event.target.value)} /><Link href="/projects">All projects</Link>{filtered.slice(0, 8).map((project) => <Link key={project.project_id} href={`/project/${project.project_id}`}>{project.name}<small>{project.you_are_owner ? "Owner" : project.you_can_upload ? "Editor" : "Guest"}</small></Link>)}</div>}</div>
+        <div className="switch-wrap"><button className="switch-button" onClick={() => setSwitching((open) => !open)}><small>Switch project</small><b>{current?.name || "All projects"}</b><span>⌄</span></button>{switching && <div className="switch-menu"><input autoFocus placeholder="Search projects…" value={projectQuery} onChange={(event) => setProjectQuery(event.target.value)} /><Link href="/projects">All projects</Link>{filtered.slice(0, 8).map((project) => <Link key={project.project_id} href={`${paths.project(project.project_id, project.name)}`}>{project.name}<small>{project.you_are_owner ? "Owner" : project.you_can_upload ? "Editor" : "Guest"}</small></Link>)}</div>}</div>
         <form className="app-global-search" onSubmit={submitSearch}><span>⌕</span><input aria-label="Search shots and moments" placeholder="Search shots, moments, issues…" value={search} onChange={(event) => setSearch(event.target.value)} /></form>
         <div className="app-top-actions"><span>{identity?.name.split(" ")[0] || "Guest"}</span></div>
       </header>

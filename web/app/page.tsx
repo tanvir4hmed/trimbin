@@ -34,7 +34,7 @@ export default function Home() {
   useEffect(() => {
     if (currentIdentity()) {
       setLeaving(true);
-      router.replace("/dashboard");
+      router.replace("/home");
     }
   }, [router]);
 
@@ -52,7 +52,7 @@ export default function Home() {
           {leaving ? (
             <p className="waiting">Taking you to your work…</p>
           ) : (
-            <SignInPanel onSignedIn={() => router.push("/dashboard")} />
+            <SignInPanel onSignedIn={() => router.push("/home")} />
           )}
         </div>
 

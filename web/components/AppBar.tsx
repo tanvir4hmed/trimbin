@@ -21,12 +21,13 @@ import SignInPanel from "@/components/SignInPanel";
 import type { Me, Project } from "@/lib/api";
 import { api } from "@/lib/api";
 import { Identity, currentIdentity, signOut } from "@/lib/auth";
+import { paths } from "@/lib/slug";
 
 const LINKS = [
-  { href: "/dashboard", label: "Home" },
+  { href: "/home", label: "Home" },
   { href: "/review", label: "Review" },
   { href: "/projects", label: "Projects" },
-  { href: "/archive", label: "Search" },
+  { href: "/search", label: "Search" },
 ] as const;
 
 export default function AppBar() {
@@ -84,11 +85,11 @@ export default function AppBar() {
 
   return (
     <nav className="topbar">
-      <Link href={identity ? "/dashboard" : "/"} className="logo">
+      <Link href={identity ? "/home" : "/"} className="logo">
         <i aria-hidden>◩</i> TRIM<span>BIN</span>
       </Link>
 
-      {identity && projects.length > 0 && <label className="project-switcher"><span>Project</span><select aria-label="Project switcher" value={pathname.match(/\/project\/(\d+)/)?.[1] ?? ""} onChange={(event) => { if (event.target.value) router.push(`/project/${event.target.value}`); }}><option value="">Switch project…</option>{projects.map((project) => <option key={project.project_id} value={project.project_id}>{project.name}</option>)}</select></label>}
+      {identity && projects.length > 0 && <label className="project-switcher"><span>Project</span><select aria-label="Project switcher" value={pathname.match(/\/project\/(\d+)/)?.[1] ?? ""} onChange={(event) => { if (event.target.value) router.push(`${paths.project(Number(event.target.value))}`); }}><option value="">Switch project…</option>{projects.map((project) => <option key={project.project_id} value={project.project_id}>{project.name}</option>)}</select></label>}
 
       {identity && (
         <div className="nav">

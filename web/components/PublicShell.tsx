@@ -63,7 +63,7 @@ export default function PublicShell({ children }: { children: React.ReactNode })
         </nav>
         {/* Signed in, the way back is the desk they were at. Signed out, the
             way in. Never both, and never neither. */}
-        <Link className="primary small" href={identity ? "/dashboard" : "/"}>
+        <Link className="primary small" href={identity ? "/home" : "/"}>
           {identity ? "Open Trimbin" : "Sign in"}
         </Link>
       </header>
