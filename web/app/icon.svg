@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- The wordmark's mark: a frame, half of it selected. That is the whole
+       product — footage, and the part of it somebody chose. -->
+  <rect width="32" height="32" rx="7" fill="#0d1d30"/>
+  <rect x="7" y="9" width="18" height="14" rx="2" fill="none" stroke="#6e9ff1" stroke-width="2"/>
+  <rect x="8" y="10" width="8" height="12" fill="#6e9ff1"/>
+</svg>

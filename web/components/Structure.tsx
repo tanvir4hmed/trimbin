@@ -161,6 +161,8 @@ export default function Structure({
                     value={shotSlug}
                     placeholder={`${s.scene}${letter(s.shots.length + 1)}`}
                     maxLength={40}
+                    aria-label="Shot code, as written on the slate"
+                    title="Shot code, as written on the slate"
                     onChange={(e) => setShotSlug(e.target.value)}
                   />
                   <input
@@ -168,6 +170,8 @@ export default function Structure({
                     value={shotDesc}
                     placeholder="wide, Maya CU, reverse"
                     maxLength={200}
+                    aria-label="What the shot is"
+                    title="What the shot is"
                     onChange={(e) => setShotDesc(e.target.value)}
                   />
                   <button
@@ -192,7 +196,8 @@ export default function Structure({
             type="text"
             value={newScene}
             placeholder="3, 12A-PU, A012C"
-            aria-label="Scene code"
+            aria-label="Scene code, as written on the slate"
+            title="Scene code, as written on the slate"
             onChange={(e) => setNewScene(e.target.value)}
           />
           <input
@@ -200,6 +205,8 @@ export default function Structure({
             value={heading}
             placeholder="INT. APARTMENT — NIGHT"
             maxLength={200}
+            aria-label="Scene heading, from the script"
+            title="Scene heading, from the script"
             onChange={(e) => setHeading(e.target.value)}
           />
           <button

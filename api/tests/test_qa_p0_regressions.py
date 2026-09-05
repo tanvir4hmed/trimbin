@@ -756,3 +756,88 @@ class TestD3ResumeMatchesTheRightFiles:
             encoding="utf-8"
         )
         assert "These are not the files that batch was uploading" in source
+
+
+class TestD4TheShellHasNoDeadControls:
+    """A control that does nothing teaches people not to trust the ones that
+    do. The QA found a notification button that opened nothing.
+    """
+
+    def test_the_notification_button_is_gone(self) -> None:
+        from pathlib import Path
+
+        source = (Path(__file__).parents[2] / "web" / "components" / "AppShell.tsx").read_text(
+            encoding="utf-8"
+        )
+        assert 'aria-label="Notifications"' not in source
+
+    def test_there_is_a_favicon(self) -> None:
+        """A browser tab with the default document icon reads as something
+        half-built, whatever is on the page."""
+        from pathlib import Path
+
+        assert (Path(__file__).parents[2] / "web" / "app" / "icon.svg").exists()
+
+    def test_the_structure_fields_are_named(self) -> None:
+        """Four inputs with no accessible name, and two pairs a sighted person
+        could not tell apart either: which box is the code on the board, and
+        which is the slugline from the script?"""
+        from pathlib import Path
+
+        source = (Path(__file__).parents[2] / "web" / "components" / "Structure.tsx").read_text(
+            encoding="utf-8"
+        )
+        for label in (
+            "Scene code, as written on the slate",
+            "Scene heading, from the script",
+            "Shot code, as written on the slate",
+            "What the shot is",
+        ):
+            assert label in source, f"missing accessible name: {label}"
+
+
+class TestD4SceneCoverageCountsShots:
+    """A shot with four ranges is one shot. The QA found the scene header
+    counting the flattened range list, so choosing more coverage for a shot
+    made the scene look less complete.
+    """
+
+    def test_the_header_counts_shots(self) -> None:
+        from pathlib import Path
+
+        source = (
+            Path(__file__).parents[2]
+            / "web"
+            / "app"
+            / "projects"
+            / "[slug]"
+            / "scenes"
+            / "[scene]"
+            / "coverage"
+            / "page.tsx"
+        ).read_text(encoding="utf-8")
+        assert "{selectedShots.length}/{data.shots} shots confirmed" in source
+
+    def test_transport_moves_between_shots(self) -> None:
+        """Previous/Next used to step through source parts, so a shot with four
+        ranges took four presses to leave."""
+        from pathlib import Path
+
+        source = (
+            Path(__file__).parents[2]
+            / "web"
+            / "app"
+            / "projects"
+            / "[slug]"
+            / "scenes"
+            / "[scene]"
+            / "coverage"
+            / "page.tsx"
+        ).read_text(encoding="utf-8")
+        assert "moveShot(-1)" in source and "moveShot(1)" in source
+
+    def test_the_scene_contract_carries_ranges_per_shot(self) -> None:
+        from app.schemas import CoverageItem
+
+        assert "entries" in CoverageItem.model_fields
+        assert "kind" in CoverageItem.model_fields
