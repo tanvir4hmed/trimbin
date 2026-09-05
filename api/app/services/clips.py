@@ -162,12 +162,41 @@ def _findings_columns(m: RawMeasurements) -> tuple[list[str], list[float], list[
         ("frames.frozen", m.freeze_spans),
         ("clip.black", m.black_spans),
     ):
-        for span in spans:
+        for start, end in _events(spans):
             codes.append(code)
-            starts.append(round(span.start_s, 2))
-            ends.append(round(span.end_s, 2))
+            starts.append(round(start, 2))
+            ends.append(round(end, 2))
 
     return codes, starts, ends
+
+
+# How close two measured spans have to be to count as one thing happening.
+#
+# A camera settling after a bump does not produce one motion spike; it produces
+# a cluster of them a few tenths of a second apart. Written out one per span,
+# a single knock became fourteen separate findings on one take — a wall of
+# tasks nobody can verify, each describing part of the same event.
+#
+# A second is long enough to join a cluster and short enough to keep two real
+# knocks apart.
+EVENT_GAP_S = 1.0
+
+
+def _events(spans) -> list[tuple[float, float]]:
+    """Measured spans, joined into the events they belong to.
+
+    Merging rather than discarding. A brief shake is still evidence and an
+    editor may care about it; what they cannot use is the same shake reported
+    fourteen times.
+    """
+    ordered = sorted(((float(s.start_s), float(s.end_s)) for s in spans), key=lambda x: x[0])
+    events: list[tuple[float, float]] = []
+    for start, end in ordered:
+        if events and start - events[-1][1] <= EVENT_GAP_S:
+            events[-1] = (events[-1][0], max(events[-1][1], end))
+        else:
+            events.append((start, end))
+    return events
 
 
 async def write_unusable(

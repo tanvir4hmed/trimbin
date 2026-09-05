@@ -125,10 +125,47 @@ class TestFindingsColumns:
     def test_the_arrays_stay_the_same_length(self) -> None:
         """They are stored as three parallel columns and zipped back together on
         read. A mismatch there would pair a code with another finding's
-        timecode, which is worse than having no timecode at all."""
+        timecode, which is worse than having no timecode at all.
+
+        The count changed when measured spans started merging into events —
+        these two spikes are a second apart and are now one shake — so this
+        asserts the invariant it was always about rather than the number it
+        happened to produce."""
         m = self._measurements(
             motion_spikes=[(1.0, 2.0), (3.0, 4.0)],
             black_spans=[(28.0, 30.0)],
         )
         codes, starts, ends = clips._findings_columns(m)
-        assert len(codes) == len(starts) == len(ends) == 3
+        assert len(codes) == len(starts) == len(ends)
+        assert len(codes) == 2
+
+    def test_a_cluster_of_spikes_is_one_event(self) -> None:
+        """The QA's wall of shake tasks. A camera settling after a knock throws
+        a spike every few tenths of a second; written out one per span it became
+        fourteen findings on one take, each describing part of the same bump."""
+        m = self._measurements(
+            motion_spikes=[(1.0, 1.4), (1.6, 2.0), (2.3, 2.7), (2.9, 3.2)],
+        )
+        codes, starts, ends = clips._findings_columns(m)
+        assert codes == ["stability.shake"]
+        assert (starts[0], ends[0]) == (1.0, 3.2)
+
+    def test_two_real_knocks_stay_two(self) -> None:
+        """Merging must not swallow separate events. Ten seconds apart is two
+        things happening, not one long one."""
+        m = self._measurements(
+            motion_spikes=[(1.0, 1.5), (12.0, 12.5)],
+        )
+        codes, starts, _ = clips._findings_columns(m)
+        assert codes == ["stability.shake", "stability.shake"]
+        assert starts == [1.0, 12.0]
+
+    def test_spans_arriving_out_of_order_still_merge(self) -> None:
+        """ffmpeg passes report in their own order, and an unsorted list would
+        merge nothing at all."""
+        m = self._measurements(
+            motion_spikes=[(2.3, 2.7), (1.0, 1.4), (1.6, 2.0)],
+        )
+        codes, starts, ends = clips._findings_columns(m)
+        assert codes == ["stability.shake"]
+        assert (starts[0], ends[0]) == (1.0, 2.7)

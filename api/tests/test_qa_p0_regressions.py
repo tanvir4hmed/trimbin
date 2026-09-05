@@ -841,3 +841,93 @@ class TestD4SceneCoverageCountsShots:
 
         assert "entries" in CoverageItem.model_fields
         assert "kind" in CoverageItem.model_fields
+
+
+class TestD5PerformanceIsNeverScored:
+    """The line the whole product is built around: this system measures what a
+    camera can be measured on and never judges a performance.
+
+    A weight quietly added for `performance.note` would move a ranking without
+    anybody deciding to, which is exactly the overreach the boundary forbids.
+    So the tables are asserted rather than trusted.
+    """
+
+    def test_performance_carries_no_weight(self) -> None:
+        from app.services import criteria
+
+        for name, table in vars(criteria).items():
+            if not isinstance(table, dict) or not name.isupper():
+                continue
+            assert "performance.note" not in table, (
+                f"{name} scores performance, which the product boundary forbids"
+            )
+
+    def test_an_unnamed_observation_carries_no_weight_either(self) -> None:
+        """`other` is something the model could not name. Scoring it is scoring
+        a guess."""
+        from app.services import criteria
+
+        for name, table in vars(criteria).items():
+            if not isinstance(table, dict) or not name.isupper():
+                continue
+            assert "other" not in table, f"{name} scores an unnamed observation"
+
+    def test_the_analyst_is_told_it_is_not_judging_performance(self) -> None:
+        from pathlib import Path
+
+        source = (
+            Path(__file__).parents[2] / "agents" / "trimbin_agents" / "analyst" / "agent.py"
+        ).read_text(encoding="utf-8")
+        assert "not a judgement of performance" in source
+
+
+class TestD5FindingsAreReviewable:
+    """A take with fourteen shake findings is a take nobody reviews. Each one
+    described part of the same camera bump.
+    """
+
+    def test_a_settling_camera_is_one_finding(self) -> None:
+        from app.services.clips import _events
+
+        class Span:
+            def __init__(self, a, b):
+                self.start_s, self.end_s = a, b
+
+        spans = [Span(1.0, 1.4), Span(1.6, 2.0), Span(2.3, 2.7), Span(2.9, 3.2)]
+        assert _events(spans) == [(1.0, 3.2)]
+
+    def test_separate_events_survive(self) -> None:
+        """Merging that swallowed distinct knocks would trade one unusable
+        screen for a dishonest one."""
+        from app.services.clips import _events
+
+        class Span:
+            def __init__(self, a, b):
+                self.start_s, self.end_s = a, b
+
+        assert _events([Span(1.0, 1.5), Span(12.0, 12.5)]) == [(1.0, 1.5), (12.0, 12.5)]
+
+    def test_nothing_is_discarded(self) -> None:
+        """Merged, never dropped. A brief shake is still evidence an editor may
+        want; what they cannot use is the same shake fourteen times."""
+        from app.services.clips import _events
+
+        class Span:
+            def __init__(self, a, b):
+                self.start_s, self.end_s = a, b
+
+        merged = _events([Span(1.0, 1.4), Span(1.6, 2.0)])
+        assert merged[0][0] == 1.0 and merged[0][1] == 2.0
+
+    def test_the_post_cut_break_can_end_a_usable_range(self) -> None:
+        """Take 4's suggested range ran past the point the actors broke after
+        "Cut". The taxonomy has a code for it and the range builder uses it."""
+        from pathlib import Path
+
+        from trimbin_agents.contracts.base import FindingCode
+
+        assert FindingCode.ACTION_POST_ROLL == "action.post_roll"
+        source = (Path(__file__).parents[1] / "app" / "services" / "ranges.py").read_text(
+            encoding="utf-8"
+        )
+        assert "action.post_roll" in source
