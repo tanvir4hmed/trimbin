@@ -129,13 +129,18 @@ async def run(
         conditions.append("c.take_no = {take:UInt16}")
         params["take"] = int(plan["take"])
 
+    # No `has_decision` guard here, and none is possible: this query reads
+    # `FROM decisions AS d`, so `d` is the table itself and a row cannot be
+    # absent. The guard belongs to the queries that LEFT JOIN `latest_decision`,
+    # where a missing right-hand side would otherwise default its Enum to the
+    # first value and invent an outcome. Adding it here names a column that
+    # does not exist, and ClickHouse rejects the whole query — which took
+    # search down in production while every unit test passed.
     if plan.get("outcome"):
-        conditions.append("d.has_decision = 1")
         conditions.append("d.outcome = {outcome:String}")
         params["outcome"] = str(plan["outcome"])
 
     if plan.get("decided_by"):
-        conditions.append("d.has_decision = 1")
         conditions.append("d.decided_by = {decided_by:String}")
         params["decided_by"] = str(plan["decided_by"])
 

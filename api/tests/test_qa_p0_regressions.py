@@ -912,3 +912,55 @@ class TestD5FindingsAreReviewable:
             encoding="utf-8"
         )
         assert "action.post_roll" in source
+
+
+class TestEveryHasDecisionReferenceHasAColumnBehindIt:
+    """`has_decision` only exists inside a `latest_decision` CTE.
+
+    The guard that stops a LEFT JOIN inventing an outcome was added to the
+    query that reads `FROM decisions AS d` as well, where `d` is the table and
+    the column does not exist. ClickHouse rejected the whole statement and
+    archive search returned 503 in production — while every unit test passed,
+    because the sibling test below counts guards in the SELECT list and this
+    one was in the WHERE clause.
+
+    So: every query that mentions `has_decision` must also define it.
+    """
+
+    @staticmethod
+    def _statements() -> list[str]:
+        """The source split into per-query chunks.
+
+        `WITH latest_decision AS` opens each guarded query, so splitting on it
+        puts a query's definition and its references in the same chunk. The
+        first chunk is everything before any CTE — which is exactly where the
+        production failure lived.
+        """
+        from pathlib import Path
+
+        source = (Path(__file__).parents[1] / "app" / "services" / "search.py").read_text(
+            encoding="utf-8"
+        )
+        # Comments explain the rule and naturally name the column, so they are
+        # stripped before it is applied. This assertion is about SQL.
+        code = chr(10).join(
+            line for line in source.splitlines() if not line.lstrip().startswith("#")
+        )
+        return code.split("WITH latest_decision AS")
+
+    def test_no_query_references_a_column_it_never_defines(self) -> None:
+        for chunk in self._statements():
+            if "has_decision" not in chunk:
+                continue
+            assert "toUInt8(1) AS has_decision" in chunk, (
+                "a query references has_decision without a latest_decision CTE "
+                "defining it; ClickHouse will reject the whole statement"
+            )
+
+    def test_the_direct_read_stays_unguarded(self) -> None:
+        """Reading `FROM decisions AS d` cannot produce an absent row, so the
+        guard is not merely invalid there — it is unnecessary."""
+        before_any_cte = self._statements()[0]
+
+        assert "FROM decisions AS d" in before_any_cte
+        assert "has_decision" not in before_any_cte
