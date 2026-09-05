@@ -17,15 +17,24 @@ ENGINE = MergeTree
 PARTITION BY toYYYYMM(occurred_at)
 ORDER BY (project_id, clip_id, occurred_at, event_id);
 
+-- `max(occurred_at) AS occurred_at` shadows the column it reads. ClickHouse
+-- resolves the name inside `tuple(occurred_at, event_id)` to that alias and
+-- refuses the query: an aggregate inside an aggregate (ILLEGAL_AGGREGATION).
+-- The ordering tuple is built in a subquery instead, which is the shape
+-- `settled_placement` below already uses and the reason it works.
 CREATE VIEW IF NOT EXISTS current_clip_lifecycle AS
 SELECT
     project_id,
     clip_id,
-    argMax(action, tuple(occurred_at, event_id)) AS action,
-    argMax(actor, tuple(occurred_at, event_id)) AS actor,
-    argMax(detail, tuple(occurred_at, event_id)) AS detail,
+    argMax(action, lifecycle_order) AS action,
+    argMax(actor, lifecycle_order) AS actor,
+    argMax(detail, lifecycle_order) AS detail,
     max(occurred_at) AS occurred_at
-FROM clip_lifecycle_events
+FROM
+(
+    SELECT *, tuple(occurred_at, event_id) AS lifecycle_order
+    FROM clip_lifecycle_events
+)
 GROUP BY project_id, clip_id;
 
 DROP VIEW IF EXISTS current_unassigned_clips;

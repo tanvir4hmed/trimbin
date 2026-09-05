@@ -144,6 +144,60 @@ jobs:
           NEXT_PUBLIC_OAUTH_CLIENT_ID: ""
           NEXT_PUBLIC_TRIAL_PASS: ""
 
+  # Migrations, applied to a real ClickHouse.
+  #
+  # This job did not exist, and its absence let a migration with a nested
+  # aggregate reach the production deploy step: `max(occurred_at) AS
+  # occurred_at` shadowed the column it read, and only a ClickHouse parser
+  # could say so. Numbering was checked; the SQL never was.
+  #
+  # A fresh server every run, so this also proves the schema builds from
+  # nothing — not merely that it survives on top of what production already
+  # has. migrate.sh does its own verification once applied.
+  migrations:
+    name: Migrations
+    runs-on: ubuntu-latest
+
+    services:
+      clickhouse:
+        # Deliberately unpinned. ClickHouse Cloud upgrades on its own
+        # schedule, and validating against a tag production stopped running
+        # months ago would give a green check for a parser nobody uses.
+        image: clickhouse/clickhouse-server:latest
+        env:
+          CLICKHOUSE_PASSWORD: ci
+          # CREATE USER and GRANT are part of what is being tested — the
+          # read-only boundary search depends on is created by this script.
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+        ports:
+          - 8123:8123
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for ClickHouse
+        run: |
+          for _ in $(seq 1 60); do
+            if curl -sf http://localhost:8123/ping >/dev/null; then
+              echo "ready"; exit 0
+            fi
+            sleep 2
+          done
+          echo "ClickHouse did not become ready" >&2
+          exit 1
+
+      - name: Apply and verify
+        working-directory: clickhouse
+        env:
+          CLICKHOUSE_URL: http://localhost:8123
+          CLICKHOUSE_PASSWORD: ci
+          # Not a secret: this server exists for ninety seconds and is
+          # reachable only from this job.
+          CLICKHOUSE_READER_PASSWORD: ci-reader
+        run: |
+          chmod +x migrate.sh
+          ./migrate.sh
+
   terraform:
     name: Terraform
     runs-on: ubuntu-latest
