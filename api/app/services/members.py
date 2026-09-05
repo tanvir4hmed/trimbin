@@ -8,11 +8,10 @@ They can reject a take, disagree with the panel, argue with a finding, leave a
 note — on our footage, in our projects. Watching somebody overrule the system
 *is* the product, and a demonstration that only lets you look is a video.
 
-What a guest may not do is put footage into our productions. That is the whole
-of the restriction, and it is about storage and cost rather than about trust.
-
-In a project a guest created, they are an editor: upload included, with limits
-stated up front on the form rather than sprung afterwards.
+A signed-in guest works as an editor in productions opened to them. Destructive
+authority is still checked per record: they may remove footage they uploaded,
+not somebody else's. Limits follow the owner of a project rather than the role
+of the person pressing Upload.
 """
 
 from __future__ import annotations
@@ -120,12 +119,10 @@ def capabilities(email: str | None) -> dict:
     implementation of this file, and the two will disagree — the failure being a
     button that is drawn and then refused, which is worse than no button.
 
-    These are the answers for *our* projects. Inside a project someone owns,
-    they have all of them; that question needs a project id and is answered by
-    Principal, not here.
+    These are workspace-level capabilities. The project serializer supplies the
+    project-scoped answer used by each screen.
     """
     role = role_of(email)
-    staff = role in ("lead", "editor")
     return {
         "role": role,
         "signed_in": bool(email),
@@ -136,8 +133,8 @@ def capabilities(email: str | None) -> dict:
         "can_override": bool(email),
         # Running the panel, describing a shot, recording a circle, assigning,
         # setting a state. The editors' work on the editors' footage.
-        "can_curate_team_projects": staff,
-        "can_upload_to_team_projects": staff,
+        "can_curate_team_projects": bool(email),
+        "can_upload_to_team_projects": bool(email),
         "can_create_own_project": bool(email),
         "can_add_members": role == "lead",
         "can_supersede": role == "lead",

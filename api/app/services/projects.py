@@ -233,6 +233,23 @@ def open_to_readers(project: Project | None) -> bool:
     return project.is_public or members.is_staff(project.owner_email)
 
 
+def can_work(project: Project | None, email: str | None) -> bool:
+    """Whether a signed-in person may curate and upload in this project.
+
+    The client is an editor inside every production intentionally opened to
+    them. Destructive operations remain record- or owner-scoped in their own
+    routes; this predicate is for ordinary production work only.
+    """
+    if project is None or project.state != "active" or not email:
+        return False
+    normalised = email.lower()
+    return bool(
+        normalised == project.owner_email.lower()
+        or normalised in {member.lower() for member in project.member_emails}
+        or open_to_readers(project)
+    )
+
+
 async def change(
     project_id: int,
     *,

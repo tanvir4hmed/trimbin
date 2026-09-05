@@ -84,9 +84,8 @@ async def resolve(
 ) -> dict:
     """Settle one clip.
 
-    For the editors who own the production. A guest may read the inbox and
-    comment on any shot; moving footage between shots is a change to where
-    somebody else's material lives.
+    Available to every signed-in editor/client on an open production. The move
+    appends a placement event; it never rewrites or deletes the slate evidence.
     """
     await principal.assert_can_curate(project_id)
     take_no = 0

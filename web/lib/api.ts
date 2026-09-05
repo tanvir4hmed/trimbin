@@ -405,7 +405,7 @@ export const api = {
     projectId: number,
     scene: number,
     shot: number,
-    body: { rev: number; reason: string; segments: { segment_id?: string; clip_id: string; source_in_s: number; source_out_s: number }[] },
+    body: { rev: number; reason: string; segments: { segment_id?: string; clip_id: string; source_in_s: number; source_out_s: number; reason?: string; origin?: string; created_by?: string }[] },
   ) => request<ShotCoverage>(`/review/${projectId}/${scene}/${shot}/coverage`, {
     method: "PUT",
     headers: { "Idempotency-Key": crypto.randomUUID() },

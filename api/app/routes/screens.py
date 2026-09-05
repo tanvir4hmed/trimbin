@@ -194,7 +194,7 @@ def _project_dict(project, principal: Principal) -> schemas.Project:
     caller has to special-case.
     """
     email = (principal.email or "").lower()
-    anonymous = principal.is_anonymous and project.is_public
+    anonymous = principal.is_anonymous
 
     return schemas.Project(
         project_id=project.project_id,
@@ -204,14 +204,7 @@ def _project_dict(project, principal: Principal) -> schemas.Project:
         is_public=project.is_public,
         created_at=project.created_at.isoformat(),
         you_are_owner=bool(email and email == project.owner_email.lower()),
-        you_can_upload=bool(
-            email
-            and (
-                email == project.owner_email.lower()
-                or email in {m.lower() for m in project.member_emails}
-                or (members.is_staff(email) and members.is_staff(project.owner_email))
-            )
-        ),
+        you_can_upload=projects.can_work(project, principal.email),
         state=getattr(project, "state", "active"),
         rev=getattr(project, "rev", 0),
     )

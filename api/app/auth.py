@@ -4,11 +4,9 @@ Three kinds of caller share every route: the lead editor, an editor, and a
 guest — which is everybody else, including a judge with three minutes and no
 intention of creating an account for us.
 
-The rule that shapes this file is that a guest is not a spectator. They may read
-our productions, comment on a shot, and overrule the panel with a reason,
-because watching somebody disagree with the system is the product and a
-demonstration you can only look at is a video. What they may not do is put
-footage into our productions — a limit about storage and cost, not about trust.
+The rule that shapes this file is that a guest is not a spectator. Once signed
+in, they may upload, review, curate and comment in productions opened to them.
+Destructive authority is narrower and enforced against the record being changed.
 
 In a project they created, a guest is an editor, upload included, under the
 limits in services/members.py.
@@ -118,15 +116,9 @@ class Principal:
     async def assert_can_curate(self, project_id: int) -> None:
         """Running the panel, describing a shot, circling, assigning, statusing.
 
-        This is the line between a guest and an editor, and it took a correction
-        to place. A guest in our productions may read everything, say anything,
-        and overrule any call we made — that last one is the whole demonstration.
-        What they may not do is *run* the production: spend a model call on our
-        footage, rewrite what a shot was meant to be, record what the director
-        circled, put somebody's name on a shot, or declare it approved.
-
-        Those are the editors' work on the editors' material. In a project a
-        guest created, they are the editor and may do all of it.
+        A signed-in client may run the ordinary production workflow in any
+        project intentionally opened to them. Owner-only and record-destructive
+        actions use narrower checks at their own route boundary.
 
         Deliberately the same predicate as uploading, with different wording.
         Two predicates that must agree is a bug with a comment on it.
@@ -143,9 +135,7 @@ class Principal:
         # enforced here, because it is not a project-wide capability — it is a
         # per-record rule, and it lives on the record: see routes/clips.py,
         # where a guest may remove only clips they uploaded themselves.
-        if projects.open_to_readers(await projects.get(project_id)):
-            return
-        if await self._owns_the_work(project_id):
+        if projects.can_work(await projects.get(project_id), self.email):
             return
 
         raise HTTPException(
@@ -157,21 +147,17 @@ class Principal:
         )
 
     async def assert_can_upload(self, project_id: int) -> None:
-        """Footage goes into our productions from the company only.
+        """Signed-in clients may upload wherever they may work.
 
-        And into anyone's own project by whoever owns it. That second clause is
-        why this is not simply is_staff: a guest who made a project is an editor
-        inside it, and the limits that bound the cost live in
-        services/members.py rather than here.
+        Storage limits follow the project's owner, so a guest cannot change the
+        cost ceiling of a project by being the person who pressed Upload.
         """
         if self.is_anonymous:
             raise _unauthorised()
         # Same rule as curate. A client checking the system needs to put a take
         # through it, and the quota in services/members.py is what bounds the
         # cost of that — not a permission that stops them trying.
-        if projects.open_to_readers(await projects.get(project_id)):
-            return
-        if await self._owns_the_work(project_id):
+        if projects.can_work(await projects.get(project_id), self.email):
             return
 
         raise HTTPException(

@@ -589,6 +589,7 @@ class CoverageSegment(Model):
     source_out_s: float
     position: int
     reason: str = ""
+    origin: str = "human"
     created_by: str = ""
 
 
@@ -625,6 +626,7 @@ class StringoutEntry(Model):
     shot_code: str = ""
     segment_id: str = ""
     position: int = 0
+    source_filename: str = ""
 
 
 class CoverageItem(Model):

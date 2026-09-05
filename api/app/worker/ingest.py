@@ -17,7 +17,7 @@ import tempfile
 from pathlib import Path
 from uuid import UUID
 
-from ..services import clips, full_take, identify, jobs, members, placements, quota, storage
+from ..services import clips, full_take, identify, jobs, placements, quota, storage
 from ..services.ffmpeg_ops import UnusableClip, analyse, build_proxy, build_sprite
 
 log = logging.getLogger(__name__)
@@ -136,8 +136,6 @@ async def process(
         # that changed with the uploader is one a guest could raise by asking an
         # editor to press the button.
         limits = await quota.limits_for_project(project_id)
-        if members.role_of(uploaded_by) == "guest":
-            limits = members.GUEST_LIMITS
         if quota.clip_is_too_long(measurements.duration_s, limits):
             await clips.write_unusable(
                 project_id=project_id,

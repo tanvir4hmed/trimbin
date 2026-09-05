@@ -64,9 +64,14 @@ class TestEdl:
         """An assistant relinking this needs to know, and the file is where they
         will be looking. A frame rate declared only in a README is a frame rate
         nobody reads."""
-        text = exports.edl("SCENE 12", [_entry()], fps=25)
+        text = exports.edl("SCENE 12", [_entry(fps=25)], fps=25)
         assert "25 FPS" in text
-        assert "DECLARED, NOT MEASURED" in text
+        assert "SOURCE FRAME RATE MEASURED AT 25 FPS" in text
+
+    def test_the_original_filename_is_the_relink_key(self) -> None:
+        text = exports.edl("SCENE 12", [_entry(source_filename="A001_C003.mov")])
+        assert "FROM CLIP NAME: A001_C003.mov" in text
+        assert "FROM CLIP NAME: 11111111" not in text
 
     def test_record_time_starts_at_zero_and_accumulates(self) -> None:
         """Two ten-second shots put the second one at ten seconds, not at its own

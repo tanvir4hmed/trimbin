@@ -614,14 +614,8 @@ export interface paths {
          * Judge
          * @description Compare every take of one shot and record the verdicts.
          *
-         *     For the editors who own the production. This was open to anyone signed in
-         *     for about an hour, on the reasoning that watching the panel reach the same
-         *     answer twice is a better demonstration than a screenshot — which is true,
-         *     and beside the point: it is a model call on somebody else's footage, paid
-         *     for by them, and it rewrites the verdicts every other reader is looking at.
-         *
-         *     A guest gets the demonstration by disagreeing with the answer instead, which
-         *     is the more interesting half anyway.
+         *     Available to every signed-in editor/client on an open production. Running it
+         *     appends a new analysis decision; it does not erase the earlier result.
          *
          *     Synchronous. A shot is a handful of takes and the fast path answers in
          *     seconds; queueing it would add a job to poll for an answer that has usually
@@ -793,10 +787,8 @@ export interface paths {
          * Circle Take
          * @description Record which take the room circled.
          *
-         *     An editor's record of what happened on the day, so it is theirs to write. A
-         *     guest inventing a circle on our footage would be inventing evidence — this is
-         *     the one field here that claims something about the world rather than about
-         *     the software.
+         *     A human record of what happened on the day. It stays attributed and
+         *     revision-safe, like every other production fact.
          *
          *     It never changes a verdict and is never shown to the panel. Feeding it in
          *     would be the end of the measurement: a model told which take a human liked
@@ -827,9 +819,8 @@ export interface paths {
          * Assign Shot
          * @description Put a name on a shot, or take one off.
          *
-         *     Any editor on the production, to themselves or to somebody else. Restricting
-         *     it to the lead would be how a queue stops moving on a Friday afternoon;
-         *     opening it to guests would let a stranger reassign our work.
+         *     Any signed-in editor/client on the production, to themselves or somebody
+         *     else. The revision prevents two people silently overwriting each other.
          */
         put: operations["assign_shot_review__project_id___group_id___subgroup_id__assignee_put"];
         post?: never;
@@ -1094,9 +1085,8 @@ export interface paths {
          * Resolve
          * @description Settle one clip.
          *
-         *     For the editors who own the production. A guest may read the inbox and
-         *     comment on any shot; moving footage between shots is a change to where
-         *     somebody else's material lives.
+         *     Available to every signed-in editor/client on an open production. The move
+         *     appends a placement event; it never rewrites or deletes the slate evidence.
          */
         post: operations["resolve_placements__project_id___clip_id__post"];
         delete?: never;
@@ -1708,6 +1698,11 @@ export interface components {
              */
             reason: string;
             /**
+             * Origin
+             * @default human
+             */
+            origin: string;
+            /**
              * Created By
              * @default
              */
@@ -1726,6 +1721,21 @@ export interface components {
             source_in_s: number;
             /** Source Out S */
             source_out_s: number;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /**
+             * Origin
+             * @default human
+             */
+            origin: string;
+            /**
+             * Created By
+             * @default
+             */
+            created_by: string;
         };
         /** DashboardScreen */
         DashboardScreen: {
@@ -3028,6 +3038,11 @@ export interface components {
              * @default 0
              */
             position: number;
+            /**
+             * Source Filename
+             * @default
+             */
+            source_filename: string;
         };
         /** Take */
         Take: {

@@ -37,6 +37,7 @@ from ..services import (
     revisions,
     selections,
     shots,
+    structure,
 )
 from ..services import comments as comments_service
 from ..services import review as review_service
@@ -99,6 +100,9 @@ class CoverageSegmentInput(BaseModel):
     clip_id: UUID
     source_in_s: float = Field(ge=0)
     source_out_s: float = Field(gt=0)
+    reason: str = Field(default="", max_length=400)
+    origin: str = Field(default="human", max_length=40)
+    created_by: str = Field(default="", max_length=254)
 
 
 class CoverageCommand(Revised):
@@ -141,6 +145,11 @@ async def project_sources(
         """,
         parameters={"p": project_id, "q": needle, "limit": min(50, max(1, limit))},
     )
+    plan = await structure.for_project(project_id)
+    scene_codes = {item.scene: item.scene_code for item in plan}
+    shot_codes = {
+        (item.scene, planned.shot): planned.slug for item in plan for planned in item.shots
+    }
     return [
         {
             "clip_id": str(row[0]),
@@ -153,8 +162,8 @@ async def project_sources(
             "description": row[7] or "",
             "camera": row[8] or "",
             "fps": float(row[9] or 0),
-            "scene_code": row[10] or "",
-            "shot_code": row[11] or "",
+            "scene_code": scene_codes.get(int(row[1])) or row[10] or "",
+            "shot_code": shot_codes.get((int(row[1]), int(row[2]))) or row[11] or "",
         }
         for row in result.result_rows
     ]
@@ -215,14 +224,8 @@ async def judge(
 ) -> dict:
     """Compare every take of one shot and record the verdicts.
 
-    For the editors who own the production. This was open to anyone signed in
-    for about an hour, on the reasoning that watching the panel reach the same
-    answer twice is a better demonstration than a screenshot — which is true,
-    and beside the point: it is a model call on somebody else's footage, paid
-    for by them, and it rewrites the verdicts every other reader is looking at.
-
-    A guest gets the demonstration by disagreeing with the answer instead, which
-    is the more interesting half anyway.
+    Available to every signed-in editor/client on an open production. Running it
+    appends a new analysis decision; it does not erase the earlier result.
 
     Synchronous. A shot is a handful of takes and the fast path answers in
     seconds; queueing it would add a job to poll for an answer that has usually
@@ -442,8 +445,9 @@ async def coverage(
     await principal.assert_can_read(project_id)
     brief = await shots.get(project_id, group_id, subgroup_id)
     verdicts_now = await _verdicts_for(project_id, group_id, subgroup_id)
+    active_takes = await review_service.takes_in_shot(project_id, group_id, subgroup_id)
     current_hash = assessment.source_set_hash(
-        [str(item.get("clip_id") or "") for item in verdicts_now]
+        [str(item.get("clip_id") or "") for item in active_takes]
     )
     fresh = bool(
         not brief.coverage_segments
@@ -476,7 +480,7 @@ async def set_coverage(
     if replayed is not None:
         return replayed
 
-    takes = await _verdicts_for(project_id, group_id, subgroup_id)
+    takes = await review_service.takes_in_shot(project_id, group_id, subgroup_id)
     by_clip = {str(take["clip_id"]): take for take in takes}
     # Freshness binds the decision to the coverage that *arrived in this shot*.
     # A person may reuse a range from elsewhere in the project, but that source
@@ -529,8 +533,9 @@ async def set_coverage(
                 "source_in_s": round(requested.source_in_s, 3),
                 "source_out_s": round(requested.source_out_s, 3),
                 "position": position,
-                "reason": body.reason,
-                "created_by": principal.email or "",
+                "reason": requested.reason or body.reason,
+                "origin": requested.origin or "human",
+                "created_by": requested.created_by or principal.email or "",
             }
         )
 
@@ -989,6 +994,11 @@ async def tree(
     )
 
     described = await shots.for_project(project_id)
+    plan = await structure.for_project(project_id)
+    scene_codes = {item.scene: item.scene_code for item in plan}
+    shot_codes = {
+        (item.scene, planned.shot): planned.slug for item in plan for planned in item.shots
+    }
     note_counts = await comments_service.counts_for_project(project_id)
     threshold = assessment.review_margin()
 
@@ -1046,12 +1056,19 @@ async def tree(
 
         node = scenes.setdefault(
             scene_id,
-            {"scene": scene_id, "scene_code": scene_code or "", "shots": []},
+            {
+                "scene": scene_id,
+                "scene_code": scene_codes.get(scene_id) or scene_code or "",
+                "shots": [],
+            },
         )
         node["shots"].append(
             {
                 "shot": shot_id,
-                "slug": (meta.slug if meta else "") or shot_code or "",
+                "slug": (meta.slug if meta else "")
+                or shot_codes.get((scene_id, shot_id))
+                or shot_code
+                or "",
                 "label": label or "",
                 "takes": int(takes),
                 "unusable": int(unusable),
@@ -1251,10 +1268,8 @@ async def circle_take(
 ) -> dict:
     """Record which take the room circled.
 
-    An editor's record of what happened on the day, so it is theirs to write. A
-    guest inventing a circle on our footage would be inventing evidence — this is
-    the one field here that claims something about the world rather than about
-    the software.
+    A human record of what happened on the day. It stays attributed and
+    revision-safe, like every other production fact.
 
     It never changes a verdict and is never shown to the panel. Feeding it in
     would be the end of the measurement: a model told which take a human liked
@@ -1297,9 +1312,8 @@ async def assign_shot(
 ) -> dict:
     """Put a name on a shot, or take one off.
 
-    Any editor on the production, to themselves or to somebody else. Restricting
-    it to the lead would be how a queue stops moving on a Friday afternoon;
-    opening it to guests would let a stranger reassign our work.
+    Any signed-in editor/client on the production, to themselves or somebody
+    else. The revision prevents two people silently overwriting each other.
     """
     await principal.assert_can_curate(project_id)
     shot = await shots.assign(

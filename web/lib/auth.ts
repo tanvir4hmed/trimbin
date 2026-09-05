@@ -105,7 +105,8 @@ export async function signInWithPass(
 
   const body = await response.json();
   const identity = store(body.token as string);
-  if (!identity) throw new Error("The server sent a token this page cannot read.");
+  if (!identity)
+    throw new Error("The server sent a token this page cannot read.");
   announce();
   return identity;
 }
@@ -113,6 +114,8 @@ export async function signInWithPass(
 function store(token: string): Identity | null {
   const identity = claimsOf(token);
   if (!identity) return null;
+  if (cached?.identity.email && cached.identity.email !== identity.email)
+    clearUploadState();
   cached = { token, identity };
   try {
     localStorage.setItem(TOKEN_KEY, token);
@@ -172,6 +175,7 @@ export function signOut(): void {
   try {
     localStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(TOKEN_KEY);
+    clearUploadState();
   } catch {
     /* nothing to clear */
   }
@@ -182,6 +186,21 @@ export function signOut(): void {
   } catch {
     /* not a browser */
   }
+}
+
+function clearUploadState(): void {
+  if (typeof window === "undefined") return;
+  const keys: string[] = [];
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+    if (
+      key?.startsWith("trimbin.upload.") ||
+      key?.startsWith("trimbin.ingest.")
+    )
+      keys.push(key);
+  }
+  keys.forEach((key) => window.localStorage.removeItem(key));
+  window.dispatchEvent(new CustomEvent("trimbin:upload-clear"));
 }
 
 /**

@@ -126,3 +126,10 @@ cd web && npx vitest run        # the frontend rules
 The live deployment answers `GET /api/public/health`, `/api/public/accuracy` and
 `/api/public/mcp-evidence` without authentication, so every claim above can be
 checked without an account.
+
+The real-footage acceptance project is
+[`Narrative Anesthesia`](https://trimbin.qlitch.com/projects/narrative-anesthesia-9).
+It exercises slate and no-slate ingest, verified placements, full-duration
+analysis, finding review, multi-range shot selects, Coverage Reel playback and
+exact-moment search. Signed-out access is read-only and redacts crew addresses;
+the guest sign-in exercises the same non-destructive workflow as an editor.

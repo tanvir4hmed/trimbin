@@ -268,6 +268,9 @@ async def _record_coverage_event(event: dict) -> None:
             int(segment.get("take_no", 0) or 0),
             str(event.get("reason") or "")[:400],
             str(event.get("actor") or ""),
+            str(segment.get("reason") or event.get("reason") or "")[:400],
+            str(segment.get("origin") or "human")[:40],
+            str(segment.get("created_by") or event.get("actor") or "")[:254],
         ]
         for index, segment in enumerate(source)
     ]
@@ -290,6 +293,9 @@ async def _record_coverage_event(event: dict) -> None:
             "take_no",
             "reason",
             "actor_id",
+            "segment_reason",
+            "segment_origin",
+            "segment_created_by",
         ],
     )
 

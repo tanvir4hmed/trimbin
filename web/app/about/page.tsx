@@ -131,9 +131,10 @@ export default function About() {
           somebody disagree with the system is the product.
         </p>
         <p>
-          The one thing a guest cannot do is put footage into our productions —
-          a limit about storage and encoding cost, not about trust. In a project
-          they create, a guest is an editor, upload included.
+          A signed-in guest works like an editor in productions opened to them:
+          they can upload footage, run review, correct findings, choose ranges and
+          comment. Destructive authority remains attached to ownership, so they
+          cannot delete footage another editor uploaded.
         </p>
       </section>
 

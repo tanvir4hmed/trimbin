@@ -52,6 +52,12 @@ each was flagged, and wants to overrule the machine without arguing with it.
 **The production that comes back to the material** — for a re-cut, a trailer, a
 different edit two years on — and needs the reasoning, not just the files.
 
+Any signed-in client can use the same workflow in a production opened to them:
+upload, verify placement, run review, correct findings, choose ranges and leave
+comments. This is not a reduced judge sandbox. Destructive actions remain tied
+to ownership, so somebody can remove footage they uploaded without being able to
+delete another editor's records.
+
 ---
 
 ## A worked example
@@ -131,6 +137,10 @@ figure worth reading.
 Coverage for the shot ends up as ranges from two takes: take 4 up to 00:34, then
 take 5 from its equivalent point. The archive records that as editorial usage,
 separate from where each clip was placed.
+
+Each range keeps its own reason, origin and author. Saving the final ordered list
+does not flatten an AI-proposed range and a manually added range into one generic
+reason.
 
 ### Two years later
 

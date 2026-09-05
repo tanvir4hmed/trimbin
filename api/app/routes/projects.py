@@ -76,14 +76,7 @@ def _as_dict(project, viewer_email: str | None) -> dict:
         # "add member" button by comparing strings will get it wrong the first
         # time an address differs in case.
         "you_are_owner": bool(viewer_email and viewer_email.lower() == project.owner_email.lower()),
-        "you_can_upload": bool(
-            viewer_email
-            and (
-                viewer_email.lower() == project.owner_email.lower()
-                or viewer_email.lower() in {m.lower() for m in project.member_emails}
-                or (members.is_staff(viewer_email) and members.is_staff(project.owner_email))
-            )
-        ),
+        "you_can_upload": projects.can_work(project, viewer_email),
         "state": getattr(project, "state", "active"),
         "rev": getattr(project, "rev", 0),
     }
@@ -197,7 +190,7 @@ async def one(
     if project is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such project.")
 
-    if project.is_public and principal.is_anonymous:
+    if principal.is_anonymous:
         # A stranger reading the demo has no business seeing who is on the team.
         # The footage and the reasoning are the public part; the crew list is not.
         #
@@ -211,12 +204,9 @@ async def one(
         # caller has to special-case, and the one that forgets is the one nobody
         # tests, because it only breaks for signed-out visitors.
         return {
-            "project_id": project.project_id,
-            "name": project.name,
+            **_as_dict(project, None),
             "owner_email": "",
             "member_emails": [],
-            "is_public": True,
-            "created_at": project.created_at.isoformat(),
             "you_are_owner": False,
             "you_can_upload": False,
         }

@@ -1,297 +1,112 @@
 # Trimbin
 
-**An assistant editor that never forgets.**
+**An AI-assisted footage archive and review desk for editorial teams.**
 
-In film editing, the trim bin held every frame you cut away — and editors went back to
-it constantly. Digital editing quietly threw that away. Trimbin brings it back: it
-organises a shoot day on its own, surfaces only the shots that need a human eye, and
-remembers every take it passed over and why.
+Trimbin ingests a shoot day, reads slates, asks a person to verify uncertain
+placements, analyses every take across its full duration, and presents the
+results as timecoded evidence. Editors—not the model—choose the source ranges
+that stand for each shot. Those ranges play shot-by-shot as a Coverage Reel,
+while every machine finding, correction, selection and comment remains
+queryable in ClickHouse.
 
-Built for **Agentic Cinema: The Blockbuster Hackathon** — ClickHouse track.
+Built for **Agentic Cinema: The Blockbuster Hackathon — ClickHouse track**.
 
 **Live:** [trimbin.qlitch.com](https://trimbin.qlitch.com) ·
-[a real project](https://trimbin.qlitch.com/project/1) ·
-[what it is](https://trimbin.qlitch.com/about) ·
-[our error rate](https://trimbin.qlitch.com/accuracy)
+[Anesthesia example project](https://trimbin.qlitch.com/projects/narrative-anesthesia-9) ·
+[product guide](https://trimbin.qlitch.com/guide) ·
+[verification](https://trimbin.qlitch.com/accuracy)
 
-Reading needs no account. Sign in with any Google account and you get the same
-application the editors here use: your own projects, your own footage — and in
-our productions you can comment and overrule any call we made.
+## What is live
 
----
+- Four-stage ingest: add files, read slates, verify matches, commit.
+- Direct-to-Cloud-Storage resumable uploads, parallel transfer, pause/cancel,
+  persisted batch recovery, bounded transient retry and visible failures.
+- Slate evidence, manual placement, create-shot and unassigned paths; nothing is
+  moved or deleted without a person confirming it.
+- Full-duration overlapping-window analysis with timecoded technical,
+  continuity and completion findings.
+- A three-pane shot-review cockpit with A/B playback, one issue lane per take,
+  exact-moment seeking, and Confirm / Dismiss / Adjust finding actions.
+- Multiple ordered source ranges from one or many takes for a single shot.
+- A Coverage Reel that plays the chosen ranges in shot order and exposes gaps.
+- Segment-level natural-language search with playable ranges through the
+  official read-only ClickHouse MCP server.
+- Timecoded threaded comments, optimistic revisions and append-only history.
+- CMX3600 EDL and marker exports using original filenames and measured source
+  frame rates when available.
 
-## The problem
+Signed-out visitors can inspect open productions without seeing crew email
+addresses. Any signed-in guest can work like an editor in an open production:
+upload, review, correct, select and comment. Delete remains owner/uploader scoped.
 
-A feature shoot produces 30–100 hours of footage. About two hours reach the screen. The
-other 98 are not deleted — they sit in bins and on archive tape. But the moment picture
-locks, three things vanish for good:
+## Product boundary
 
-- **The reasoning.** Why take 4 and not take 5 lived only in the editor's head.
-- **Findability.** Reopening a two-year-old project needs the same software, the same
-  version, relinked media, and someone who remembers.
-- **Institutional memory.** Nothing lets a production ask what it has already shot.
-
-Trimbin does the assistant editor's daily job — logging, grouping, triage — and keeps the
-notes as a by-product. The archive is not extra work anyone has to do. It accumulates
-because the work happened.
-
----
-
-## What runs today
-
-Verified against the deployed system, not asserted from the code.
-
-| | |
-|---|---|
-| **Ingest, end to end** | A clip uploaded to a signed URL is measured, read for a slate, embedded, encoded and playing through the CDN in about a minute. |
-| **Measurement** | Exposure, focus, stability, audio and freeze detection with ffmpeg, in the same pass that builds the proxy. Every finding carries a timecode. |
-| **Slate reading** | A board on the front of a clip becomes scene, shot and take. No board is *said to be* no board, and the take is left ungrouped rather than guessed at. |
-| **The panel** | Three specialists and a chief compare every take of a shot and write a verdict per take — including the rejected ones, with reasons. |
-| **The dashboard** | One queue across every project: the close calls, the shots nothing has compared, and the ones where the take the director circled is not the take the measurements chose. |
-| **The workspace** | Scene → shot tree filtered by camera, shoot day and assignee; six criteria side by side; every take openable; findings that seek the player to the moment they describe. |
-| **The stringout** | The scene assembled from the takes that stand, shot by shot, in order — what an assistant editor actually hands the editor. |
-| **Comments** | Timecoded, threaded one level, resolved by writing forward rather than deleting. |
-| **Export** | CMX3600 EDL with the reasoning in the comment lines, and every finding and note as timeline markers in record time. |
-| **Overrides** | An editor picks a different take and says why. Recorded as a new decision beside the panel's, never over it. |
-| **Retrieval** | A question in plain language returns takes with their reasons, and the query that produced them. |
-
-## What is not built
-
-Stated because a demo that omits this is the same overclaim as an invented accuracy figure,
-and this project made that mistake once already.
-
-- **Any editorial accuracy figure.** The number is null, not zero — see below. It can
-  only come from editors overriding the system, and that has to happen first.
-- **Frame rate.** Exports declare it rather than measure it; nothing in the archive
-  records what the original was shot at. The EDL header says which rate was used.
-- **Embeddings on the generated corpus.** Only worker-ingested clips carry one.
-- **The panel window.** Specialists watch the first thirty seconds of each take, so a
-  continuity error at 0:58 of a 1:10 take will be missed.
-- **Sign-in on this deployment**, pending one console step
-  ([docs/oauth-client.md](docs/oauth-client.md)).
-- **Cloud Trace spans per agent call**, and keyboard shuttle controls.
-
----
-
-## What it refuses to do
-
-No model has been trained on take selection, because the data has never existed — nobody
-recorded which take an editor chose and why. **Trimbin does not claim to judge acting.**
-It handles everything around that judgement and hands the editor a decision that takes
-seconds instead of an hour.
-
-Nothing is ever auto-rejected. A technically worse take is often the right take.
-
----
-
-## How it decides
-
-Judgement follows Walter Murch's Rule of Six, the standard framework in film editing.
-Emotion (51%) and story (23%) are human territory and Trimbin does not enter them. Rhythm,
-eye-trace, planarity and spatial continuity are progressively more objective — that is
-where an agent earns its place.
-
-Work splits by what is knowable:
-
-- **Measured, not inferred** — exposure, focus, stability, audio levels, duration. Computed
-  with ffmpeg. Deterministic, cheap, testable.
-- **Observed by a model** — did the action complete, did the camera move land, does
-  continuity hold against the other takes.
-- **Left to a person** — whether the performance is right.
-
-Measurements are **relative to the group, never absolute.** If all seven takes are handheld,
-that is the language of the scene. If six are locked off and one is not, that one is
-probably an accident.
-
-Every finding uses a **closed vocabulary** — an enum passed to the model as its response
-schema, so a specialist selects from the taxonomy rather than inventing. That was added
-after the panel produced thirty-nine distinct codes across twelve takes with no two
-agreeing, which made the archive unqueryable and silently broke scoring.
-
----
-
-## What the real footage showed
-
-Twelve takes from a published, openly licensed dataset
-([Zenodo 15767853](https://doi.org/10.5281/zenodo.15767853), CC BY 4.0) went through the
-whole pipeline.
-
-**Measurement found nothing wrong with any of them** — every take within a few percent of
-its shot median. That is the correct answer: competent takes have nothing technical to
-separate them, and a system that manufactured a confident winner from that would be lying.
-
-**The panel found what measurement could not.** A take that stops mid-sentence. A whip pan
-that breaks eye-trace. A wall crossing the foreground for the first sixteen seconds. An
-extra stoop to pick up shoes that no other take has.
-
-Every shot came back below the review margin and was flagged for a person. Four out of
-four went to a human, which is the honest outcome for four close calls.
-
----
-
-## Accuracy
-
-Published live at [`/accuracy`](https://trimbin.qlitch.com/accuracy), per project, no
-account needed.
-
-**It currently says nothing, and that is deliberate.** Accuracy here means "confident
-decisions no editor overturned". No editor has overturned anything yet, so the figure is
-**null — not zero**. A system with no measurements is not a system that is wrong every
-time, and the interface keeps those apart.
-
-The dataset cannot fill the gap either: its annotation file is an empty template, every
-take `pending`, every issue column blank. There is no ground truth to score against. **The
-first real figure arrives the first time an editor disagrees with the system.**
-
-What *is* earned is the evaluation set: faults planted at timecodes we chose, and
-**6/6 found, 0 false alarms, every timecode within tolerance.** That is a fact rather than
-an agreement, and it is the only number on the site with evidence behind it.
-
-The override rate is reported in two halves. Disagreement on a *flagged* call is the system
-working as designed. Disagreement on a *confident* call is a real error. One combined
-number would flatter us and inform nobody.
-
----
+Trimbin is not an NLE and does not make a final edit. It does not judge acting,
+choose emotional beats, or silently reject footage. Its recommendation is based
+only on observable technical quality, continuity and completion evidence. A
+human chooses the ranges; the app organizes the evidence and remembers why.
 
 ## Architecture
 
-```
-Browser ──▶ Cloud Run: API ──▶ Pub/Sub ──▶ Cloud Run: worker
-                │                               │  ffmpeg · Gemini · embeddings
-                │                               ▼
-                │                     Cloud Storage ──▶ Cloud CDN (/media)
-                ▼
-    ┌───────────┴───────────┐
-    ▼                       ▼
-ClickHouse Cloud        Firestore
-the logbook             the whiteboard
-clips · decisions       projects · members · jobs
-embeddings · findings   guest quotas
+```text
+Browser ── resumable upload ──▶ Cloud Storage / CDN
+   │                                  │
+   └──▶ Cloud Run API ──▶ Pub/Sub ──▶ Cloud Run worker
+              │                        ffmpeg + Gemini
+              ├── Firestore: mutable operational state
+              └── ClickHouse: immutable events, read models, search
+                         ▲
+                         └── official mcp-clickhouse (read-only retrieval)
 ```
 
-Four decisions worth naming.
+Firestore owns mutable project, shot, ingest and current-selection state.
+ClickHouse owns immutable placement/analysis/finding/decision events, derived
+read models and hybrid retrieval. Cloud Storage owns media bytes. Interactive
+playback, scrubbing, A/B switching, upload progress and authentication never
+wait on ClickHouse.
 
-**The workflow layer is not an agent.** Two hundred clips is an hour of processing with
-failures in the middle. Agents answer questions; they are the wrong shape for driving a
-long batch. The worker is a plain Pub/Sub consumer that scales to zero.
+The API and worker are separate Cloud Run entrypoints from one image: web
+requests scale independently from long ffmpeg/Gemini jobs without introducing a
+microservice per feature.
 
-**Nothing writes SQL but us — and nothing runs it as an admin.** Two separate
-questions, and the first version of this got both wrong at once.
+## Agent system
 
-Retrieval runs on a fixed query shape with the model choosing only parameters, so the
-statement is always ours. It executes through the official `mcp-clickhouse` server, as the
-ClickHouse track requires the database to be used at runtime, connecting as
-`trimbin_reader` — SELECT on ten named objects, under a profile with `readonly = 1 CONST`.
+The runtime uses the `google-genai` SDK against Gemini on Vertex AI with typed
+Pydantic response contracts. Slate identification, full-take analysis, segment
+description and archive query planning have narrow responsibilities. The
+workflow itself is deterministic orchestration, not an agent: jobs can retry
+without repeating settled steps.
 
-That user is new. The wrapper opened for weeks with a comment naming a read-only database
-user as its primary defence and there was none: the connection was the admin one and a
-keyword regex was the only thing in the way. A regex over SQL is a filter, not a boundary.
-Every deploy now proves the reader can read and cannot write before anything ships.
+The model never emits executable SQL. Retrieval selects parameters for fixed
+query shapes, executed through the official `mcp-clickhouse` server as a user
+whose `readonly = 1` setting is verified during deployment.
 
-**The panel watches proxies, not originals.** That is fairness before cost — proxies are
-encoded to one contract, so a model comparing them is comparing footage rather than being
-swayed by which take happened to be shot at 4K.
+## Repository
 
-**Every decision is a new row.** An override never edits the panel's verdict. Both are true
-things that happened, and collapsing them would erase the disagreement — which is the only
-signal this system has about its own quality.
-
----
-
-## Stack
-
-| Layer | Choice |
-|---|---|
-| Models | Gemini 3.6 Flash (video, long context) via Vertex AI, **global endpoint** |
-| Embeddings | `gemini-embedding-2`, 768 dimensions, natively multimodal |
-| Agent framework | None. The `google-genai` SDK directly, with pydantic response schemas. |
-| Analytics store | ClickHouse Cloud — clips, decisions, embeddings; reached at runtime through the official `mcp-clickhouse` server |
-| Mutable store | Firestore — projects, members, jobs, shot briefs, circled takes |
-| Media | Cloud Storage + Cloud CDN, uniform HLS proxies |
-| Measurement | ffmpeg filter graph, one decode, two branches |
-| API / Web | FastAPI · Next.js 15, both on Cloud Run |
-| Scheduled work | Cloud Scheduler → an OIDC-authenticated route |
-| Infrastructure | Terraform — everything except one OAuth client Google will not expose |
-| CI/CD | GitHub Actions with Workload Identity Federation, no long-lived keys |
-
-**On the agent framework:** the plan called for Google ADK on Agent Engine, and the manifest
-listed it. Nothing imported it. The agents are four prompts with typed contracts calling
-`generate_content` with a response schema, which is what they turned out to need — and on a
-scale-to-zero worker, a dependency the code does not use is cold-start latency for nothing.
-Removed rather than left in to look impressive.
-
----
-
-## Repository layout
-
-```
-agents/       one folder per agent, each with an AGENT.md contract and its prompts
-api/          FastAPI service and the ingest worker (one image, two entrypoints)
-web/          Next.js application
-clickhouse/   migrations and the seed generator
-infra/        Terraform — nothing exists outside this
-eval/         measurement and misplacement harnesses
-docs/         deployment, and the one thing Terraform cannot create
+```text
+agents/         agent contracts, prompts and tests
+api/            FastAPI API and Pub/Sub worker
+web/            Next.js application
+clickhouse/     append-only schema migrations and views
+infra/          Terraform for Google Cloud and ClickHouse integration
+documentation/ product and technical documentation with diagrams
+eval/           deterministic evaluation fixtures
 ```
 
----
+Start with [documentation/README.md](documentation/README.md). Deployment notes
+are in [docs/deployment.md](docs/deployment.md).
 
-## Running it
+## Verification
 
-Everything is declared in Terraform. There is exactly one manual step, and it is itself
-Terraform: the state bucket cannot be created by the configuration that stores state in it.
+The release gate runs API, agent and browser-logic tests, formatting, lint,
+static typing, a production web build, ClickHouse migration checks and deployed
+smoke checks. Real-footage QA uses the Anesthesia project linked above; generated
+scale rows are isolated from published product figures.
 
-```bash
-# once, by hand
-cd infra/bootstrap && terraform init && terraform apply
+## Data and license
 
-# thereafter — push to main
-git push
-```
+The example uses **Filmed Scenes** by Yilmaz, Rietdijk, Primett, Mukhina,
+Lotman & Tikka (2025), [doi:10.5281/zenodo.15767853](https://doi.org/10.5281/zenodo.15767853),
+licensed CC BY 4.0. Source attribution remains with the project data.
 
-One value is not Terraform's, and cannot be: Google exposes OAuth client creation through
-its API only for organisation-internal consent screens, and this project has no
-organisation. See [docs/oauth-client.md](docs/oauth-client.md) — everything downstream of
-that one console step is automated.
-
-Setup and required secrets: [docs/deployment.md](docs/deployment.md).
-
----
-
-## Tests
-
-278 tests across the API and the agents. They cover the shapes that go wrong quietly:
-a normalisation that flattens real ratios into placeholders, a quota that returns a
-plausible integer while allowing everything through, an enum that stringifies to its class
-name and matches nothing.
-
-```bash
-cd api && .venv/bin/python -m pytest tests -q
-cd agents && .venv/bin/python -m pytest -q
-```
-
-Three bugs in this codebase were found by *using* the deployed system rather than reading
-it, and each had passed its tests: signed URLs that could not be signed, a queue that never
-said which project a clip belonged to, and a signed upload URL missing the header it
-required. That is why the rule here is that a thing is done when it runs end to end and a
-person can use it.
-
----
-
-## Data sources
-
-- **Filmed Scenes** — Yilmaz, Rietdijk, Primett, Mukhina, Lotman & Tikka (2025), Zenodo,
-  [doi:10.5281/zenodo.15767853](https://doi.org/10.5281/zenodo.15767853), CC BY 4.0.
-  Twelve takes across four camera shots. Attribution is recorded in the archive beside
-  the rows it produced.
-- **Blackmagic Fusion training material** — analysed locally, never published or
-  redistributed. It is given away freely and still owned by Blackmagic.
-- **Generated rows** — several hundred thousand, at `project_id >= 900000`, to show the
-  queries stay fast at scale. Excluded from every published figure *at the view*, not by a
-  filter someone has to remember to write.
-
----
-
-## License
-
-Apache License 2.0 — see [LICENSE](LICENSE).
+Code is licensed under the [Apache License 2.0](LICENSE).

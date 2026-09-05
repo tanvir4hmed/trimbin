@@ -64,9 +64,9 @@ class TestWhatAGuestMayDo:
     def test_a_signed_in_guest_may_comment(self) -> None:
         assert members.capabilities("a-judge@example.com")["can_comment"]
 
-    def test_a_guest_may_not_upload_into_our_productions(self) -> None:
+    def test_a_guest_may_upload_into_open_team_productions(self) -> None:
         caps = members.capabilities("a-judge@example.com")
-        assert not caps["can_upload_to_team_projects"]
+        assert caps["can_upload_to_team_projects"]
 
     def test_a_guest_may_make_their_own_project(self) -> None:
         """The whole of how a visitor gets a real workspace instead of a
@@ -344,7 +344,7 @@ class TestCuratingIsNotCommenting:
         guest = members.capabilities("a-judge@example.com")
         assert guest["can_override"]
         assert guest["can_comment"]
-        assert not guest["can_curate_team_projects"]
+        assert guest["can_curate_team_projects"]
 
         editor = members.capabilities(next(iter(members.EDITORS)))
         assert editor["can_curate_team_projects"]

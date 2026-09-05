@@ -31,7 +31,7 @@ state.
 | `placements` | Where a clip belongs. A correction appends; the mistaken row stays |
 | `clip_segments` · `clip_moments` | Usable ranges and timecoded moments, per analysis run |
 | `finding_events` · `analysis_runs` | What was flagged, what a person did about it, which run produced it |
-| `coverage_selection_events` | Editorial usage — which ranges stand for a shot |
+| `coverage_selection_events` | Editorial usage — which ranges stand for a shot, including per-range reason, origin and author |
 | `clip_lifecycle_events` | Deletion and restoration as states, not as absence |
 | `activity` · `comments` | The audit trail and the conversation |
 

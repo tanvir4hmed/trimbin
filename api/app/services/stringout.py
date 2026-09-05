@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from . import assessment
 from . import comments as comments_service
 from . import shots as shots_service
+from . import structure as structure_service
 from .analytics import client
 
 log = logging.getLogger(__name__)
@@ -54,6 +55,7 @@ class Entry:
     shot_code: str = ""
     segment_id: str = ""
     position: int = 0
+    source_filename: str = ""
 
     @property
     def duration_s(self) -> float:
@@ -88,6 +90,7 @@ class Entry:
             "shot_code": self.shot_code,
             "segment_id": self.segment_id,
             "position": self.position,
+            "source_filename": self.source_filename,
         }
 
 
@@ -119,7 +122,7 @@ async def scene(project_id: int, scene_id: int) -> dict:
                l.in_point_s, l.out_point_s,
                c.proxy_uri, c.sprite_uri,
                l.reason, l.decided_by, l.actor, l.margin,
-               c.duration_ms, c.fps, c.scene_code, c.shot_code
+               c.duration_ms, c.fps, c.scene_code, c.shot_code, c.storage_uri
         FROM latest AS l
         INNER JOIN current_clip_placement AS c
             ON c.clip_id = l.clip_id AND c.project_id = {p:UInt32}
@@ -145,6 +148,11 @@ async def scene(project_id: int, scene_id: int) -> dict:
     observed_shots = set(observed_by_shot)
 
     meta = await shots_service.for_project(project_id)
+    plan = await structure_service.for_project(project_id)
+    scene_codes = {item.scene: item.scene_code for item in plan}
+    shot_codes = {
+        (item.scene, planned.shot): planned.slug for item in plan for planned in item.shots
+    }
     open_counts = await comments_service.counts_for_project(project_id)
     margin = assessment.review_margin()
 
@@ -198,8 +206,12 @@ async def scene(project_id: int, scene_id: int) -> dict:
                 circled_take=described.circled_take if described else 0,
                 open_comments=open_counts.get((scene_id, shot_id), {}).get("open", 0),
                 fps=float(r[12] or 0),
-                scene_code=r[13] or "",
-                shot_code=r[14] or "",
+                scene_code=scene_codes.get(scene_id) or r[13] or "",
+                shot_code=(described.slug if described else "")
+                or shot_codes.get((scene_id, shot_id))
+                or r[14]
+                or "",
+                source_filename=str(r[15] or "").rsplit("/", 1)[-1],
             )
         )
 
@@ -227,7 +239,7 @@ async def scene(project_id: int, scene_id: int) -> dict:
             clips_result = await ch.query(
                 """
                 SELECT toString(clip_id), take_no, proxy_uri, sprite_uri,
-                       duration_ms, fps, scene_code, shot_code
+                       duration_ms, fps, scene_code, shot_code, storage_uri
                 FROM current_clip_placement
                 WHERE project_id = {p:UInt32} AND clip_id IN {clips:Array(UUID)}
                 """,
@@ -271,8 +283,12 @@ async def scene(project_id: int, scene_id: int) -> dict:
                         circled_take=described.circled_take,
                         open_comments=open_counts.get((scene_id, shot_id), {}).get("open", 0),
                         fps=float(row[5] or 0),
-                        scene_code=row[6] or "",
-                        shot_code=row[7] or "",
+                        scene_code=scene_codes.get(scene_id) or row[6] or "",
+                        shot_code=described.slug
+                        or shot_codes.get((scene_id, shot_id))
+                        or row[7]
+                        or "",
+                        source_filename=str(row[8] or "").rsplit("/", 1)[-1],
                         segment_id=str(segment.get("segment_id") or ""),
                         position=int(segment.get("position", position)),
                     )

@@ -18,6 +18,7 @@
 import { useEffect, useState } from "react";
 import type { Comment } from "@/lib/api";
 import { useComment } from "@/lib/queries";
+import { archiveDate } from "@/lib/time";
 
 function seconds(value: number): string {
   const m = Math.floor(value / 60);
@@ -27,7 +28,7 @@ function seconds(value: number): string {
 
 function when(iso: string): string {
   if (!iso) return "";
-  const ms = Date.now() - new Date(iso).getTime();
+  const ms = Date.now() - archiveDate(iso).getTime();
   const mins = Math.round(ms / 60000);
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m`;
