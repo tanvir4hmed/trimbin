@@ -121,6 +121,23 @@ class TestLiveResponseValidation:
         async def no_operational_state(project_id: int, requested_clip_id):
             return []
 
+        # Read access is a rule now, not a hardcoded demo id, so the project
+        # this reads has to exist for the guard to allow an anonymous caller.
+        from app.services import members
+        from app.services import projects as projects_service
+
+        class OpenProject:
+            project_id = 1
+            owner_email = members.LEAD_EDITOR
+            member_emails: list[str] = []
+            is_public = True
+            state = "active"
+            rev = 0
+
+        async def open_project(project_id: int, **kwargs):
+            return OpenProject()
+
+        monkeypatch.setattr(projects_service, "get", open_project)
         monkeypatch.setattr(analysis.analysis_store, "read", archived)
         monkeypatch.setattr(analysis.finding_actions, "states_for_clip", no_operational_state)
         response = TestClient(app).get(f"/analysis/1/{clip_id}")

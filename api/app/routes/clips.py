@@ -8,8 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from ..auth import Principal, require_signed_in
-from ..config import settings
-from ..services import activity, clip_lifecycle, members
+from ..services import activity, clip_lifecycle, members, projects
 
 router = APIRouter(prefix="/clips", tags=["clips"])
 
@@ -20,7 +19,7 @@ async def _assert_can_remove(principal: Principal, project_id: int, clip_id: UUI
     if found is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such clip.")
     if (
-        project_id == settings.demo_project_id
+        projects.open_to_readers(await projects.get(project_id))
         and members.role_of(principal.email) == "guest"
         and found["uploaded_by"].lower() != (principal.email or "").lower()
     ):

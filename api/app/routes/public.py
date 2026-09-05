@@ -132,9 +132,7 @@ async def accuracy_per_project(response: Response) -> dict[str, Any]:
     named = []
     for row in rows:
         project = await projects.get(int(row["project_id"]))
-        public = project is not None and (
-            project.is_public or project.project_id == settings.demo_project_id
-        )
+        public = project is not None and (projects.open_to_readers(project))
         named.append(
             {
                 **row,

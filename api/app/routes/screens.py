@@ -207,8 +207,7 @@ def _project_dict(project, principal: Principal) -> schemas.Project:
         you_can_upload=bool(
             email
             and (
-                project.project_id == settings.demo_project_id
-                or email == project.owner_email.lower()
+                email == project.owner_email.lower()
                 or email in {m.lower() for m in project.member_emails}
                 or (members.is_staff(email) and members.is_staff(project.owner_email))
             )

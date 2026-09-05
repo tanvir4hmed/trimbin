@@ -422,3 +422,74 @@ class TestNoMutationInTheReviewPath:
                 line for line in source.splitlines() if not line.lstrip().startswith("#")
             )
             assert "ALTER TABLE clips UPDATE" not in code, f"{path.name} mutates clips"
+
+
+class TestP01GuestEntryOpensAProduct:
+    """Guest login succeeded and the project list came back empty. The demo was
+    one id in config — `demo_project_id = 1` — and project 1 had been deleted,
+    so a judge clicking "Try it as a guest" reached an empty application.
+
+    A demo that depends on one row surviving forever is a fuse, not a demo. It
+    is a rule now: the team's own active productions are open to readers.
+    """
+
+    def test_the_team_s_work_is_open_to_readers(self) -> None:
+        from app.services import members, projects
+
+        class P:
+            state = "active"
+            is_public = False
+            owner_email = members.LEAD_EDITOR
+
+        assert projects.open_to_readers(P()) is True
+
+    def test_a_deleted_project_is_open_to_nobody(self) -> None:
+        """The exact failure. A removed production must not be the thing a
+        visitor is sent to."""
+        from app.services import members, projects
+
+        class P:
+            state = "deleted"
+            is_public = True
+            owner_email = members.LEAD_EDITOR
+
+        assert projects.open_to_readers(P()) is False
+
+    def test_a_guest_owned_project_stays_private(self) -> None:
+        """ "Everyone sees the team's work" must not become "everyone sees
+        everyone's work". A guest's own production is theirs until they publish
+        it."""
+        from app.services import projects
+
+        class P:
+            state = "active"
+            is_public = False
+            owner_email = "someone@guest.trimbin"
+
+        assert projects.open_to_readers(P()) is False
+
+    def test_a_guest_who_publishes_is_readable(self) -> None:
+        from app.services import projects
+
+        class P:
+            state = "active"
+            is_public = True
+            owner_email = "someone@guest.trimbin"
+
+        assert projects.open_to_readers(P()) is True
+
+    def test_nothing_is_open(self) -> None:
+        from app.services import projects
+
+        assert projects.open_to_readers(None) is False
+
+    def test_no_hardcoded_demo_id_decides_access(self) -> None:
+        """The mechanism that broke. If an id ever gates read access again, it
+        can point at a project somebody deletes."""
+        from pathlib import Path
+
+        auth_source = (Path(__file__).parents[1] / "app" / "auth.py").read_text(encoding="utf-8")
+        code = chr(10).join(
+            line for line in auth_source.splitlines() if not line.lstrip().startswith("#")
+        )
+        assert "demo_project_id" not in code

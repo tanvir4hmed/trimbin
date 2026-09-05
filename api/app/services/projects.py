@@ -14,8 +14,7 @@ from datetime import UTC, datetime
 
 from google.cloud import firestore
 
-from ..config import settings
-from . import jobs
+from . import jobs, members
 
 log = logging.getLogger(__name__)
 
@@ -181,8 +180,12 @@ async def visible_to(email: str) -> list[Project]:
     mine = await for_member(email)
     seen = {p.project_id for p in mine}
 
+    # Everything a reader is allowed to open, by the same rule the read guard
+    # applies. Scanning `is_public` alone missed the team's own productions,
+    # which are the ones actually worth showing — and left a guest staring at
+    # an empty desk on a deployment full of work.
     public: list[Project] = []
-    async for snapshot in jobs.db().collection(COLLECTION).where("is_public", "==", True).stream():
+    async for snapshot in jobs.db().collection(COLLECTION).stream():
         try:
             project_id = int(snapshot.id)
         except ValueError:
@@ -190,8 +193,8 @@ async def visible_to(email: str) -> list[Project]:
         if project_id in seen:
             continue
         found = await get(project_id)
-        if found is not None and found.state == "active":
-            public.append(found)
+        if open_to_readers(found):
+            public.append(found)  # type: ignore[arg-type]
 
     # Theirs first, then ours. A person opens the thing they are working on, and
     # a dashboard that leads with somebody else's production reads as a
@@ -199,14 +202,25 @@ async def visible_to(email: str) -> list[Project]:
     return mine + sorted(public, key=lambda p: p.project_id)
 
 
-def is_public_project(project_id: int) -> bool:
-    """Open to a reader with no account.
+def open_to_readers(project: Project | None) -> bool:
+    """Whether anyone at all may read this production.
 
-    One id, from config. The sandbox that used to be the second one is gone —
-    everyone gets the same application now, and a guest works in a project they
-    own rather than in a shared scratch space.
+    This used to be one id from config — `demo_project_id`. That id was project
+    1, project 1 was deleted, and every signed-out visitor and every guest then
+    landed in an empty application. A demo that depends on one row surviving
+    forever is not a demo; it is a fuse.
+
+    The rule instead: the team's own active productions are readable by anyone.
+    A guest is not given a private sandbox and is not shown a curated fake —
+    they see the same work the editors see, which is the thing worth showing,
+    and the permission checks elsewhere still decide what they may change.
+
+    A guest's own project stays theirs alone unless they publish it, because
+    `is_staff` is false for a guest-owned production.
     """
-    return project_id == settings.demo_project_id
+    if project is None or project.state != "active":
+        return False
+    return project.is_public or members.is_staff(project.owner_email)
 
 
 async def change(

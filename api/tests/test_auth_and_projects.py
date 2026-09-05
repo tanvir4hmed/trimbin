@@ -26,11 +26,15 @@ from app.services import members
 class FakeProject:
     """Only the fields the access checks read."""
 
-    def __init__(self, project_id: int, is_public: bool):
+    def __init__(self, project_id: int, is_public: bool, owner: str = "owner@example.com"):
         self.project_id = project_id
         self.is_public = is_public
-        self.owner_email = "owner@example.com"
+        self.owner_email = owner
         self.member_emails: list[str] = []
+        # Read access is now "active, and either public or owned by the team",
+        # so state is one of the fields the checks read.
+        self.state = "active"
+        self.rev = 0
 
 
 async def _public_project(project_id: int):
@@ -120,11 +124,36 @@ class TestAudienceVerification:
 
 class TestReadAccess:
     @pytest.mark.asyncio
-    async def test_the_demo_is_readable_without_an_account(self, monkeypatch) -> None:
+    async def test_the_teams_work_is_readable_without_an_account(self, monkeypatch) -> None:
         """A judge with three minutes will not create an account, and asking
-        them to is the difference between being evaluated and being skipped."""
-        monkeypatch.setattr(auth.settings, "demo_project_id", 1)
+        them to is the difference between being evaluated and being skipped.
+
+        This used to be one id from config. That id was project 1, project 1
+        was deleted, and every signed-out visitor then landed in an empty
+        application — so the demo is a rule now, not a row: the team's own
+        active productions are open to readers."""
+        from app.services import members
+
+        async def team_owned(project_id: int):
+            return FakeProject(project_id, is_public=False, owner=members.LEAD_EDITOR)
+
+        monkeypatch.setattr(auth.projects, "get", team_owned)
         await Principal(email=None).assert_can_read(1)
+
+    @pytest.mark.asyncio
+    async def test_a_deleted_project_is_readable_by_nobody(self, monkeypatch) -> None:
+        """The failure that started this: the demo pointed at a project that no
+        longer existed, and nothing noticed."""
+        from app.services import members
+
+        async def removed(project_id: int):
+            project = FakeProject(project_id, is_public=True, owner=members.LEAD_EDITOR)
+            project.state = "deleted"
+            return project
+
+        monkeypatch.setattr(auth.projects, "get", removed)
+        with pytest.raises(HTTPException):
+            await Principal(email=None).assert_can_read(1)
 
     @pytest.mark.asyncio
     async def test_a_private_project_is_not(self, monkeypatch) -> None:
@@ -201,7 +230,12 @@ class TestCommentingAndOverruling:
         argument won instead. Watching somebody disagree with the system is the
         thing worth showing, and every version of every decision is kept,
         attributed, and undoable."""
-        monkeypatch.setattr(auth.settings, "demo_project_id", 1)
+        from app.services import members
+
+        async def team_owned(project_id: int):
+            return FakeProject(project_id, is_public=False, owner=members.LEAD_EDITOR)
+
+        monkeypatch.setattr(auth.projects, "get", team_owned)
         await Principal(email="a-judge@example.com").assert_can_comment(1)
 
     @pytest.mark.asyncio
@@ -255,17 +289,29 @@ class TestUploading:
         assert "your own project" in raised.value.detail.lower()
 
     @pytest.mark.asyncio
-    async def test_a_guest_may_upload_a_bounded_sample_into_the_public_example(
-        self, monkeypatch
-    ) -> None:
+    async def test_a_guest_may_not_upload_into_the_team_s_project(self, monkeypatch) -> None:
+        """A deliberate reversal, and the reason is written down.
+
+        This granted upload rights on one configured project to anybody signed
+        in — the "public example" exception. The frozen guest policy says the
+        opposite: in the team's productions a guest reads, comments on any
+        shot, and may overrule a take. Nothing else. They upload into their own
+        project, where they are the editor.
+
+        The exception was also attached to `demo_project_id`, which pointed at
+        a deleted project, so in practice it had already stopped granting
+        anything. Removing it makes the code say what the policy says.
+        """
+
         async def company_project(project_id):
             project = FakeProject(project_id, is_public=True)
             project.owner_email = members.LEAD_EDITOR
             return project
 
         monkeypatch.setattr(auth.projects, "get", company_project)
-        monkeypatch.setattr(auth.settings, "demo_project_id", 1)
-        await Principal(email="a-judge@example.com").assert_can_upload(1)
+        with pytest.raises(HTTPException) as raised:
+            await Principal(email="a-judge@example.com").assert_can_upload(1)
+        assert raised.value.status_code == 403
 
     @pytest.mark.asyncio
     async def test_a_guest_uploads_into_their_own_project(self, monkeypatch) -> None:

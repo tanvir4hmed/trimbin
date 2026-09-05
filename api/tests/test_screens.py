@@ -35,6 +35,11 @@ class FakeProject:
         self.member_emails: list[str] = []
         self.is_public = public
         self.created_at = datetime.now(UTC)
+        # The real record carries these, and the read guard now reads them:
+        # a project is open to readers when it is active and either public or
+        # owned by the team.
+        self.state = "active"
+        self.rev = 0
 
 
 class FakeShot:

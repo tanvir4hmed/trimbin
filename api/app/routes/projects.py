@@ -25,7 +25,6 @@ from pydantic import BaseModel, Field, field_validator
 
 from .. import schemas
 from ..auth import Principal, current_principal, require_signed_in
-from ..config import settings
 from ..services import dashboard as dashboard_service
 from ..services import members, projects
 
@@ -80,8 +79,7 @@ def _as_dict(project, viewer_email: str | None) -> dict:
         "you_can_upload": bool(
             viewer_email
             and (
-                project.project_id == settings.demo_project_id
-                or viewer_email.lower() == project.owner_email.lower()
+                viewer_email.lower() == project.owner_email.lower()
                 or viewer_email.lower() in {m.lower() for m in project.member_emails}
                 or (members.is_staff(viewer_email) and members.is_staff(project.owner_email))
             )
@@ -288,12 +286,13 @@ async def add_member(
     if body.email in {m.lower() for m in project.member_emails}:
         return {"status": "already_a_member", "email": body.email}
 
-    if project_id == settings.demo_project_id:
-        # Read by strangers and written to by the pipeline. Adding editors to it
-        # would let a member change what every visitor sees.
+    if project.is_public:
+        # Read by strangers. Adding editors to something published would let a
+        # member change what every visitor sees. The team's own productions are
+        # readable without being published, and those do take members.
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            "The demo project does not take members.",
+            "A published project does not take members.",
         )
 
     await projects.add_member(project_id, body.email)
