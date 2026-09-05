@@ -124,6 +124,13 @@ jobs:
         run: npm ci
         working-directory: web
 
+      # The frontend rules that are pure functions — the slug scheme, the
+      # ingest resume fingerprint, which shot statuses still want a person —
+      # are run here rather than asserted as source text from the API suite.
+      - name: Tests
+        run: npx vitest run
+        working-directory: web
+
       - name: Types
         run: npx tsc --noEmit
         working-directory: web
