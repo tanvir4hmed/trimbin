@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 900" width="1180" height="900" font-family="Inter, 'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <style>
+      .t{fill:#0b1220}.d{fill:#5b6b82}
+      .zone{fill:#f7f9fc;stroke:#dbe3ee;stroke-width:1.5}
+      .box{fill:#ffffff;stroke:#c9d6e8;stroke-width:1.5}
+      .ev{fill:#fff8f2;stroke:#e8b98c;stroke-width:1.5}
+      .vw{fill:#f2f8ff;stroke:#a9c8ec;stroke-width:1.5}
+      .hdr{font-size:11px;font-weight:700;letter-spacing:.12em}
+      .name{font-size:13px;font-weight:650;font-family:'SF Mono',Consolas,monospace}
+      .sub{font-size:10.5px}
+      .flow{stroke:#7c93b3;stroke-width:1.6;fill:none;marker-end:url(#a)}
+      .lbl{font-size:10.5px;fill:#5b6b82}
+    </style>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,1 L8,4.5 L0,8 Z" fill="#7c93b3"/></marker>
+    <g id="i-append"><rect width="18" height="18" rx="4" fill="#fdf0e3"/><path d="M9 4.6v8.8M4.6 9h8.8" stroke="#b06000" stroke-width="1.6" stroke-linecap="round"/></g>
+    <g id="i-view"><rect width="18" height="18" rx="4" fill="#e8f0fe"/><path d="M4 9s2.3-3.2 5-3.2S14 9 14 9s-2.3 3.2-5 3.2S4 9 4 9Z" fill="none" stroke="#1a73e8" stroke-width="1.2"/><circle cx="9" cy="9" r="1.4" fill="#1a73e8"/></g>
+    <g id="i-vec"><rect width="18" height="18" rx="4" fill="#f3e8fd"/><path d="M4.6 13.4 9 4.6l4.4 8.8" fill="none" stroke="#7b1fa2" stroke-width="1.3" stroke-linejoin="round"/><path d="M6.4 10.6h5.2" stroke="#7b1fa2" stroke-width="1.2"/></g>
+  </defs>
+
+  <rect width="1180" height="900" fill="#ffffff"/>
+  <text x="40" y="46" class="t" font-size="22" font-weight="700">Trimbin — The Archive</text>
+  <text x="40" y="68" class="d" font-size="12.5">ClickHouse holds what happened. Nothing in it is ever updated in place, which is the property the whole product rests on.</text>
+
+  <!-- events -->
+  <rect x="40" y="96" width="352" height="474" rx="14" class="zone"/>
+  <text x="58" y="120" class="hdr d">EVENTS · APPEND ONLY</text>
+  <text x="58" y="140" class="d sub">Written once, never modified. MergeTree, partitioned by month.</text>
+
+  <rect x="52" y="152" width="328" height="62" rx="10" class="ev"/>
+  <g transform="translate(64,164)"><use href="#i-append"/></g>
+  <text x="90" y="176" class="t name">clips</text>
+  <text x="64" y="196" class="d sub">One row per piece of footage: measurements, slate</text>
+  <text x="64" y="208" class="d sub">reading, findings with timecodes, description embedding</text>
+
+  <rect x="52" y="222" width="328" height="56" rx="10" class="ev"/>
+  <g transform="translate(64,234)"><use href="#i-append"/></g>
+  <text x="90" y="246" class="t name">decisions</text>
+  <text x="64" y="266" class="d sub">One row per take considered, with the reason recorded at</text>
+  <text x="64" y="278" class="d sub">the time and who or what decided it</text>
+
+  <rect x="52" y="286" width="328" height="56" rx="10" class="ev"/>
+  <g transform="translate(64,298)"><use href="#i-append"/></g>
+  <text x="90" y="310" class="t name">placements</text>
+  <text x="64" y="330" class="d sub">Where a clip belongs. A correction appends a new row;</text>
+  <text x="64" y="342" class="d sub">the mistaken one stays, which is how misfiling is auditable</text>
+
+  <rect x="52" y="350" width="328" height="44" rx="10" class="ev"/>
+  <g transform="translate(64,360)"><use href="#i-append"/></g>
+  <text x="90" y="372" class="t name">clip_segments · clip_moments</text>
+  <text x="64" y="390" class="d sub">Usable ranges and timecoded moments, per analysis run</text>
+
+  <rect x="52" y="402" width="328" height="44" rx="10" class="ev"/>
+  <g transform="translate(64,412)"><use href="#i-append"/></g>
+  <text x="90" y="424" class="t name">finding_events · analysis_runs</text>
+  <text x="64" y="442" class="d sub">What was flagged, what a person did about it, which run</text>
+
+  <rect x="52" y="454" width="328" height="44" rx="10" class="ev"/>
+  <g transform="translate(64,464)"><use href="#i-append"/></g>
+  <text x="90" y="476" class="t name">coverage_selection_events</text>
+  <text x="64" y="494" class="d sub">Editorial usage: which ranges stand for a shot</text>
+
+  <rect x="52" y="506" width="328" height="44" rx="10" class="ev"/>
+  <g transform="translate(64,516)"><use href="#i-append"/></g>
+  <text x="90" y="528" class="t name">clip_lifecycle_events · activity · comments</text>
+  <text x="64" y="546" class="d sub">Deletion and restoration, the audit trail, the conversation</text>
+
+  <!-- views -->
+  <rect x="420" y="96" width="352" height="474" rx="14" class="zone"/>
+  <text x="438" y="120" class="hdr d">READ MODELS · DERIVED</text>
+  <text x="438" y="140" class="d sub">Views over the log. The current state is a question asked of history.</text>
+
+  <rect x="432" y="152" width="328" height="62" rx="10" class="vw"/>
+  <g transform="translate(444,164)"><use href="#i-view"/></g>
+  <text x="470" y="176" class="t name">current_clip_placement</text>
+  <text x="444" y="196" class="d sub">Where every clip stands right now. The one view every</text>
+  <text x="444" y="208" class="d sub">operational screen reads, so there is one answer, not five</text>
+
+  <rect x="432" y="222" width="328" height="56" rx="10" class="vw"/>
+  <g transform="translate(444,234)"><use href="#i-view"/></g>
+  <text x="470" y="246" class="t name">settled_placement</text>
+  <text x="444" y="266" class="d sub">The last settled row per clip, resolved by</text>
+  <text x="444" y="278" class="d sub">argMax over (occurred_at, event_id) — never ambiguous</text>
+
+  <rect x="432" y="286" width="328" height="56" rx="10" class="vw"/>
+  <g transform="translate(444,298)"><use href="#i-view"/></g>
+  <text x="470" y="310" class="t name">placement_inbox · current_unassigned_clips</text>
+  <text x="444" y="330" class="d sub">What is proposed and waiting, and what a person</text>
+  <text x="444" y="342" class="d sub">deliberately left outside the structure</text>
+
+  <rect x="432" y="350" width="328" height="56" rx="10" class="vw"/>
+  <g transform="translate(444,362)"><use href="#i-view"/></g>
+  <text x="470" y="374" class="t name">review_queue</text>
+  <text x="444" y="394" class="d sub">Every shot still wanting a person, by one rule the</text>
+  <text x="444" y="406" class="d sub">interface reads rather than re-deriving</text>
+
+  <rect x="432" y="414" width="328" height="66" rx="10" class="vw"/>
+  <g transform="translate(444,426)"><use href="#i-view"/></g>
+  <text x="470" y="438" class="t name">accuracy · accuracy_by_project</text>
+  <text x="444" y="458" class="d sub">Where a person overruled the recommendation, counted</text>
+  <text x="444" y="470" class="d sub">from the log. Nothing is self-reported</text>
+
+  <rect x="432" y="488" width="328" height="62" rx="10" class="vw"/>
+  <g transform="translate(444,500)"><use href="#i-view"/></g>
+  <text x="470" y="512" class="t name">real_clips · real_decisions</text>
+  <text x="444" y="532" class="d sub">Synthetic rows are separated at the schema, so test data</text>
+  <text x="444" y="544" class="d sub">cannot reach a figure anybody is shown</text>
+
+  <!-- why -->
+  <rect x="800" y="96" width="340" height="474" rx="14" class="zone"/>
+  <text x="818" y="120" class="hdr d">WHY THIS SHAPE</text>
+
+  <text x="818" y="150" class="t" font-size="12.5" font-weight="650">An edit decision is a fact, not a field</text>
+  <text x="818" y="172" class="d sub">A row that is updated forgets. Six months on,</text>
+  <text x="818" y="187" class="d sub">"why was take 4 chosen" has no answer if the</text>
+  <text x="818" y="202" class="d sub">answer was overwritten by take 6. Every</text>
+  <text x="818" y="217" class="d sub">decision, override and correction is a new row.</text>
+
+  <text x="818" y="250" class="t" font-size="12.5" font-weight="650">Mutations never touch a request</text>
+  <text x="818" y="272" class="d sub">ALTER TABLE … UPDATE rewrites whole parts,</text>
+  <text x="818" y="287" class="d sub">runs asynchronously and is capped in flight.</text>
+  <text x="818" y="302" class="d sub">One in an interactive path is a screen that</text>
+  <text x="818" y="317" class="d sub">hangs under load. There are none.</text>
+
+  <text x="818" y="350" class="t" font-size="12.5" font-weight="650">Reads are analytical, not transactional</text>
+  <text x="818" y="372" class="d sub">"Every rejected take across four productions,</text>
+  <text x="818" y="387" class="d sub">with its reason" is a column scan over</text>
+  <text x="818" y="402" class="d sub">millions of rows. That is the query this</text>
+  <text x="818" y="417" class="d sub">database is shaped for.</text>
+
+  <rect x="812" y="440" width="316" height="112" rx="10" class="box"/>
+  <g transform="translate(824,452)"><use href="#i-vec"/></g>
+  <text x="850" y="464" class="t" font-size="12.5" font-weight="650">One store, three kinds of search</text>
+  <text x="824" y="488" class="d sub">Structured filters, full-text over descriptions</text>
+  <text x="824" y="503" class="d sub">and reasons, and vector similarity over</text>
+  <text x="824" y="518" class="d sub">embeddings — in a single query, against one</text>
+  <text x="824" y="533" class="d sub">table. No second system to keep in step.</text>
+
+  <path class="flow" d="M380 183 H432"/>
+  <path class="flow" d="M380 250 C400 250 412 220 432 200"/>
+  <path class="flow" d="M380 314 C400 314 412 270 432 250"/>
+  <path class="flow" d="M380 372 C400 372 412 400 432 420"/>
+  <path class="flow" d="M380 424 C400 424 412 440 432 448"/>
+  <path class="flow" d="M380 476 C400 476 412 400 432 382"/>
+
+  <text x="40" y="614" class="hdr d">HOW THE CURRENT STATE IS DERIVED</text>
+  <path d="M40 626 H1140" stroke="#dbe3ee" stroke-width="1.5"/>
+  <text x="40" y="652" class="d" font-size="12">A clip is misfiled by the slate agent, corrected by an editor, then moved again after a conform. Three rows, in order:</text>
+
+  <rect x="40" y="668" width="1100" height="112" rx="10" fill="#fbfcfe" stroke="#dbe3ee" stroke-width="1.5"/>
+  <text x="60" y="694" class="d sub" font-family="'SF Mono',Consolas,monospace" font-size="11.5">
+    <tspan x="60" dy="0">placements   scene 4  shot 2  take 3   source=slate    state=open      2026-08-14 09:12:04.221</tspan>
+    <tspan x="60" dy="18">placements   scene 4  shot 3  take 1   source=human    state=settled   2026-08-14 11:40:57.883   "wrong setup, this is the reverse"</tspan>
+    <tspan x="60" dy="18">placements   scene 4  shot 3  take 2   source=human    state=settled   2026-08-19 16:02:11.104   "renumbered after the conform"</tspan>
+  </text>
+  <text x="60" y="766" class="d sub">All three rows remain. <tspan font-weight="650" fill="#0b1220">settled_placement</tspan> answers "take 2" by argMax over (occurred_at, event_id) — deterministic even for two events in the same millisecond.</text>
+
+  <text x="40" y="812" class="d" font-size="12">
+    <tspan x="40" dy="0">The mistaken reading is still there. Six months later, "which clips did the slate agent get wrong, and who corrected them" is a query, not an investigation —</tspan>
+    <tspan x="40" dy="20">and it is the same query that produces the published accuracy figure. Neither is calculated by the thing being measured.</tspan>
+  </text>
+  <text x="40" y="872" class="d" font-size="11" font-style="italic">Amber: events, written once. Blue: views, computed on read. Nothing flows the other way.</text>
+</svg>

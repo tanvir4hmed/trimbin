@@ -1,0 +1,156 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 880" width="1180" height="880" font-family="Inter, 'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <style>
+      .t{fill:#0b1220}.d{fill:#5b6b82}
+      .zone{fill:#f7f9fc;stroke:#dbe3ee;stroke-width:1.5}
+      .box{fill:#ffffff;stroke:#c9d6e8;stroke-width:1.5}
+      .hdr{font-size:11px;font-weight:700;letter-spacing:.12em}
+      .name{font-size:14px;font-weight:650}
+      .role{font-size:11.5px;font-weight:650}
+      .sub{font-size:11px}
+      .flow{stroke:#7c93b3;stroke-width:1.8;fill:none;marker-end:url(#a)}
+      .lbl{font-size:10.5px;fill:#5b6b82}
+      .chip{font-size:10px;font-weight:650}
+    </style>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,1 L8,4.5 L0,8 Z" fill="#7c93b3"/></marker>
+
+    <g id="i-eye"><rect width="20" height="20" rx="5" fill="#e8f0fe"/><path d="M4 10s2.6-3.6 6-3.6S16 10 16 10s-2.6 3.6-6 3.6S4 10 4 10Z" fill="none" stroke="#1a73e8" stroke-width="1.3"/><circle cx="10" cy="10" r="1.6" fill="#1a73e8"/></g>
+    <g id="i-scale"><rect width="20" height="20" rx="5" fill="#e6f4ea"/><path d="M10 5v10M6 15h8M6.5 8h7M6.5 8 4.5 11.6h4Zm7 0L11.5 11.6h4Z" fill="none" stroke="#137333" stroke-width="1.2" stroke-linejoin="round"/></g>
+    <g id="i-scissor"><rect width="20" height="20" rx="5" fill="#fef7e0"/><circle cx="7" cy="14" r="1.8" fill="none" stroke="#b06000" stroke-width="1.2"/><circle cx="13" cy="14" r="1.8" fill="none" stroke="#b06000" stroke-width="1.2"/><path d="M6.2 12.4 13.6 5M13.8 12.4 6.4 5" stroke="#b06000" stroke-width="1.2" stroke-linecap="round"/></g>
+    <g id="i-calc"><rect width="20" height="20" rx="5" fill="#f1f3f4"/><rect x="5.6" y="4.6" width="8.8" height="10.8" rx="1.6" fill="none" stroke="#3c4043" stroke-width="1.2"/><path d="M7.4 7.4h5.2M7.6 10.2h.01M10 10.2h.01M12.4 10.2h.01M7.6 12.6h.01M10 12.6h.01M12.4 12.6h.01" stroke="#3c4043" stroke-width="1.4" stroke-linecap="round"/></g>
+    <g id="i-search"><rect width="20" height="20" rx="5" fill="#f3e8fd"/><circle cx="9" cy="9" r="3.6" fill="none" stroke="#7b1fa2" stroke-width="1.3"/><path d="M11.8 11.8 15 15" stroke="#7b1fa2" stroke-width="1.5" stroke-linecap="round"/></g>
+    <g id="i-ruler"><rect width="20" height="20" rx="5" fill="#fce8e6"/><rect x="4" y="7.4" width="12" height="5.2" rx="1.2" fill="none" stroke="#c5221f" stroke-width="1.2"/><path d="M7 7.4v2M10 7.4v2.8M13 7.4v2" stroke="#c5221f" stroke-width="1.1"/></g>
+  </defs>
+
+  <rect width="1180" height="880" fill="#ffffff"/>
+  <text x="40" y="46" class="t" font-size="22" font-weight="700">Trimbin — Agent Design and Flow</text>
+  <text x="40" y="68" class="d" font-size="12.5">Five agents. Each has a written charter naming what it may write and what it must never do. None of them chooses where a cut goes.</text>
+
+  <!-- stage 1 -->
+  <rect x="40" y="96" width="248" height="228" rx="14" class="zone"/>
+  <text x="58" y="120" class="hdr d">1 · MEASURE</text>
+  <rect x="52" y="130" width="224" height="180" rx="10" class="box"/>
+  <g transform="translate(64,142)"><use href="#i-ruler"/></g>
+  <text x="92" y="156" class="t name">ffmpeg</text>
+  <text x="92" y="171" class="d sub">Not an agent</text>
+  <text x="64" y="196" class="d sub">Exposure, focus, stability,</text>
+  <text x="64" y="211" class="d sub">audio level, noise floor,</text>
+  <text x="64" y="226" class="d sub">freezes, dropped frames.</text>
+  <text x="64" y="250" class="d sub">Every finding carries a</text>
+  <text x="64" y="265" class="d sub">timecode, so it is a thing</text>
+  <text x="64" y="280" class="d sub">you can seek to rather than</text>
+  <text x="64" y="295" class="d sub">a sentence about a problem.</text>
+
+  <!-- stage 2 -->
+  <rect x="316" y="96" width="248" height="228" rx="14" class="zone"/>
+  <text x="334" y="120" class="hdr d">2 · IDENTIFY</text>
+  <rect x="328" y="130" width="224" height="180" rx="10" class="box"/>
+  <g transform="translate(340,142)"><use href="#i-eye"/></g>
+  <text x="368" y="156" class="t name">Slate</text>
+  <text x="368" y="171" class="d sub">vision · low thinking</text>
+  <text x="340" y="196" class="d sub">Reads the clapperboard and</text>
+  <text x="340" y="211" class="d sub">groups takes of one setup.</text>
+  <text x="340" y="235" class="d sub">Flags a clip that appears to</text>
+  <text x="340" y="250" class="d sub">belong somewhere else.</text>
+  <text x="340" y="274" class="d sub">Runs on every clip ever</text>
+  <text x="340" y="289" class="d sub">uploaded, so it is the</text>
+  <text x="340" y="304" class="d sub">cheapest call in the system.</text>
+
+  <!-- stage 3: the panel -->
+  <rect x="592" y="96" width="548" height="380" rx="14" class="zone"/>
+  <text x="610" y="120" class="hdr d">3 · JUDGE · THE PANEL</text>
+  <text x="610" y="140" class="d sub">Four roles, not one prompt. A single prompt asked to assess technical quality,</text>
+  <text x="610" y="155" class="d sub">continuity and performance at once does all three badly.</text>
+
+  <rect x="604" y="168" width="164" height="128" rx="10" class="box"/>
+  <text x="620" y="192" class="t role">Technical</text>
+  <text x="620" y="214" class="d sub">Reads the measurements</text>
+  <text x="620" y="229" class="d sub">only. Focus, exposure,</text>
+  <text x="620" y="244" class="d sub">stability, audio.</text>
+  <text x="620" y="268" class="d sub" font-style="italic">Cannot see the story.</text>
+
+  <rect x="780" y="168" width="164" height="128" rx="10" class="box"/>
+  <text x="796" y="192" class="t role">Continuity</text>
+  <text x="796" y="214" class="d sub">Watches for what breaks</text>
+  <text x="796" y="229" class="d sub">between takes: eyelines,</text>
+  <text x="796" y="244" class="d sub">props, action edges.</text>
+  <text x="796" y="268" class="d sub" font-style="italic">Does not rank quality.</text>
+
+  <rect x="956" y="168" width="172" height="128" rx="10" class="box"/>
+  <text x="972" y="192" class="t role">Performance</text>
+  <text x="972" y="214" class="d sub">Reports what is observably</text>
+  <text x="972" y="229" class="d sub">true — a fluffed line, a</text>
+  <text x="972" y="244" class="d sub">take that stops early.</text>
+  <text x="972" y="268" class="d sub" font-style="italic">Never judges acting.</text>
+
+  <rect x="604" y="316" width="524" height="144" rx="10" class="box"/>
+  <g transform="translate(616,328)"><use href="#i-scale"/></g>
+  <text x="644" y="342" class="t name">Chief</text>
+  <text x="644" y="357" class="d sub">weighs the three reports · long context · higher thinking</text>
+  <text x="616" y="382" class="d sub">Holds every take of the shot at once, uncut, picture and sound together. Produces a</text>
+  <text x="616" y="397" class="d sub">recommendation, a margin, and the reason for every take — including the rejected ones.</text>
+  <text x="616" y="421" class="d sub">Writes one decision row per take considered. Nothing is auto-rejected: a technically</text>
+  <text x="616" y="436" class="d sub">worse take is often the right take, and that call belongs to a person.</text>
+
+  <!-- stage 4 -->
+  <rect x="40" y="352" width="248" height="228" rx="14" class="zone"/>
+  <text x="58" y="376" class="hdr d">4 · SCOPE</text>
+  <rect x="52" y="386" width="224" height="180" rx="10" class="box"/>
+  <g transform="translate(64,398)"><use href="#i-scissor"/></g>
+  <text x="92" y="412" class="t name">Segment</text>
+  <text x="92" y="427" class="d sub">usable ranges</text>
+  <text x="64" y="452" class="d sub">Which part of each take is</text>
+  <text x="64" y="467" class="d sub">safe to use, as source</text>
+  <text x="64" y="482" class="d sub">ranges with descriptions.</text>
+  <text x="64" y="506" class="d sub">A take with one bad moment</text>
+  <text x="64" y="521" class="d sub">is not a bad take — it is a</text>
+  <text x="64" y="536" class="d sub">take with a shorter usable</text>
+  <text x="64" y="551" class="d sub">range.</text>
+
+  <!-- stage 5 -->
+  <rect x="316" y="352" width="248" height="228" rx="14" class="zone"/>
+  <text x="334" y="376" class="hdr d">5 · APPLY</text>
+  <rect x="328" y="386" width="224" height="180" rx="10" class="box"/>
+  <g transform="translate(340,398)"><use href="#i-calc"/></g>
+  <text x="368" y="412" class="t name">Assembly</text>
+  <text x="368" y="427" class="d sub">almost no model at all</text>
+  <text x="340" y="452" class="d sub">In and out points, the</text>
+  <text x="340" y="467" class="d sub">decision log, the flags for</text>
+  <text x="340" y="482" class="d sub">what needs a person, the</text>
+  <text x="340" y="497" class="d sub">EDL and the playlist.</text>
+  <text x="340" y="521" class="d sub">Ranking and duration maths</text>
+  <text x="340" y="536" class="d sub">are SQL. A deterministic step</text>
+  <text x="340" y="551" class="d sub">here is what makes the rest</text>
+  <text x="340" y="566" class="d sub">auditable.</text>
+
+  <!-- archivist -->
+  <rect x="592" y="504" width="548" height="152" rx="14" class="zone"/>
+  <text x="610" y="528" class="hdr d">ON DEMAND · ASKED BY A PERSON</text>
+  <rect x="604" y="538" width="524" height="104" rx="10" class="box"/>
+  <g transform="translate(616,550)"><use href="#i-search"/></g>
+  <text x="644" y="564" class="t name">Archivist</text>
+  <text x="644" y="579" class="d sub">the only agent a person talks to, and the only one on a latency budget</text>
+  <text x="616" y="604" class="d sub">Plans a query from a sentence, the database answers, the model describes what came back. It never writes</text>
+  <text x="616" y="619" class="d sub">the SQL and never sees a row the query did not return, so an answer with nothing behind it cannot be produced.</text>
+  <text x="616" y="634" class="d sub" font-style="italic">Writes nothing. Ever. The query it ran is shown beside the answer, so a result can be checked rather than trusted.</text>
+
+  <path class="flow" d="M276 220 H328"/>
+  <path class="flow" d="M552 220 H604"/>
+  <path class="flow" d="M866 460 C866 486 300 470 164 386"/>
+  <text x="500" y="486" class="lbl">verdict and reasons</text>
+  <path class="flow" d="M276 476 H328"/>
+  <path class="flow" d="M552 476 C572 476 586 500 604 538"/>
+  <text x="556" y="512" class="lbl">recorded</text>
+
+  <text x="40" y="700" class="hdr d">WHAT HOLDS IT TOGETHER</text>
+  <path d="M40 712 H1140" stroke="#dbe3ee" stroke-width="1.5"/>
+  <text x="40" y="738" class="d" font-size="12">
+    <tspan x="40" dy="0"><tspan font-weight="650" fill="#0b1220">Every measurement is relative to its group, never absolute.</tspan> Seven dark takes of a night scene are a night scene, not seven faults. Six locked-off takes</tspan>
+    <tspan x="40" dy="20">and one handheld is probably one accident. An absolute threshold cannot tell those apart; a ratio against the setup's own median can.</tspan>
+    <tspan x="40" dy="24"><tspan font-weight="650" fill="#0b1220">Each agent has a charter naming what it must not do.</tspan> The Slate agent writes clip rows and nothing else. The Archivist writes nothing at all.</tspan>
+    <tspan x="40" dy="20">The panel recommends and never removes. Those boundaries are in the repository next to the code, not in a prompt.</tspan>
+    <tspan x="40" dy="24"><tspan font-weight="650" fill="#0b1220">A person decides.</tspan> Every verdict is a recommendation with its reasoning attached, and an editor's override is recorded as its own event —</tspan>
+    <tspan x="40" dy="20">which is what makes the accuracy figure real rather than self-reported.</tspan>
+  </text>
+</svg>

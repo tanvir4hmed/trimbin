@@ -11,10 +11,17 @@ production archive. A regex over SQL is a filter, not a boundary — a subquery,
 comment splicing a keyword, a function whose name contains a forbidden word are
 all ordinary SQL and none of them are what the pattern was written for.
 
-The user now exists. `trimbin_reader` holds SELECT on ten named objects and
-nothing else, under a profile with `readonly = 1 CONST` — const so it cannot be
-turned off mid-session, which is the difference between a setting and a
-guarantee. See `clickhouse/migrations/011_readonly_user.sql`.
+The user now exists. `trimbin_reader` holds SELECT on named objects and nothing
+else — each granted explicitly by the migration that creates the object, so the
+list grows only when somebody writes the grant — under a profile with
+`readonly = 1 CONST`. Const so it cannot be turned off mid-session, which is the
+difference between a setting and a guarantee.
+See `clickhouse/migrations/011_readonly_user.sql`.
+
+(This said "ten named objects" until the count reached thirty-four. A number in
+a comment is a claim that stops being true without anything failing, which is the
+mistake this file's opening paragraph is about — so it names the mechanism now
+rather than the total.)
 
 So the layers, in the order they actually stop something:
 

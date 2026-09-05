@@ -1,0 +1,190 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 900" width="1180" height="900" font-family="Inter, 'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <style>
+      .t{fill:#0b1220}.d{fill:#5b6b82}
+      .zone{fill:#f7f9fc;stroke:#dbe3ee;stroke-width:1.5}
+      .box{fill:#ffffff;stroke:#c9d6e8;stroke-width:1.5}
+      .hdr{font-size:11px;font-weight:700;letter-spacing:.12em}
+      .name{font-size:13.5px;font-weight:650}
+      .sub{font-size:11px}
+      .flow{stroke:#7c93b3;stroke-width:1.6;fill:none;marker-end:url(#a)}
+      .flow2{stroke:#c96a2b;stroke-width:1.6;fill:none;stroke-dasharray:5 4;marker-end:url(#ao)}
+      .lbl{font-size:10.5px;fill:#5b6b82}
+    </style>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,1 L8,4.5 L0,8 Z" fill="#7c93b3"/></marker>
+    <marker id="ao" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,1 L8,4.5 L0,8 Z" fill="#c96a2b"/></marker>
+
+    <g id="i-run"><rect width="18" height="18" rx="4" fill="#e8f0fe"/><path d="M6 5 L13 9 L6 13 Z" fill="#1a73e8"/></g>
+    <g id="i-bucket"><rect width="18" height="18" rx="4" fill="#e6f4ea"/><path d="M4.5 5 h9 l-1.2 8.2 a1 1 0 0 1 -1 .8 H6.7 a1 1 0 0 1 -1 -.8 Z" fill="none" stroke="#137333" stroke-width="1.4"/></g>
+    <g id="i-queue"><rect width="18" height="18" rx="4" fill="#fef7e0"/><path d="M4.5 6.5h9M4.5 9h9M4.5 11.5h6" stroke="#b06000" stroke-width="1.4" stroke-linecap="round"/></g>
+    <g id="i-db"><rect width="18" height="18" rx="4" fill="#fce8e6"/><ellipse cx="9" cy="6.2" rx="4.6" ry="1.9" fill="none" stroke="#c5221f" stroke-width="1.3"/><path d="M4.4 6.2v5.6c0 1 2 1.9 4.6 1.9s4.6-.9 4.6-1.9V6.2" fill="none" stroke="#c5221f" stroke-width="1.3"/></g>
+    <g id="i-lock"><rect width="18" height="18" rx="4" fill="#f1f3f4"/><rect x="5.6" y="8.4" width="6.8" height="5.2" rx="1.2" fill="none" stroke="#3c4043" stroke-width="1.3"/><path d="M7.2 8.4V6.9a1.8 1.8 0 0 1 3.6 0v1.5" fill="none" stroke="#3c4043" stroke-width="1.3"/></g>
+    <g id="i-globe"><rect width="18" height="18" rx="4" fill="#e8f0fe"/><circle cx="9" cy="9" r="4.4" fill="none" stroke="#1a73e8" stroke-width="1.3"/><path d="M4.6 9h8.8M9 4.6c1.8 2.4 1.8 6.4 0 8.8M9 4.6c-1.8 2.4-1.8 6.4 0 8.8" fill="none" stroke="#1a73e8" stroke-width="1.1"/></g>
+    <g id="i-clock"><rect width="18" height="18" rx="4" fill="#f3e8fd"/><circle cx="9" cy="9" r="4.4" fill="none" stroke="#7b1fa2" stroke-width="1.3"/><path d="M9 6.2V9l2 1.4" fill="none" stroke="#7b1fa2" stroke-width="1.3" stroke-linecap="round"/></g>
+    <g id="i-brain"><rect width="18" height="18" rx="4" fill="#e6f4ea"/><path d="M9 4.6c-2 0-3.3 1.2-3.3 2.6 0 .5-.8.9-.8 1.9s.9 1.3.9 1.9c0 1.3 1.4 2.4 3.2 2.4s3.2-1.1 3.2-2.4c0-.6.9-.9.9-1.9s-.8-1.4-.8-1.9c0-1.4-1.3-2.6-3.3-2.6Z" fill="none" stroke="#137333" stroke-width="1.2"/><path d="M9 5v8" stroke="#137333" stroke-width="1"/></g>
+    <g id="i-reg"><rect width="18" height="18" rx="4" fill="#e8eaed"/><path d="M9 4.4 13.4 7v4L9 13.6 4.6 11V7Z" fill="none" stroke="#3c4043" stroke-width="1.3"/></g>
+  </defs>
+
+  <rect width="1180" height="900" fill="#ffffff"/>
+  <text x="40" y="46" class="t" font-size="22" font-weight="700">Trimbin — Production Infrastructure</text>
+  <text x="40" y="68" class="d" font-size="12.5">Every resource below is declared in Terraform. Nothing is created by hand, and a push to main is the only path to production.</text>
+
+  <rect x="40" y="94" width="270" height="196" rx="14" class="zone"/>
+  <text x="58" y="118" class="hdr d">EDGE</text>
+  <rect x="52" y="128" width="246" height="66" rx="10" class="box"/>
+  <g transform="translate(64,140)"><use href="#i-globe"/></g>
+  <text x="90" y="150" class="t name">Global Load Balancer</text>
+  <text x="90" y="166" class="d sub">Managed TLS · trimbin.qlitch.com</text>
+  <text x="90" y="181" class="d sub">HTTP redirected · two URL maps</text>
+
+  <rect x="52" y="204" width="246" height="66" rx="10" class="box"/>
+  <g transform="translate(64,216)"><use href="#i-reg"/></g>
+  <text x="90" y="226" class="t name">Artifact Registry</text>
+  <text x="90" y="242" class="d sub">One image, tagged by commit</text>
+  <text x="90" y="257" class="d sub">Rollback targets a build, not a tag</text>
+
+  <rect x="336" y="94" width="300" height="322" rx="14" class="zone"/>
+  <text x="354" y="118" class="hdr d">COMPUTE · CLOUD RUN</text>
+
+  <rect x="348" y="128" width="276" height="82" rx="10" class="box"/>
+  <g transform="translate(360,140)"><use href="#i-run"/></g>
+  <text x="386" y="150" class="t name">web</text>
+  <text x="386" y="166" class="d sub">Next.js App Router · SSR and static</text>
+  <text x="386" y="181" class="d sub">Public pages, workspace, cockpit</text>
+  <text x="386" y="196" class="d sub">Scales to zero</text>
+
+  <rect x="348" y="220" width="276" height="82" rx="10" class="box"/>
+  <g transform="translate(360,232)"><use href="#i-run"/></g>
+  <text x="386" y="242" class="t name">api</text>
+  <text x="386" y="258" class="d sub">FastAPI · types generated from OpenAPI</text>
+  <text x="386" y="273" class="d sub">Auth, curation, search, exports</text>
+  <text x="386" y="288" class="d sub">Never runs a mutation inline</text>
+
+  <rect x="348" y="312" width="276" height="92" rx="10" class="box"/>
+  <g transform="translate(360,324)"><use href="#i-run"/></g>
+  <text x="386" y="334" class="t name">worker</text>
+  <text x="386" y="350" class="d sub">Same image, different entrypoint</text>
+  <text x="386" y="365" class="d sub">Pub/Sub push · ffmpeg and agents</text>
+  <text x="386" y="380" class="d sub">download, measure, read slate,</text>
+  <text x="386" y="395" class="d sub">encode proxy, hand to verification</text>
+
+  <rect x="662" y="94" width="228" height="196" rx="14" class="zone"/>
+  <text x="680" y="118" class="hdr d">MESSAGING</text>
+  <rect x="674" y="128" width="204" height="66" rx="10" class="box"/>
+  <g transform="translate(686,140)"><use href="#i-queue"/></g>
+  <text x="712" y="150" class="t name">ingest topic</text>
+  <text x="686" y="170" class="d sub">One message per clip, pushed</text>
+  <text x="686" y="185" class="d sub">to the worker</text>
+
+  <rect x="674" y="204" width="204" height="66" rx="10" class="box"/>
+  <g transform="translate(686,216)"><use href="#i-queue"/></g>
+  <text x="712" y="226" class="t name">dead letter</text>
+  <text x="686" y="246" class="d sub">A clip that cannot be processed</text>
+  <text x="686" y="261" class="d sub">is kept, not dropped</text>
+
+  <rect x="662" y="304" width="228" height="112" rx="14" class="zone"/>
+  <text x="680" y="328" class="hdr d">SCHEDULED</text>
+  <rect x="674" y="338" width="204" height="66" rx="10" class="box"/>
+  <g transform="translate(686,350)"><use href="#i-clock"/></g>
+  <text x="712" y="360" class="t name">Cloud Scheduler</text>
+  <text x="686" y="380" class="d sub">Daily guest retention sweep</text>
+  <text x="686" y="395" class="d sub">Deletes footage past its window</text>
+
+  <rect x="40" y="440" width="596" height="200" rx="14" class="zone"/>
+  <text x="58" y="464" class="hdr d">STORAGE · CLOUD STORAGE</text>
+  <rect x="52" y="474" width="182" height="152" rx="10" class="box"/>
+  <g transform="translate(64,486)"><use href="#i-bucket"/></g>
+  <text x="90" y="496" class="t name">originals</text>
+  <text x="64" y="518" class="d sub">Camera masters, uploaded</text>
+  <text x="64" y="533" class="d sub">straight from the browser by</text>
+  <text x="64" y="548" class="d sub">resumable signed URL.</text>
+  <text x="64" y="570" class="d sub">Bytes never pass through</text>
+  <text x="64" y="585" class="d sub">the API.</text>
+  <text x="64" y="609" class="d sub" font-style="italic">Versioned · lifecycle rules</text>
+
+  <rect x="242" y="474" width="182" height="152" rx="10" class="box"/>
+  <g transform="translate(254,486)"><use href="#i-bucket"/></g>
+  <text x="280" y="496" class="t name">proxies</text>
+  <text x="254" y="518" class="d sub">HLS renditions and sprite</text>
+  <text x="254" y="533" class="d sub">sheets built by the worker.</text>
+  <text x="254" y="555" class="d sub">What the cockpit plays — a</text>
+  <text x="254" y="570" class="d sub">4K master is never sent to</text>
+  <text x="254" y="585" class="d sub">a browser.</text>
+  <text x="254" y="609" class="d sub" font-style="italic">Served via backend bucket</text>
+
+  <rect x="432" y="474" width="192" height="152" rx="10" class="box"/>
+  <g transform="translate(444,486)"><use href="#i-bucket"/></g>
+  <text x="470" y="496" class="t name">artifacts</text>
+  <text x="444" y="518" class="d sub">Deliverables the editor</text>
+  <text x="444" y="533" class="d sub">takes away: EDL, CSV,</text>
+  <text x="444" y="548" class="d sub">string-out, decision log.</text>
+  <text x="444" y="570" class="d sub">Written once, and kept</text>
+  <text x="444" y="585" class="d sub">beside their decisions.</text>
+
+  <rect x="662" y="440" width="478" height="200" rx="14" class="zone"/>
+  <text x="680" y="464" class="hdr d">STATE</text>
+
+  <rect x="674" y="474" width="222" height="152" rx="10" class="box"/>
+  <g transform="translate(686,486)"><use href="#i-db"/></g>
+  <text x="712" y="496" class="t name">ClickHouse Cloud</text>
+  <text x="686" y="518" class="d sub">The immutable event log and</text>
+  <text x="686" y="533" class="d sub">the read models over it.</text>
+  <text x="686" y="555" class="d sub">Every decision, finding,</text>
+  <text x="686" y="570" class="d sub">placement and segment —</text>
+  <text x="686" y="585" class="d sub">appended, never updated.</text>
+  <text x="686" y="609" class="d sub" font-style="italic">Separate read-only user for search</text>
+
+  <rect x="904" y="474" width="224" height="70" rx="10" class="box"/>
+  <g transform="translate(916,486)"><use href="#i-db"/></g>
+  <text x="942" y="496" class="t name">Firestore</text>
+  <text x="916" y="518" class="d sub">Mutable operational state:</text>
+  <text x="916" y="533" class="d sub">projects, members, jobs, revisions</text>
+
+  <rect x="904" y="556" width="224" height="70" rx="10" class="box"/>
+  <g transform="translate(916,568)"><use href="#i-lock"/></g>
+  <text x="942" y="578" class="t name">Secret Manager</text>
+  <text x="916" y="600" class="d sub">Per-service IAM on each secret</text>
+  <text x="916" y="615" class="d sub">No key material in the repository</text>
+
+  <rect x="916" y="94" width="224" height="322" rx="14" class="zone"/>
+  <text x="934" y="118" class="hdr d">INTELLIGENCE</text>
+  <rect x="928" y="128" width="200" height="276" rx="10" class="box"/>
+  <g transform="translate(940,140)"><use href="#i-brain"/></g>
+  <text x="966" y="150" class="t name">Vertex AI</text>
+  <text x="940" y="172" class="d sub">Five agents, each with its</text>
+  <text x="940" y="187" class="d sub">own charter and model</text>
+  <text x="940" y="202" class="d sub">settings.</text>
+  <text x="940" y="228" class="t sub" font-weight="650">Slate</text><text x="940" y="243" class="d sub">vision · low thinking</text>
+  <text x="940" y="266" class="t sub" font-weight="650">Analyst</text><text x="940" y="281" class="d sub">three specialists, one chief</text>
+  <text x="940" y="304" class="t sub" font-weight="650">Segment</text><text x="940" y="319" class="d sub">usable ranges per take</text>
+  <text x="940" y="342" class="t sub" font-weight="650">Assembly</text><text x="940" y="357" class="d sub">arithmetic, barely a model</text>
+  <text x="940" y="380" class="t sub" font-weight="650">Archivist</text><text x="940" y="395" class="d sub">question, query, answer</text>
+
+  <path class="flow" d="M298 161 H348"/>
+  <path class="flow" d="M624 169 H674"/>
+  <text x="628" y="162" class="lbl">enqueue</text>
+  <path class="flow" d="M776 194 V210"/>
+  <path class="flow" d="M672 172 C648 200 640 300 626 344"/>
+  <text x="608" y="272" class="lbl">push</text>
+  <path class="flow" d="M486 404 V474"/>
+  <text x="492" y="444" class="lbl">proxies written</text>
+  <path class="flow" d="M470 302 C440 340 200 400 143 474"/>
+  <text x="196" y="424" class="lbl">signed URL</text>
+  <path class="flow2" d="M626 366 C700 366 762 420 786 474"/>
+  <text x="678" y="416" class="lbl" fill="#c96a2b">append events</text>
+  <path class="flow2" d="M926 250 C880 250 700 300 626 352"/>
+  <text x="762" y="292" class="lbl" fill="#c96a2b">agent calls</text>
+
+  <text x="40" y="684" class="hdr d">DEPLOYMENT</text>
+  <path d="M40 696 H1140" stroke="#dbe3ee" stroke-width="1.5"/>
+  <text x="40" y="722" class="d" font-size="12">
+    <tspan x="40" dy="0">A push to main runs the full check suite, applies Terraform, runs the ClickHouse migrations, then builds one image and points all three services at it.</tspan>
+    <tspan x="40" dy="20">Checks include applying every migration to a throwaway ClickHouse from empty, so a statement that will not parse fails on the branch and never reaches production.</tspan>
+    <tspan x="40" dy="20">Migrations run after the database exists and before anything that reads from it deploys. They are idempotent, so every push runs all of them.</tspan>
+    <tspan x="40" dy="20">Authentication is Workload Identity Federation: GitHub proves which repository and ref is running, Google issues a short-lived token. No service account key exists to leak.</tspan>
+    <tspan x="40" dy="20">A failed check blocks the deploy. Concurrency is capped at one, so an apply is never interrupted mid-flight.</tspan>
+  </text>
+  <text x="40" y="866" class="d" font-size="11" font-style="italic">Solid lines carry footage and requests. Dashed lines carry recorded facts — events appended to the archive, and the model calls that produce them.</text>
+</svg>

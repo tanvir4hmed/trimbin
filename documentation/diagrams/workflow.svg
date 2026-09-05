@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 940" width="1180" height="940" font-family="Inter, 'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <style>
+      .t{fill:#0b1220}.d{fill:#5b6b82}
+      .lane{fill:#f7f9fc;stroke:#dbe3ee;stroke-width:1.5}
+      .box{fill:#ffffff;stroke:#c9d6e8;stroke-width:1.5}
+      .human{fill:#fffdf5;stroke:#e2c98a;stroke-width:1.5}
+      .hdr{font-size:11px;font-weight:700;letter-spacing:.12em}
+      .step{font-size:12.5px;font-weight:650}
+      .sub{font-size:10.5px}
+      .flow{stroke:#7c93b3;stroke-width:1.8;fill:none;marker-end:url(#a)}
+      .back{stroke:#c96a2b;stroke-width:1.6;fill:none;stroke-dasharray:5 4;marker-end:url(#ao)}
+      .lbl{font-size:10.5px;fill:#5b6b82}
+      .n{font-size:11px;font-weight:700;fill:#ffffff}
+    </style>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,1 L8,4.5 L0,8 Z" fill="#7c93b3"/></marker>
+    <marker id="ao" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,1 L8,4.5 L0,8 Z" fill="#c96a2b"/></marker>
+  </defs>
+
+  <rect width="1180" height="940" fill="#ffffff"/>
+  <text x="40" y="46" class="t" font-size="22" font-weight="700">Trimbin — Processing Workflow</text>
+  <text x="40" y="68" class="d" font-size="12.5">From a folder of camera files to a decision an editor can act on, and the record that outlives them both.</text>
+
+  <!-- lane labels -->
+  <rect x="40" y="96" width="140" height="716" rx="14" class="lane"/>
+  <text x="60" y="150" class="hdr d">BROWSER</text>
+  <text x="60" y="300" class="hdr d">API</text>
+  <text x="60" y="446" class="hdr d">WORKER</text>
+  <text x="60" y="620" class="hdr d">EDITOR</text>
+  <text x="60" y="756" class="hdr d">ARCHIVE</text>
+
+  <!-- 1 -->
+  <rect x="208" y="112" width="240" height="90" rx="10" class="box"/>
+  <circle cx="228" cy="132" r="11" fill="#1a73e8"/><text x="228" y="136" class="n" text-anchor="middle">1</text>
+  <text x="248" y="136" class="t step">Drop the folder</text>
+  <text x="222" y="160" class="d sub">The browser asks for upload tickets,</text>
+  <text x="222" y="174" class="d sub">then sends bytes straight to storage</text>
+  <text x="222" y="188" class="d sub">by resumable signed URL.</text>
+
+  <rect x="480" y="112" width="240" height="90" rx="10" class="box"/>
+  <text x="500" y="136" class="t step">Interrupted?</text>
+  <text x="500" y="160" class="d sub">The batch is fingerprinted by name,</text>
+  <text x="500" y="174" class="d sub">size and modified time. Reselecting</text>
+  <text x="500" y="188" class="d sub">the same files resumes; different</text>
+  <text x="500" y="202" class="d sub">footage is refused, not uploaded.</text>
+
+  <rect x="752" y="112" width="388" height="90" rx="10" class="box"/>
+  <text x="772" y="136" class="t step">Why the bytes skip the API</text>
+  <text x="772" y="160" class="d sub">A 4K master is tens of gigabytes. Routing it through a request handler</text>
+  <text x="772" y="174" class="d sub">would tie up a container for the length of the upload and cap the whole</text>
+  <text x="772" y="188" class="d sub">system at one shoot at a time. Storage takes the bytes; the API takes the facts.</text>
+
+  <!-- 2 -->
+  <rect x="208" y="248" width="240" height="82" rx="10" class="box"/>
+  <circle cx="228" cy="268" r="11" fill="#1a73e8"/><text x="228" y="272" class="n" text-anchor="middle">2</text>
+  <text x="248" y="272" class="t step">Enqueue</text>
+  <text x="222" y="296" class="d sub">One message per clip on the ingest</text>
+  <text x="222" y="310" class="d sub">topic. The request returns at once —</text>
+  <text x="222" y="324" class="d sub">nothing waits on ffmpeg.</text>
+
+  <rect x="480" y="248" width="240" height="82" rx="10" class="box"/>
+  <text x="500" y="272" class="t step">Idempotent</text>
+  <text x="500" y="296" class="d sub">The same bytes arriving twice under two</text>
+  <text x="500" y="310" class="d sub">names are recognised as a duplicate, and</text>
+  <text x="500" y="324" class="d sub">a completed analysis is not re-run.</text>
+
+  <rect x="752" y="248" width="388" height="82" rx="10" class="box"/>
+  <text x="772" y="272" class="t step">A clip that cannot be processed is kept</text>
+  <text x="772" y="296" class="d sub">Failures go to a dead-letter topic rather than disappearing. Footage that broke</text>
+  <text x="772" y="310" class="d sub">the pipeline is still footage somebody shot, and it stays visible as unresolved</text>
+  <text x="772" y="324" class="d sub">rather than silently absent from the count.</text>
+
+  <!-- 3: worker stages -->
+  <rect x="208" y="376" width="932" height="150" rx="10" class="box"/>
+  <circle cx="228" cy="398" r="11" fill="#1a73e8"/><text x="228" y="402" class="n" text-anchor="middle">3</text>
+  <text x="248" y="402" class="t step">The worker, one stage at a time — and it says which</text>
+  <text x="248" y="420" class="d sub">The middle of this pipeline used to be silent for minutes. Each stage is now reported as it starts, because a progress bar that does not move is indistinguishable from a system that has stopped.</text>
+
+  <rect x="228" y="438" width="166" height="72" rx="8" fill="#f7f9fc" stroke="#dbe3ee"/>
+  <text x="244" y="460" class="t sub" font-weight="650">downloading</text>
+  <text x="244" y="480" class="d sub">The master, into the</text>
+  <text x="244" y="494" class="d sub">worker's own disk</text>
+
+  <rect x="406" y="438" width="166" height="72" rx="8" fill="#f7f9fc" stroke="#dbe3ee"/>
+  <text x="422" y="460" class="t sub" font-weight="650">measuring</text>
+  <text x="422" y="480" class="d sub">ffmpeg: exposure, focus,</text>
+  <text x="422" y="494" class="d sub">stability, audio, freezes</text>
+
+  <rect x="584" y="438" width="166" height="72" rx="8" fill="#f7f9fc" stroke="#dbe3ee"/>
+  <text x="600" y="460" class="t sub" font-weight="650">reading_slate</text>
+  <text x="600" y="480" class="d sub">The clapperboard, and</text>
+  <text x="600" y="494" class="d sub">an honest "not found"</text>
+
+  <rect x="762" y="438" width="166" height="72" rx="8" fill="#f7f9fc" stroke="#dbe3ee"/>
+  <text x="778" y="460" class="t sub" font-weight="650">encoding_proxy</text>
+  <text x="778" y="480" class="d sub">HLS and a sprite sheet —</text>
+  <text x="778" y="494" class="d sub">what the cockpit plays</text>
+
+  <rect x="940" y="438" width="184" height="72" rx="8" fill="#f7f9fc" stroke="#dbe3ee"/>
+  <text x="956" y="460" class="t sub" font-weight="650">ready_for_verification</text>
+  <text x="956" y="480" class="d sub">Proposed placement, held</text>
+  <text x="956" y="494" class="d sub">for a person to confirm</text>
+
+  <!-- 4 -->
+  <rect x="208" y="562" width="446" height="106" rx="10" class="human"/>
+  <circle cx="228" cy="584" r="11" fill="#b06000"/><text x="228" y="588" class="n" text-anchor="middle">4</text>
+  <text x="248" y="588" class="t step">A person confirms where it belongs</text>
+  <text x="222" y="612" class="d sub">The slate proposes; it does not decide. Placement becomes canonical only when</text>
+  <text x="222" y="626" class="d sub">a person settles it, and a correction appends rather than overwrites — so the</text>
+  <text x="222" y="640" class="d sub">agent's mistake stays on the record beside the fix.</text>
+  <text x="222" y="658" class="d sub" font-style="italic">Footage deliberately left outside the structure is a state, not a fictional Scene 0.</text>
+
+  <rect x="686" y="562" width="454" height="106" rx="10" class="box"/>
+  <circle cx="706" cy="584" r="11" fill="#1a73e8"/><text x="706" y="588" class="n" text-anchor="middle">5</text>
+  <text x="726" y="588" class="t step">The panel compares the takes of that shot</text>
+  <text x="700" y="612" class="d sub">Three specialists and a chief, holding every take at once. Out comes a recommendation,</text>
+  <text x="700" y="626" class="d sub">a margin, the reason for each take including the rejected ones, and the range of each</text>
+  <text x="700" y="640" class="d sub">that is safe to use.</text>
+  <text x="700" y="658" class="d sub" font-style="italic">Nothing is auto-rejected. A technically worse take is often the right take.</text>
+
+  <!-- 6 -->
+  <rect x="208" y="700" width="446" height="96" rx="10" class="human"/>
+  <circle cx="228" cy="722" r="11" fill="#b06000"/><text x="228" y="726" class="n" text-anchor="middle">6</text>
+  <text x="248" y="726" class="t step">The editor decides</text>
+  <text x="222" y="750" class="d sub">Both takes side by side, each finding seekable at its timecode. Accept, overrule,</text>
+  <text x="222" y="764" class="d sub">or build coverage from ranges across several takes.</text>
+  <text x="222" y="782" class="d sub" font-style="italic">An override is recorded as its own event, with the reason. That is where the accuracy figure comes from.</text>
+
+  <rect x="686" y="700" width="454" height="96" rx="10" class="box"/>
+  <circle cx="706" cy="722" r="11" fill="#1a73e8"/><text x="706" y="726" class="n" text-anchor="middle">7</text>
+  <text x="726" y="726" class="t step">Out, and kept</text>
+  <text x="700" y="750" class="d sub">EDL, CSV, string-out and the decision log, written to storage for the editor to</text>
+  <text x="700" y="764" class="d sub">take away. The archive keeps every event behind them.</text>
+  <text x="700" y="782" class="d sub" font-style="italic">Years later, "why was take 4 chosen" is a sentence typed into a box.</text>
+
+  <path class="flow" d="M448 157 H480"/>
+  <path class="flow" d="M328 202 V248"/>
+  <path class="flow" d="M328 330 V376"/>
+  <path class="flow" d="M394 474 H406"/>
+  <path class="flow" d="M572 474 H584"/>
+  <path class="flow" d="M750 474 H762"/>
+  <path class="flow" d="M928 474 H940"/>
+  <path class="flow" d="M432 526 V562"/>
+  <path class="flow" d="M654 610 H686"/>
+  <path class="flow" d="M912 668 C912 682 500 684 432 700"/>
+  <text x="640" y="690" class="lbl">recommendation, with its reasoning</text>
+  <path class="flow" d="M654 748 H686"/>
+  <path class="back" d="M240 700 C180 690 180 560 208 592"/>
+  <text x="120" y="646" class="lbl" fill="#c96a2b">correction</text>
+  <text x="120" y="660" class="lbl" fill="#c96a2b">appends</text>
+
+  <text x="40" y="854" class="hdr d">THE PROPERTY THAT MAKES IT WORTH DOING</text>
+  <path d="M40 866 H1140" stroke="#dbe3ee" stroke-width="1.5"/>
+  <text x="40" y="892" class="d" font-size="12">
+    <tspan x="40" dy="0">A feature shoot produces thirty to a hundred hours of footage. Two reach the screen. The other ninety-eight are kept but not usable, because the reasoning</tspan>
+    <tspan x="40" dy="20">behind every choice lived in one editor's head and left with them. Every step above writes its reason down as it goes — the notes are a by-product of the work, not extra work.</tspan>
+  </text>
+</svg>
