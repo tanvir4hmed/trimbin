@@ -40,6 +40,9 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from typing import Any
 
 log = logging.getLogger(__name__)
@@ -90,6 +93,33 @@ _COLUMNS = [
 # actually matched a word somebody wrote.
 SEMANTIC_WEIGHT = 0.35
 TEXT_WEIGHT = 1.0
+
+# A semantic request executes the segment, finding and moment branches. Opening
+# an `uvx mcp-clickhouse` process for every branch added roughly fifteen seconds
+# to one click in production. The process remains request-scoped, but all query
+# branches in that request share it. Playback and scrubbing never enter here.
+_REQUEST_MCP: ContextVar[Any | None] = ContextVar("trimbin_search_mcp", default=None)
+
+
+@asynccontextmanager
+async def execution_session() -> AsyncIterator[None]:
+    """Share one official MCP subprocess for all queries in one search.
+
+    Missing reader configuration is deliberately not hidden. We yield without
+    a shared session so `_execute` follows its normal fail-closed path and
+    returns the existing explicit unavailable response.
+    """
+    from trimbin_agents.tools.clickhouse_mcp import ReaderMissing, session
+
+    try:
+        async with session() as mcp:
+            token = _REQUEST_MCP.set(mcp)
+            try:
+                yield
+            finally:
+                _REQUEST_MCP.reset(token)
+    except ReaderMissing:
+        yield
 
 
 async def run(
@@ -225,8 +255,14 @@ async def _execute(sql: str, params: dict[str, Any], project_id: int) -> tuple[l
     try:
         from trimbin_agents.tools.clickhouse_mcp import ReaderMissing, session
 
-        async with session() as mcp:
+        mcp = _REQUEST_MCP.get()
+        if mcp is not None:
             outcome = await mcp.run_query(_interpolated(sql, params), project_id, columns=_COLUMNS)
+        else:
+            async with session() as isolated:
+                outcome = await isolated.run_query(
+                    _interpolated(sql, params), project_id, columns=_COLUMNS
+                )
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         log.info("search via MCP: %d rows in %dms", len(outcome.rows), elapsed_ms)
         return outcome.rows, elapsed_ms

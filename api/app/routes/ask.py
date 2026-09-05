@@ -100,21 +100,21 @@ async def ask(
     if plan.semantic:
         embedding = await _embed(plan.semantic)
 
+    widened = False
     try:
-        rows, sql, elapsed_ms = await search.run(project_id, filters, embedding)
+        # Segment, finding and moment retrieval share one request-scoped
+        # official MCP session. Starting a new subprocess per query made a
+        # correct search feel broken without buying any additional isolation.
+        async with search.execution_session():
+            rows, sql, elapsed_ms = await search.run(project_id, filters, embedding)
+            if not rows and not plan.is_empty():
+                # Offered, not substituted. The near misses are labelled as near
+                # misses, because a person asked about scene 12 would act on rows
+                # from scene 9 without noticing they were not what they asked for.
+                rows, sql, elapsed_ms = await search.widen(project_id, filters)
+                widened = bool(rows)
     except search.SearchUnavailable as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
-
-    widened = False
-    if not rows and not plan.is_empty():
-        # Offered, not substituted. The near misses are labelled as near misses,
-        # because a person asked about scene 12 would act on rows from scene 9
-        # without noticing they were not what they asked for.
-        try:
-            rows, sql, elapsed_ms = await search.widen(project_id, filters)
-        except search.SearchUnavailable as exc:
-            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
-        widened = bool(rows)
 
     matches = [_as_match(r) for r in rows]
 

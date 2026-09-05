@@ -178,12 +178,13 @@ async def guest_limits(response: Response) -> dict[str, Any]:
     return {
         **limits.as_dict(),
         "note": (
-            f"Sign in with any Google account and you get a real workspace: "
+            f"Sign in as a guest and you get a real workspace: "
             f"{limits.projects} projects of your own, {limits.scenes} scenes "
             f"each, up to {limits.takes_per_shot} takes a shot, clips up to "
             f"{limits.clip_seconds} seconds, kept for {limits.retention_days} "
-            f"days. In our projects you can read everything, comment, and "
-            f"overrule any call we made — you just cannot upload into them."
+            f"days. In our projects you can upload, review, comment, and "
+            f"overrule any call we made. Editor-owned records stay protected "
+            f"from guest deletion."
         ),
     }
 

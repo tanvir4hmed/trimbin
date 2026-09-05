@@ -94,7 +94,10 @@ class Settings(BaseSettings):
     # ---- access -----------------------------------------------------------
     # Membership by email, which is all a small team needs. A permissions matrix
     # is real work for a real product and would earn nothing here.
-    demo_project_id: int = 1
+    # The complete real-footage example used by the public workspace and demo.
+    # Keep this aligned with README/documentation and the seeded production
+    # project; UI protections and links key off the same value.
+    demo_project_id: int = 9
 
     # ---- guest workspaces -------------------------------------------------
     # The numbers themselves live in services/members.py, beside the roster and

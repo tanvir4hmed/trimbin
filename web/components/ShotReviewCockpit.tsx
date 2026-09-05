@@ -730,6 +730,16 @@ export default function ShotReviewCockpit({
           {takes.map((take) => {
             const analysis = analysisFor(analyses, take.clip_id);
             const findings = analysis?.findings ?? [];
+            const markerEnds: number[] = [];
+            const findingMarkers = [...findings]
+              .sort((a, b) => a.start_s - b.start_s || a.end_s - b.end_s)
+              .map((finding) => {
+                let row = markerEnds.findIndex((end) => finding.start_s >= end);
+                if (row < 0) row = markerEnds.length;
+                markerEnds[row] = finding.end_s;
+                return { finding, row };
+              });
+            const markerRows = Math.max(1, markerEnds.length);
             const safe = analysis?.safe_ranges ?? take.safe_ranges;
             return (
               <div
@@ -747,7 +757,10 @@ export default function ShotReviewCockpit({
                   {take.take_no ? `T${take.take_no}` : "UN"}
                   <small>{tc(take.duration_s)}</small>
                 </button>
-                <div className="lane-track">
+                <div
+                  className="lane-track"
+                  style={{ height: 31 + (markerRows - 1) * 15 }}
+                >
                   <span
                     className="lane-empty"
                     style={{ width: pct(take.duration_s) }}
@@ -766,7 +779,7 @@ export default function ShotReviewCockpit({
                       title={`Clean ${tc(item.start_s)}–${tc(item.end_s)}`}
                     />
                   ))}
-                  {findings.map((finding) => (
+                  {findingMarkers.map(({ finding, row }) => (
                     <button
                       key={String(finding.finding_id)}
                       className={`lane-finding severity-${finding.severity}${focus && String(focus.finding.finding_id) === String(finding.finding_id) ? " open" : ""}`}
@@ -775,6 +788,9 @@ export default function ShotReviewCockpit({
                         width: pct(
                           Math.max(0.4, finding.end_s - finding.start_s),
                         ),
+                        top: row * 15,
+                        bottom: "auto",
+                        height: 15,
                       }}
                       onClick={() => inspect(take.clip_id, finding)}
                       title={`${label(finding.code)} ${tc(finding.start_s)}–${tc(finding.end_s)}`}

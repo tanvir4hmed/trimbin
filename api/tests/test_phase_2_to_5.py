@@ -189,6 +189,38 @@ async def test_search_fails_closed_when_official_mcp_is_unavailable(monkeypatch)
         )
 
 
+@pytest.mark.asyncio
+async def test_one_search_reuses_one_official_mcp_process(monkeypatch) -> None:
+    """Moment search has several query branches but only one process startup."""
+    from contextlib import asynccontextmanager
+    from types import SimpleNamespace
+
+    from trimbin_agents.tools import clickhouse_mcp
+
+    opened = 0
+    queries = 0
+
+    class FakeMCP:
+        async def run_query(self, sql, project_id, columns=None):
+            nonlocal queries
+            queries += 1
+            return SimpleNamespace(rows=[])
+
+    @asynccontextmanager
+    async def fake_session():
+        nonlocal opened
+        opened += 1
+        yield FakeMCP()
+
+    monkeypatch.setattr(clickhouse_mcp, "session", fake_session)
+    async with search.execution_session():
+        await search._execute("SELECT 1 WHERE project_id = 7 LIMIT 1", {}, 7)
+        await search._execute("SELECT 2 WHERE project_id = 7 LIMIT 1", {}, 7)
+
+    assert opened == 1
+    assert queries == 2
+
+
 class Principal:
     email = "owner@example.com"
 
