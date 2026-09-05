@@ -118,7 +118,12 @@ async def test_source_picker_can_return_a_clip_from_another_shot(monkeypatch) ->
     async def archive():
         return Archive()
 
+    async def no_plan(project_id: int):
+        assert project_id == 7
+        return []
+
     monkeypatch.setattr(review, "client", archive)
+    monkeypatch.setattr(review.structure, "for_project", no_plan)
     rows = await review.project_sources(7, Principal(), q="window", limit=20)
     assert rows[0]["shot"] == 3
     assert rows[0]["clip_id"] == str(CLIP)
