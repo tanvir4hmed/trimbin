@@ -493,3 +493,48 @@ class TestP01GuestEntryOpensAProduct:
             line for line in auth_source.splitlines() if not line.lstrip().startswith("#")
         )
         assert "demo_project_id" not in code
+
+
+class TestTheClientCanDoTheWork:
+    """Trimbin is one company's tool. The guest role is the client, reviewing
+    alongside the editors — not a stranger on a tour.
+
+    So on any production open to readers a client compares, judges, curates and
+    uploads exactly as an editor does. The one thing they may not do is destroy
+    the editors' material, and that is a per-record rule rather than a
+    project-wide capability.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_client_may_curate_and_upload(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from app import auth
+        from app.services import members
+
+        class Readable:
+            project_id = 7
+            owner_email = members.LEAD_EDITOR
+            member_emails: list[str] = []
+            is_public = False
+            state = "active"
+            rev = 0
+
+        async def readable(project_id: int, **kwargs):
+            return Readable()
+
+        monkeypatch.setattr(auth.projects, "get", readable)
+        client = auth.Principal(email="client@example.com")
+        await client.assert_can_read(7)
+        await client.assert_can_comment(7)
+        await client.assert_can_curate(7)
+        await client.assert_can_upload(7)
+
+    def test_the_editors_footage_stays_protected(self) -> None:
+        """The boundary that remains. A guest removes only what they uploaded,
+        enforced on the record rather than on the project."""
+        from pathlib import Path
+
+        source = (Path(__file__).parents[1] / "app" / "routes" / "clips.py").read_text(
+            encoding="utf-8"
+        )
+        assert 'members.role_of(principal.email) == "guest"' in source
+        assert 'found["uploaded_by"]' in source

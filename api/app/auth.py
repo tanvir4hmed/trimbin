@@ -133,10 +133,18 @@ class Principal:
         """
         if self.is_anonymous:
             raise _unauthorised()
-        # No demo exception. This used to grant curate rights on one configured
-        # project to anybody signed in, which contradicts the frozen policy: a
-        # guest reads the team's work, comments on any shot and may overrule a
-        # take, and does nothing else there. Their own project is theirs.
+        # A client is here to do the work, not watch it. This is one company's
+        # tool: the guest role is the client who reviews with the editors, and
+        # a review they cannot run is a review they cannot check. So on any
+        # production open to readers they compare, judge, and curate exactly as
+        # an editor does.
+        #
+        # What they may not do is destroy somebody else's material. That is not
+        # enforced here, because it is not a project-wide capability — it is a
+        # per-record rule, and it lives on the record: see routes/clips.py,
+        # where a guest may remove only clips they uploaded themselves.
+        if projects.open_to_readers(await projects.get(project_id)):
+            return
         if await self._owns_the_work(project_id):
             return
 
@@ -158,8 +166,11 @@ class Principal:
         """
         if self.is_anonymous:
             raise _unauthorised()
-        # Same reason as curate: reading the team's work never carried the right
-        # to put footage into it.
+        # Same rule as curate. A client checking the system needs to put a take
+        # through it, and the quota in services/members.py is what bounds the
+        # cost of that — not a permission that stops them trying.
+        if projects.open_to_readers(await projects.get(project_id)):
+            return
         if await self._owns_the_work(project_id):
             return
 

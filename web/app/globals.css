@@ -2457,3 +2457,13 @@ body{background:var(--bg);color:var(--ink)}
 .scene-row-waiting.on{color:var(--amber);border-color:rgba(242,182,77,.4)}
 .scene-row i{color:var(--faint);font-style:normal}
 @media(max-width:700px){.scene-row{grid-template-columns:1fr auto}.scene-row-meta{grid-column:1/-1}}
+
+/* The guide doubles as the acceptance script, so each step carries what you
+   should see when it worked. A walkthrough that only describes the happy path
+   cannot tell you whether the happy path happened. */
+.prose .callout{margin:12px 0 0;padding:11px 14px;background:var(--surface-2);border-left:3px solid var(--blue);border-radius:0 6px 6px 0;color:var(--mid);font-size:13px}
+.prose .callout strong{color:var(--ink)}
+.prose ul.plain{margin:10px 0;padding-left:18px;display:grid;gap:7px}
+.prose ul.plain li{color:var(--mid);font-size:13.5px}
+.prose ul.plain strong{color:var(--ink)}
+.prose code{padding:1px 5px;background:var(--surface-2);border-radius:4px;font:12px var(--mono)}

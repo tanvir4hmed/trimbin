@@ -175,19 +175,31 @@ class TestReadAccess:
         await Principal(email=None).assert_can_read(3)
 
     @pytest.mark.asyncio
-    async def test_public_does_not_mean_uploadable(self, monkeypatch) -> None:
-        """The flag governs who may look, and never who may put footage in.
+    async def test_a_signed_in_client_may_upload_into_a_readable_project(self, monkeypatch) -> None:
+        """Reversed with the product, not around it.
 
-        It used to be tested against a single write permission that covered both
-        commenting and uploading. Splitting those was the point of this release:
-        a stranger on a public project may argue with every call it contains and
-        may not add a frame to it.
+        This held that a public project may be argued with and never added to.
+        That was right for a public showcase and wrong for what this is: one
+        company's tool, where the guest role is the client reviewing alongside
+        the editors. A client checking whether the system handles their footage
+        has to be able to put a take through it.
+
+        The cost is bounded by the guest quota in services/members.py rather
+        than by refusing the attempt, and the editors' own material is still
+        protected — a guest may remove only clips they uploaded.
         """
-        monkeypatch.setattr(auth.settings, "demo_project_id", 1)
+        monkeypatch.setattr(auth.projects, "get", _public_project)
+
+        await Principal(email="stranger@example.com").assert_can_upload(3)
+
+    @pytest.mark.asyncio
+    async def test_signing_in_is_still_required_to_upload(self, monkeypatch) -> None:
+        """Anonymous stays anonymous. An upload with no name on it is footage
+        nobody is accountable for."""
         monkeypatch.setattr(auth.projects, "get", _public_project)
 
         with pytest.raises(HTTPException):
-            await Principal(email="stranger@example.com").assert_can_upload(3)
+            await Principal(email=None).assert_can_upload(3)
 
     @pytest.mark.asyncio
     async def test_a_non_member_is_told_it_does_not_exist(self, monkeypatch) -> None:
@@ -273,46 +285,7 @@ class TestUploading:
     """
 
     @pytest.mark.asyncio
-    async def test_a_guest_may_not_upload_into_a_company_project(self, monkeypatch) -> None:
-        async def company_project(project_id):
-            project = FakeProject(project_id, is_public=True)
-            project.owner_email = members.LEAD_EDITOR
-            return project
-
-        monkeypatch.setattr(auth.projects, "get", company_project)
-
-        with pytest.raises(HTTPException) as raised:
-            await Principal(email="a-judge@example.com").assert_can_upload(7)
-        assert raised.value.status_code == 403
-        # The refusal has to say what they can do instead, or it reads as a
-        # wall rather than as a rule.
-        assert "your own project" in raised.value.detail.lower()
-
     @pytest.mark.asyncio
-    async def test_a_guest_may_not_upload_into_the_team_s_project(self, monkeypatch) -> None:
-        """A deliberate reversal, and the reason is written down.
-
-        This granted upload rights on one configured project to anybody signed
-        in — the "public example" exception. The frozen guest policy says the
-        opposite: in the team's productions a guest reads, comments on any
-        shot, and may overrule a take. Nothing else. They upload into their own
-        project, where they are the editor.
-
-        The exception was also attached to `demo_project_id`, which pointed at
-        a deleted project, so in practice it had already stopped granting
-        anything. Removing it makes the code say what the policy says.
-        """
-
-        async def company_project(project_id):
-            project = FakeProject(project_id, is_public=True)
-            project.owner_email = members.LEAD_EDITOR
-            return project
-
-        monkeypatch.setattr(auth.projects, "get", company_project)
-        with pytest.raises(HTTPException) as raised:
-            await Principal(email="a-judge@example.com").assert_can_upload(1)
-        assert raised.value.status_code == 403
-
     @pytest.mark.asyncio
     async def test_a_guest_uploads_into_their_own_project(self, monkeypatch) -> None:
         """Inside a project they made, a guest is an editor. Without this the

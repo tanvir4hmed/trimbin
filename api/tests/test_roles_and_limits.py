@@ -257,10 +257,21 @@ class TestCuratingIsNotCommenting:
     """
 
     @pytest.mark.asyncio
-    async def test_a_guest_may_not_curate_a_company_project(
+    async def test_a_client_curates_the_company_s_project(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from fastapi import HTTPException
+        """Reversed deliberately, and this is the reasoning.
+
+        Trimbin is one company's tool. The guest role is not a stranger being
+        given a tour — it is the client, sitting with the editors, checking the
+        work. A client who cannot run the comparison cannot check the thing the
+        comparison decided, so on any production open to readers they curate as
+        an editor does.
+
+        What they still may not do is destroy the editors' material. That is a
+        per-record rule rather than a project-wide one and it lives on the
+        record: `routes/clips.py` lets a guest remove only clips they uploaded.
+        """
 
         from app import auth
 
@@ -273,16 +284,14 @@ class TestCuratingIsNotCommenting:
                     "is_public": True,
                     "owner_email": members.LEAD_EDITOR,
                     "member_emails": [],
+                    "state": "active",
+                    "rev": 0,
                 },
             )()
 
         monkeypatch.setattr(auth.projects, "get", company_project)
 
-        with pytest.raises(HTTPException) as raised:
-            await auth.Principal(email="a-judge@example.com").assert_can_curate(7)
-        assert raised.value.status_code == 403
-        # The refusal has to name what they *can* do, or it reads as a wall.
-        assert "overrule" in raised.value.detail.lower()
+        await auth.Principal(email="a-judge@example.com").assert_can_curate(7)
 
     @pytest.mark.asyncio
     async def test_a_guest_curates_their_own_project(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -297,6 +306,8 @@ class TestCuratingIsNotCommenting:
                     "is_public": False,
                     "owner_email": "a-judge@example.com",
                     "member_emails": [],
+                    "state": "active",
+                    "rev": 0,
                 },
             )()
 
@@ -318,6 +329,8 @@ class TestCuratingIsNotCommenting:
                     "is_public": True,
                     "owner_email": members.LEAD_EDITOR,
                     "member_emails": [],
+                    "state": "active",
+                    "rev": 0,
                 },
             )()
 
