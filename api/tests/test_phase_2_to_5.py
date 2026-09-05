@@ -234,10 +234,12 @@ async def test_ingest_commit_settles_before_it_queues_analysis(monkeypatch) -> N
         return SimpleNamespace(takes_per_shot=0)
 
     monkeypatch.setattr(uploads.jobs, "get_job", get_job)
-    monkeypatch.setattr(uploads.placements, "resolve", settle)
-    monkeypatch.setattr(uploads.activity, "record", activity)
+    monkeypatch.setattr(uploads.settlement.placements, "resolve", settle)
+    monkeypatch.setattr(uploads.settlement.activity, "record", activity)
     monkeypatch.setattr(uploads.jobs, "mark_verified", verified)
-    monkeypatch.setattr(uploads.analysis_store, "active_clips_without_analysis", candidates)
+    monkeypatch.setattr(
+        uploads.settlement.analysis_store, "active_clips_without_analysis", candidates
+    )
     monkeypatch.setattr(uploads.jobs, "enqueue_analysis", queue)
     monkeypatch.setattr(uploads.quota, "limits_for_project", limits)
 
@@ -281,8 +283,8 @@ async def test_retrying_an_ingest_commit_does_not_append_another_event(monkeypat
 
     monkeypatch.setattr(uploads.jobs, "get_job", get_job)
     monkeypatch.setattr(uploads.quota, "limits_for_project", limits)
-    monkeypatch.setattr(uploads.placements, "resolve", must_not_run)
-    monkeypatch.setattr(uploads.activity, "record", must_not_run)
+    monkeypatch.setattr(uploads.settlement.placements, "resolve", must_not_run)
+    monkeypatch.setattr(uploads.settlement.activity, "record", must_not_run)
 
     result = await uploads.commit_ingest(
         JOB,

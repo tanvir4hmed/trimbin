@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 
 from .. import schemas
 from ..auth import Principal, current_principal, require_signed_in
-from ..services import activity, analysis_store, jobs, members, placements
+from ..services import activity, members, placements, settlement
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/placements", tags=["placements"])
@@ -157,36 +157,19 @@ async def resolve(
         scene, shot = 0, 0
         detail = body.note or "left unassigned"
 
-    if body.action == "unassign":
-        await placements.unassign(
-            project_id, clip_id, principal.email or "", detail, take_no=take_no
-        )
-    else:
-        await placements.resolve(
-            project_id, clip_id, scene, shot, principal.email or "", detail, take_no=take_no
-        )
-    await activity.record(
-        project_id,
-        principal.email or "",
-        "placed",
-        detail=detail,
+    # The same command the ingest wizard runs. Settling used to be written out
+    # here and again in `/uploads/jobs/{id}/commit`, which is how one of them
+    # queued analysis and the other did not.
+    queued = await settlement.settle(
+        project_id=project_id,
+        clip_id=clip_id,
         scene=scene,
         shot=shot,
-        actor_role=members.role_of(principal.email),
+        take_no=take_no,
+        actor=principal.email or "",
+        detail=detail,
+        unassign=body.action == "unassign",
     )
-
-    log.info(
-        "placement settled: clip %s -> %d/%d by %s",
-        str(clip_id)[:8],
-        scene,
-        shot,
-        principal.email,
-    )
-    queued = 0
-    if body.action != "unassign":
-        candidates = await analysis_store.active_clips_without_analysis(project_id)
-        target = [row for row in candidates if str(row["clip_id"]) == str(clip_id)]
-        queued = await jobs.enqueue_analysis(project_id, target) if target else 0
     return {
         "status": "settled",
         "scene": scene,

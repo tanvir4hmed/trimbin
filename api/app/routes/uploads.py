@@ -25,11 +25,10 @@ from .. import schemas
 from ..auth import Principal, current_principal, require_signed_in
 from ..services import (
     activity,
-    analysis_store,
     jobs,
     members,
-    placements,
     quota,
+    settlement,
     storage,
     structure,
 )
@@ -456,43 +455,35 @@ async def commit_ingest(
                 )
             batch_counts[key] = batch_counts.get(key, 0) + 1
         take_no = int(decision.take or proposed.get("take_no", 0) or 0)
-        if decision.action == "unassign":
-            await placements.unassign(
-                job.project_id,
-                decision.clip_id,
-                principal.email or "",
-                detail,
-                take_no=take_no,
-            )
-        else:
-            await placements.resolve(
-                job.project_id,
-                decision.clip_id,
-                scene,
-                shot,
-                principal.email or "",
-                detail,
-                take_no=take_no,
-            )
-        committed.add(str(decision.clip_id))
-        await activity.record(
-            job.project_id,
-            principal.email or "",
-            "ingest_committed",
-            detail=detail,
+        # The same command the Placement Inbox runs, so a clip settled here and
+        # a clip settled there end in the same state — including being queued
+        # for analysis, which is what differed between them.
+        await settlement.settle(
+            project_id=job.project_id,
+            clip_id=decision.clip_id,
             scene=scene,
             shot=shot,
-            actor_role=members.role_of(principal.email),
+            take_no=take_no,
+            actor=principal.email or "",
+            detail=detail,
+            unassign=decision.action == "unassign",
+            verb="ingest_committed",
+            # Deferred: the whole batch settles, the job is marked verified,
+            # and only then is analysis queued for what was assigned.
+            queue_analysis_now=False,
         )
+        committed.add(str(decision.clip_id))
 
     if not committed:
         return {"status": "committed", "committed": 0, "analysis_queued": 0}
 
     await jobs.mark_verified(job_id, committed)
-    candidates = await analysis_store.active_clips_without_analysis(job.project_id)
-    assigned = {str(item.clip_id) for item in body.items if item.action != "unassign"}
-    to_queue = [row for row in candidates if str(row["clip_id"]) in committed & assigned]
-    queued = await jobs.enqueue_analysis(job.project_id, to_queue) if to_queue else 0
+    assigned = [
+        item.clip_id
+        for item in body.items
+        if item.action != "unassign" and str(item.clip_id) in committed
+    ]
+    queued = await settlement.queue_analysis(job.project_id, assigned)
     return {
         "status": "committed",
         "committed": len(committed),

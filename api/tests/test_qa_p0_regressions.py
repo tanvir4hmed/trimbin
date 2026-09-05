@@ -247,3 +247,178 @@ class TestP07SearchReturnsTheEventNotTheWindow:
             encoding="utf-8"
         )
         assert "_run_moments" in source, "semantic queries no longer reach the moment index"
+
+
+class TestP03OnePathToSettlement:
+    """Clips committed through the ingest wizard were queued for full-take
+    analysis; clips settled later through the Placement Inbox were not. Whether
+    a take ever got intelligence depended on which screen an editor used.
+
+    Both later grew the enqueue call, but as two copies of a sequence that had
+    to stay in step by hand — the same bug waiting for whoever edited one of
+    them next. The sequence lives in one command now.
+    """
+
+    def test_both_routes_call_the_same_command(self) -> None:
+        from pathlib import Path
+
+        routes = Path(__file__).parents[1] / "app" / "routes"
+        uploads = (routes / "uploads.py").read_text(encoding="utf-8")
+        inbox = (routes / "placements.py").read_text(encoding="utf-8")
+        assert "settlement.settle(" in uploads
+        assert "settlement.settle(" in inbox
+
+    def test_neither_route_reimplements_the_sequence(self) -> None:
+        """A route that appends its own placement is a route that can forget
+        the step after it."""
+        from pathlib import Path
+
+        routes = Path(__file__).parents[1] / "app" / "routes"
+        uploads = (routes / "uploads.py").read_text(encoding="utf-8")
+        assert "placements.resolve(" not in uploads
+        assert "placements.unassign(" not in uploads
+
+    @pytest.mark.asyncio
+    async def test_settling_queues_analysis_for_the_clip(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import uuid
+
+        from app.services import settlement
+
+        clip = uuid.uuid4()
+        queued: list = []
+
+        async def noop(*args, **kwargs):
+            return None
+
+        async def candidates(project_id):
+            return [{"clip_id": clip}]
+
+        async def enqueue(project_id, rows):
+            queued.extend(rows)
+            return len(rows)
+
+        monkeypatch.setattr(settlement.placements, "resolve", noop)
+        monkeypatch.setattr(settlement.activity, "record", noop)
+        monkeypatch.setattr(settlement.analysis_store, "active_clips_without_analysis", candidates)
+        monkeypatch.setattr(settlement.jobs, "enqueue_analysis", enqueue)
+
+        assert (
+            await settlement.settle(
+                project_id=1,
+                clip_id=clip,
+                scene=12,
+                shot=1,
+                take_no=2,
+                actor="editor@example.com",
+                detail="moved",
+            )
+            == 1
+        )
+        assert len(queued) == 1
+
+    @pytest.mark.asyncio
+    async def test_unassigned_footage_is_not_analysed(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Analysing a clip nobody has claimed spends the model's budget on a
+        question nobody asked."""
+        import uuid
+
+        from app.services import settlement
+
+        async def noop(*args, **kwargs):
+            return None
+
+        async def explode(*args, **kwargs):
+            raise AssertionError("unassigned footage must not be queued")
+
+        monkeypatch.setattr(settlement.placements, "unassign", noop)
+        monkeypatch.setattr(settlement.activity, "record", noop)
+        monkeypatch.setattr(settlement.analysis_store, "active_clips_without_analysis", explode)
+
+        assert (
+            await settlement.settle(
+                project_id=1,
+                clip_id=uuid.uuid4(),
+                scene=0,
+                shot=0,
+                take_no=0,
+                actor="editor@example.com",
+                detail="left unassigned",
+                unassign=True,
+            )
+            == 0
+        )
+
+    @pytest.mark.asyncio
+    async def test_settling_twice_queues_once(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Idempotent by construction: the queue is asked only for clips the
+        archive says have no analysis, so a replayed commit finds none."""
+        import uuid
+
+        from app.services import settlement
+
+        clip = uuid.uuid4()
+        analysed: set[str] = set()
+
+        async def noop(*args, **kwargs):
+            return None
+
+        async def candidates(project_id):
+            return [] if str(clip) in analysed else [{"clip_id": clip}]
+
+        async def enqueue(project_id, rows):
+            analysed.update(str(row["clip_id"]) for row in rows)
+            return len(rows)
+
+        monkeypatch.setattr(settlement.placements, "resolve", noop)
+        monkeypatch.setattr(settlement.activity, "record", noop)
+        monkeypatch.setattr(settlement.analysis_store, "active_clips_without_analysis", candidates)
+        monkeypatch.setattr(settlement.jobs, "enqueue_analysis", enqueue)
+
+        first = await settlement.settle(
+            project_id=1,
+            clip_id=clip,
+            scene=12,
+            shot=1,
+            take_no=2,
+            actor="e@x.com",
+            detail="moved",
+        )
+        second = await settlement.settle(
+            project_id=1,
+            clip_id=clip,
+            scene=12,
+            shot=1,
+            take_no=2,
+            actor="e@x.com",
+            detail="moved again",
+        )
+        assert (first, second) == (1, 0)
+
+
+class TestNoMutationInTheReviewPath:
+    """`normalise_group` ran one `ALTER TABLE clips UPDATE` per shot from the
+    hot path of every comparison. A ClickHouse mutation rewrites every part it
+    touches and runs asynchronously; queueing them per row is the most reliable
+    way to make this database behave badly.
+
+    Removing it was a release gate, so it is removed rather than left unused.
+    """
+
+    def test_the_helper_is_gone(self) -> None:
+        from app.services import clips
+
+        assert not hasattr(clips, "normalise_group")
+
+    def test_no_service_issues_a_clips_mutation(self) -> None:
+        from pathlib import Path
+
+        for path in (Path(__file__).parents[1] / "app" / "services").glob("*.py"):
+            source = path.read_text(encoding="utf-8")
+            code = "\n".join(
+                line for line in source.splitlines() if not line.lstrip().startswith("#")
+            )
+            assert "ALTER TABLE clips UPDATE" not in code, f"{path.name} mutates clips"

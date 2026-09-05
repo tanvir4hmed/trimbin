@@ -218,109 +218,17 @@ async def write_unusable(
     log.info("clip %s recorded as unusable: %s", clip_id, reason)
 
 
-async def normalise_group(project_id: int, group_id: int, subgroup_id: int) -> int:
-    """Express every take in a setup against that setup's median.
-
-    This is the step that makes a measurement mean something. An absolute
-    threshold marks down all seven takes of a night scene for being dark; a
-    ratio asks the only useful question — is this take unlike its siblings?
-
-    Re-runnable, and meant to be re-run. Takes arrive one message at a time and
-    out of order, so the median moves as a setup fills: normalising after take
-    three and again after take seven gives different and equally correct
-    answers. Whichever ran last is the one that saw the most footage.
-
-    Returns how many takes were normalised, so a caller can tell "the group was
-    too small" from "nothing happened".
-    """
-    ch = await client()
-
-    result = await ch.query(
-        """
-        SELECT clip_id, exposure_raw, sharpness_raw, motion_raw
-        FROM current_clip_placement
-        WHERE project_id = {p:UInt32} AND group_id = {g:UInt32}
-          AND subgroup_id = {s:UInt32} AND status = 'active'
-        ORDER BY clip_id, ingested_at DESC
-        LIMIT 1 BY clip_id
-        """,
-        parameters={"p": project_id, "g": group_id, "s": subgroup_id},
-    )
-
-    rows = result.result_rows
-    if len(rows) < 2:
-        # A group of one has no median worth computing; the take would only be
-        # compared against itself and would always sit exactly at 1.0.
-        return 0
-
-    # Refuse rather than normalise from nothing.
-    #
-    # A clip written before the raw columns existed, or by a tool that computed
-    # its own ratios and stored only those, carries zeros here. Every median
-    # would be zero, every ratio would fall back to 1.0, and the result would be
-    # a whole setup silently flattened to "all takes typical" — overwriting
-    # correct values with a confident-looking placeholder.
-    #
-    # This is not hypothetical: it happened to the twelve dataset takes the
-    # first time this ran, and the only reason it was visible is that
-    # normalised_at had just been added.
-    if not any(float(r[1]) or float(r[2]) or float(r[3]) for r in rows):
-        log.warning(
-            "project %d scene %d setup %d has no raw measurements; "
-            "leaving the existing ratios alone",
-            project_id,
-            group_id,
-            subgroup_id,
-        )
-        return 0
-
-    medians = {
-        axis: _median([float(r[i]) for r in rows])
-        for i, axis in ((1, "exposure"), (2, "sharpness"), (3, "motion"))
-    }
-
-    # One mutation for the whole shot, not one per take.
-    #
-    # This ran a separate ALTER UPDATE per clip, so a seven-take shot queued
-    # seven mutations and a shoot day queued hundreds. A ClickHouse mutation is
-    # not a row edit: it rewrites every part it touches, runs asynchronously,
-    # and the server caps how many may be in flight. Queueing them per row is
-    # the single most common way to make this database behave badly, and it was
-    # in the hot path of every comparison.
-    #
-    # The arithmetic moves into the statement. The medians are still computed
-    # here — ClickHouse has no median window function that is cheap over a
-    # partition this small, and the guard against a zero median needs a branch
-    # that is clearer in Python than in SQL.
-    divisors = {axis: (value if value > 0 else 1.0) for axis, value in medians.items()}
-
-    await ch.command(
-        """
-        ALTER TABLE clips UPDATE
-            exposure_rel  = if(exposure_raw > 0, exposure_raw / {em:Float32}, 1.0),
-            sharpness_rel = if(sharpness_raw > 0, sharpness_raw / {sm:Float32}, 1.0),
-            motion_rel    = if(motion_raw > 0, motion_raw / {mm:Float32}, 1.0),
-            normalised_at = now()
-        WHERE project_id = {p:UInt32} AND clip_id IN {ids:Array(UUID)}
-          AND status = 'active'
-        """,
-        parameters={
-            "em": divisors["exposure"],
-            "sm": divisors["sharpness"],
-            "mm": divisors["motion"],
-            "p": project_id,
-            "ids": [r[0] for r in rows],
-        },
-    )
-
-    log.info(
-        "normalised %d takes in project %d scene %d shot %d (1 mutation)",
-        len(rows),
-        project_id,
-        group_id,
-        subgroup_id,
-    )
-    return len(rows)
+# `normalise_group` lived here and is gone.
+#
+# It ran one `ALTER TABLE clips UPDATE` per shot to rewrite the relative
+# exposure/sharpness/motion columns. A ClickHouse mutation is not a row edit: it
+# rewrites every part it touches, runs asynchronously, and the server caps how
+# many may be in flight — and this sat in the hot path of every comparison.
+#
+# Nothing calls it any more. Left in place it was a loaded gun: the next person
+# needing normalised values would find a ready-made helper that quietly
+# degrades the whole database under a shoot day's worth of shots. The QA named
+# removing it as a release gate, so it is removed rather than merely unused.
 
 
 def _median(values: list[float]) -> float:

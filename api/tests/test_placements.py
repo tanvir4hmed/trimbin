@@ -133,7 +133,9 @@ class TestKeepCannotBecomeAMove:
         monkeypatch.setattr(routes.placements, "inbox", inbox)
         monkeypatch.setattr(routes.placements, "resolve", resolve)
         monkeypatch.setattr(routes.activity, "record", noted)
-        monkeypatch.setattr(routes.analysis_store, "active_clips_without_analysis", no_candidates)
+        monkeypatch.setattr(
+            routes.settlement.analysis_store, "active_clips_without_analysis", no_candidates
+        )
 
         await routes.resolve(
             1,
@@ -256,7 +258,9 @@ class TestReplacingADuplicate:
         monkeypatch.setattr(routes.placements, "resolve", resolve)
         monkeypatch.setattr(routes.placements, "unassign", unassign)
         monkeypatch.setattr(routes.activity, "record", noted)
-        monkeypatch.setattr(routes.analysis_store, "active_clips_without_analysis", no_candidates)
+        monkeypatch.setattr(
+            routes.settlement.analysis_store, "active_clips_without_analysis", no_candidates
+        )
 
         await routes.resolve(
             1,
