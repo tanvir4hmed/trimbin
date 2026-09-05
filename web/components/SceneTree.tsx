@@ -18,6 +18,7 @@
  */
 
 import type { SceneNode, ShotStatus } from "@/lib/api";
+import { waitingCount } from "@/lib/shot";
 
 const STATUS_LABEL: Record<ShotStatus, string> = {
   too_few_takes: "one take",
@@ -66,19 +67,10 @@ export default function SceneTree({
   // no selection read as "Everything is decided" in this column while the
   // cockpit beside it said "Human decision required" and the scene page said
   // one shot needed a decision. Three surfaces, three answers, one shot.
-  const waiting = scenes
-    .flatMap((s) => s.shots)
-    .filter(
-      (s) =>
-        // No chosen source range is an unresolved shot. `chosen_take` looked
-        // like the right field and is not: a one-take shot reports 1 whether or
-        // not a human chose anything, which is why this column claimed
-        // everything was decided beside a cockpit asking for a decision.
-        s.segments === 0 ||
-        s.status === "needs_review" ||
-        s.status === "not_judged" ||
-        s.status === "differs_from_circle",
-    ).length;
+  // One rule, and the server's. See lib/shot.ts — this column, the overview
+  // and the queue all asked the same question in three different ways, and
+  // gave three different answers about the same shot.
+  const waiting = waitingCount(scenes.flatMap((s) => s.shots));
 
   return (
     <nav className="tree" aria-label="Scenes and shots">

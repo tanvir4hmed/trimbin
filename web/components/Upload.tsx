@@ -30,7 +30,7 @@ function bytes(value: number) {
  * bytes after a reload — so this is what tells a genuine resume from somebody
  * selecting different footage that happens to share a filename.
  */
-function matches(saved: SavedFile[], chosen: SavedFile[]): boolean {
+export function matches(saved: SavedFile[], chosen: SavedFile[]): boolean {
   if (saved.length !== chosen.length) return false;
   const key = (file: SavedFile) => `${file.name}:${file.size}:${file.lastModified}`;
   const remaining = new Map<string, number>();

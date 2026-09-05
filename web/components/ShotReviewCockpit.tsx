@@ -398,8 +398,22 @@ export default function ShotReviewCockpit({
             ? [{ side: "a" as const, take: previous, ref: playerA }, { side: "b" as const, take: chosen, ref: playerB }]
             : [{ side: "a" as const, take: chosen, ref: playerA }]
           ).map(({ side, take, ref }) => take && (
-            <div key={side} className={take.clip_id === chosen?.clip_id ? "compare-player active" : "compare-player"} onClick={() => chooseTake(take.clip_id)}>
-              <span className="player-badge">{takeName(take).toUpperCase()}{take.clip_id === chosen?.clip_id && previous ? " · chosen" : ""}</span>
+            /* Choosing is the badge, not the frame. The whole panel used to
+               carry the click, and it wraps a video — so pressing play on the
+               left take, or scrubbing it, bubbled up and silently reassigned
+               which take was chosen. You could not watch A without selecting
+               it. A div is also not reachable by keyboard, so this was the
+               only control here nobody could tab to. */
+            <div key={side} className={take.clip_id === chosen?.clip_id ? "compare-player active" : "compare-player"}>
+              <button
+                type="button"
+                className="player-badge"
+                aria-pressed={take.clip_id === chosen?.clip_id}
+                onClick={() => chooseTake(take.clip_id)}
+                title={`Choose ${takeName(take)}`}
+              >
+                {takeName(take).toUpperCase()}{take.clip_id === chosen?.clip_id && previous ? " · chosen" : ""}
+              </button>
               <Player ref={ref} className="player" src={take.proxy_uri} poster={take.sprite_uri} onTimeUpdate={(at) => {
                 setPlayheads((current) => ({ ...current, [take.clip_id]: at }));
                 if (take.clip_id === chosen?.clip_id) setCommentAt((old) => old && old.clipId === take.clip_id ? { ...old, at } : old);
@@ -523,7 +537,7 @@ export default function ShotReviewCockpit({
                   markup is preserved verbatim, so restoring it is deleting
                   this comment.
 
-                  <details className="source-library"><summary>Reuse footage from another shot or scene</summary><p className="policy-note">Adds a source range here without changing where its slate placed the clip.</p><div className="source-search"><input value={sourceQuery} onChange={(event) => setSourceQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void findSources(); }} placeholder="Scene, shot, description or clip ID"/><button className="ghost" disabled={sourceBusy} onClick={() => void findSources()}>{sourceBusy ? "Finding…" : "Find"}</button></div>{sourcePreview?.proxy_uri && <Player className="source-preview" src={sourcePreview.proxy_uri} poster={sourcePreview.sprite_uri} />}{sourceRows.map((source) => <div className="source-row" key={source.clip_id}><button className="source-ident" onClick={() => setSourcePreview(source)}><b>Scene {source.scene_code || source.scene} · Shot {source.shot_code || source.shot} · Take {source.take_no}</b><small>{tc(source.duration_s)}{source.description ? ` · ${source.description}` : ""}</small></button><button className="ghost" disabled={!canComment} onClick={() => addSource(source)}>Add range</button></div>)}</details>
+                  <details className="source-library"><summary>Reuse footage from another shot or scene</summary><p className="policy-note">Adds a source range here without changing where its slate placed the clip.</p><div className="source-search"><input aria-label="Find footage from another shot or scene" value={sourceQuery} onChange={(event) => setSourceQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void findSources(); }} placeholder="Scene, shot, description or clip ID"/><button className="ghost" disabled={sourceBusy} onClick={() => void findSources()}>{sourceBusy ? "Finding…" : "Find"}</button></div>{sourcePreview?.proxy_uri && <Player className="source-preview" src={sourcePreview.proxy_uri} poster={sourcePreview.sprite_uri} />}{sourceRows.map((source) => <div className="source-row" key={source.clip_id}><button className="source-ident" onClick={() => setSourcePreview(source)}><b>Scene {source.scene_code || source.scene} · Shot {source.shot_code || source.shot} · Take {source.take_no}</b><small>{tc(source.duration_s)}{source.description ? ` · ${source.description}` : ""}</small></button><button className="ghost" disabled={!canComment} onClick={() => addSource(source)}>Add range</button></div>)}</details>
               */}
               {previewSegment && previewSource?.proxy_uri && <div className="shot-select-preview"><Player ref={selectPlayer} src={previewSource.proxy_uri} poster={previewSource.sprite_uri} onReady={() => selectPlayer.current?.seek(previewSegment.source_in_s, true)} onTimeUpdate={(at) => { if (at >= previewSegment.source_out_s - .05) setSelectPreviewIndex((index) => index !== null && index + 1 < selects.length ? index + 1 : null); }} /><small>Playing select {(selectPreviewIndex ?? 0) + 1} of {selects.length} · Take {previewSegment.take_no} · {tc(previewSegment.source_in_s)}–{tc(previewSegment.source_out_s)}</small></div>}
               <button className="ghost cockpit-confirm" disabled={!selects.length} onClick={() => setSelectPreviewIndex(0)}>▶ Play this shot</button>

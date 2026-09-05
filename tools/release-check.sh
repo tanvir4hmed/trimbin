@@ -54,6 +54,7 @@ step "Generated schema fresh" bash -c '
         exit 1
     fi'
 
+step "Web tests"            bash -c "cd web && npx vitest run"
 step "Web typecheck"        bash -c "cd web && npx tsc --noEmit"
 step "Web build"            bash -c "cd web && npm run build"
 

@@ -12,6 +12,7 @@ are cheap and their results are cacheable.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Annotated, Any
 
@@ -129,10 +130,15 @@ async def accuracy_per_project(response: Response) -> dict[str, Any]:
 
     rows = await analytics.accuracy_by_project()
 
+    # One round trip per project, all at once. This looked one up per accuracy
+    # row in sequence, so the public page's latency grew with the number of
+    # productions on the deployment — for a lookup that has no ordering
+    # requirement at all.
+    found = await asyncio.gather(*(projects.get(int(row["project_id"])) for row in rows))
+
     named = []
-    for row in rows:
-        project = await projects.get(int(row["project_id"]))
-        public = project is not None and (projects.open_to_readers(project))
+    for row, project in zip(rows, found, strict=True):
+        public = project is not None and projects.open_to_readers(project)
         named.append(
             {
                 **row,

@@ -634,20 +634,11 @@ class TestP07SearchLandsOnTheEvent:
         )
         assert match.play_from_s == 0.0
 
-    def test_an_undecided_clip_is_not_attributed_to_anybody(self) -> None:
-        """The interface said "by the panel" for anything not decided by a
-        human, which turned an absent decision into an editorial one."""
-        from pathlib import Path
-
-        source = (Path(__file__).parents[2] / "web" / "components" / "AskArchive.tsx").read_text(
-            encoding="utf-8"
-        )
-        code = chr(10).join(
-            line for line in source.splitlines() if not line.lstrip().startswith(("*", "//", "/*"))
-        )
-        assert '"by the panel"' not in code
-        assert "no decision recorded" in code
-        assert "AI suggested" in code
+    # The other half of this blocker — that the interface does not attribute an
+    # absent decision to anybody — is `web/tests/ask.test.ts`. It called this
+    # file's grep for the string "by the panel", which proves the source does
+    # not contain a phrase, not that the five states are distinguished. That
+    # rule is a pure function; it is now run rather than read.
 
 
 class TestD3IngestIsRecoverable:
@@ -730,26 +721,16 @@ class TestD3ResumeMatchesTheRightFiles:
     somebody is waiting on.
     """
 
-    def test_the_fingerprint_is_name_size_and_time(self) -> None:
-        from pathlib import Path
-
-        source = (Path(__file__).parents[2] / "web" / "components" / "Upload.tsx").read_text(
-            encoding="utf-8"
-        )
-        assert "type SavedFile = { name: string; size: number; lastModified: number }" in source
-
-    def test_matching_ignores_the_order_a_picker_returns(self) -> None:
-        """Comparing the serialised arrays meant reselecting the same footage in
-        a different order abandoned the session and re-uploaded every byte."""
-        from pathlib import Path
-
-        source = (Path(__file__).parents[2] / "web" / "components" / "Upload.tsx").read_text(
-            encoding="utf-8"
-        )
-        assert "function matches(" in source
-        assert "JSON.stringify(prior.files) === JSON.stringify(fingerprints)" not in source
+    # The fingerprint rule itself — order independence, duplicate counting,
+    # rejecting different bytes behind the same filename — is
+    # `web/tests/upload.test.ts`, which calls `matches()` with real batches.
+    # It was three greps here for a type alias and a function name, neither of
+    # which can tell a working comparison from a broken one.
 
     def test_a_mismatch_is_stated_rather_than_started_over(self) -> None:
+        """A copy assertion, and only that: it pins the sentence a person sees
+        when the batch does not match. The comparison behind it is tested in
+        `web/tests/upload.test.ts`."""
         from pathlib import Path
 
         source = (Path(__file__).parents[2] / "web" / "components" / "Upload.tsx").read_text(

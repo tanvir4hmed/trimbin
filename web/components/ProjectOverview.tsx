@@ -15,6 +15,7 @@
 
 import Link from "next/link";
 import type { SceneNode, ShotNode, ShotStatus } from "@/lib/api";
+import { needsAPerson } from "@/lib/shot";
 import { paths } from "@/lib/slug";
 
 const STATUS_LABEL: Record<ShotStatus, string> = {
@@ -25,16 +26,6 @@ const STATUS_LABEL: Record<ShotStatus, string> = {
   decided: "decided",
   confirmed: "settled",
 };
-
-/** Whether a shot still wants a person — the rule the queue and rail use. */
-function unsettled(shot: ShotNode) {
-  return (
-    shot.segments === 0 ||
-    shot.status === "needs_review" ||
-    shot.status === "not_judged" ||
-    shot.status === "differs_from_circle"
-  );
-}
 
 /** What stands for a shot, said the way an editor would say it. */
 function standing(shot: ShotNode) {
@@ -69,8 +60,8 @@ export default function ProjectOverview({
         <div className="overview-stats">
           <span><b>{open.shots.length}</b> shot{open.shots.length === 1 ? "" : "s"}</span>
           <span><b>{open.shots.reduce((n, s) => n + s.takes, 0)}</b> takes</span>
-          <span className={open.shots.filter(unsettled).length ? "overview-waiting" : ""}>
-            <b>{open.shots.filter(unsettled).length}</b> waiting
+          <span className={open.shots.filter(needsAPerson).length ? "overview-waiting" : ""}>
+            <b>{open.shots.filter(needsAPerson).length}</b> waiting
           </span>
           <Link className="ghost small" href={`${paths.coverage(projectId, open.scene)}`}>
             Play scene
@@ -111,7 +102,7 @@ export default function ProjectOverview({
   // -- the production: its scenes ------------------------------------------
   const shots = scenes.flatMap((item) => item.shots);
   const takes = shots.reduce((total, shot) => total + shot.takes, 0);
-  const waiting = shots.filter(unsettled).length;
+  const waiting = shots.filter(needsAPerson).length;
 
   return (
     <div className="project-overview">
@@ -126,7 +117,7 @@ export default function ProjectOverview({
 
       <div className="scene-rows">
         {scenes.map((item) => {
-          const sceneWaiting = item.shots.filter(unsettled).length;
+          const sceneWaiting = item.shots.filter(needsAPerson).length;
           return (
             <Link
               key={item.scene}

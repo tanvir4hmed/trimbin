@@ -1835,10 +1835,12 @@ select {
 .compare-vs { color: #6e829d; font-weight: 800; }
 
 .compare-players { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #020812; border: 1px solid var(--cockpit-line); border-radius: 8px; padding: 8px; }
-.compare-player { position: relative; opacity: .68; border: 2px solid transparent; border-radius: 6px; overflow: hidden; cursor: pointer; }
+.compare-player { position: relative; opacity: .68; border: 2px solid transparent; border-radius: 6px; overflow: hidden; }
 .compare-player.active { opacity: 1; border-color: var(--cockpit-blue); }
 .compare-player .player { display: block; width: 100%; aspect-ratio: 16/9; background: #02050b; }
-.player-badge { position: absolute; z-index: 2; left: 8px; top: 8px; padding: 4px 7px; background: rgba(3, 9, 17, .78); border-radius: 4px; font-size: 11px; font-weight: 800; }
+.player-badge { position: absolute; z-index: 2; left: 8px; top: 8px; padding: 4px 7px; background: rgba(3, 9, 17, .78); border: 1px solid transparent; border-radius: 4px; font-size: 11px; font-weight: 800; color: inherit; font-family: inherit; cursor: pointer; }
+.player-badge:hover { background: rgba(3, 9, 17, .92); border-color: var(--cockpit-blue); }
+.player-badge[aria-pressed="true"] { border-color: var(--cockpit-blue); }
 
 .take-card-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(116px, 1fr)); gap: 7px; margin: 10px 0 18px; }
 .take-card { display: grid; gap: 6px; min-width: 0; padding: 10px; text-align: left; color: var(--cockpit-text); background: var(--cockpit-panel); border: 1px solid var(--cockpit-line); border-radius: 7px; }

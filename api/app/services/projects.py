@@ -43,12 +43,22 @@ def _doc(project_id: int):
     return jobs.db().collection(COLLECTION).document(str(project_id))
 
 
-async def get(project_id: int, *, include_deleted: bool = False) -> Project | None:
-    snapshot = await _doc(project_id).get()
+def _from_snapshot(snapshot, *, include_deleted: bool = False) -> Project | None:
+    """A project out of a document already in hand.
+
+    The listing queries stream snapshots and then called `get()` on each id,
+    which fetches the very document just streamed — two reads per project on
+    every dashboard and every projects page, and each one a sequential round
+    trip. The data was already there.
+    """
     if not snapshot.exists:
         return None
     d = snapshot.to_dict() or {}
     if d.get("state") == "deleted" and not include_deleted:
+        return None
+    try:
+        project_id = int(snapshot.id)
+    except ValueError:
         return None
     return Project(
         project_id=project_id,
@@ -60,6 +70,10 @@ async def get(project_id: int, *, include_deleted: bool = False) -> Project | No
         state=d.get("state", "active"),
         rev=int(d.get("rev", 0)),
     )
+
+
+async def get(project_id: int, *, include_deleted: bool = False) -> Project | None:
+    return _from_snapshot(await _doc(project_id).get(), include_deleted=include_deleted)
 
 
 async def is_member(project_id: int, email: str) -> bool:
@@ -149,11 +163,11 @@ async def for_member(email: str, *, states: set[str] | None = None) -> list[Proj
     # all and the owner had no way to see — or restore — something they had
     # removed.
     async for snapshot in collection.where("owner_email", "==", email).stream():
-        found[int(snapshot.id)] = await get(int(snapshot.id), include_deleted=True)  # type: ignore[assignment]
+        found[int(snapshot.id)] = _from_snapshot(snapshot, include_deleted=True)  # type: ignore[assignment]
 
     async for snapshot in collection.where("member_emails", "array_contains", email).stream():
         if int(snapshot.id) not in found:
-            found[int(snapshot.id)] = await get(int(snapshot.id), include_deleted=True)  # type: ignore[assignment]
+            found[int(snapshot.id)] = _from_snapshot(snapshot, include_deleted=True)  # type: ignore[assignment]
 
     allowed = states or {"active"}
     return sorted(
@@ -186,15 +200,11 @@ async def visible_to(email: str) -> list[Project]:
     # an empty desk on a deployment full of work.
     public: list[Project] = []
     async for snapshot in jobs.db().collection(COLLECTION).stream():
-        try:
-            project_id = int(snapshot.id)
-        except ValueError:
+        candidate = _from_snapshot(snapshot)
+        if candidate is None or candidate.project_id in seen:
             continue
-        if project_id in seen:
-            continue
-        found = await get(project_id)
-        if open_to_readers(found):
-            public.append(found)  # type: ignore[arg-type]
+        if open_to_readers(candidate):
+            public.append(candidate)
 
     # Theirs first, then ours. A person opens the thing they are working on, and
     # a dashboard that leads with somebody else's production reads as a

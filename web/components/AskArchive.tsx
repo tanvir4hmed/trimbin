@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, api } from "@/lib/api";
 
-interface AskMatch {
+export interface AskMatch {
   clip_id: string;
   group_id: number;
   subgroup_id: number;
@@ -56,7 +56,7 @@ interface Answer {
  *
  * A suggestion is not a choice, and no decision at all is neither.
  */
-function state(match: AskMatch): { label: string; who: string; tone: string } {
+export function state(match: AskMatch): { label: string; who: string; tone: string } {
   if (match.outcome === "analysed") {
     return { label: "analysed", who: "no decision recorded", tone: "analysed" };
   }
