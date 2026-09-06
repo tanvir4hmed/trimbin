@@ -13,7 +13,7 @@ import pytest
 
 from app.routes import ask, review, uploads
 from app.routes import projects as project_routes
-from app.services import analytics, jobs, search, stringout
+from app.services import analytics, jobs, search, stringout, structure
 
 CLIP = UUID("3f758068-eebe-4df5-8a5d-e982646f09dd")
 JOB = UUID("7c1722c9-d910-466b-82ba-526db3e30da1")
@@ -219,6 +219,40 @@ async def test_one_search_reuses_one_official_mcp_process(monkeypatch) -> None:
 
     assert opened == 1
     assert queries == 2
+
+
+def test_search_result_copy_uses_the_verified_playable_row() -> None:
+    match = SimpleNamespace(
+        group_id=3,
+        subgroup_id=5,
+        take_no=6,
+        model_dump=lambda **_: {
+            "group_id": 3,
+            "subgroup_id": 5,
+            "take_no": 6,
+            "where": {"start_s": 5.5, "end_s": 7.5},
+            "reason": "A white handbag falls onto the floor.",
+        },
+    )
+
+    rendered = ask._with_display_codes(
+        [match],
+        [
+            structure.Scene(
+                project_id=7,
+                scene=3,
+                scene_code="12",
+                shots=[structure.PlannedShot(shot=5, slug="E")],
+            )
+        ],
+    )
+    answer, suggestion = ask._result_copy(rendered, widened=False)
+
+    assert "Scene 12, Shot E, Take 6 at 5.5s" in answer
+    assert rendered[0]["group_id"] == 3
+    assert rendered[0]["subgroup_id"] == 5
+    assert "white handbag" in answer
+    assert suggestion == ""
 
 
 class Principal:

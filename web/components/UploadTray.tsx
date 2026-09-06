@@ -11,11 +11,19 @@ import {
   uploadSnapshots,
 } from "@/lib/upload";
 import { api } from "@/lib/api";
+import { currentIdentity } from "@/lib/auth";
 
 const empty: ReturnType<typeof uploadSnapshots> = [];
 
 export default function UploadTray() {
-  useEffect(() => restoreUploadSnapshots(), []);
+  useEffect(() => {
+    const restoreForCurrentUser = () =>
+      restoreUploadSnapshots(currentIdentity()?.email ?? "");
+    restoreForCurrentUser();
+    window.addEventListener("trimbin:auth", restoreForCurrentUser);
+    return () =>
+      window.removeEventListener("trimbin:auth", restoreForCurrentUser);
+  }, []);
   const batches = useSyncExternalStore(
     subscribeUploads,
     uploadSnapshots,

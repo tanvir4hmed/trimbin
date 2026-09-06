@@ -137,7 +137,11 @@ export default function DashboardPage() {
             <Link key={p.project_id} href={`${paths.project(p.project_id, p.name)}`} className="pcard">
               <div className="pthumb" style={{ background: THUMBS[i % THUMBS.length] }}>
                 <span className="ptag">
-                  {p.you_can_upload ? "yours" : "read & comment"}
+                  {p.you_are_owner
+                    ? "yours"
+                    : p.you_can_upload
+                      ? "editor"
+                      : "read & comment"}
                 </span>
               </div>
               <div className="pinfo">

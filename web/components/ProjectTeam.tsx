@@ -15,6 +15,11 @@ export default function ProjectTeam({ project, me }: { project: Project; me: Me 
   const people = [project.owner_email, ...project.member_emails].filter(Boolean);
   const mayAdd = project.you_are_owner && project.project_id !== me.demo_project_id;
 
+  // Anonymous project responses intentionally redact crew identities. Drawing
+  // "Team 0" from that redacted shape claims the production has no crew; the
+  // control becomes useful after sign-in, when the real roster is returned.
+  if (!me.signed_in && people.length === 0) return null;
+
   const add = async (event: FormEvent) => {
     event.preventDefault();
     if (!email.trim() || busy) return;

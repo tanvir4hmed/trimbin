@@ -238,7 +238,7 @@ export default function ProjectWorkspace({
           {project && me && <ProjectTeam project={project} me={me} />}
           {open && (
             <Link className="ghost" href={`${paths.coverage(projectId, open.scene, project?.name)}`}>
-              Play scene {open.scene}
+              Play scene {tree.scenes.find((item) => item.scene === open.scene)?.scene_code || open.scene}
             </Link>
           )}
           {canCurate ? (
@@ -419,6 +419,11 @@ export default function ProjectWorkspace({
                 initialClipId={deepLink.clip}
                 initialAt={deepLink.at}
                 focusTake={railTake}
+                sceneLabel={
+                  tree.scenes.find((item) => item.scene === open.scene)
+                    ?.scene_code || String(open.scene)
+                }
+                shotLabel={openShot?.slug || String(open.shot)}
               />
             ) : (
               <ProjectOverview

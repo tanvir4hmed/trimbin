@@ -3,6 +3,7 @@ import { type AskMatch, state } from "@/components/AskArchive";
 
 const match = (over: Partial<AskMatch> = {}): AskMatch => ({
   clip_id: "c", group_id: 1, subgroup_id: 1, take_no: 1,
+  scene_code: "1", shot_code: "A",
   outcome: "selected", reason: "", decided_by: "agent", actor: "",
   description: "", duration_s: 0, playlist_uri: "", where: null,
   play_from_s: 0, relevance: 0, ...over,

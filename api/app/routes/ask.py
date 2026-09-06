@@ -11,6 +11,7 @@ system whose whole claim is that it remembers why should let people ask.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Annotated
 
@@ -19,7 +20,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from ..auth import Principal, current_principal
 from ..config import settings
-from ..services import search
+from ..services import search, structure
 
 log = logging.getLogger(__name__)
 
@@ -99,6 +100,15 @@ async def ask(
     embedding = None
     if plan.semantic:
         embedding = await _embed(plan.semantic)
+        if embedding is None:
+            # A semantic request without a vector does not degrade to a useful
+            # text search: the whole natural-language phrase becomes a literal
+            # gate and a transient model fault is reported as "no match". Say
+            # the search is unavailable so nobody acts on a false empty result.
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "Semantic search is temporarily unavailable. Try again.",
+            )
 
     widened = False
     try:
@@ -117,26 +127,21 @@ async def ask(
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
 
     matches = [_as_match(r) for r in rows]
+    scenes = await structure.for_project(project_id)
+    rendered_matches = _with_display_codes(matches, scenes)
 
-    try:
-        answer, suggestion = await agent.explain(body.question, matches, plan)
-    except AgentFailure:
-        # The rows are the answer; the sentence is a convenience. Losing the
-        # sentence should not lose the result.
-        log.warning("could not describe %d rows; returning them plainly", len(matches))
-        answer = (
-            f"{len(matches)} take{'s' if len(matches) != 1 else ''} matched."
-            if matches
-            else "Nothing matched."
-        )
-        suggestion = ""
+    # The evidence rows already contain the exact description and time range.
+    # A second model call merely paraphrased them and added 10-20 seconds after
+    # the result existed. Keep the model where it adds value — planning the
+    # hybrid retrieval — and render its verified result deterministically.
+    answer, suggestion = _result_copy(rendered_matches, widened)
 
     return {
         "question": body.question,
         "outcome": outcome_for(matches, widened).value,
         "answer": answer,
         "suggestion": suggestion if not matches else "",
-        "matches": [m.model_dump(mode="json") for m in matches],
+        "matches": rendered_matches,
         # Shown so the result can be checked rather than trusted.
         "sql": sql,
         "filters": plan.model_dump(exclude_defaults=True),
@@ -148,28 +153,69 @@ async def ask(
 async def _embed(description: str) -> list[float] | None:
     """A vector for a description of what the footage looks like.
 
-    Returns None on failure rather than raising: the structured and text filters
-    still work without it, and a search that narrows less is better than one
-    that does not run.
+    Returns None after one retry. The caller may still run a purely structured
+    query, but must not turn a failed semantic search into a false empty result.
     """
-    try:
-        from google import genai
-        from google.genai import types
+    from google import genai
+    from google.genai import types
 
-        client = genai.Client(
-            vertexai=True,
-            project=settings.project_id,
-            location=settings.model_location,
+    client = genai.Client(
+        vertexai=True,
+        project=settings.project_id,
+        location=settings.model_location,
+    )
+    for attempt in range(2):
+        try:
+            response = await client.aio.models.embed_content(
+                model=settings.embedding_model,
+                contents=[description],
+                config=types.EmbedContentConfig(output_dimensionality=768),
+            )
+            return list(response.embeddings[0].values)
+        except Exception:
+            if attempt == 0:
+                await asyncio.sleep(0.25)
+                continue
+            log.exception("could not embed %r after retry; searching without it", description)
+    return None
+
+
+def _with_display_codes(matches: list, scenes: list[structure.Scene]) -> list[dict]:
+    """Add production-facing codes without changing internal navigation ids."""
+    scene_codes = {item.scene: item.scene_code or str(item.scene) for item in scenes}
+    shot_codes = {
+        (item.scene, shot.shot): shot.slug or str(shot.shot)
+        for item in scenes
+        for shot in item.shots
+    }
+    rendered: list[dict] = []
+    for match in matches:
+        row = match.model_dump(mode="json")
+        row["scene_code"] = scene_codes.get(match.group_id, str(match.group_id))
+        row["shot_code"] = shot_codes.get(
+            (match.group_id, match.subgroup_id), str(match.subgroup_id)
         )
-        response = await client.aio.models.embed_content(
-            model=settings.embedding_model,
-            contents=[description],
-            config=types.EmbedContentConfig(output_dimensionality=768),
+        rendered.append(row)
+    return rendered
+
+
+def _result_copy(matches: list[dict], widened: bool) -> tuple[str, str]:
+    if not matches:
+        return (
+            "Nothing matched that request in this project.",
+            "Try a scene, shot, take, spoken line, visible action, object, or issue.",
         )
-        return list(response.embeddings[0].values)
-    except Exception:
-        log.exception("could not embed %r; searching without it", description)
-        return None
+
+    first = matches[0]
+    where = first.get("where")
+    at = f" at {float(where['start_s']):.1f}s" if where else ""
+    scope = "Closest match" if widened else "Best match"
+    count = f"{len(matches)} playable moment{'s' if len(matches) != 1 else ''}"
+    answer = (
+        f"Found {count}. {scope}: Scene {first['scene_code']}, Shot "
+        f"{first['shot_code']}, Take {first['take_no']}{at} — {first['reason']}"
+    )
+    return answer, ""
 
 
 def _clipped(text: str, limit: int) -> str:

@@ -19,6 +19,9 @@ export interface AskMatch {
   clip_id: string;
   group_id: number;
   subgroup_id: number;
+  /** Production-facing labels; numeric ids remain the navigation keys. */
+  scene_code: string;
+  shot_code: string;
   take_no: number;
   outcome: string;
   reason: string;
@@ -235,7 +238,7 @@ export default function AskArchive({
                     disabled={!onOpen}
                   >
                     <span className="where">
-                      Scene {m.group_id} · Shot {m.subgroup_id} · Take {m.take_no}
+                      Scene {m.scene_code} · Shot {m.shot_code} · Take {m.take_no}
                     </span>
                     <span className={`outcome ${state(m).tone}`}>{state(m).label}</span>
                     <span className="ask-reason">{m.reason}</span>

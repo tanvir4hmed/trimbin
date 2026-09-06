@@ -86,6 +86,8 @@ export default function ShotReviewCockpit({
   initialClipId = "",
   initialAt = 0,
   focusTake = 0,
+  sceneLabel = "",
+  shotLabel = "",
 }: {
   projectId: number;
   scene: number;
@@ -98,6 +100,9 @@ export default function ShotReviewCockpit({
   initialAt?: number;
   /** A take chosen in the rail. Opens it on the A side. */
   focusTake?: number;
+  /** Canonical production identity; numeric route ids remain storage keys. */
+  sceneLabel?: string;
+  shotLabel?: string;
 }) {
   const screen = useShotScreen(projectId, scene, shot);
   const verdicts = screen.data?.verdicts;
@@ -500,8 +505,7 @@ export default function ShotReviewCockpit({
           <div>
             <p className="eyebrow">SHOT REVIEW</p>
             <h1>
-              Scene {screen.data?.brief.heading || scene} /{" "}
-              {screen.data?.brief.slug || `Shot ${shot}`}
+              Scene {sceneLabel || scene} / Shot {shotLabel || screen.data?.brief.slug || shot}
             </h1>
           </div>
           <div className="cockpit-summary">

@@ -17,6 +17,8 @@
  * cross-refresh recovery: after a reload the person must choose the files again.
  */
 
+import { currentIdentity } from "./auth";
+
 export interface Ticket {
   clip_id: string;
   filename: string;
@@ -35,6 +37,7 @@ export interface Progress {
 
 export interface UploadSnapshot {
   id: string;
+  owner: string;
   rows: Progress[];
   state:
     "uploading" | "paused" | "interrupted" | "done" | "cancelled" | "failed";
@@ -65,6 +68,7 @@ function publish(
   const previous = snapshots.get(id);
   snapshots.set(id, {
     id,
+    owner: previous?.owner || currentIdentity()?.email || "",
     rows: [...rows],
     state: state ?? previous?.state ?? "uploading",
     updatedAt: Date.now(),
@@ -84,16 +88,29 @@ function publish(
 }
 
 let restored = false;
-export function restoreUploadSnapshots(): void {
+export function restoreUploadSnapshots(owner: string): void {
   if (restored || typeof window === "undefined") return;
   restored = true;
-  for (let index = 0; index < window.localStorage.length; index += 1) {
-    const key = window.localStorage.key(index);
-    if (!key?.startsWith("trimbin.upload.snapshot.")) continue;
+  // Snapshot the keys first. Removing an item while walking localStorage by
+  // index shifts the next key into the current slot and otherwise leaves every
+  // second stale card behind.
+  const keys = Array.from({ length: window.localStorage.length }, (_, index) =>
+    window.localStorage.key(index),
+  ).filter((key): key is string =>
+    Boolean(key?.startsWith("trimbin.upload.snapshot.")),
+  );
+  for (const key of keys) {
     try {
       const value = JSON.parse(
         window.localStorage.getItem(key) || "",
       ) as UploadSnapshot;
+      // Legacy snapshots had no owner. They are intentionally discarded: an
+      // anonymous visitor seeing another editor's filenames and upload state
+      // is worse than losing a terminal progress card after this upgrade.
+      if (!owner || value?.owner !== owner) {
+        window.localStorage.removeItem(key);
+        continue;
+      }
       if (!value?.id || !Array.isArray(value.rows)) continue;
       if (value.state === "uploading" || value.state === "paused")
         value.state = "interrupted";
