@@ -278,14 +278,8 @@ class TestCommentingAndOverruling:
 
 
 class TestUploading:
-    """The one thing a guest cannot do in our productions.
+    """Guests use the real upload path, with bounded batch/resource limits."""
 
-    Not for lack of trust. Footage costs storage, encoding and model time, and
-    none of those are free.
-    """
-
-    @pytest.mark.asyncio
-    @pytest.mark.asyncio
     @pytest.mark.asyncio
     async def test_a_guest_uploads_into_their_own_project(self, monkeypatch) -> None:
         """Inside a project they made, a guest is an editor. Without this the

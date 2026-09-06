@@ -125,10 +125,10 @@ async def grant_upload(
     close the tab. Without something durable to come back to, a long ingest is
     indistinguishable from one that silently died.
 
-    Uploading is the one thing a guest cannot do in our productions. Not for
-    lack of trust — they may overrule any call we made — but because footage
-    costs storage, encoding and model time, and none of those are free. In their
-    own project they upload like anybody else.
+    A signed-in guest may exercise this same path in the shared example project
+    or in a project they own. Guest batches stay deliberately small because
+    footage costs storage, encoding and model time; the workflow itself is not
+    replaced by a toy or a separate sandbox.
     """
     await principal.assert_can_upload(request.project_id)
 
