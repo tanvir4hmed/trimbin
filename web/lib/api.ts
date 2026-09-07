@@ -24,6 +24,11 @@ import { currentToken } from "./auth";
 import type { components } from "./schema";
 
 type S = components["schemas"];
+export type FilmState = S["FilmState"];
+export type FilmSource = S["FilmSource"];
+export type FilmRange = S["FilmRange"];
+export type AttemptItem = S["AttemptItem"];
+export type AttemptState = S["AttemptState"];
 
 // -- generated ---------------------------------------------------------------
 
@@ -34,8 +39,8 @@ export type Tree = S["Tree"];
 export type SceneNode = S["SceneNode"];
 export type ShotNode = S["ShotNode"];
 export type Take = S["Take"];
-export type Finding = S["Finding"];
-export type TimeRange = S["TimeRange"];
+export type Finding = S["app__schemas__Finding"];
+export type TimeRange = S["app__schemas__TimeRange"];
 export type Verdicts = S["Verdicts"];
 export type Brief = S["Brief"];
 export type Comment = S["Comment"];
@@ -195,7 +200,11 @@ const WAKE_RETRY_MS = 12_000;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function request<T>(path: string, init?: RequestInit, retriedWake = false): Promise<T> {
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  retriedWake = false,
+): Promise<T> {
   // The token is attached here rather than at each call site. A route that
   // forgets it does not fail loudly — it 401s, and the page shows an empty
   // state that looks like "no data" rather than "not signed in".
@@ -238,6 +247,47 @@ async function request<T>(path: string, init?: RequestInit, retriedWake = false)
 }
 
 export const api = {
+  recordingAnalysis: (id: number, clip: string) =>
+    request<TakeAnalysis>(`/analysis/${id}/${clip}`, { cache: "no-store" }),
+  film: (id: number) =>
+    request<FilmState>(`/film/${id}`, { cache: "no-store" }),
+  attempts: (id: number, clip: string) =>
+    request<AttemptState>(`/attempts/${id}/${clip}`, { cache: "no-store" }),
+  analyseAttempts: (id: number, clip: string) =>
+    request<S["AnalysisQueued"]>(`/attempts/${id}/${clip}/analyse`, {
+      method: "POST",
+    }),
+  editorialEvidence: (id: number, clip: string) =>
+    request<S["EditorialDatasetRecord"]>(`/dataset/${id}/${clip}`, {
+      cache: "no-store",
+    }),
+  saveAttempts: (id: number, clip: string, body: S["AttemptSave"]) =>
+    request<AttemptState>(`/attempts/${id}/${clip}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  attemptHistory: (id: number, clip: string) =>
+    request<S["AttemptHistory"]>(`/attempts/${id}/${clip}/history`),
+  attemptVersion: (id: number, clip: string, rev: number) =>
+    request<AttemptState>(`/attempts/${id}/${clip}/history/${rev}`),
+  filmCoverage: (id: number) =>
+    request<S["FilmCoverage"]>(`/film/${id}/coverage`, { cache: "no-store" }),
+  filmHistory: (id: number) => request<S["FilmHistory"]>(`/film/${id}/history`),
+  filmVersion: (id: number, rev: number) =>
+    request<FilmState>(`/film/${id}/history/${rev}`),
+  filmSources: (id: number, offset = 0) =>
+    request<S["FilmSources"]>(`/film/${id}/sources?offset=${offset}`),
+  resolveFilmSources: (id: number, clipIds: string[]) =>
+    request<S["FilmSources"]>(`/film/${id}/sources`, {
+      method: "POST",
+      body: JSON.stringify({ clip_ids: clipIds }),
+    }),
+  saveFilm: (id: number, body: S["FilmSave"]) =>
+    request<FilmState>(`/film/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  quality: () => request<S["QualityReport"]>("/quality", { cache: "no-store" }),
   /** Who is asking, and what they may do. Works signed out, and answers truthfully. */
   me: () => request<Me>("/me"),
 
@@ -250,7 +300,12 @@ export const api = {
    */
   projectScreen: (
     projectId: number,
-    filters?: { scene?: number; camera?: string; shoot_day?: string; assignee?: string },
+    filters?: {
+      scene?: number;
+      camera?: string;
+      shoot_day?: string;
+      assignee?: string;
+    },
   ) => {
     const q = new URLSearchParams();
     if (filters?.scene !== undefined) q.set("scene", String(filters.scene));
@@ -276,15 +331,7 @@ export const api = {
     projectId: number,
     clipId: string,
     findingId: string,
-    body: {
-      rev: number;
-      action: "confirm" | "dismiss" | "correct" | "adjust_range";
-      code?: string;
-      detail?: string;
-      severity?: "note" | "attention" | "blocking";
-      start_s?: number;
-      end_s?: number;
-    },
+    body: S["FindingCommand"],
   ) =>
     request<S["FindingActionResult"]>(
       `/analysis/${projectId}/${clipId}/findings/${findingId}`,
@@ -339,7 +386,12 @@ export const api = {
    */
   tree: (
     projectId: number,
-    filters?: { scene?: number; camera?: string; shoot_day?: string; assignee?: string },
+    filters?: {
+      scene?: number;
+      camera?: string;
+      shoot_day?: string;
+      assignee?: string;
+    },
   ) => {
     const q = new URLSearchParams();
     if (filters?.scene !== undefined) q.set("scene", String(filters.scene));
@@ -361,14 +413,18 @@ export const api = {
     request<Verdicts>(`/review/${projectId}/${scene}/${shot}`),
 
   projectSources: (projectId: number, q = "") =>
-    request<SourceClip[]>(`/review/${projectId}/sources?q=${encodeURIComponent(q)}`),
+    request<SourceClip[]>(
+      `/review/${projectId}/sources?q=${encodeURIComponent(q)}`,
+    ),
 
   /** Ask the panel to judge a shot. Spends money; hence a POST. */
   judge: (projectId: number, scene: number, shot: number) =>
-    request<{ status: string; margin?: number; needs_review?: boolean; rationale?: string }>(
-      `/review/${projectId}/${scene}/${shot}`,
-      { method: "POST" },
-    ),
+    request<{
+      status: string;
+      margin?: number;
+      needs_review?: boolean;
+      rationale?: string;
+    }>(`/review/${projectId}/${scene}/${shot}`, { method: "POST" }),
 
   /**
    * Record an editor's choice.
@@ -405,28 +461,46 @@ export const api = {
     projectId: number,
     scene: number,
     shot: number,
-    body: { rev: number; reason: string; segments: { segment_id?: string; clip_id: string; source_in_s: number; source_out_s: number; reason?: string; origin?: string; created_by?: string }[] },
-  ) => request<ShotCoverage>(`/review/${projectId}/${scene}/${shot}/coverage`, {
-    method: "PUT",
-    headers: { "Idempotency-Key": crypto.randomUUID() },
-    body: JSON.stringify(body),
-  }),
+    body: {
+      rev: number;
+      reason: string;
+      segments: {
+        segment_id?: string;
+        clip_id: string;
+        source_in_s: number;
+        source_out_s: number;
+        reason?: string;
+        origin?: string;
+        created_by?: string;
+      }[];
+    },
+  ) =>
+    request<ShotCoverage>(`/review/${projectId}/${scene}/${shot}/coverage`, {
+      method: "PUT",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify(body),
+    }),
 
   /** Put back what stood before the last human decision. Written forward, never deleted. */
   undo: (projectId: number, scene: number, shot: number, rev: number) =>
-    request<S["Undone"]>(
-      `/review/${projectId}/${scene}/${shot}/undo`,
-      {
-        method: "POST",
-        headers: { "Idempotency-Key": crypto.randomUUID() },
-        body: JSON.stringify({ rev }),
-      },
-    ),
+    request<S["Undone"]>(`/review/${projectId}/${scene}/${shot}/undo`, {
+      method: "POST",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify({ rev }),
+    }),
 
   changeProject: (
     projectId: number,
-    body: { rev: number; action: "rename" | "archive" | "trash" | "restore" | "delete"; name?: string },
-  ) => request<Project>(`/projects/${projectId}`, { method: "PATCH", body: JSON.stringify(body) }),
+    body: {
+      rev: number;
+      action: "rename" | "archive" | "trash" | "restore" | "delete";
+      name?: string;
+    },
+  ) =>
+    request<Project>(`/projects/${projectId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
 
   brief: (projectId: number, scene: number, shot: number) =>
     request<Brief>(`/review/${projectId}/${scene}/${shot}/brief`),
@@ -435,13 +509,20 @@ export const api = {
     projectId: number,
     scene: number,
     shot: number,
-    body: Partial<Pick<Brief, "slug" | "heading" | "action" | "line" | "notes" | "look">>,
+    body: Partial<
+      Pick<Brief, "slug" | "heading" | "action" | "line" | "notes" | "look">
+    >,
     rev?: number,
   ) =>
     request<Brief>(`/review/${projectId}/${scene}/${shot}/brief`, {
       method: "PUT",
       body: JSON.stringify({
-        slug: "", heading: "", action: "", line: "", notes: "", look: "",
+        slug: "",
+        heading: "",
+        action: "",
+        line: "",
+        notes: "",
+        look: "",
         ...body,
         rev,
       }),
@@ -500,14 +581,25 @@ export const api = {
     projectId: number,
     scene: number,
     shot: number,
-    body: { body: string; clip_id?: string | null; at_s?: number; to_s?: number; parent_id?: string },
+    body: {
+      body: string;
+      clip_id?: string | null;
+      at_s?: number;
+      to_s?: number;
+      parent_id?: string;
+    },
   ) =>
     request<Comment>(`/review/${projectId}/${scene}/${shot}/comments`, {
       method: "POST",
       body: JSON.stringify(body),
     }),
 
-  resolveComment: (projectId: number, scene: number, shot: number, commentId: string) =>
+  resolveComment: (
+    projectId: number,
+    scene: number,
+    shot: number,
+    commentId: string,
+  ) =>
     request<{ status: string }>(
       `/review/${projectId}/${scene}/${shot}/comments/${commentId}/resolve`,
       { method: "POST" },
@@ -534,13 +626,13 @@ export const api = {
     `${BASE}/scenes/${projectId}/${scene}/markers.csv?fps=${fps}`,
 
   /** What a guest account may hold, from the API that enforces it. */
-  guestLimits: () =>
-    request<Limits & { note: string }>("/public/limits"),
+  guestLimits: () => request<Limits & { note: string }>("/public/limits"),
 
   grantUpload: (
     projectId: number,
     filenames: string[],
     target?: { scene: number; shot: number; take?: number },
+    autoOrganize = false,
   ) =>
     request<{
       job_id: string;
@@ -559,6 +651,7 @@ export const api = {
         scene: target?.scene ?? 0,
         shot: target?.shot ?? 0,
         take: target?.take ?? 0,
+        auto_organize: autoOrganize,
       }),
     }),
 
@@ -582,9 +675,12 @@ export const api = {
   jobStatus: (jobId: string) => request<JobStatus>(`/uploads/jobs/${jobId}`),
 
   cancelUpload: (jobId: string) =>
-    request<{ status: string; job_id: string }>(`/uploads/jobs/${jobId}/cancel`, {
-      method: "POST",
-    }),
+    request<{ status: string; job_id: string }>(
+      `/uploads/jobs/${jobId}/cancel`,
+      {
+        method: "POST",
+      },
+    ),
 
   commitIngest: (
     jobId: string,
@@ -599,10 +695,11 @@ export const api = {
       description?: string;
       note?: string;
     }[],
-  ) => request<{ status: string; committed: number; analysis_queued: number }>(
-    `/uploads/jobs/${jobId}/commit`,
-    { method: "POST", body: JSON.stringify({ items }) },
-  ),
+  ) =>
+    request<{ status: string; committed: number; analysis_queued: number }>(
+      `/uploads/jobs/${jobId}/commit`,
+      { method: "POST", body: JSON.stringify({ items }) },
+    ),
 
   saveIngestDraft: (
     jobId: string,
@@ -613,19 +710,21 @@ export const api = {
       shot?: number;
       take?: number;
     },
-  ) => request<{ status: string; clip_id: string }>(`/uploads/jobs/${jobId}/draft`, {
-    method: "PUT",
-    body: JSON.stringify({ item }),
-  }),
+  ) =>
+    request<{ status: string; clip_id: string }>(
+      `/uploads/jobs/${jobId}/draft`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ item }),
+      },
+    ),
 
   /** The scenes and shots somebody declared, before any footage exists. */
   plan: (projectId: number) => request<Plan>(`/structure/${projectId}`),
 
   /** Clips whose placement nobody has agreed with, with the evidence. */
   placementInbox: (projectId: number) =>
-    request<PlacementInbox>(
-      `/placements/${projectId}`,
-    ),
+    request<PlacementInbox>(`/placements/${projectId}`),
 
   /** Settle one. Move, keep where it is, park it, or replace a duplicate —
    *  never automatic, and never a delete. */
@@ -702,7 +801,7 @@ export const api = {
       body: JSON.stringify({ question }),
     }),
 
-  accuracy: () => request<AccuracySummary>("/public/accuracy"),
+  accuracy: () => request<S["QualityReport"]>("/public/accuracy"),
   scale: () => request<Scale>("/public/scale"),
 };
 

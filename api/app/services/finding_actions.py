@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
+from fastapi import HTTPException
 from google.cloud import firestore
 
 from . import analysis_store, revisions
@@ -24,6 +26,32 @@ class Committed:
     finding_id: UUID
     rev: int
     action: str
+    replayed: bool = False
+
+
+def command_ref(project_id: int, clip_id: UUID, finding_id: UUID, actor: str, key: str):
+    identity = f"{project_id}/{clip_id}/{finding_id}/{actor}/{key}"
+    return (
+        db().collection("finding_commands").document(hashlib.sha256(identity.encode()).hexdigest())
+    )
+
+
+def receipt_result(data: dict, request: dict) -> Committed:
+    if data.get("request") != request:
+        raise HTTPException(
+            409, "This command key was already used for a different finding action."
+        )
+    result = data["result"]
+    return Committed(
+        UUID(result["event_id"]), UUID(result["finding_id"]), result["rev"], result["action"], True
+    )
+
+
+async def replay(
+    project_id: int, clip_id: UUID, finding_id: UUID, actor: str, key: str, request: dict
+):
+    snapshot = await command_ref(project_id, clip_id, finding_id, actor, key).get()
+    return receipt_result(snapshot.to_dict() or {}, request) if snapshot.exists else None
 
 
 def _as_text(value) -> str:
@@ -40,6 +68,8 @@ async def commit(
     actor: str,
     actor_role: str,
     changes: dict,
+    command_key: str = "",
+    request: dict | None = None,
 ) -> Committed:
     """Commit current operational state and its archive event atomically."""
     finding_id = UUID(_as_text(current["finding_id"]))
@@ -48,9 +78,16 @@ async def commit(
     event_id = uuid4()
     delivery_ref = db().collection(DELIVERY_COLLECTION).document(str(event_id))
     now = datetime.now(UTC)
+    receipt = (
+        command_ref(project_id, clip_id, finding_id, actor, command_key) if command_key else None
+    )
 
     @firestore.async_transactional
     async def write(transaction) -> Committed:
+        if receipt:
+            previous = await receipt.get(transaction=transaction)
+            if previous.exists:
+                return receipt_result(previous.to_dict() or {}, request or {})
         snapshot = await state_ref.get(transaction=transaction)
         prior = snapshot.to_dict() or {} if snapshot.exists else {}
         found_rev = int(prior.get("rev", fallback_rev))
@@ -85,6 +122,8 @@ async def commit(
             "model_id": "",
             "prompt_version": "",
             "occurred_at": now,
+            "retracts_event_id": _as_text(changes.get("retracts_event_id")) or None,
+            "restored_action": _as_text(changes.get("restored_action")),
         }
         transaction.set(
             state_ref,
@@ -99,6 +138,20 @@ async def commit(
             delivery_ref,
             {**payload, "state": "pending", "created_at": now},
         )
+        if receipt:
+            transaction.set(
+                receipt,
+                {
+                    "request": request or {},
+                    "created_at": now,
+                    "result": {
+                        "event_id": str(event_id),
+                        "finding_id": str(finding_id),
+                        "rev": next_rev,
+                        "action": action,
+                    },
+                },
+            )
         return Committed(event_id, finding_id, next_rev, action)
 
     return await write(db().transaction())
@@ -132,6 +185,9 @@ async def deliver(event_id: UUID) -> bool:
                         if event.get("supersedes_event_id")
                         else None
                     ),
+                    "retracts_event_id": (
+                        UUID(event["retracts_event_id"]) if event.get("retracts_event_id") else None
+                    ),
                 }
             ]
         )
@@ -161,6 +217,18 @@ async def states_for_clip(project_id: int, clip_id: UUID) -> list[dict]:
     return found
 
 
+async def pending_history(project_id: int, finding_id: UUID) -> list[dict]:
+    """Read durable events even when archive delivery is delayed."""
+    rows = []
+    async for snapshot in (
+        db().collection(DELIVERY_COLLECTION).where("finding_id", "==", str(finding_id)).stream()
+    ):
+        row = snapshot.to_dict() or {}
+        if int(row.get("project_id", 0)) == project_id:
+            rows.append(row)
+    return rows
+
+
 def overlay(archive: dict, operational: list[dict]) -> dict:
     """Overlay undelivered Firestore truth on the ClickHouse read model."""
     if not operational:
@@ -173,12 +241,20 @@ def overlay(archive: dict, operational: list[dict]) -> dict:
     for row in operational:
         finding_id = str(row["finding_id"])
         event_id = str(row.get("event_id", ""))
-        if row.get("action") == "human_dismissed":
+        current_run = str((archive.get("run") or {}).get("run_id", ""))
+        same_run = not current_run or str(row.get("run_id", "")) == current_run
+        effective_action = (
+            row.get("restored_action")
+            if row.get("action") == "human_retracted"
+            else row.get("action")
+        )
+        if same_run and effective_action == "human_dismissed":
             current.pop(finding_id, None)
-        else:
+        elif same_run:
             current[finding_id] = {
                 **row,
                 "revision": int(row.get("rev", row.get("revision", 0))),
+                "action": effective_action,
             }
         if event_id and event_id not in history_events:
             history.append(

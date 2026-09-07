@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
-from uuid import NAMESPACE_URL, UUID, uuid5
+from uuid import UUID, uuid4, uuid5
 
-from . import analysis_store, identify, shots, storage
+from . import analysis_store, attempt_detection, identify, shots, storage
 from .ffmpeg_ops import remux
 
 log = logging.getLogger(__name__)
@@ -91,7 +92,8 @@ def _absolute_findings(
         local_start = max(0.0, min(float(finding.where.start_s), window.duration_s))
         local_end = max(0.0, min(float(finding.where.end_s), window.duration_s))
         if local_end <= local_start:
-            local_start, local_end = 0.0, window.duration_s
+            log.warning("ignored unlocalized finding %s in segment %s", code, segment_id)
+            continue
 
         found.append(
             {
@@ -185,6 +187,7 @@ def consolidate_findings(findings: list[dict]) -> list[dict]:
                 current
                 for current in consolidated
                 if current["code"] == candidate["code"]
+                and (current.get("severity") == "note") == (candidate.get("severity") == "note")
                 and min(current["end_s"], candidate["end_s"])
                 > max(current["start_s"], candidate["start_s"])
             ),
@@ -225,6 +228,9 @@ async def analyse_clip(
     shot: int,
     duration_s: float,
     agent: Any | None = None,
+    force: bool = False,
+    dispatch_id: str = "",
+    assert_owned: Callable[[], Awaitable[None]] | None = None,
 ) -> dict:
     """Analyse every window, persist only a fully covered current run."""
     from trimbin_agents.config import settings as agent_settings
@@ -234,13 +240,20 @@ async def analyse_clip(
     if not windows:
         raise ValueError("a clip must have positive duration")
 
-    key = run_key(project_id, clip_id, duration_s, PROMPT_VERSION)
+    shot_meta = await shots.get(project_id, scene, shot)
+    briefing = shots.briefing(shot_meta, duration_s)
+    context_key = f"{PROMPT_VERSION}/{agent_settings.analyst_model}/{scene}/{shot}/{briefing}"
+    if force:
+        # Explicit re-analysis is a new command, but delivery retries of that
+        # command still reuse its completed result.
+        context_key += f"/requested/{dispatch_id or uuid4()}"
+    key = run_key(project_id, clip_id, duration_s, context_key)
     if await analysis_store.already_completed(project_id, key):
         return {"status": "already_analysed", "run_key": key, "windows": len(windows)}
 
-    # Pub/Sub is at-least-once. Stable identities make two delivery attempts
-    # converge on the same run, segment, and machine-finding evidence.
-    run_id = uuid5(NAMESPACE_URL, f"trimbin/full-take/{key}")
+    # A retry can produce different observations. Never mix partial outputs
+    # from two executions; only a completed generation becomes current.
+    run_id = uuid4()
     await analysis_store.record_run(
         run_id=run_id,
         run_key=key,
@@ -253,16 +266,17 @@ async def analyse_clip(
     )
 
     observer = agent or SegmentAgent()
-    shot_meta = await shots.get(project_id, scene, shot)
-    briefing = shots.briefing(shot_meta, duration_s)
     segments: list[dict] = []
     moment_candidates: list[dict] = []
+    attempt_candidates: list[dict] = []
     candidates: list[dict] = []
 
     try:
         with TemporaryDirectory() as tmp:
             work = Path(tmp)
             for window in windows:
+                if assert_owned:
+                    await assert_owned()
                 source = work / f"window-{window.index:04d}.ts"
                 if not storage.download_proxy_range(
                     f"p{project_id}/{clip_id}", source, window.start_s, window.end_s
@@ -321,6 +335,7 @@ async def analyse_clip(
                         "speakers": observation.speakers,
                         "shot_size": observation.shot_size,
                         "camera_motion": observation.camera_motion,
+                        "observation_json": observation.model_dump_json(),
                         "embedding": embedding,
                         "model_id": agent_settings.analyst_model,
                         "prompt_version": PROMPT_VERSION,
@@ -330,13 +345,19 @@ async def analyse_clip(
                     _absolute_moments(observation, window, segment_id, embedding)
                 )
                 candidates.extend(_absolute_findings(observation, window, segment_id))
+                attempt_candidates.extend(
+                    attempt_detection.absolute_attempts(observation, window, segment_id)
+                )
                 source.unlink(missing_ok=True)
 
         for measured in await analysis_store.raw_findings(project_id, clip_id):
             start = max(0.0, min(float(measured["start_s"]), duration_s))
             end = max(0.0, min(float(measured["end_s"]), duration_s))
             if end <= start:
-                start, end = 0.0, duration_s
+                log.warning(
+                    "ignoring measured finding without a valid source span: %s", measured["code"]
+                )
+                continue
             evidence = [
                 segment["segment_id"]
                 for segment in segments
@@ -372,7 +393,7 @@ async def analyse_clip(
         finding_events = []
         for finding in consolidated:
             identity = (
-                f"{finding['code']}/{finding['start_s']:.3f}/{finding['end_s']:.3f}/"
+                f"{finding['code']}/{finding['severity']}/{finding['start_s']:.3f}/{finding['end_s']:.3f}/"
                 + ",".join(str(s) for s in finding["evidence_segment_ids"])
             )
             finding_id = uuid5(run_id, identity)
@@ -396,6 +417,22 @@ async def analyse_clip(
         await analysis_store.record_segments(segments)
         await analysis_store.record_moments(moments)
         await analysis_store.record_finding_events(finding_events)
+        attempts = attempt_detection.consolidate_attempts(attempt_candidates, run_id)
+        await analysis_store.record_attempts(
+            [
+                {
+                    **item,
+                    "run_id": run_id,
+                    "project_id": project_id,
+                    "clip_id": clip_id,
+                    "model_id": agent_settings.analyst_model,
+                    "prompt_version": PROMPT_VERSION,
+                }
+                for item in attempts
+            ]
+        )
+        if assert_owned:
+            await assert_owned()
         await analysis_store.record_run(
             run_id=run_id,
             run_key=key,

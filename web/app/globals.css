@@ -8,6 +8,7 @@
  */
 
 :root {
+  --focus-ring: #91b8e5;
   --bg: #12100c;
   --surface: #1a1712;
   --surface-2: #211d17;
@@ -32,6 +33,48 @@
   --sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
   --serif: "Fraunces", Georgia, serif;
 }
+
+/* Editorial sequence and live review metrics share the workspace palette. */
+.quality-page, .film-page { padding: 28px; max-width: 1600px; margin: auto; }
+.quality-page h1, .film-page h1 { font: 600 28px var(--sans); margin: 10px 0; }
+.quality-page p, .film-page p { color: var(--mid); line-height: 1.6; }
+.quality-toolbar, .quality-breakdown, .film-heading, .film-transport { display:flex; align-items:center; flex-wrap:wrap; gap:16px; }
+.quality-toolbar { margin:28px 0; }
+.quality-toolbar select, .film-tools select, .film-tools input { padding:10px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:6px; max-width:100%; }
+.quality-toolbar label { display:flex; gap:12px; align-items:center; }
+.quality-grid { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:16px; }
+.quality-grid article { padding:22px; border:1px solid var(--line); border-radius:10px; background:var(--surface); }
+.quality-grid strong { display:block; font-size:28px; margin:12px 0; font-variant-numeric:tabular-nums; }
+.quality-grid small { color:var(--mid); }
+.quality-grid p { font-size:13px; margin:0; }
+.quality-breakdown { margin:24px 0; padding:16px 0; border-bottom:1px solid var(--line); }
+.quality-method { max-width:900px; font-size:14px; }
+.quality-method h2, .film-page h2 { font:600 18px var(--sans); }
+.film-heading { justify-content:space-between; }
+.film-heading > div:last-child { display:flex; gap:10px; }
+.film-grid { display:grid; grid-template-columns:minmax(0, 1fr) 320px; gap:24px; margin:24px 0; }
+.film-player { background:#050608; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+.film-player video { width:100%; max-height:48vh; aspect-ratio:16/9; display:block; }
+.film-transport { padding:16px 0; font-family:var(--mono); font-size:13px; }
+.film-scrub { width:100%; accent-color:var(--blue); }
+.film-tools { padding:20px; border:1px solid var(--line); border-radius:8px; display:flex; flex-direction:column; gap:14px; }
+.film-tools label { display:flex; flex-direction:column; gap:8px; }
+.film-tools p { font-size:13px; margin:0; }
+.film-source-pages { display:flex; justify-content:space-between; gap:4px; align-items:center; font-size:11px; }
+.film-list { border:1px solid var(--line); border-radius:8px; }
+.film-list header { padding:18px; }
+.film-list header p { font-size:13px; margin-bottom:0; }
+.film-table-scroll { overflow:auto; }
+.film-list table { width:100%; border-collapse:collapse; font-size:13px; }
+.film-list th, .film-list td { text-align:left; padding:12px; border-top:1px solid var(--line); }
+.film-list th { color:var(--mid); font-weight:500; }
+.film-list tr.active { background:var(--surface-2); }
+.film-list input { width:100%; min-width:100px; padding:8px; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:4px; }
+.film-list input[type=number] { width:100px; font-family:var(--mono); }
+.film-row-actions { display:flex; gap:4px; }
+.film-page :focus-visible, .quality-page :focus-visible { outline:2px solid var(--focus-ring); outline-offset:3px; }
+@media (max-width:1100px) { .quality-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .film-grid { grid-template-columns:minmax(0,1fr); } }
+@media (max-width:640px) { .quality-grid { grid-template-columns:1fr; } .quality-page,.film-page { padding:16px; } }
 
 /* A light palette, kept for an explicit `data-theme="light"`.
    It is no longer the automatic answer to a light-mode operating system: the
@@ -2416,6 +2459,7 @@ body{background:var(--bg);color:var(--ink)}
 
 /* One choice drives the stage: the take under review, and the take before it. */
 .compare-hint{color:var(--cockpit-dim,#8ea2bb);font-size:11px}
+.compare-hint select{margin-left:6px;max-width:180px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;background:var(--surface);color:var(--ink)}.recommendation>b small{display:block;font-size:10px;font-weight:400;color:var(--mid);white-space:nowrap}
 .compare-player.active{outline:2px solid #4c88ef;outline-offset:-2px;border-radius:8px}
 
 /* An empty column beside a full one looked like a panel that failed to load. */
@@ -2428,6 +2472,12 @@ body{background:var(--bg);color:var(--ink)}
    picked. This is the step the hierarchy was missing: Projects lists
    productions, this lists a production, a shot opens the work. */
 .project-overview{display:grid;gap:18px;margin-top:14px}
+.film-grid.preview-only{grid-template-columns:minmax(0,1fr)}.film-tools[hidden],.film-list[hidden]{display:none}.film-grid.preview-only .film-player{max-width:1100px;margin:auto}.film-chapters{margin-top:24px}.film-chapters>div{display:flex;gap:8px;overflow-x:auto;padding:6px 2px 14px}.film-chapters button{display:grid;gap:6px;min-width:190px;padding:12px;text-align:left;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:7px}.film-chapters button.on{border-color:var(--blue);background:var(--surface-2)}.film-chapters small,.film-chapters span{font-size:11px;color:var(--mid)}.film-chapters b{font-size:12px}
+.example-actions{display:flex;gap:12px;flex-wrap:wrap}.example-production{padding:24px!important;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.project-next-step{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:22px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.project-next-step h2{font:600 20px var(--sans);margin:5px 0 8px}.project-next-step p{max-width:660px;color:var(--mid);line-height:1.6;font-size:13px}.project-next-step>div:last-child{display:flex;gap:10px;flex-wrap:wrap;flex-shrink:0}
+.sidebar-navigation{min-height:0;overflow-y:auto;overscroll-behavior:contain}.app-sidebar .nav-section-label{margin:0 12px 7px;font-size:10px;letter-spacing:.1em;color:#8299b4}.app-sidebar nav.project-navigation{border-top:1px solid #20344b;padding-top:15px}.app-sidebar footer nav.support-navigation{padding:0 0 10px;gap:2px}.app-sidebar footer nav a{height:34px}.sidebar-collapsed .nav-section-label{display:none}.switch-results{max-height:310px;overflow:auto}.switch-results a[aria-current="true"]{background:#142b49;color:#fff}.film-view-modes{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:18px 0}.film-omissions{margin-bottom:18px;padding:12px 16px;border:1px solid var(--amber);border-radius:8px;color:var(--amber)}.film-omissions a{display:block;padding:6px 0;color:var(--mid)}
+@media(max-width:760px){.nav-section-label{display:none}.project-next-step{align-items:flex-start;flex-direction:column}.app-top-actions .ghost{white-space:nowrap}}
 .overview-stats{display:flex;gap:20px;flex-wrap:wrap;padding:12px 16px;background:var(--surface);border:1px solid var(--line);border-radius:9px;color:var(--low);font-size:11.5px}
 .overview-stats b{margin-right:5px;color:var(--ink);font-size:15px}
 .overview-stats .overview-waiting b{color:var(--amber)}
@@ -2469,3 +2519,24 @@ body{background:var(--bg);color:var(--ink)}
 .prose ul.plain li{color:var(--mid);font-size:13.5px}
 .prose ul.plain strong{color:var(--ink)}
 .prose code{padding:1px 5px;background:var(--surface-2);border-radius:4px;font:12px var(--mono)}
+/* Source-local performance review: neutral evidence, explicit human choices. */
+.performance-entry { margin: 18px 0; border: 1px solid #334155; border-radius: 10px; padding: 14px; }
+.performance-entry > summary, .performance-boundaries > summary { cursor: pointer; font-weight: 600; }
+.performance-workspace { margin-top: 16px; }
+.performance-workspace header, .performance-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.performance-workspace h2 { font-size: 17px; }
+.performance-workspace small { display: block; color: #a8b5c7; font-variant-numeric: tabular-nums; }
+.performance-candidates { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; max-height: 460px; overflow: auto; margin: 14px 0; }
+.performance-candidates article { border: 1px solid #334155; border-radius: 8px; padding: 12px; display: grid; gap: 8px; align-content: start; background: #131d2b; }
+.performance-candidates article.active { border-color: #78a9e8; }
+.performance-candidates details { font-size: 12px; color: #bccbdb; }
+.performance-viewers { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 16px 0; }
+.performance-viewers section { min-width: 0; }
+.performance-viewers video { width: 100%; aspect-ratio: 16 / 9; object-fit: contain; background: #080c12; }
+.performance-boundaries { border-top: 1px solid #334155; padding-top: 14px; }
+.performance-boundaries fieldset { border: 0; padding: 12px 0; min-width: 0; }
+.performance-edit-list { display: grid; gap: 10px; max-height: 520px; overflow: auto; margin-top: 12px; }
+.performance-edit-list > div { display: flex; gap: 8px; flex-wrap: wrap; padding: 10px; border: 1px solid #334155; border-radius: 6px; }
+.performance-edit-list input[type=number], .performance-viewers input[type=number] { width: 90px; font-variant-numeric: tabular-nums; }
+.issue-lanes .lane-safe { background: #344b64; }
+.issue-lanes .clean-key { color: #a7bdd8; }

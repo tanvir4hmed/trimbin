@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { JobStatus, PlannedScene } from "@/lib/api";
 import { ApiError, api } from "@/lib/api";
 import { type Progress, type Ticket, uploadAll } from "@/lib/upload";
+import IngestRecordingReview from "./IngestRecordingReview";
 
 type Stage = "add" | "read" | "verify" | "ingest";
 type Resolution = {
@@ -20,6 +21,7 @@ type SavedGrant = {
   filenames: string[];
   files?: SavedFile[];
   mode?: "slate" | "manual";
+  autoOrganize?: boolean;
   target?: { scene: number; shot: number; take: number };
 };
 
@@ -74,6 +76,7 @@ export default function Upload({
   const storageKey = `trimbin.ingest.${projectId}`;
   const [stage, setStage] = useState<Stage>("add");
   const [mode, setMode] = useState<"slate" | "manual">("slate");
+  const [autoOrganize, setAutoOrganize] = useState(true);
   const [files, setFiles] = useState<File[]>([]);
   const [rows, setRows] = useState<Progress[]>([]);
   const [jobId, setJobId] = useState("");
@@ -104,6 +107,7 @@ export default function Upload({
       const grant = JSON.parse(saved) as SavedGrant;
       setJobId(grant.job_id);
       setMode(grant.mode || (grant.target ? "manual" : "slate"));
+      setAutoOrganize(grant.autoOrganize ?? false);
       setTargetScene(grant.target?.scene || 0);
       setTargetShot(grant.target?.shot || 0);
       setTargetTake(grant.target?.take || 0);
@@ -195,6 +199,17 @@ export default function Upload({
           : undefined;
       const sameTarget =
         JSON.stringify(prior?.target) === JSON.stringify(requestedTarget);
+      if (
+        prior?.files &&
+        sameTarget &&
+        (prior.autoOrganize ?? false) !== (mode === "slate" && autoOrganize)
+      ) {
+        setStage("add");
+        setError(
+          "This batch keeps its original organization choice. Restore that choice to resume, or clear the batch before starting a new one.",
+        );
+        return;
+      }
       const fingerprints = files.map((file) => ({
         name: file.name,
         size: file.size,
@@ -223,6 +238,7 @@ export default function Upload({
             projectId,
             files.map((file) => file.name),
             requestedTarget,
+            mode === "slate" && autoOrganize,
           );
       if (!grant) throw new Error("Upload batch could not be restored.");
       window.localStorage.setItem(
@@ -233,6 +249,7 @@ export default function Upload({
           filenames: files.map((file) => file.name),
           files: fingerprints,
           mode,
+          autoOrganize: mode === "slate" && autoOrganize,
           target: requestedTarget,
         }),
       );
@@ -276,7 +293,16 @@ export default function Upload({
           : "Upload could not start.",
       );
     }
-  }, [files, mode, projectId, storageKey, targetScene, targetShot, targetTake]);
+  }, [
+    files,
+    mode,
+    autoOrganize,
+    projectId,
+    storageKey,
+    targetScene,
+    targetShot,
+    targetTake,
+  ]);
 
   const choose = async (clipId: string, resolution: Resolution) => {
     setDecisions((current) => ({ ...current, [clipId]: resolution }));
@@ -305,7 +331,7 @@ export default function Upload({
       const pending = items
         .filter((item) => !item.verified)
         .map((item) => ({ clip_id: item.clip_id, ...decisions[item.clip_id] }));
-      await api.commitIngest(jobId, pending);
+      if (pending.length) await api.commitIngest(jobId, pending);
       const found = await api.jobStatus(jobId);
       setStatus(found);
       setStage("ingest");
@@ -363,7 +389,7 @@ export default function Upload({
           </p>
         </div>
         <span className="safety-lock">
-          ◈ Nothing moves or deletes without confirmation
+          ◈ Uncertain matches need review. Nothing is auto-deleted.
         </span>
       </header>
       <ol className="ingest-stepper">
@@ -421,6 +447,17 @@ export default function Upload({
               <small>Declare a destination; mismatches are still flagged</small>
             </button>
           </div>
+          {mode === "slate" && (
+            <label className="hint">
+              <input
+                type="checkbox"
+                checked={autoOrganize}
+                onChange={(e) => setAutoOrganize(e.target.checked)}
+              />{" "}
+              Automatically file confident slate matches and create missing
+              scenes / shots. Duplicates and uncertain footage stay in review.
+            </label>
+          )}
           {mode === "manual" && (
             <div className="manual-target">
               <label>
@@ -689,6 +726,12 @@ export default function Upload({
                   </div>
                 )}
                 <h2>{selected.filename}</h2>
+                <IngestRecordingReview
+                  key={selected.clip_id}
+                  projectId={projectId}
+                  clipId={selected.clip_id}
+                  canEdit={canResolve}
+                />
                 <div className="slate-read">
                   <span>
                     Scene <b>{selected.scene || "—"}</b>
@@ -859,7 +902,10 @@ export default function Upload({
       {stage === "verify" && (
         <footer className="ingest-footer">
           <div>
-            <b>Nothing moves or deletes without confirmation.</b>
+            <b>
+              Automatic filing follows your upload choice. Uncertain footage
+              needs review; nothing is auto-deleted.
+            </b>
             <span>
               {unresolved.length
                 ? `${unresolved.length} clip${unresolved.length === 1 ? "" : "s"} still need a decision.`
@@ -883,7 +929,8 @@ export default function Upload({
             <h2>Ingest committed</h2>
             <p>
               {status?.items.filter((item) => item.verified).length ?? 0} clips
-              are organized. Full-take analysis is queued.
+              are organized. Check each recording for its separate analysis
+              progress.
             </p>
           </div>
           <button className="ghost" onClick={reset}>

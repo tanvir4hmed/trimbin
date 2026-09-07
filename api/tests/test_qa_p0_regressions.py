@@ -106,9 +106,9 @@ class TestP02SlateCodesResolveAgainstThePlan:
         assert await resolve_codes(1, "3", "") == (3, 0)
 
     def test_codes_compare_without_changing_what_is_displayed(self) -> None:
-        """Matching ignores punctuation and case; the code an editor typed is
-        still the code they see."""
-        assert _normalise_code(" 12a-pu ") == _normalise_code("12A_PU") == "12APU"
+        """Case and whitespace are tolerant; distinct production codes remain distinct."""
+        assert _normalise_code(" 12a-pu ") == "12A-PU"
+        assert _normalise_code("12A-PU") != _normalise_code("12APU")
 
 
 class TestP04NewFootageReopensADecision:

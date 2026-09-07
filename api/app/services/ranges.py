@@ -106,19 +106,17 @@ def safe_ranges(
     blocked: list[Range] = []
     causes: list[str] = []
     for f in findings:
+        if f.get("severity") == "note":
+            continue
         code = f.get("code")
         if code not in removable:
             continue
         start = max(0.0, float(f.get("start_s") or 0.0))
         end = min(duration_s, float(f.get("end_s") or 0.0))
 
-        # Once the subject exits, the following dead tail is not a second clean
-        # performance. Model spans often mark only the exit movement itself;
-        # treating their end as a return to usable action offered post-cut room
-        # as the primary range. Keep everything before the exit, block through
-        # the end of the source.
-        if code in {"frame.subject_exits", "action.post_roll"} and start < duration_s:
-            end = duration_s
+        # Evidence is source-local. A continuously rolling recording may contain
+        # another performance after this exit/reset; never extend the exclusion
+        # beyond the actual observed span.
 
         # A finding with no span applies to the whole take. Those are real —
         # "underexposed throughout" — and the honest reading is that nothing is

@@ -58,12 +58,23 @@ export default function ProjectOverview({
     return (
       <div className="project-overview">
         <div className="overview-stats">
-          <span><b>{open.shots.length}</b> shot{open.shots.length === 1 ? "" : "s"}</span>
-          <span><b>{open.shots.reduce((n, s) => n + s.takes, 0)}</b> takes</span>
-          <span className={open.shots.filter(needsAPerson).length ? "overview-waiting" : ""}>
+          <span>
+            <b>{open.shots.length}</b> shot{open.shots.length === 1 ? "" : "s"}
+          </span>
+          <span>
+            <b>{open.shots.reduce((n, s) => n + s.takes, 0)}</b> takes
+          </span>
+          <span
+            className={
+              open.shots.filter(needsAPerson).length ? "overview-waiting" : ""
+            }
+          >
             <b>{open.shots.filter(needsAPerson).length}</b> waiting
           </span>
-          <Link className="ghost small" href={`${paths.coverage(projectId, open.scene)}`}>
+          <Link
+            className="ghost small"
+            href={`${paths.coverage(projectId, open.scene)}`}
+          >
             Play scene
           </Link>
         </div>
@@ -79,7 +90,9 @@ export default function ProjectOverview({
                 <span className={`dot ${shot.status}`} aria-hidden />
                 <b>{shot.slug || `Shot ${shot.shot}`}</b>
               </span>
-              {shot.label && <small className="overview-shot-label">{shot.label}</small>}
+              {shot.label && (
+                <small className="overview-shot-label">{shot.label}</small>
+              )}
               <span className="overview-shot-meta">
                 {shot.takes} take{shot.takes === 1 ? "" : "s"}
                 {shot.take_numbers.length > 1 &&
@@ -87,7 +100,9 @@ export default function ProjectOverview({
               </span>
               <span className="overview-shot-state">{standing(shot)}</span>
               {shot.open_notes > 0 && (
-                <span className="overview-shot-notes">{shot.open_notes} open notes</span>
+                <span className="overview-shot-notes">
+                  {shot.open_notes} open notes
+                </span>
               )}
             </Link>
           ))}
@@ -103,13 +118,43 @@ export default function ProjectOverview({
   const shots = scenes.flatMap((item) => item.shots);
   const takes = shots.reduce((total, shot) => total + shot.takes, 0);
   const waiting = shots.filter(needsAPerson).length;
+  const selected = shots.filter(
+    (shot) => (shot.segments ?? 0) > 0 || shot.status === "confirmed",
+  ).length;
 
   return (
     <div className="project-overview">
+      <section className="project-next-step">
+        <div>
+          <p className="eyebrow">PRODUCTION WORKSPACE</p>
+          <h2>From footage to a film you can review</h2>
+          <p>
+            {selected} of {shots.length} shots have confirmed selections. Review
+            the evidence, choose your portions, then watch them across the
+            project.
+          </p>
+        </div>
+        <div>
+          <Link className="primary" href={paths.film(projectId)}>
+            Film Preview
+          </Link>
+          {canCurate && (
+            <Link className="ghost" href={paths.ingest(projectId)}>
+              Add footage
+            </Link>
+          )}
+        </div>
+      </section>
       <div className="overview-stats">
-        <span><b>{scenes.length}</b> scene{scenes.length === 1 ? "" : "s"}</span>
-        <span><b>{shots.length}</b> shot{shots.length === 1 ? "" : "s"}</span>
-        <span><b>{takes}</b> take{takes === 1 ? "" : "s"}</span>
+        <span>
+          <b>{scenes.length}</b> scene{scenes.length === 1 ? "" : "s"}
+        </span>
+        <span>
+          <b>{shots.length}</b> shot{shots.length === 1 ? "" : "s"}
+        </span>
+        <span>
+          <b>{takes}</b> take{takes === 1 ? "" : "s"}
+        </span>
         <span className={waiting ? "overview-waiting" : ""}>
           <b>{waiting}</b> waiting
         </span>
@@ -132,7 +177,11 @@ export default function ProjectOverview({
                 {item.shots.length} shot{item.shots.length === 1 ? "" : "s"} ·{" "}
                 {item.shots.reduce((n, s) => n + s.takes, 0)} takes
               </span>
-              <span className={sceneWaiting ? "scene-row-waiting on" : "scene-row-waiting"}>
+              <span
+                className={
+                  sceneWaiting ? "scene-row-waiting on" : "scene-row-waiting"
+                }
+              >
                 {sceneWaiting ? `${sceneWaiting} waiting` : "settled"}
               </span>
               <i aria-hidden>›</i>
@@ -142,7 +191,10 @@ export default function ProjectOverview({
       </div>
 
       {canCurate && (
-        <Link className="ghost overview-add" href={`${paths.ingest(projectId)}`}>
+        <Link
+          className="ghost overview-add"
+          href={`${paths.ingest(projectId)}`}
+        >
           Add scenes, shots &amp; footage →
         </Link>
       )}

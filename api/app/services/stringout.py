@@ -17,6 +17,7 @@ has no standing to answer them. A stringout is the raw material an editor cuts
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -56,6 +57,8 @@ class Entry:
     segment_id: str = ""
     position: int = 0
     source_filename: str = ""
+    attempt_id: str | None = None
+    attempt_revision: int = 0
 
     @property
     def duration_s(self) -> float:
@@ -91,10 +94,28 @@ class Entry:
             "segment_id": self.segment_id,
             "position": self.position,
             "source_filename": self.source_filename,
+            "attempt_id": self.attempt_id,
+            "attempt_revision": self.attempt_revision,
         }
 
 
-async def scene(project_id: int, scene_id: int) -> dict:
+@dataclass(frozen=True)
+class ProjectContext:
+    shots: dict[tuple[int, int], shots_service.Shot]
+    plan: list[structure_service.Scene]
+    comments: dict[tuple[int, int], dict]
+
+
+async def project_context(project_id: int) -> ProjectContext:
+    meta, plan, comments = await asyncio.gather(
+        shots_service.for_project(project_id),
+        structure_service.for_project(project_id),
+        comments_service.counts_for_project(project_id),
+    )
+    return ProjectContext(meta, plan, comments)
+
+
+async def scene(project_id: int, scene_id: int, *, context: ProjectContext | None = None) -> dict:
     """Every shot of one scene, with the take currently standing for it.
 
     "Currently standing" rather than "the panel chose": an editor override is
@@ -147,13 +168,14 @@ async def scene(project_id: int, scene_id: int) -> dict:
         observed_by_shot.setdefault(int(row[0]), []).append(str(row[1]))
     observed_shots = set(observed_by_shot)
 
-    meta = await shots_service.for_project(project_id)
-    plan = await structure_service.for_project(project_id)
+    context = context or await project_context(project_id)
+    meta = context.shots
+    plan = context.plan
     scene_codes = {item.scene: item.scene_code for item in plan}
     shot_codes = {
         (item.scene, planned.shot): planned.slug for item in plan for planned in item.shots
     }
-    open_counts = await comments_service.counts_for_project(project_id)
+    open_counts = context.comments
     margin = assessment.review_margin()
 
     entries: list[Entry] = []
@@ -290,6 +312,8 @@ async def scene(project_id: int, scene_id: int) -> dict:
                         or "",
                         source_filename=str(row[8] or "").rsplit("/", 1)[-1],
                         segment_id=str(segment.get("segment_id") or ""),
+                        attempt_id=segment.get("attempt_id"),
+                        attempt_revision=int(segment.get("attempt_revision", 0)),
                         position=int(segment.get("position", position)),
                     )
                 )

@@ -1,10 +1,9 @@
 import { AccuracyDashboard } from "@/components/AccuracyDashboard";
-import { PerProjectAccuracy } from "@/components/PerProjectAccuracy";
 
 export const metadata = {
   title: "Accuracy · Trimbin",
   description:
-    "How often Trimbin is right, computed live from production. Published because a system that will not show its error rate is asking to be taken on faith.",
+    "Live analysis coverage and explicit human finding reviews, by project.",
 };
 
 // Never statically rendered. The whole point of this page is that the numbers
@@ -16,7 +15,6 @@ export default function AccuracyPage() {
   return (
     <main className="shell">
       <AccuracyDashboard />
-      <PerProjectAccuracy />
     </main>
   );
 }

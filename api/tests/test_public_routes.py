@@ -8,11 +8,13 @@ accuracy is worse than one that says so.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services import analytics
+from app.services import analytics, quality
 
 
 @pytest.fixture
@@ -29,22 +31,16 @@ class TestEmptyDeployment:
         """Zero would say the system is wrong every time. Null says nothing has
         been measured, which is the truth on a fresh deployment."""
 
-        async def empty() -> dict:
-            return {
-                "decision_accuracy_pct": None,
-                "confident_decisions": 0,
-                "confident_overturned": 0,
-                "flagged_for_review": 0,
-                "flagged_changed_pct": None,
-                "auto_decided_pct": None,
-                "shots_total": 0,
-            }
+        async def empty():
+            return quality.QualityReport(
+                measured_at=datetime.now(UTC), overall=quality.counts({}), projects=[]
+            )
 
-        monkeypatch.setattr(analytics, "accuracy_summary", empty)
+        monkeypatch.setattr(quality, "report", empty)
         body = client.get("/public/accuracy").json()
 
-        assert body["decision_accuracy_pct"] is None
-        assert body["shots_total"] == 0
+        assert body["overall"]["agreement_pct"] is None
+        assert body["overall"]["reviewed"] == 0
 
     def test_eval_says_it_has_not_run(
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch
@@ -141,10 +137,12 @@ class TestProvenanceSeparation:
     def test_accuracy_declares_that_it_excludes_generated_rows(
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        async def empty() -> dict:
-            return {"shots_total": 0, "decision_accuracy_pct": None}
+        async def empty():
+            return quality.QualityReport(
+                measured_at=datetime.now(UTC), overall=quality.counts({}), projects=[]
+            )
 
-        monkeypatch.setattr(analytics, "accuracy_summary", empty)
+        monkeypatch.setattr(quality, "report", empty)
         assert client.get("/public/accuracy").json()["counts_only_real_work"] is True
 
 
@@ -155,24 +153,20 @@ class TestPopulatedDeployment:
         """A figure whose definition lives in a slide deck is not one anyone can
         check. It travels with the number."""
 
-        async def measured() -> dict:
-            return {
-                "decision_accuracy_pct": 98.8,
-                "confident_decisions": 45918,
-                "confident_overturned": 571,
-                "flagged_for_review": 9231,
-                "flagged_changed_pct": 41.5,
-                "auto_decided_pct": 83.3,
-                "shots_total": 55149,
-            }
+        async def measured():
+            return quality.QualityReport(
+                measured_at=datetime.now(UTC),
+                overall=quality.counts({"confirmed": 6, "dismissed": 4}),
+                projects=[],
+            )
 
-        monkeypatch.setattr(analytics, "accuracy_summary", measured)
+        monkeypatch.setattr(quality, "report", measured)
         body = client.get("/public/accuracy").json()
 
-        assert body["decision_accuracy_pct"] == 98.8
-        assert "flagged for review are excluded" in body["definition"]
+        assert body["overall"]["agreement_pct"] == 60
+        assert "explicitly reviewed" in body["definition"]
         # The weakness is published beside the number, not omitted.
-        assert "weaker evidence" in body["caveat"]
+        assert "do not measure overall accuracy" in body["caveat"]
 
     def test_eval_keeps_misses_and_false_alarms_apart(
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch
@@ -203,18 +197,20 @@ class TestPopulatedDeployment:
 
 
 class TestCaching:
-    def test_public_pages_are_cacheable(
+    def test_live_review_measurements_are_not_cached(
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """A burst of visitors should cost one query. The window is short enough
         that the page stays visibly live, which is the point of it."""
 
-        async def empty() -> dict:
-            return {"shots_total": 0}
+        async def empty():
+            return quality.QualityReport(
+                measured_at=datetime.now(UTC), overall=quality.counts({}), projects=[]
+            )
 
-        monkeypatch.setattr(analytics, "accuracy_summary", empty)
+        monkeypatch.setattr(quality, "report", empty)
         response = client.get("/public/accuracy")
-        assert "max-age" in response.headers["cache-control"]
+        assert response.headers["cache-control"] == "no-store"
 
 
 class TestHealth:
@@ -243,7 +239,7 @@ class TestTheArchiveWaking:
         async def asleep() -> dict:
             raise analytics.Waking("The archive is waking up.")
 
-        monkeypatch.setattr(analytics, "accuracy_summary", asleep)
+        monkeypatch.setattr(quality, "report", asleep)
 
         response = client.get("/public/accuracy")
         assert response.status_code == 503
@@ -257,7 +253,7 @@ class TestTheArchiveWaking:
         async def asleep() -> dict:
             raise analytics.Waking("The archive is waking up.")
 
-        monkeypatch.setattr(analytics, "accuracy_summary", asleep)
+        monkeypatch.setattr(quality, "report", asleep)
 
         response = client.get("/public/accuracy")
         assert response.headers.get("Retry-After")
@@ -275,7 +271,7 @@ class TestTheArchiveWaking:
         async def broken() -> dict:
             raise RuntimeError("column does not exist")
 
-        monkeypatch.setattr(analytics, "accuracy_summary", broken)
+        monkeypatch.setattr(quality, "report", broken)
 
         with TestClient(app, raise_server_exceptions=False) as unshielded:
             response = unshielded.get("/public/accuracy")

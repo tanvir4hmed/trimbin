@@ -32,6 +32,7 @@ from ..services import (
     activity,
     analysis_store,
     assessment,
+    attempts,
     members,
     ranges,
     revisions,
@@ -98,6 +99,8 @@ class UndoRequest(Revised):
 class CoverageSegmentInput(BaseModel):
     segment_id: UUID | None = None
     clip_id: UUID
+    attempt_id: UUID | None = None
+    attempt_revision: int = Field(default=0, ge=0)
     source_in_s: float = Field(ge=0)
     source_out_s: float = Field(gt=0)
     reason: str = Field(default="", max_length=400)
@@ -506,6 +509,12 @@ async def set_coverage(
                 for row in source_rows.result_rows
             }
         )
+    for clip_ref, attempt_ref, attempt_rev in {
+        (r.clip_id, r.attempt_id, r.attempt_revision)
+        for r in body.segments
+        if r.attempt_id or r.attempt_revision
+    }:
+        await attempts.validate_reference(project_id, clip_ref, attempt_ref, attempt_rev)
     prepared: list[dict] = []
     for position, requested in enumerate(body.segments):
         clip_id = str(requested.clip_id)
@@ -530,12 +539,14 @@ async def set_coverage(
                 else uuid4().hex,
                 "clip_id": clip_id,
                 "take_no": int(take.get("take_no", 0) or 0),
+                "attempt_id": str(requested.attempt_id) if requested.attempt_id else None,
+                "attempt_revision": requested.attempt_revision,
                 "source_in_s": round(requested.source_in_s, 3),
                 "source_out_s": round(requested.source_out_s, 3),
                 "position": position,
                 "reason": requested.reason or body.reason,
                 "origin": requested.origin or "human",
-                "created_by": requested.created_by or principal.email or "",
+                "created_by": principal.email or "",
             }
         )
 

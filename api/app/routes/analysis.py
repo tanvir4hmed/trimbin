@@ -19,7 +19,6 @@ from ..services import (
     jobs,
     members,
     ranges,
-    revisions,
 )
 
 log = logging.getLogger(__name__)
@@ -28,7 +27,7 @@ router = APIRouter(prefix="/analysis", tags=["analysis"])
 
 class FindingCommand(BaseModel):
     rev: int = Field(ge=0)
-    action: Literal["confirm", "dismiss", "correct", "adjust_range"]
+    action: Literal["confirm", "dismiss", "correct", "adjust_range", "retract"]
     code: FindingCode | None = None
     detail: str | None = Field(default=None, max_length=500)
     severity: Literal["note", "attention", "blocking"] | None = None
@@ -124,14 +123,38 @@ async def act_on_finding(
     """Confirm, dismiss, correct, or range-adjust one machine finding."""
     await principal.assert_can_comment(project_id)
     actor = principal.email or ""
-    if replayed := await revisions.replay(idempotency_key, actor):
-        return replayed
+    request_data = body.model_dump(mode="json")
+    replayed = await finding_actions.replay(
+        project_id, clip_id, finding_id, actor, idempotency_key, request_data
+    )
+    if replayed:
+        pending = False
+        try:
+            pending = not await finding_actions.deliver(replayed.event_id)
+        except Exception:
+            pending = True
+        return {
+            "status": "recorded",
+            "finding_id": str(replayed.finding_id),
+            "event_id": str(replayed.event_id),
+            "action": replayed.action,
+            "rev": replayed.rev,
+            "archive_pending": pending,
+        }
 
     read_model = await _read(project_id, clip_id)
     current = next(
         (row for row in read_model["findings"] if UUID(str(row["finding_id"])) == finding_id),
         None,
     )
+    history = [
+        row
+        for row in read_model["history"]
+        if str(row["finding_id"]) == str(finding_id)
+        and str(row["run_id"]) == str((read_model.get("run") or {}).get("run_id", ""))
+    ]
+    if current is None and body.action == "retract" and history:
+        current = max(history, key=lambda row: int(row["revision"]))
     if current is None:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
@@ -152,6 +175,7 @@ async def act_on_finding(
         "dismiss": "human_dismissed",
         "correct": "human_corrected",
         "adjust_range": "human_range_adjusted",
+        "retract": "human_retracted",
     }[body.action]
     changes = {
         "code": body.code.value if body.code is not None else None,
@@ -160,6 +184,59 @@ async def act_on_finding(
         "start_s": start_s if body.action == "adjust_range" else None,
         "end_s": end_s if body.action == "adjust_range" else None,
     }
+    if body.action == "retract":
+        durable = await finding_actions.pending_history(project_id, finding_id)
+        by_event = {str(row["event_id"]): row for row in history}
+        by_event.update(
+            {
+                str(row["event_id"]): row
+                for row in durable
+                if str(row["run_id"]) == str(current["run_id"])
+            }
+        )
+        history = list(by_event.values())
+        withdrawn = {
+            str(row.get("retracts_event_id", ""))
+            for row in history
+            if row["action"] == "human_retracted"
+        }
+        valid = sorted(
+            [
+                row
+                for row in history
+                if row["action"] != "human_retracted" and str(row["event_id"]) not in withdrawn
+            ],
+            key=lambda row: int(row["revision"]),
+        )
+        if not valid or not str(valid[-1]["action"]).startswith("human_"):
+            raise HTTPException(409, "There is no active human review to retract.")
+        target = valid[-1]
+        # Retraction is for one's own mistaken review. Team correction of another
+        # review remains a new explicit judgement, not rewriting their intent.
+        if target.get("actor_id") != actor:
+            raise HTTPException(
+                403, "Only the author can retract this review; add your own correction instead."
+            )
+        if len(valid) < 2:
+            raise HTTPException(
+                409, "Original evidence is not available yet; retry after history sync."
+            )
+        previous = valid[-2]
+        changes = {
+            name: previous[name]
+            for name in (
+                "code",
+                "detail",
+                "severity",
+                "start_s",
+                "end_s",
+                "evidence_segment_ids",
+                "sources",
+            )
+        }
+        changes.update(
+            retracts_event_id=str(target["event_id"]), restored_action=previous["action"]
+        )
     committed = await finding_actions.commit(
         project_id=project_id,
         clip_id=clip_id,
@@ -169,6 +246,8 @@ async def act_on_finding(
         actor=actor,
         actor_role=members.role_of(actor),
         changes=changes,
+        command_key=idempotency_key,
+        request=request_data,
     )
 
     archive_pending = False
@@ -188,7 +267,8 @@ async def act_on_finding(
         "rev": committed.rev,
         "archive_pending": archive_pending,
     }
-    await revisions.remember(idempotency_key, actor, result)
+    if committed.replayed:
+        return result
     await activity.record(
         project_id,
         actor,

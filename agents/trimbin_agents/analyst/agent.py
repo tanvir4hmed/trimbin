@@ -53,12 +53,16 @@ log = logging.getLogger(__name__)
 # Rows stamped analyst/v1 carry invented codes; rows stamped v2 carry taxonomy
 # ones, and a query that treats them alike is comparing two different
 # vocabularies while believing it is comparing takes.
-PROMPT_VERSION = "analyst/v3"
+PROMPT_VERSION = "analyst/v4"
 _HERE = Path(__file__).parent
 
 TECHNICAL = (_HERE / "prompt_technical_v1.md").read_text(encoding="utf-8")
 CONTINUITY = (_HERE / "prompt_continuity_v1.md").read_text(encoding="utf-8")
 CHIEF = (_HERE / "prompt_chief_v1.md").read_text(encoding="utf-8")
+_RUBRIC = (_HERE.parent / "common" / "editorial_rubric.md").read_text(encoding="utf-8")
+TECHNICAL += "\n\n" + _RUBRIC
+CONTINUITY += "\n\n" + _RUBRIC
+CHIEF += "\n\n" + _RUBRIC
 
 # How far from the group median counts as an outlier worth mentioning. Below
 # this, the takes agree and there is nothing to report â€” seven handheld takes are

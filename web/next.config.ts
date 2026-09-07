@@ -43,7 +43,12 @@ const config: NextConfig = {
   },
 
   async rewrites() {
-    return [{ source: "/api/:path*", destination: `${API_URL}/:path*` }];
+    return [
+      { source: "/api/:path*", destination: `${API_URL}/:path*` },
+      ...(process.env.NODE_ENV === "development" && process.env.MEDIA_URL
+        ? [{ source: "/media/:path*", destination: `${process.env.MEDIA_URL}/:path*` }]
+        : []),
+    ];
   },
 
   async headers() {

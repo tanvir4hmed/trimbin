@@ -235,6 +235,7 @@ export default function ProjectWorkspace({
         </div>
 
         <div className="project-tools">
+          {urlScene > 0 && <Link className="primary" href={paths.film(projectId, project?.name)}>Film Preview</Link>}
           {project && me && <ProjectTeam project={project} me={me} />}
           {open && (
             <Link className="ghost" href={`${paths.coverage(projectId, open.scene, project?.name)}`}>

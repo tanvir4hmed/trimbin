@@ -45,6 +45,7 @@ SEGMENT_COLUMNS = [
     "model_id",
     "prompt_version",
     "occurred_at",
+    "observation_json",
 ]
 
 MOMENT_COLUMNS = [
@@ -84,9 +85,53 @@ FINDING_COLUMNS = [
     "model_id",
     "prompt_version",
     "occurred_at",
+    "retracts_event_id",
+    "restored_action",
 ]
 
 ZERO_UUID = UUID(int=0)
+
+ATTEMPT_COLUMNS = [
+    "attempt_id",
+    "run_id",
+    "project_id",
+    "clip_id",
+    "start_s",
+    "end_s",
+    "action",
+    "observation",
+    "interpretation",
+    "recommendation",
+    "confidence",
+    "intent",
+    "starts_before_window",
+    "ends_after_window",
+    "evidence_segment_ids",
+    "model_id",
+    "prompt_version",
+]
+
+
+async def record_attempts(rows: list[dict]) -> None:
+    if rows:
+        await (await client()).insert(
+            "performance_attempts",
+            [[row[key] for key in ATTEMPT_COLUMNS] for row in rows],
+            column_names=ATTEMPT_COLUMNS,
+        )
+
+
+async def read_attempts(project_id: int, clip_id: UUID) -> list[dict]:
+    result = await (await client()).query(
+        """SELECT a.* FROM (SELECT * FROM performance_attempts FINAL
+          WHERE project_id={p:UInt32} AND clip_id={c:UUID}) AS a
+        INNER JOIN current_analysis_runs AS r
+          ON r.project_id=a.project_id AND r.clip_id=a.clip_id AND r.run_id=a.run_id
+        WHERE a.project_id={p:UInt32} AND a.clip_id={c:UUID} AND r.state='completed'
+        ORDER BY a.start_s, a.attempt_id""",
+        parameters={"p": project_id, "c": clip_id},
+    )
+    return [dict(zip(result.column_names, row, strict=True)) for row in result.result_rows]
 
 
 async def already_completed(project_id: int, run_key: str) -> bool:
@@ -165,6 +210,7 @@ async def record_segments(segments: list[dict]) -> int:
             s.get("model_id", ""),
             s.get("prompt_version", ""),
             now,
+            s.get("observation_json", "{}"),
         ]
         for s in segments
     ]
@@ -224,6 +270,8 @@ async def record_finding_events(events: list[dict]) -> int:
             e.get("model_id", ""),
             e.get("prompt_version", ""),
             e.get("occurred_at") or now,
+            e.get("retracts_event_id") or ZERO_UUID,
+            e.get("restored_action", ""),
         ]
         for e in events
     ]
@@ -240,13 +288,30 @@ async def finding_event_exists(project_id: int, event_id: UUID) -> bool:
 
 
 _CLIP_SQL = """
-        SELECT group_id, subgroup_id, take_no, duration_ms / 1000 AS duration_s,
-               proxy_uri, sprite_uri, fps, scene_code, shot_code
-        FROM current_clip_placement
-        WHERE project_id={p:UInt32} AND clip_id={c:UUID} AND status='active'
-        ORDER BY ingested_at DESC
+        SELECT p.group_id AS group_id, p.subgroup_id AS subgroup_id,
+               c.take_no AS take_no, c.duration_ms / 1000 AS duration_s,
+               c.proxy_uri AS proxy_uri, c.sprite_uri AS sprite_uri, c.fps AS fps,
+               p.scene_code AS scene_code, p.shot_code AS shot_code
+        FROM clips AS c
+        LEFT ANY JOIN current_clip_placement AS p
+          ON p.project_id=c.project_id AND p.clip_id=c.clip_id
+        LEFT JOIN current_clip_lifecycle AS l
+          ON l.project_id=c.project_id AND l.clip_id=c.clip_id
+        WHERE c.project_id={p:UInt32} AND c.clip_id={c:UUID}
+          AND c.status='active' AND l.action != 'deleted'
+        ORDER BY c.ingested_at DESC
         LIMIT 1
         """
+
+
+async def clip_identity(project_id: int, clip_id: UUID) -> dict:
+    result = await (await client()).query(_CLIP_SQL, parameters={"p": project_id, "c": clip_id})
+    return (
+        dict(zip(result.column_names, result.result_rows[0], strict=True))
+        if result.result_rows
+        else {}
+    )
+
 
 _RUN_SQL = """
         SELECT run_id, run_key, state, duration_s, covered_until_s, window_count,
@@ -279,7 +344,8 @@ _HISTORY_SQL = """
         (
             SELECT clip_id, finding_id, event_id, run_id, revision, action, code, detail,
                    severity, start_s, end_s, evidence_segment_ids, sources,
-                   supersedes_event_id, actor_id, actor_role, occurred_at
+                   supersedes_event_id, actor_id, actor_role, occurred_at,
+                   retracts_event_id, restored_action
             FROM finding_events
             WHERE project_id={p:UInt32} AND clip_id={c:UUID}
             ORDER BY occurred_at DESC, event_id
@@ -363,11 +429,30 @@ async def active_clips_without_analysis(project_id: int) -> list[dict]:
     return [dict(zip(result.column_names, row, strict=True)) for row in result.result_rows]
 
 
+STYLE_SENSITIVE_MEASUREMENTS = frozenset(
+    {
+        "focus.soft",
+        "focus.lost",
+        "motion.blur",
+        "stability.shake",
+        "stability.outlier",
+        "exposure.under",
+        "exposure.over",
+        "exposure.clipped",
+        "white_balance.shift",
+        "noise.high",
+        "clip.black",
+        "audio.silence",
+        "audio.noise_floor",
+    }
+)
+
+
 async def raw_findings(project_id: int, clip_id: UUID) -> list[dict]:
     result = await (await client()).query(
         """
         SELECT finding_codes, finding_starts_s, finding_ends_s
-        FROM current_clip_placement
+        FROM clips
         WHERE project_id={p:UInt32} AND clip_id={c:UUID} AND status='active'
         ORDER BY ingested_at DESC
         LIMIT 1
@@ -382,8 +467,12 @@ async def raw_findings(project_id: int, clip_id: UUID) -> list[dict]:
             "code": str(code),
             "start_s": float(start),
             "end_s": float(end),
-            "detail": "Measured during ingest.",
-            "severity": "attention",
+            "detail": (
+                "Measured during ingest. Intent is unknown; review against the shot brief."
+                if str(code) in STYLE_SENSITIVE_MEASUREMENTS
+                else "Measured during ingest."
+            ),
+            "severity": "note" if str(code) in STYLE_SENSITIVE_MEASUREMENTS else "attention",
             "source": "measured",
         }
         for code, start, end in zip(codes, starts, ends, strict=True)

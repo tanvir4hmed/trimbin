@@ -56,7 +56,8 @@ export default function Home() {
           )}
         </div>
 
-        <div className="door-workflow" aria-label="What Trimbin does"><span><b>01</b> Verify ingest</span><span><b>02</b> Review every take</span><span><b>03</b> Play scene coverage</span></div>
+        <p><Link className="ghost" href="/demo">Explore the example project →</Link></p>
+        <div className="door-workflow" aria-label="What Trimbin does"><span><b>01</b> Organize footage</span><span><b>02</b> Review takes &amp; portions</span><span><b>03</b> Film Preview</span></div>
 
         <p className="door-links">
           <Link href="/about">About</Link>

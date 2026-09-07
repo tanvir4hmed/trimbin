@@ -41,6 +41,7 @@ function Archive() {
   const router = useRouter();
   const search = useSearchParams();
   const asked = search.get("q") ?? undefined;
+  const requestedProject = Number(search.get("project") || 0);
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState<number | null>(null);
@@ -51,20 +52,31 @@ function Archive() {
     try {
       const found = await api.projects();
       setProjects(found.projects);
-      // The project with the most in it, rather than the newest. A search box
-      // pointed at an empty project answers "no match" to every question and
-      // reads as a broken feature.
-      setProjectId(found.projects[0]?.project_id ?? null);
+      const requested = found.projects.find(
+        (p) => p.project_id === requestedProject,
+      );
+      setProjectId(
+        requestedProject
+          ? (requested?.project_id ?? null)
+          : (found.projects[0]?.project_id ?? null),
+      );
+      setError(
+        requestedProject && !requested
+          ? "This project is unavailable to you. Choose another project; search has not changed scope automatically."
+          : null,
+      );
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
         router.replace("/");
         return;
       }
-      setError(e instanceof Error ? e.message : "Could not load your projects.");
+      setError(
+        e instanceof Error ? e.message : "Could not load your projects.",
+      );
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, requestedProject]);
 
   useEffect(() => {
     if (!currentIdentity()) {
@@ -86,7 +98,7 @@ function Archive() {
     <main className="shell">
       <header className="dash-top">
         <div>
-          <h1>Archive</h1>
+          <h1>Search footage</h1>
           <p className="dim">
             Every take ever considered, every measurement, every reason, every
             override — with the query that found them.
@@ -97,7 +109,11 @@ function Archive() {
             <span>In</span>
             <select
               value={projectId ?? ""}
-              onChange={(e) => setProjectId(Number(e.target.value))}
+              onChange={(e) => {
+                const next = new URLSearchParams(search.toString());
+                next.set("project", e.target.value);
+                router.replace(`/search?${next.toString()}`);
+              }}
             >
               {projects.map((p) => (
                 <option key={p.project_id} value={p.project_id}>
@@ -124,7 +140,9 @@ function Archive() {
           projectId={projectId}
           initialQuestion={asked}
           onOpen={(scene, shot, at, clipId) =>
-            router.push(`${paths.shot(projectId, scene, shot)}${at !== undefined ? `?at=${at}` : ""}${clipId ? `${at !== undefined ? "&" : "?"}clip=${clipId}` : ""}`)
+            router.push(
+              `${paths.shot(projectId, scene, shot)}${at !== undefined ? `?at=${at}` : ""}${clipId ? `${at !== undefined ? "&" : "?"}clip=${clipId}` : ""}`,
+            )
           }
         />
       )}

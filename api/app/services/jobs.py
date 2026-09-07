@@ -20,6 +20,7 @@ from uuid import UUID, uuid4
 from google.cloud import firestore, pubsub_v1
 
 from ..config import settings
+from . import analysis_queue
 
 log = logging.getLogger(__name__)
 
@@ -97,6 +98,7 @@ class Job:
     target_scene: int = 0
     target_shot: int = 0
     target_take: int = 0
+    auto_organize: bool = False
     # One entry per clip: what happened to it, and where it landed.
     items: list[dict] = field(default_factory=list)
     stages: dict[str, dict] = field(default_factory=dict)
@@ -110,6 +112,7 @@ async def open_job(
     target_scene: int = 0,
     target_shot: int = 0,
     target_take: int = 0,
+    auto_organize: bool = False,
 ) -> UUID:
     """Create the record before any work starts.
 
@@ -136,6 +139,7 @@ async def open_job(
                 "target_scene": target_scene,
                 "target_shot": target_shot,
                 "target_take": target_take,
+                "auto_organize": auto_organize,
                 "items": [],
                 "stages": {},
             }
@@ -165,6 +169,7 @@ async def get_job(job_id: UUID) -> Job | None:
         target_scene=int(d.get("target_scene", 0) or 0),
         target_shot=int(d.get("target_shot", 0) or 0),
         target_take=int(d.get("target_take", 0) or 0),
+        auto_organize=bool(d.get("auto_organize", False)),
         items=d.get("items", []),
         stages=d.get("stages", {}),
     )
@@ -252,11 +257,26 @@ async def record_progress(job_id: UUID, clip_id: UUID, ok: bool, reason: str = "
         snapshot = await ref.get(transaction=transaction)
         d = snapshot.to_dict() or {}
 
+        outcomes = dict(d.get("clip_outcomes", {}))
+        previous = outcomes.get(str(clip_id))
+        # At-least-once delivery must not count a clip twice. Successful work
+        # remains successful if an older failed delivery finishes afterwards.
+        if previous is True or previous is ok:
+            return d.get("completed_items", 0), d.get("failed_items", 0), d.get("total_items", 0)
         completed = d.get("completed_items", 0) + (1 if ok else 0)
-        failed = d.get("failed_items", 0) + (0 if ok else 1)
+        failed = d.get("failed_items", 0) + (0 if ok else 1) - (1 if previous is False else 0)
+        outcomes[str(clip_id)] = ok
         total = d.get("total_items", 0)
 
-        update: dict = {"completed_items": completed, "failed_items": failed}
+        update: dict = {
+            "completed_items": completed,
+            "failed_items": failed,
+            "clip_outcomes": outcomes,
+        }
+        if ok and previous is False:
+            update["failures"] = [
+                item for item in d.get("failures", []) if str(item.get("clip_id")) != str(clip_id)
+            ]
         if not ok:
             update["failures"] = firestore.ArrayUnion([{"clip_id": str(clip_id), "reason": reason}])
 
@@ -264,7 +284,11 @@ async def record_progress(job_id: UUID, clip_id: UUID, ok: bool, reason: str = "
         # still finishes — "done" describes the work, not the outcome, and the
         # failures are listed beside it.
         if total and completed + failed >= total:
-            update["state"] = State.DONE
+            update["state"] = (
+                State.COMMITTED
+                if d.get("items") and all(item.get("verified") for item in d["items"])
+                else State.DONE
+            )
             update["finished_at"] = datetime.now(UTC)
 
         transaction.update(ref, update)
@@ -346,7 +370,11 @@ async def mark_verified(job_id: UUID, clip_ids: set[str]) -> None:
             {**item, "verified": True} if str(item.get("clip_id")) in clip_ids else item
             for item in data.get("items", [])
         ]
-        finished = bool(items) and all(bool(item.get("verified")) for item in items)
+        finished = (
+            bool(items)
+            and len(items) >= int(data.get("total_items", 0)) - int(data.get("failed_items", 0))
+            and all(bool(item.get("verified")) for item in items)
+        )
         transaction.update(
             ref,
             {
@@ -437,6 +465,7 @@ async def enqueue_ingest(
     target_shot: int = 0,
     target_take: int = 0,
     uploaded_by: str = "",
+    auto_organize: bool = False,
 ) -> None:
     """One message per clip.
 
@@ -467,6 +496,7 @@ async def enqueue_ingest(
             # So the clip row can say who put it here. It has been written as an
             # empty string since the first week.
             uploaded_by=uploaded_by[:120],
+            auto_organize="true" if auto_organize else "false",
         )
 
     log.info("queued %d clips for job %s, project %d", len(clip_ids), job_id, project_id)
@@ -475,6 +505,8 @@ async def enqueue_ingest(
 async def enqueue_analysis(
     project_id: int,
     clips: list[dict],
+    *,
+    force: bool = False,
 ) -> int:
     """Queue independent full-take work, one retryable message per clip."""
     topic = publisher().topic_path(settings.project_id, settings.ingest_topic)
@@ -483,6 +515,8 @@ async def enqueue_analysis(
         clip_id = str(clip["clip_id"])
         attributes = {
             "task": "full_take_analysis",
+            "dispatch_id": str(uuid4()),
+            "force": "true" if force else "false",
             "project_id": str(project_id),
             "clip_id": clip_id,
             "scene": str(int(clip.get("group_id", clip.get("scene", 0)) or 0)),
@@ -491,34 +525,24 @@ async def enqueue_analysis(
             "duration_s": f"{float(clip.get('duration_s', 0.0)):.3f}",
         }
         task_ref = db().collection(ANALYSIS_QUEUE_COLLECTION).document(f"p{project_id}_{clip_id}")
-        await task_ref.set(
-            {
-                **attributes,
-                "state": "pending",
-                "updated_at": datetime.now(UTC),
-                "error": "",
-            }
-        )
+        if not await analysis_queue.reserve(db(), task_ref, attributes):
+            continue
         try:
             future = publisher().publish(topic, b"", **attributes)
             message_id = await asyncio.to_thread(future.result, timeout=30)
-            await task_ref.set(
-                {
-                    "state": "queued",
-                    "message_id": message_id,
-                    "updated_at": datetime.now(UTC),
-                },
-                merge=True,
+            await analysis_queue.published(
+                db(),
+                task_ref,
+                attributes["dispatch_id"],
+                message_id=message_id,
             )
             queued += 1
         except Exception as exc:
-            await task_ref.set(
-                {
-                    "state": "publish_failed",
-                    "error": str(exc)[:500],
-                    "updated_at": datetime.now(UTC),
-                },
-                merge=True,
+            await analysis_queue.published(
+                db(),
+                task_ref,
+                attributes["dispatch_id"],
+                error=str(exc),
             )
             log.exception("could not queue full-take analysis for clip %s", clip_id)
 
@@ -526,27 +550,6 @@ async def enqueue_analysis(
         "queued full-take analysis for %d/%d clips in project %d", queued, len(clips), project_id
     )
     return queued
-
-
-async def record_analysis_state(
-    project_id: int,
-    clip_id: UUID,
-    state: str,
-    error: str = "",
-) -> None:
-    await (
-        db()
-        .collection(ANALYSIS_QUEUE_COLLECTION)
-        .document(f"p{project_id}_{clip_id}")
-        .set(
-            {
-                "state": state,
-                "error": error[:500],
-                "updated_at": datetime.now(UTC),
-            },
-            merge=True,
-        )
-    )
 
 
 async def analysis_states(project_id: int, clip_ids: list[str]) -> dict[str, dict]:
@@ -578,7 +581,12 @@ async def analysis_states(project_id: int, clip_ids: list[str]) -> dict[str, dic
             continue
         data = snapshot.to_dict() or {}
         found[snapshot.id.split("_", 1)[-1]] = {
-            "state": str(data.get("state") or ""),
+            "state": (
+                "stalled"
+                if data.get("state") in analysis_queue.ACTIVE
+                and not analysis_queue.active(data, datetime.now(UTC))
+                else str(data.get("state") or "")
+            ),
             "error": str(data.get("error") or ""),
         }
     return found

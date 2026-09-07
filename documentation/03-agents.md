@@ -1,141 +1,39 @@
-# Agents
+# Editorial intelligence
 
-![Agent design and flow](diagrams/agents.svg)
+Trimbin separates observation, comparison, retrieval and editorial decisions. Runtime model settings and prompts live in the agents package; application services validate and persist their outputs.
 
-Five agents. Each has a written charter in the repository, beside its code, naming
-what it may write and what it must never do. Those boundaries are not in a prompt,
-because a prompt is not a contract.
+## Identity
 
-Model identifiers live in one configuration module rather than at call sites.
-Choosing a model is a decision with a cost attached, and it should be visible in
-one place.
+The slate reader proposes production codes and evidence. Application policy resolves the proposal or places it in review. An automatic organization choice does not authorize deletion or artistic rejection.
 
----
+## Independent observation
 
-## Slate — identify
+Full-take analysis covers the recorded duration in 60-second windows with 8-second overlap. It records descriptions, transcript/action context, timecoded moments and findings. Overlap consolidation retains evidence references. A completed run records coverage; it does not prove every possible issue was detected.
 
-**Reads** the clapperboard in each clip, groups takes belonging to the same setup,
-and flags a clip that appears to belong somewhere else.
+Moment spans carry source timing. Their semantic context currently uses the enclosing window's embedding, so fine-grained moment embeddings are a separate enhancement.
 
-**Writes** clip rows. Nothing else.
+The observer also proposes performance attempts inside continuously rolling recordings. Window-edge continuations and repeated action are distinguished; uncertain boundaries remain reviewable. A versioned editorial rubric separates observation, possible creative interpretation, recommendation and confidence. Rack focus, blur, darkness or a subject exit is not automatically an error. These instructions guide the model; they do not establish measured competence or train a new model.
 
-Vision, low thinking level, low media resolution — deliberately the cheapest call
-in the system, because it runs on every clip ever uploaded. This is closer to OCR
-than to judgement, and raising either setting would multiply the bill across the
-whole archive to read six characters off a board.
+Machine proposals and original structured window outputs are retained independently of human boundary revisions. Adjacent repeated performances are not merged merely because their action descriptions match. Ambiguous cross-window associations require review.
 
-**It proposes; it never decides.** A slate reading becomes canonical placement only
-when a person settles it. When there is no board, it says so rather than guessing —
-those clips arrive as unassigned footage for somebody to place.
+Style-sensitive ingest measurements (such as softness, camera shake, darkness or silence) enter full-duration analysis as descriptive notes, not automatic exclusions. An independently evidenced model or human issue can still require review. Notes are not merged into overlapping faults to enlarge their exclusion ranges. Invalid unlocalized spans are retained in source measurements but not expanded into whole-recording findings.
 
-## Analyst — judge
+## Comparative recommendation
 
-The only agent that makes a judgement, and it is four roles rather than one prompt.
-A single prompt asked to assess technical quality, continuity and performance
-simultaneously does all three badly.
+Technical, continuity and observable-completion reports inform a chief recommendation. Group-relative measurements help identify outliers but are not a universal guarantee: intentional lighting or camera movement requires context.
 
-**Technical** reads the measurements only — focus, exposure, stability, audio. It
-cannot see the story, and does not pretend to.
+The comparative video preview is bounded to 30 seconds; independent full-duration findings provide additional evidence. Do not describe the panel as watching every take uncut. Recommendations and human preferences remain distinct.
 
-**Continuity** watches what breaks between takes: eyelines, props, the edges of an
-action. It does not rank quality.
+## Retrieval
 
-**Performance** reports what is observably true — a fluffed line, a take that stops
-early, an exchange clipped by the camera cutting. **It never judges acting.**
+The archivist forms a structured search plan. Application code builds scoped queries and runs retrieval through the official ClickHouse MCP server with a read-only account. Results carry source references and playable ranges. Search does not grant mutation authority, and unavailable retrieval is not represented as an empty archive.
 
-**The chief** weighs the three reports. Long context and a higher thinking level,
-because comparing seven takes properly means holding all seven in mind at once,
-picture and sound together, uncut.
+## Human judgement
 
-**Writes** one decision row per take considered, each with the reason recorded at
-the time — including for the takes that were not chosen.
+Editors verify individual findings, select useful portions and record story reasons. The application does not objectively grade acting, infer a performer's true emotions or autonomously direct the film. Export/sequence arithmetic is deterministic; more model calls are not a substitute for valid time ranges and source references.
 
-Nothing is auto-rejected. The panel recommends and never removes.
+Review authors can retract their last active finding judgement. Retraction appends an event and restores the preceding state; it does not delete history or withdraw another person's review. Human classification as an intentional technique remains a note rather than an exclusion.
 
-## Segment — scope
+## Research evidence exports
 
-Marks which parts of each take are usable, as source ranges with descriptions.
-
-A take with one bad moment is not a bad take; it is a take with a shorter usable
-range. Take 4 with a continuity break at 00:34 still has 34 clean seconds, and
-throwing away the whole take to avoid the last of it is how usable material becomes
-unusable material.
-
-## Assembly — apply
-
-The deliberately boring agent, and almost no model at all.
-
-It sits between AI judgement and what the editor sees: in and out points, the
-decision log, the flags for what needs a person, the EDL and the streaming
-playlist. Ranking, thresholding, sorting and duration arithmetic are SQL. Asking a
-language model to compare two numbers is slower, more expensive and less reliable
-than comparing them.
-
-**A deterministic, auditable step at this boundary is what makes the rest of the
-pipeline trustworthy.** One short model call phrases the review summary; everything
-that affects an outcome is arithmetic.
-
-## Archivist — ask
-
-The only agent a person talks to directly, and the only one on a user-facing
-latency budget.
-
-The shape is: **the model plans, the database answers, the model describes what
-came back.** It never writes the query and never sees a row the query did not
-return — so an answer with nothing behind it is not something it can produce. The
-schema it replies with has no field to put a take in.
-
-**Writes nothing. Ever.** It runs as a read-only database user whose inability to
-write is verified on every deploy.
-
-It takes no video input. By the time a question is asked, every clip has already
-been watched, measured and described, so search runs over what was recorded rather
-than over the footage — which is why an answer takes about a second instead of a
-minute.
-
-The query it ran is shown beside the answer. A result somebody can check is worth
-more than one they have to trust, and that is this system's whole argument.
-
----
-
-## What holds it together
-
-### Measurement is relative, never absolute
-
-Seven dark takes of a night scene are a night scene, not seven faults. Six
-locked-off takes and one handheld is probably one accident. A ratio against the
-setup's own median is the only question worth asking: *is this take unlike its
-siblings?*
-
-There is a real failure mode here that the code guards explicitly. If a group has
-no raw measurements at all, normalising it would compute a median of zero on every
-axis, fall back to a neutral ratio everywhere, and flatten twelve correctly
-measured takes into "all typical" — a placeholder that looks exactly like a real
-answer. That case is detected and refused rather than written.
-
-### Findings are events, not spans
-
-A camera settling after a knock throws a motion spike every few tenths of a second.
-Written out one per span, that became fourteen findings on one take, each
-describing part of the same bump. Spans within a second of each other merge into
-one event; ten seconds apart stays two, because that is two things happening.
-
-### An honest empty
-
-A failed search says it failed. Dressed as an empty result, it would tell somebody
-their archive contains nothing — a different and wrong thing.
-
-When a query returns no rows, near misses are offered *labelled as near misses*,
-never substituted. Somebody who asked about scene 12 would act on rows from scene 9
-without noticing they were not what they asked for.
-
-### A person decides, and the disagreement is the measurement
-
-Every verdict is a recommendation with its reasoning attached. An editor's override
-is recorded as its own event beside the recommendation rather than replacing it.
-
-That is where the published accuracy figure comes from: the share of confident
-decisions no editor later replaced, counted from the event log. Shots the system
-flagged for review are excluded, because those were handed to a person
-deliberately. Nothing is self-reported, and the figure is not calculated by the
-component being measured.
+Authorized editors can export per-recording evidence manifests with media hashes, source timing, machine window outputs, attempt proposals/current human boundaries, finding history and current saved film occurrences. Exports contain no media URLs and do not grant training rights. License/participant consent and training eligibility remain unverified; these are review artifacts, not a certified training corpus. Comparison exposure, expert adjudication and full historical sequence exports require additional collection work. Split future evaluations by production/source recording, not overlapping windows.

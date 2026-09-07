@@ -54,6 +54,7 @@ class UploadRequest(BaseModel):
     scene: int = Field(default=0, ge=0)
     shot: int = Field(default=0, ge=0)
     take: int = Field(default=0, ge=0)
+    auto_organize: bool = False
 
     @field_validator("filenames")
     @classmethod
@@ -152,6 +153,7 @@ async def grant_upload(
         target_scene=request.scene,
         target_shot=request.shot,
         target_take=request.take,
+        auto_organize=request.auto_organize,
     )
 
     # The job exists now, so a failure from here on has to close it. Otherwise
@@ -245,6 +247,7 @@ async def complete_upload(
             target_shot=job.target_shot,
             target_take=job.target_take,
             uploaded_by=principal.email or "",
+            auto_organize=job.auto_organize,
         )
 
     await activity.record(
@@ -346,6 +349,7 @@ async def job_status(
 
     return {
         "job_id": str(job.job_id),
+        "project_id": job.project_id,
         "state": job.state,
         "done": done,
         "total": job.total_items,

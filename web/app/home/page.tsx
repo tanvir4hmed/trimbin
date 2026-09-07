@@ -108,7 +108,7 @@ export default function DashboardPage() {
     <main className="shell dash home-command">
       <div className="dash-top">
         <div>
-          <p className="eyebrow">EDITORIAL WORKSPACE</p><h1>Good morning</h1>
+          <p className="eyebrow">EDITORIAL WORKSPACE</p><h1>Your workspace</h1>
           <p className="dim">Continue where you stopped, or open the next shot that needs a human decision.</p>
         </div>
         <div className="dash-actions">

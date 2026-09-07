@@ -24,6 +24,22 @@ class Moment(Strict):
     where: TimeRange
 
 
+class PerformanceAttempt(Strict):
+    """A proposed performance interval, not an invented production take number."""
+
+    where: TimeRange
+    action: str = Field(max_length=300)
+    observation: str = Field(max_length=500)
+    interpretation: str = Field(max_length=500)
+    recommendation: str = Field(max_length=300)
+    confidence: float = Field(ge=0, le=1)
+    intent: str = Field(
+        max_length=80, description="Declared, possible, or unknown intent; not fact."
+    )
+    starts_before_window: bool = False
+    ends_after_window: bool = False
+
+
 class SegmentObservation(Strict):
     """What is visibly or audibly present in one window.
 
@@ -43,3 +59,4 @@ class SegmentObservation(Strict):
     camera_motion: str = Field(default="", max_length=60)
     moments: list[Moment] = Field(default_factory=list, max_length=40)
     findings: list[Finding] = Field(default_factory=list, max_length=30)
+    attempts: list[PerformanceAttempt] = Field(default_factory=list, max_length=40)

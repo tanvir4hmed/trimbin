@@ -10,11 +10,28 @@ from pydantic import BaseModel
 
 from ..common.errors import AgentFailure, text_of
 from ..config import settings
-from ..contracts.base import Finding
+from ..contracts.base import Finding, TimeRange
 from ..contracts.segments import Moment, SegmentObservation
 
-PROMPT_VERSION = "segment/v2"
-PROMPT = (Path(__file__).parent / "prompt_v2.md").read_text(encoding="utf-8")
+PROMPT_VERSION = "segment/v3"
+PROMPT = (Path(__file__).parent / "prompt_v3.md").read_text(encoding="utf-8")
+RUBRIC = (Path(__file__).parent.parent / "common" / "editorial_rubric.md").read_text(
+    encoding="utf-8"
+)
+
+
+class AttemptModelResponse(BaseModel):
+    """Provider schema stays constraint-light; the durable contract validates it."""
+
+    where: TimeRange
+    action: str
+    observation: str
+    interpretation: str
+    recommendation: str
+    confidence: float
+    intent: str
+    starts_before_window: bool
+    ends_after_window: bool
 
 
 class SegmentModelResponse(BaseModel):
@@ -37,6 +54,7 @@ class SegmentModelResponse(BaseModel):
     camera_motion: str
     moments: list[Moment]
     findings: list[Finding]
+    attempts: list[AttemptModelResponse]
 
 
 class SegmentAgent:
@@ -63,6 +81,7 @@ class SegmentAgent:
         contents: list[object] = [
             types.Part.from_bytes(data=video, mime_type="video/mp4"),
             PROMPT,
+            RUBRIC,
             context,
         ]
         if briefing:

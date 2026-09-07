@@ -33,18 +33,7 @@ export interface paths {
         };
         /**
          * Accuracy
-         * @description How often the system is right, defined precisely enough to publish.
-         *
-         *         decision accuracy = confident decisions that stood / confident decisions
-         *
-         *     Shots the system flagged for review are excluded from both sides. Those were
-         *     handed to a person on purpose, and counting a human choosing between two
-         *     near-identical takes as an error would be measuring the product working and
-         *     calling it a fault.
-         *
-         *     Nulls are returned rather than zeros when there is not enough data. A system
-         *     with no measurements yet is not a system that is wrong every time, and the
-         *     interface has to be able to tell those apart.
+         * @description Explicit finding-review agreement across public, real-footage projects.
          */
         get: operations["accuracy_public_accuracy_get"];
         put?: never;
@@ -91,17 +80,7 @@ export interface paths {
         };
         /**
          * Accuracy Per Project
-         * @description The figure broken out by production, with the counts it needs to be read.
-         *
-         *     Public and unauthenticated, like the headline number. A system that
-         *     publishes its own error rate should not put the breakdown behind a signup —
-         *     the breakdown is where the number stops being asserted and becomes
-         *     checkable.
-         *
-         *     Names come from the project records so a reader sees "Scene 1 - two
-         *     perspectives" rather than "project 1". Only public projects are named: a
-         *     private one appears as its id and its counts and nothing else, because a
-         *     list of project names is a list of who is using this.
+         * @description Compatibility entry point; private project counts are never published.
          */
         get: operations["accuracy_per_project_public_accuracy_by_project_get"];
         put?: never;
@@ -211,6 +190,196 @@ export interface paths {
          *     survived, and the dependency has its own monitoring.
          */
         get: operations["health_public_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/quality": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Report */
+        get: operations["report_quality_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/film/{project_id}/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coverage */
+        get: operations["coverage_film__project_id__coverage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/film/{project_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** History */
+        get: operations["history_film__project_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/film/{project_id}/history/{revision}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Version */
+        get: operations["version_film__project_id__history__revision__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/film/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read */
+        get: operations["read_film__project_id__get"];
+        /** Save */
+        put: operations["save_film__project_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/film/{project_id}/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sources */
+        get: operations["sources_film__project_id__sources_get"];
+        put?: never;
+        /** Resolve Sources */
+        post: operations["resolve_sources_film__project_id__sources_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/attempts/{project_id}/{clip_id}/analyse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Analyse */
+        post: operations["analyse_attempts__project_id___clip_id__analyse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/attempts/{project_id}/{clip_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read */
+        get: operations["read_attempts__project_id___clip_id__get"];
+        /** Save */
+        put: operations["save_attempts__project_id___clip_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/attempts/{project_id}/{clip_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** History */
+        get: operations["history_attempts__project_id___clip_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/attempts/{project_id}/{clip_id}/history/{revision}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Version */
+        get: operations["version_attempts__project_id___clip_id__history__revision__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dataset/{project_id}/{clip_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Clip */
+        get: operations["export_clip_dataset__project_id___clip_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1471,6 +1640,139 @@ export interface components {
              */
             assignee: string;
         };
+        /** AttemptHistory */
+        AttemptHistory: {
+            /** Versions */
+            versions: components["schemas"]["AttemptHistoryEntry"][];
+        };
+        /** AttemptHistoryEntry */
+        AttemptHistoryEntry: {
+            /** Rev */
+            rev: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Count */
+            count: number;
+        };
+        /** AttemptItem */
+        AttemptItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Proposal Id */
+            proposal_id?: string | null;
+            /** Label */
+            label: string;
+            /** Start S */
+            start_s: number;
+            /** End S */
+            end_s: number;
+            /**
+             * State
+             * @default proposed
+             * @enum {string}
+             */
+            state: "proposed" | "reviewed" | "shortlisted" | "director_choice" | "rejected";
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** AttemptProposal */
+        AttemptProposal: {
+            /**
+             * Attempt Id
+             * Format: uuid
+             */
+            attempt_id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Start S */
+            start_s: number;
+            /** End S */
+            end_s: number;
+            /** Action */
+            action: string;
+            /** Observation */
+            observation: string;
+            /** Interpretation */
+            interpretation: string;
+            /** Recommendation */
+            recommendation: string;
+            /** Confidence */
+            confidence: number;
+            /** Intent */
+            intent: string;
+            /** Starts Before Window */
+            starts_before_window: boolean;
+            /** Ends After Window */
+            ends_after_window: boolean;
+            /** Evidence Segment Ids */
+            evidence_segment_ids: string[];
+            /** Model Id */
+            model_id: string;
+            /** Prompt Version */
+            prompt_version: string;
+        };
+        /** AttemptSave */
+        AttemptSave: {
+            /** Rev */
+            rev: number;
+            /**
+             * Command Id
+             * Format: uuid
+             */
+            command_id: string;
+            /** Items */
+            items: components["schemas"]["AttemptItem"][];
+        };
+        /** AttemptState */
+        AttemptState: {
+            /** Project Id */
+            project_id: number;
+            /**
+             * Clip Id
+             * Format: uuid
+             */
+            clip_id: string;
+            /**
+             * Rev
+             * @default 0
+             */
+            rev: number;
+            /** Duration S */
+            duration_s: number;
+            /** Items */
+            items: components["schemas"]["AttemptItem"][];
+            /** Proposals */
+            proposals: components["schemas"]["AttemptProposal"][];
+            /**
+             * Analysis Changed
+             * @default false
+             */
+            analysis_changed: boolean;
+            /** Updated At */
+            updated_at?: string | null;
+            /**
+             * Analysis State
+             * @default
+             */
+            analysis_state: string;
+            /**
+             * Analysis Error
+             * @default
+             */
+            analysis_error: string;
+        };
         /** Brief */
         Brief: {
             /** Scene */
@@ -1675,12 +1977,32 @@ export interface components {
              */
             entries: components["schemas"]["StringoutEntry"][];
         };
+        /** CoverageOmission */
+        CoverageOmission: {
+            /** Scene */
+            scene: number;
+            /** Shot */
+            shot: number;
+            /** Scene Code */
+            scene_code: string;
+            /** Shot Code */
+            shot_code: string;
+            /** Reason */
+            reason: string;
+        };
         /** CoverageSegment */
         CoverageSegment: {
             /** Segment Id */
             segment_id: string;
             /** Clip Id */
             clip_id: string;
+            /** Attempt Id */
+            attempt_id?: string | null;
+            /**
+             * Attempt Revision
+             * @default 0
+             */
+            attempt_revision: number;
             /**
              * Take No
              * @default 0
@@ -1717,6 +2039,13 @@ export interface components {
              * Format: uuid
              */
             clip_id: string;
+            /** Attempt Id */
+            attempt_id?: string | null;
+            /**
+             * Attempt Revision
+             * @default 0
+             */
+            attempt_revision: number;
             /** Source In S */
             source_in_s: number;
             /** Source Out S */
@@ -1761,24 +2090,351 @@ export interface components {
             activity: components["schemas"]["Activity"][];
             limits: components["schemas"]["Limits"];
         };
-        /** Finding */
-        Finding: {
+        /** DatasetFinding */
+        DatasetFinding: {
+            /**
+             * Event Id
+             * Format: uuid
+             */
+            event_id: string;
+            /**
+             * Finding Id
+             * Format: uuid
+             */
+            finding_id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Revision */
+            revision: number;
+            /** Action */
+            action: string;
             /** Code */
             code: string;
+            /** Detail */
+            detail: string;
+            /** Severity */
+            severity: string;
+            /** Start S */
+            start_s: number;
+            /** End S */
+            end_s: number;
+            /** Evidence Segment Ids */
+            evidence_segment_ids: string[];
+            /** Sources */
+            sources: string[];
+            /** Actor Role */
+            actor_role: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Retracts Event Id */
+            retracts_event_id?: string | null;
+            /**
+             * Restored Action
+             * @default
+             */
+            restored_action: string;
+        };
+        /** DatasetMedia */
+        DatasetMedia: {
+            /**
+             * Clip Id
+             * Format: uuid
+             */
+            clip_id: string;
+            /**
+             * Content Hash
+             * @default
+             */
+            content_hash: string;
+            /** Duration S */
+            duration_s: number;
+            /** Measured Fps */
+            measured_fps: number;
+            /**
+             * Time Unit
+             * @default source_seconds
+             * @constant
+             */
+            time_unit: "source_seconds";
+        };
+        /** DatasetOccurrence */
+        DatasetOccurrence: {
+            /** Id */
+            id: string;
+            /** Start S */
+            start_s: number;
+            /** End S */
+            end_s: number;
+            /** Position */
+            position: number;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /** Attempt Id */
+            attempt_id?: string | null;
+            /**
+             * Attempt Revision
+             * @default 0
+             */
+            attempt_revision: number;
+        };
+        /** DatasetWindow */
+        DatasetWindow: {
+            /**
+             * Segment Id
+             * Format: uuid
+             */
+            segment_id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Start S */
+            start_s: number;
+            /** End S */
+            end_s: number;
+            /** Model Id */
+            model_id: string;
+            /** Prompt Version */
+            prompt_version: string;
+            observation?: components["schemas"]["SegmentObservation"] | null;
+            /**
+             * Observation Time Unit
+             * @default seconds_relative_to_window_start
+             * @constant
+             */
+            observation_time_unit: "seconds_relative_to_window_start";
+        };
+        /** EditorialDatasetRecord */
+        EditorialDatasetRecord: {
+            /**
+             * Schema Version
+             * @default editorial-evidence/1
+             * @constant
+             */
+            schema_version: "editorial-evidence/1";
+            /** Project Id */
+            project_id: number;
+            /**
+             * Exported At
+             * Format: date-time
+             */
+            exported_at: string;
+            media: components["schemas"]["DatasetMedia"];
+            /**
+             * Training Eligible
+             * @default false
+             * @constant
+             */
+            training_eligible: false;
+            /**
+             * Rights Status
+             * @default unverified
+             * @constant
+             */
+            rights_status: "unverified";
+            /**
+             * Usage Note
+             * @default Operational review export only. Obtain explicit footage, participant and training permissions before dataset release or training.
+             */
+            usage_note: string;
+            attempt_state: components["schemas"]["AttemptState"];
+            /** Windows */
+            windows: components["schemas"]["DatasetWindow"][];
+            /** Finding Events */
+            finding_events: components["schemas"]["DatasetFinding"][];
+            /** Film Revision */
+            film_revision: number;
+            /** Film Occurrences */
+            film_occurrences: components["schemas"]["DatasetOccurrence"][];
+            /** Scope */
+            scope?: string[];
+            /** Missing Labels */
+            missing_labels?: string[];
+        };
+        /** FilmCoverage */
+        FilmCoverage: {
+            preview: components["schemas"]["FilmState"];
+            /** Scene Count */
+            scene_count: number;
+            /** Omissions */
+            omissions: components["schemas"]["CoverageOmission"][];
+        };
+        /** FilmEntry */
+        FilmEntry: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Clip Id
+             * Format: uuid
+             */
+            clip_id: string;
+            /** Attempt Id */
+            attempt_id?: string | null;
+            /**
+             * Attempt Revision
+             * @default 0
+             */
+            attempt_revision: number;
             /** Start S */
             start_s: number;
             /** End S */
             end_s: number;
             /**
-             * Detail
+             * Note
              * @default
              */
-            detail: string;
+            note: string;
+            source?: components["schemas"]["FilmSource"] | null;
             /**
-             * Severity
+             * Available
+             * @default false
+             */
+            available: boolean;
+            /** Record Start S */
+            record_start_s: number;
+        };
+        /** FilmHistory */
+        FilmHistory: {
+            /** Versions */
+            versions: components["schemas"]["FilmVersion"][];
+        };
+        /** FilmRange */
+        FilmRange: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Clip Id
+             * Format: uuid
+             */
+            clip_id: string;
+            /** Attempt Id */
+            attempt_id?: string | null;
+            /**
+             * Attempt Revision
+             * @default 0
+             */
+            attempt_revision: number;
+            /** Start S */
+            start_s: number;
+            /** End S */
+            end_s: number;
+            /**
+             * Note
              * @default
              */
-            severity: string;
+            note: string;
+        };
+        /** FilmSave */
+        FilmSave: {
+            /** Rev */
+            rev: number;
+            /**
+             * Command Id
+             * Format: uuid
+             */
+            command_id: string;
+            /**
+             * Name
+             * @default Film sequence
+             */
+            name: string;
+            /** Ranges */
+            ranges: components["schemas"]["FilmRange"][];
+        };
+        /** FilmSource */
+        FilmSource: {
+            /**
+             * Clip Id
+             * Format: uuid
+             */
+            clip_id: string;
+            /** Scene */
+            scene: number;
+            /** Shot */
+            shot: number;
+            /** Scene Code */
+            scene_code: string;
+            /** Shot Code */
+            shot_code: string;
+            /** Take No */
+            take_no: number;
+            /** Duration S */
+            duration_s: number;
+            /** Fps */
+            fps: number;
+            /** Proxy Uri */
+            proxy_uri: string;
+            /** Sprite Uri */
+            sprite_uri: string;
+        };
+        /** FilmSourceRequest */
+        FilmSourceRequest: {
+            /** Clip Ids */
+            clip_ids: string[];
+        };
+        /** FilmSources */
+        FilmSources: {
+            /** Sources */
+            sources: components["schemas"]["FilmSource"][];
+            /** More */
+            more: boolean;
+        };
+        /** FilmState */
+        FilmState: {
+            /** Project Id */
+            project_id: number;
+            /**
+             * Name
+             * @default Film sequence
+             */
+            name: string;
+            /**
+             * Rev
+             * @default 0
+             */
+            rev: number;
+            /**
+             * Updated By
+             * @default
+             */
+            updated_by: string;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Entries */
+            entries?: components["schemas"]["FilmEntry"][];
+            /**
+             * Duration S
+             * @default 0
+             */
+            duration_s: number;
+        };
+        /** FilmVersion */
+        FilmVersion: {
+            /** Rev */
+            rev: number;
+            /** Name */
+            name: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** FindingActionResult */
         FindingActionResult: {
@@ -1831,7 +2487,7 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "confirm" | "dismiss" | "correct" | "adjust_range";
+            action: "confirm" | "dismiss" | "correct" | "adjust_range" | "retract";
             code?: components["schemas"]["FindingCode"] | null;
             /** Detail */
             detail?: string | null;
@@ -1898,6 +2554,13 @@ export interface components {
              * @default delivered
              */
             archive_state: string;
+            /** Retracts Event Id */
+            retracts_event_id?: string | null;
+            /**
+             * Restored Action
+             * @default
+             */
+            restored_action: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2028,6 +2691,11 @@ export interface components {
         JobStatus: {
             /** Job Id */
             job_id: string;
+            /**
+             * Project Id
+             * @default 0
+             */
+            project_id: number;
             /** State */
             state: string;
             /** Done */
@@ -2120,6 +2788,21 @@ export interface components {
             /** Demo Project Id */
             demo_project_id: number;
         };
+        /**
+         * Moment
+         * @description One discrete, seekable event inside an analysis window.
+         */
+        Moment: {
+            kind: components["schemas"]["MomentKind"];
+            /** Text */
+            text: string;
+            where: components["schemas"]["trimbin_agents__contracts__base__TimeRange"];
+        };
+        /**
+         * MomentKind
+         * @enum {string}
+         */
+        MomentKind: "dialogue" | "action" | "object" | "completion";
         /** NewComment */
         NewComment: {
             /** Body */
@@ -2212,6 +2895,38 @@ export interface components {
             username: string;
             /** Password */
             password: string;
+        };
+        /**
+         * PerformanceAttempt
+         * @description A proposed performance interval, not an invented production take number.
+         */
+        PerformanceAttempt: {
+            where: components["schemas"]["trimbin_agents__contracts__base__TimeRange"];
+            /** Action */
+            action: string;
+            /** Observation */
+            observation: string;
+            /** Interpretation */
+            interpretation: string;
+            /** Recommendation */
+            recommendation: string;
+            /** Confidence */
+            confidence: number;
+            /**
+             * Intent
+             * @description Declared, possible, or unknown intent; not fact.
+             */
+            intent: string;
+            /**
+             * Starts Before Window
+             * @default false
+             */
+            starts_before_window: boolean;
+            /**
+             * Ends After Window
+             * @default false
+             */
+            ends_after_window: boolean;
         };
         /** PlacementInbox */
         PlacementInbox: {
@@ -2498,6 +3213,55 @@ export interface components {
             /** Projects */
             projects: components["schemas"]["Project"][];
         };
+        /** ProjectQuality */
+        ProjectQuality: {
+            /**
+             * Clips
+             * @default 0
+             */
+            clips: number;
+            /**
+             * Placed
+             * @default 0
+             */
+            placed: number;
+            /**
+             * Analysed
+             * @default 0
+             */
+            analysed: number;
+            /**
+             * Findings
+             * @default 0
+             */
+            findings: number;
+            /**
+             * Confirmed
+             * @default 0
+             */
+            confirmed: number;
+            /**
+             * Corrected
+             * @default 0
+             */
+            corrected: number;
+            /**
+             * Dismissed
+             * @default 0
+             */
+            dismissed: number;
+            /**
+             * Reviewed
+             * @default 0
+             */
+            reviewed: number;
+            /** Agreement Pct */
+            agreement_pct?: number | null;
+            /** Project Id */
+            project_id: number;
+            /** Name */
+            name: string;
+        };
         /**
          * ProjectScreen
          * @description Everything the project workspace draws, in one answer.
@@ -2511,6 +3275,72 @@ export interface components {
             tree: components["schemas"]["Tree"];
             plan: components["schemas"]["Plan"];
             me: components["schemas"]["Me"];
+        };
+        /** QualityCounts */
+        QualityCounts: {
+            /**
+             * Clips
+             * @default 0
+             */
+            clips: number;
+            /**
+             * Placed
+             * @default 0
+             */
+            placed: number;
+            /**
+             * Analysed
+             * @default 0
+             */
+            analysed: number;
+            /**
+             * Findings
+             * @default 0
+             */
+            findings: number;
+            /**
+             * Confirmed
+             * @default 0
+             */
+            confirmed: number;
+            /**
+             * Corrected
+             * @default 0
+             */
+            corrected: number;
+            /**
+             * Dismissed
+             * @default 0
+             */
+            dismissed: number;
+            /**
+             * Reviewed
+             * @default 0
+             */
+            reviewed: number;
+            /** Agreement Pct */
+            agreement_pct?: number | null;
+        };
+        /** QualityReport */
+        QualityReport: {
+            /**
+             * Measured At
+             * Format: date-time
+             */
+            measured_at: string;
+            /**
+             * Refresh Seconds
+             * @default 15
+             */
+            refresh_seconds: number;
+            /**
+             * Scope
+             * @default Projects visible to you; real footage only
+             */
+            scope: string;
+            overall: components["schemas"]["QualityCounts"];
+            /** Projects */
+            projects: components["schemas"]["ProjectQuality"][];
         };
         /** Question */
         Question: {
@@ -2703,6 +3533,47 @@ export interface components {
             /** To S */
             to_s: number;
         };
+        /**
+         * SegmentObservation
+         * @description What is visibly or audibly present in one window.
+         *
+         *     Finding timecodes are local to the supplied window. The application adds
+         *     the absolute source offset and clamps them before persistence.
+         */
+        SegmentObservation: {
+            /**
+             * Description
+             * @description Concrete visual summary suitable for footage search.
+             */
+            description: string;
+            /**
+             * Transcript
+             * @default
+             */
+            transcript: string;
+            /** Actions */
+            actions?: string[];
+            /** Objects */
+            objects?: string[];
+            /** Speakers */
+            speakers?: string[];
+            /**
+             * Shot Size
+             * @default
+             */
+            shot_size: string;
+            /**
+             * Camera Motion
+             * @default
+             */
+            camera_motion: string;
+            /** Moments */
+            moments?: components["schemas"]["Moment"][];
+            /** Findings */
+            findings?: components["schemas"]["trimbin_agents__contracts__base__Finding"][];
+            /** Attempts */
+            attempts?: components["schemas"]["PerformanceAttempt"][];
+        };
         /** SetState */
         SetState: {
             /** Rev */
@@ -2713,6 +3584,11 @@ export interface components {
              */
             state: string;
         };
+        /**
+         * Severity
+         * @enum {string}
+         */
+        Severity: "note" | "attention" | "blocking";
         /**
          * ShotBrief
          * @description What a shot was meant to be, as a person types it.
@@ -2977,6 +3853,13 @@ export interface components {
         };
         /** StringoutEntry */
         StringoutEntry: {
+            /** Attempt Id */
+            attempt_id?: string | null;
+            /**
+             * Attempt Revision
+             * @default 0
+             */
+            attempt_revision: number;
             /** Scene */
             scene: number;
             /** Shot */
@@ -3061,7 +3944,7 @@ export interface components {
             /** Reason Code */
             reason_code: string;
             /** Findings */
-            findings: components["schemas"]["Finding"][];
+            findings: components["schemas"]["app__schemas__Finding"][];
             /** Usable From S */
             usable_from_s: number;
             /** Usable To S */
@@ -3087,7 +3970,7 @@ export interface components {
                 [key: string]: number;
             };
             /** Safe Ranges */
-            safe_ranges: components["schemas"]["TimeRange"][];
+            safe_ranges: components["schemas"]["app__schemas__TimeRange"][];
             /** Trim Reasons */
             trim_reasons: string[];
             /** Duration S */
@@ -3154,15 +4037,8 @@ export interface components {
             /** History */
             history: components["schemas"]["FindingEvent"][];
             /** Safe Ranges */
-            safe_ranges: components["schemas"]["TimeRange"][];
-            primary_usable_range?: components["schemas"]["TimeRange"] | null;
-        };
-        /** TimeRange */
-        TimeRange: {
-            /** Start S */
-            start_s: number;
-            /** End S */
-            end_s: number;
+            safe_ranges: components["schemas"]["app__schemas__TimeRange"][];
+            primary_usable_range?: components["schemas"]["app__schemas__TimeRange"] | null;
         };
         /** Totals */
         Totals: {
@@ -3310,6 +4186,11 @@ export interface components {
              * @default 0
              */
             take: number;
+            /**
+             * Auto Organize
+             * @default false
+             */
+            auto_organize: boolean;
         };
         /** UploadTicket */
         UploadTicket: {
@@ -3382,6 +4263,67 @@ export interface components {
              * @default []
              */
             coverage_segments: components["schemas"]["CoverageSegment"][];
+        };
+        /** Finding */
+        app__schemas__Finding: {
+            /** Code */
+            code: string;
+            /** Start S */
+            start_s: number;
+            /** End S */
+            end_s: number;
+            /**
+             * Detail
+             * @default
+             */
+            detail: string;
+            /**
+             * Severity
+             * @default
+             */
+            severity: string;
+        };
+        /** TimeRange */
+        app__schemas__TimeRange: {
+            /** Start S */
+            start_s: number;
+            /** End S */
+            end_s: number;
+        };
+        /**
+         * Finding
+         * @description One observation about one clip, anchored in time.
+         *
+         *     `detail` is written for an editor to read, not for a log file. It states what
+         *     was seen and how it compares to the other takes of the same shot - never a
+         *     verdict. "2.3x the camera movement of the group median" is a fact the editor
+         *     interprets; "too shaky" is an opinion the system has no standing to hold.
+         */
+        trimbin_agents__contracts__base__Finding: {
+            /** @description Pick the closest. Put what actually happened in `detail`. */
+            code: components["schemas"]["FindingCode"];
+            /** Detail */
+            detail: string;
+            severity: components["schemas"]["Severity"];
+            /**
+             * @description Where in the clip, in seconds. Required.
+             *
+             *     A fault that genuinely runs the whole take is given as the whole take — start 0, end the clip's length — not omitted. Those are different answers and the interface shows them differently.
+             */
+            where: components["schemas"]["trimbin_agents__contracts__base__TimeRange"];
+        };
+        /**
+         * TimeRange
+         * @description A span within a single clip, in seconds from its start.
+         */
+        trimbin_agents__contracts__base__TimeRange: {
+            /** Start S */
+            start_s: number;
+            /**
+             * End S
+             * @description End, in seconds. For something that runs the whole take, the clip's length — not zero.
+             */
+            end_s: number;
         };
     };
     responses: never;
@@ -3575,6 +4517,451 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    report_quality_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualityReport"];
+                };
+            };
+        };
+    };
+    coverage_film__project_id__coverage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilmCoverage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    history_film__project_id__history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilmHistory"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    version_film__project_id__history__revision__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                revision: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilmState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_film__project_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilmState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_film__project_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FilmSave"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilmState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sources_film__project_id__sources_get: {
+        parameters: {
+            query?: {
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilmSources"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_sources_film__project_id__sources_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FilmSourceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilmSources"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    analyse_attempts__project_id___clip_id__analyse_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                clip_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisQueued"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_attempts__project_id___clip_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                clip_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_attempts__project_id___clip_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                clip_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttemptSave"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    history_attempts__project_id___clip_id__history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                clip_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptHistory"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    version_attempts__project_id___clip_id__history__revision__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                clip_id: string;
+                revision: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_clip_dataset__project_id___clip_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                clip_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditorialDatasetRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

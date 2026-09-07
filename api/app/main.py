@@ -18,12 +18,16 @@ from .config import settings
 from .routes import (
     analysis,
     ask,
+    attempts,
     clips,
     dashboard,
+    dataset,
+    film,
     maintenance,
     placements,
     projects,
     public,
+    quality,
     review,
     scenes,
     screens,
@@ -76,6 +80,10 @@ app.add_middleware(
 )
 
 app.include_router(public.router)
+app.include_router(quality.router)
+app.include_router(film.router)
+app.include_router(attempts.router)
+app.include_router(dataset.router)
 app.include_router(analysis.router)
 app.include_router(clips.router)
 app.include_router(session.router)

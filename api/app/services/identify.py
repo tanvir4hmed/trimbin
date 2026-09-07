@@ -178,9 +178,8 @@ async def read_slate(source: Path, work: Path, clip_id: UUID, project_id: int) -
     resolved_scene, resolved_shot = await structure.resolve_codes(
         project_id, identity.scene_code, identity.shot_code
     )
-    if resolved_scene:
-        identity.group_id = resolved_scene
-        identity.subgroup_id = resolved_shot
+    identity.group_id = resolved_scene
+    identity.subgroup_id = resolved_shot
 
     # One still from the head, kept as the evidence behind the reading. An
     # editor deciding whether the board or the reader was wrong has to see the

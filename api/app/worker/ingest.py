@@ -11,13 +11,26 @@ it and a retry re-runs one clip rather than a day.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import tempfile
+from contextlib import suppress
 from pathlib import Path
 from uuid import UUID
 
-from ..services import clips, full_take, identify, jobs, placements, quota, storage
+from ..services import (
+    analysis_queue,
+    clips,
+    full_take,
+    identify,
+    jobs,
+    placements,
+    quota,
+    settlement,
+    storage,
+    structure,
+)
 from ..services.ffmpeg_ops import UnusableClip, analyse, build_proxy, build_sprite
 
 log = logging.getLogger(__name__)
@@ -103,6 +116,7 @@ async def process(
     target_take: int = 0,
     filename: str = "",
     uploaded_by: str = "",
+    auto_organize: bool = False,
 ) -> None:
     """One clip, start to finish.
 
@@ -114,6 +128,22 @@ async def process(
     object_path = storage.object_for(project_id, clip_id)
     if object_path is None:
         raise Rejected("not found in storage")
+
+    job = await jobs.get_job(job_id)
+    previous = (
+        next((item for item in job.items if item.get("clip_id") == str(clip_id)), None)
+        if job
+        else None
+    )
+    if previous:
+        # Resume the final durable steps, not ffmpeg, clip insertion or placement
+        # proposals. In particular, never replace a human placement on redelivery.
+        # A retry cannot distinguish a partial auto-file from a later human
+        # correction. Leave any unresolved placement for verification instead
+        # of replaying an automatic decision over the current placement.
+        if previous.get("duration_s"):
+            await jobs.enqueue_analysis(project_id, [{**previous, "clip_id": clip_id}])
+        return
 
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
@@ -170,6 +200,21 @@ async def process(
         identity = await identify.read_slate(source, work, clip_id, project_id)
         identity.embedding = await identify.embed(source, work, clip_id, measurements.duration_s)
 
+        fingerprint = content_hash(source)
+        duplicate_of = await placements.duplicates_of(project_id, fingerprint)
+        if (
+            auto_organize
+            and not target_scene
+            and identity.slate_confident
+            and identity.scene_code
+            and identity.shot_code
+            and identity.take_no
+            and not duplicate_of
+        ):
+            identity.group_id, identity.subgroup_id = await structure.ensure_slate_codes(
+                project_id, identity.scene_code, identity.shot_code
+            )
+
         read_take = identity.take_no
         if target_take:
             if identity.slate_confident and read_take and read_take != target_take:
@@ -188,6 +233,22 @@ async def process(
             identity.subgroup_id,
             bool(identity.slate_confident),
         )
+        if target_scene and identity.slate_confident and identity.scene_code:
+            declared = await structure.get(project_id, target_scene)
+            declared_shot = next((s for s in declared.shots if s.shot == target_shot), None)
+            if structure._normalise_code(identity.scene_code) != structure._normalise_code(
+                declared.scene_code or str(target_scene)
+            ) or (
+                target_shot
+                and identity.shot_code
+                and declared_shot
+                and structure._normalise_code(identity.shot_code)
+                != structure._normalise_code(declared_shot.slug or str(target_shot))
+            ):
+                mismatch = (
+                    f"slate reads scene {identity.scene_code} shot {identity.shot_code}; "
+                    "declared destination differs"
+                )
         if target_take and identity.slate_confident and read_take and read_take != target_take:
             take_mismatch = f"slate reads take {read_take}, declared take is {target_take}"
             mismatch = f"{mismatch}; {take_mismatch}" if mismatch else take_mismatch
@@ -197,8 +258,6 @@ async def process(
             )
 
         # The same bytes already here under another name.
-        fingerprint = content_hash(source)
-        duplicate_of = await placements.duplicates_of(project_id, fingerprint)
         if duplicate_of:
             log.warning("clip %s has the same bytes as %s", clip_id, duplicate_of[0][:8])
 
@@ -277,8 +336,8 @@ async def process(
 
         # Where it belongs, as a proposal rather than a decision.
         #
-        # Every proposal is written `open` and waits for a person. Even a high
-        # confidence match is evidence, not permission to file footage.
+        # Record the proposal as evidence. Only an uploader's explicit auto-file
+        # policy can settle an unambiguous match below; all others need review.
         await placements.record(
             project_id=project_id,
             clip_id=clip_id,
@@ -320,8 +379,43 @@ async def process(
         slate_candidates=slate_candidates,
     )
     await jobs.record_stage(job_id, clip_id, "ready_for_verification", filename)
-    # Full-take work starts after verification. Until then this is staged
-    # footage, not a take in a canonical shot.
+    if (
+        auto_organize
+        and not target_scene
+        and identity.slate_confident
+        and scene
+        and shot
+        and identity.take_no
+        and not mismatch
+        and not duplicate_of
+    ):
+        await settlement.settle(
+            project_id=project_id,
+            clip_id=clip_id,
+            scene=scene,
+            shot=shot,
+            take_no=identity.take_no,
+            actor=uploaded_by,
+            detail="Auto-filed from slate under uploader's organization choice",
+            verb="auto_placed",
+            queue_analysis_now=False,
+        )
+        await jobs.mark_verified(job_id, {str(clip_id)})
+        await jobs.record_stage(job_id, clip_id, "filed", filename)
+    # Observation is independent of placement. Uncertain footage remains in the
+    # inbox, with analysis ready when an editor identifies its home.
+    await jobs.enqueue_analysis(
+        project_id,
+        [
+            {
+                "clip_id": clip_id,
+                "group_id": scene,
+                "subgroup_id": shot,
+                "duration_s": measurements.duration_s,
+            }
+        ],
+    )
+    # Analysis does not grant a canonical placement to staged footage.
     log.info("clip %s: done", clip_id)
 
 
@@ -329,24 +423,53 @@ async def handle_analysis_message(attributes: dict[str, str]) -> bool:
     """Run only full-take intelligence; safe for independent Pub/Sub retry."""
     project_id = int(attributes["project_id"])
     clip_id = UUID(attributes["clip_id"])
+    client = jobs.db()
+    ref = client.collection(jobs.ANALYSIS_QUEUE_COLLECTION).document(f"p{project_id}_{clip_id}")
+    dispatch_id = attributes.get("dispatch_id", "")
+    worker_id = ""
+    heartbeat_task = None
     try:
-        await jobs.record_analysis_state(project_id, clip_id, "processing")
+        outcome, worker_id = await analysis_queue.claim(client, ref, dispatch_id)
+        if outcome != "claimed":
+            return outcome == "obsolete"
+
+        async def assert_owned():
+            if not await analysis_queue.advance(client, ref, dispatch_id, worker_id, "processing"):
+                raise RuntimeError("Analysis lease changed; this execution cannot publish results.")
+
+        async def heartbeat():
+            while True:
+                await asyncio.sleep(60)
+                await assert_owned()
+
+        heartbeat_task = asyncio.create_task(heartbeat())
         await full_take.analyse_clip(
             project_id=project_id,
             clip_id=clip_id,
             scene=int(attributes.get("scene", "0") or 0),
             shot=int(attributes.get("shot", "0") or 0),
             duration_s=float(attributes["duration_s"]),
+            force=attributes.get("force") == "true",
+            dispatch_id=dispatch_id,
+            assert_owned=assert_owned,
         )
-        await jobs.record_analysis_state(project_id, clip_id, "completed")
+        await analysis_queue.advance(client, ref, dispatch_id, worker_id, "completed")
         return True
     except Exception as exc:
         try:
-            await jobs.record_analysis_state(project_id, clip_id, "failed", str(exc))
+            if worker_id:
+                await analysis_queue.advance(
+                    client, ref, dispatch_id, worker_id, "failed", str(exc)
+                )
         except Exception:
             log.exception("could not record analysis task failure for clip %s", clip_id)
         log.exception("full-take analysis failed for clip %s", attributes.get("clip_id"))
         return False
+    finally:
+        if heartbeat_task:
+            heartbeat_task.cancel()
+            with suppress(asyncio.CancelledError, Exception):
+                await heartbeat_task
 
 
 async def handle_message(attributes: dict[str, str]) -> bool:
@@ -366,6 +489,7 @@ async def handle_message(attributes: dict[str, str]) -> bool:
     target_take = int(attributes.get("target_take", "0") or 0)
     filename = attributes.get("filename", "")
     uploaded_by = attributes.get("uploaded_by", "")
+    auto_organize = attributes.get("auto_organize", "false") == "true"
     # No default. A missing project id used to become 0, which sent the download
     # to a prefix that cannot exist and produced "not found in storage" — a
     # message that blames the upload for a fault in the queue.
@@ -381,6 +505,7 @@ async def handle_message(attributes: dict[str, str]) -> bool:
             target_take,
             filename,
             uploaded_by,
+            auto_organize,
         )
         await jobs.record_progress(job_id, clip_id, ok=True)
         return True

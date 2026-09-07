@@ -7,8 +7,9 @@ about it.
 
 ## Report facts, not verdicts
 
-Every number you are given is **relative to the other takes of this shot**, where
-1.0 is the group median. This is deliberate and it changes what you can say.
+Only the explicitly normalized exposure_rel, sharpness_rel and motion_rel
+features are relative to the group (1.0 is the median). Clipping percentage,
+audio LUFS/noise dB, duration and dropped-frame counts retain their physical units.
 
 A take with 2.3× the camera movement of its siblings is the most handheld take in
 the group. Whether that is a problem depends entirely on what the scene is for,
@@ -30,9 +31,9 @@ standing to make, and it will be acted on as though you did.
 
 ## When the group agrees, there is nothing to report
 
-If every take sits close to the median on an axis, that axis is not interesting.
-Seven handheld takes mean the scene is handheld — that is the language of the
-sequence, not seven mistakes. Say nothing about it.
+If every take sits close to the median, there is no relative outlier on that
+axis. This does not establish intent or rule out a shared defect. Describe
+relevant absolute evidence and any conflict with the declared brief separately.
 
 You are looking for **outliers**, not for imperfection.
 

@@ -57,16 +57,15 @@ async def add_scene(
     principal: Annotated[Principal, Depends(require_signed_in)],
 ) -> dict:
     await principal.assert_can_curate(project_id)
-    scene_id = body.scene or await structure.next_scene_number(project_id)
     scene = await structure.add_scene(
-        project_id, scene_id, body.heading, scene_code=body.scene_code
+        project_id, body.scene, body.heading, scene_code=body.scene_code
     )
     await activity.record(
         project_id,
         principal.email or "",
         "planned",
         detail=f"scene {body.scene_code}" + (f" — {body.heading}" if body.heading else ""),
-        scene=scene_id,
+        scene=scene.scene,
         actor_role=members.role_of(principal.email),
     )
     return scene.as_dict()

@@ -29,16 +29,20 @@ const Player = forwardRef<
     className?: string;
     onTimeUpdate?: (t: number) => void;
     onPlay?: () => void;
+    onPause?: () => void;
+    controls?: boolean;
     onEnded?: () => void;
     onReady?: () => void;
     /** Shown instead of the video when there is no source. Say why. */
     emptyLabel?: string;
   }
 >(function Player(
-  { src, poster, className, onTimeUpdate, onPlay, onEnded, onReady, emptyLabel },
+  { src, poster, className, onTimeUpdate, onPlay, onPause, controls = true, onEnded, onReady, emptyLabel },
   ref,
 ) {
   const video = useRef<HTMLVideoElement>(null);
+  const readyCallback = useRef(onReady);
+  readyCallback.current = onReady;
   const [failed, setFailed] = useState(false);
   const [failure, setFailure] = useState("");
   const [retry, setRetry] = useState(0);
@@ -67,7 +71,7 @@ const Player = forwardRef<
     // buffer, and no library to keep current.
     if (el.canPlayType("application/vnd.apple.mpegurl")) {
       el.src = src;
-      const ready = () => onReady?.();
+      const ready = () => readyCallback.current?.();
       const fail = () => { setFailed(true); setFailure("The proxy playlist or one of its media segments could not be loaded."); };
       el.addEventListener("loadedmetadata", ready, { once: true });
       el.addEventListener("error", fail, { once: true });
@@ -91,7 +95,7 @@ const Player = forwardRef<
         instance = hls;
         hls.loadSource(src);
         hls.attachMedia(el);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => onReady?.());
+        hls.on(Hls.Events.MANIFEST_PARSED, () => readyCallback.current?.());
         hls.on(Hls.Events.ERROR, (_e, data) => {
           // Only fatal errors are worth showing. Recoverable ones happen on
           // every seek across a segment boundary and mean nothing to a viewer.
@@ -118,13 +122,14 @@ const Player = forwardRef<
       <video
         ref={video}
         className={className}
-        controls
+        controls={controls}
         playsInline
         preload="metadata"
         poster={poster || undefined}
         tabIndex={0}
         onTimeUpdate={(e) => onTimeUpdate?.(e.currentTarget.currentTime)}
         onPlay={onPlay}
+        onPause={onPause}
         onEnded={onEnded}
       />
       {/* No source is not the same as a source that is not ready yet. The scene

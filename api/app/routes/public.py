@@ -12,14 +12,13 @@ are cheap and their results are cacheable.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Query, Response
 
 from ..config import settings
-from ..services import analytics, members, projects
+from ..services import analytics, members, quality
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/public", tags=["public"])
@@ -50,39 +49,19 @@ async def mcp_evidence(response: Response) -> dict[str, Any]:
 
 @router.get("/accuracy")
 async def accuracy(response: Response) -> dict[str, Any]:
-    """How often the system is right, defined precisely enough to publish.
-
-        decision accuracy = confident decisions that stood / confident decisions
-
-    Shots the system flagged for review are excluded from both sides. Those were
-    handed to a person on purpose, and counting a human choosing between two
-    near-identical takes as an error would be measuring the product working and
-    calling it a fault.
-
-    Nulls are returned rather than zeros when there is not enough data. A system
-    with no measurements yet is not a system that is wrong every time, and the
-    interface has to be able to tell those apart.
-    """
-    _cached(response)
-    summary = await analytics.accuracy_summary()
-
+    """Explicit finding-review agreement across public, real-footage projects."""
+    response.headers["Cache-Control"] = "no-store"
+    report = await quality.report()
     return {
-        **summary,
-        # Published alongside the number, because a figure whose definition
-        # lives in a slide deck is not a figure anyone can check.
+        **report.model_dump(mode="json"),
         "definition": (
-            "Of the decisions the system made confidently, the share no editor "
-            "later replaced. Shots it flagged for review are excluded — those "
-            "were handed to a person deliberately."
+            "First-review agreement = confirmed unchanged / explicitly reviewed findings. "
+            "Corrected and dismissed findings are reviewed but not confirmed unchanged."
         ),
         "caveat": (
-            "Confident decisions are not systematically re-reviewed, so this is "
-            "weaker evidence than a verified result. The evaluation set is the "
-            "harder measure."
+            "Unreviewed findings and take preferences are not correctness evidence. "
+            "Self-selected reviews do not measure overall accuracy or missed issues."
         ),
-        # Stated in the payload, not only in the page, so it cannot be lost in a
-        # rendering. Generated rows are excluded from this figure at the view
-        # level: a number computed over them would measure the generator.
         "counts_only_real_work": True,
     }
 
@@ -114,48 +93,8 @@ async def eval_results(response: Response) -> dict[str, Any]:
 
 @router.get("/accuracy/by-project")
 async def accuracy_per_project(response: Response) -> dict[str, Any]:
-    """The figure broken out by production, with the counts it needs to be read.
-
-    Public and unauthenticated, like the headline number. A system that
-    publishes its own error rate should not put the breakdown behind a signup —
-    the breakdown is where the number stops being asserted and becomes
-    checkable.
-
-    Names come from the project records so a reader sees "Scene 1 - two
-    perspectives" rather than "project 1". Only public projects are named: a
-    private one appears as its id and its counts and nothing else, because a
-    list of project names is a list of who is using this.
-    """
-    _cached(response)
-
-    rows = await analytics.accuracy_by_project()
-
-    # One round trip per project, all at once. This looked one up per accuracy
-    # row in sequence, so the public page's latency grew with the number of
-    # productions on the deployment — for a lookup that has no ordering
-    # requirement at all.
-    found = await asyncio.gather(*(projects.get(int(row["project_id"])) for row in rows))
-
-    named = []
-    for row, project in zip(rows, found, strict=True):
-        public = project is not None and projects.open_to_readers(project)
-        named.append(
-            {
-                **row,
-                "name": project.name if (project and public) else None,
-                "is_public": bool(public),
-            }
-        )
-
-    return {
-        "projects": named,
-        "definition": (
-            "Accuracy is the share of confident decisions no editor overturned. "
-            "A confident decision is one where the gap to the runner-up was at "
-            "least 15%. Null means no confident decision has been made yet, "
-            "which is not the same as being wrong every time."
-        ),
-    }
+    """Compatibility entry point; private project counts are never published."""
+    return await accuracy(response)
 
 
 @router.get("/limits")

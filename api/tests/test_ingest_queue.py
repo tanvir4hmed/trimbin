@@ -8,11 +8,12 @@ reported as never uploaded, which sent the investigation to the browser.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
 
-from app.services import jobs
+from app.services import analysis_queue, jobs
 
 
 class FakePublisher:
@@ -53,6 +54,10 @@ class Ref:
     async def set(self, fields: dict, merge: bool = False):
         self.data = {**self.data, **fields} if merge else dict(fields)
 
+    async def get(self, **kwargs):
+        data = dict(self.data)
+        return SimpleNamespace(exists=bool(data), to_dict=lambda: data)
+
 
 class Collection:
     def __init__(self, docs: dict[str, Ref]):
@@ -68,6 +73,20 @@ class Store:
 
     def collection(self, name: str):
         return Collection(self.collections.setdefault(name, {}))
+
+    def transaction(self):
+        return self
+
+    def set(self, ref, fields, merge=False):
+        ref.data = {**ref.data, **fields} if merge else dict(fields)
+
+    def update(self, ref, fields):
+        self.set(ref, fields, merge=True)
+
+
+@pytest.fixture(autouse=True)
+def transactional_double(monkeypatch):
+    monkeypatch.setattr(jobs.firestore, "async_transactional", lambda fn: fn)
 
 
 @pytest.fixture
@@ -158,3 +177,29 @@ async def test_analysis_publish_failure_is_visible_and_not_reported_as_queued(mo
     task = next(iter(store.collections[jobs.ANALYSIS_QUEUE_COLLECTION].values())).data
     assert task["state"] == "publish_failed"
     assert "permission denied" in task["error"]
+
+
+@pytest.mark.asyncio
+async def test_late_publish_response_cannot_downgrade_completed_work():
+    store, ref = Store(), Ref()
+    assert await analysis_queue.reserve(store, ref, {"dispatch_id": "first"})
+    result, worker = await analysis_queue.claim(store, ref, "first")
+    assert result == "claimed"
+    assert await analysis_queue.advance(store, ref, "first", worker, "completed")
+    await analysis_queue.published(store, ref, "first", message_id="late-message")
+    assert ref.data["state"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_active_dispatch_and_worker_are_not_duplicated():
+    store, ref = Store(), Ref()
+    assert await analysis_queue.reserve(store, ref, {"dispatch_id": "first"})
+    assert not await analysis_queue.reserve(store, ref, {"dispatch_id": "second"})
+    result, worker = await analysis_queue.claim(store, ref, "first")
+    assert result == "claimed"
+    assert (await analysis_queue.claim(store, ref, "first"))[0] == "busy"
+    assert (await analysis_queue.claim(store, ref, "old"))[0] == "obsolete"
+    assert not await analysis_queue.advance(store, ref, "first", "other-worker", "completed")
+    assert await analysis_queue.advance(store, ref, "first", worker, "failed", "retryable")
+    assert await analysis_queue.reserve(store, ref, {"dispatch_id": "second"})
+    assert (await analysis_queue.claim(store, ref, "first"))[0] == "obsolete"

@@ -12,6 +12,9 @@ import {
 } from "@/lib/upload";
 import { api } from "@/lib/api";
 import { currentIdentity } from "@/lib/auth";
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import { paths } from "@/lib/slug";
 
 const empty: ReturnType<typeof uploadSnapshots> = [];
 
@@ -90,6 +93,7 @@ export default function UploadTray() {
             <div className="upload-tray-bar">
               <i style={{ width: `${pct}%` }} />
             </div>
+            {batch.state === "done" && <ServerProgress jobId={batch.id} />}
             {failed.length > 0 && (
               <details>
                 <summary>Show failed files</summary>
@@ -104,5 +108,40 @@ export default function UploadTray() {
         );
       })}
     </aside>
+  );
+}
+
+function ServerProgress({ jobId }: { jobId: string }) {
+  const query = useQuery({
+    queryKey: ["job", jobId],
+    queryFn: () => api.jobStatus(jobId),
+    refetchInterval: (q) => (q.state.data?.done ? false : 5000),
+  });
+  if (query.isError)
+    return (
+      <p role="status">
+        Server progress unavailable.{" "}
+        <button onClick={() => void query.refetch()}>Retry</button>
+      </p>
+    );
+  if (!query.data) return <p role="status">Checking server processing…</p>;
+  const job = query.data;
+  return (
+    <div role="status">
+      <p>
+        {job.done
+          ? job.state === "committed"
+            ? "Footage organized"
+            : "Ready to verify placement"
+          : `Server processing: ${job.completed + job.failed}/${job.total}`}
+        {job.failed > 0 ? ` · ${job.failed} failed` : ""}. Analysis is a
+        separate stage.
+      </p>
+      {job.project_id > 0 && (
+        <Link href={`${paths.project(job.project_id)}/ingest`}>
+          Open footage & progress
+        </Link>
+      )}
+    </div>
   );
 }

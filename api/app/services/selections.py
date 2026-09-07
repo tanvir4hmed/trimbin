@@ -63,6 +63,11 @@ async def commit_coverage(
         found_rev = int(current.get("rev", 0) or 0)
         revisions.check(expected_rev, found_rev)
         previous_segments = list(current.get("coverage_segments") or [])
+        creators = {str(row.get("segment_id")): row.get("created_by") for row in previous_segments}
+        for segment in segments:
+            # Existing occurrences retain authorship; callers cannot attribute
+            # newly introduced ranges to another team member.
+            segment["created_by"] = creators.get(str(segment.get("segment_id"))) or actor
         previous_clip = current.get("selected_clip_id") or None
         chosen = str(segments[0]["clip_id"]) if segments else ""
         transaction.set(
@@ -271,6 +276,8 @@ async def _record_coverage_event(event: dict) -> None:
             str(segment.get("reason") or event.get("reason") or "")[:400],
             str(segment.get("origin") or "human")[:40],
             str(segment.get("created_by") or event.get("actor") or "")[:254],
+            UUID(str(segment["attempt_id"])) if segment.get("attempt_id") else UUID(int=0),
+            int(segment.get("attempt_revision", 0)),
         ]
         for index, segment in enumerate(source)
     ]
@@ -296,6 +303,8 @@ async def _record_coverage_event(event: dict) -> None:
             "segment_reason",
             "segment_origin",
             "segment_created_by",
+            "attempt_id",
+            "attempt_revision",
         ],
     )
 

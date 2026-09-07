@@ -335,6 +335,8 @@ class FindingEvent(Model):
     actor_role: str
     occurred_at: datetime
     archive_state: str = "delivered"
+    retracts_event_id: UUID | None = None
+    restored_action: str = ""
 
 
 class TakeAnalysis(Model):
@@ -584,6 +586,8 @@ class ShotScreen(Model):
 class CoverageSegment(Model):
     segment_id: str
     clip_id: str
+    attempt_id: UUID | None = None
+    attempt_revision: int = 0
     take_no: int = 0
     source_in_s: float
     source_out_s: float
@@ -603,6 +607,8 @@ class ShotCoverage(Model):
 
 
 class StringoutEntry(Model):
+    attempt_id: UUID | None = None
+    attempt_revision: int = 0
     scene: int
     shot: int
     slug: str
@@ -751,6 +757,7 @@ class IngestItem(Model):
 
 class JobStatus(Model):
     job_id: str
+    project_id: int = 0
     state: str
     done: bool
     total: int

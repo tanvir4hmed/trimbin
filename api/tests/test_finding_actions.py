@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from pydantic import ValidationError
@@ -45,6 +45,23 @@ class TestFindingCommandContract:
 
 
 class TestWorkingViewAndHistory:
+    def test_old_run_review_does_not_reappear_in_current_analysis(self) -> None:
+        finding = current_finding()
+        old = {
+            **finding,
+            "finding_id": uuid4(),
+            "event_id": uuid4(),
+            "run_id": uuid4(),
+            "action": "human_confirmed",
+            "rev": 1,
+        }
+        result = finding_actions.overlay(
+            {"run": {"run_id": finding["run_id"]}, "findings": [finding], "history": []},
+            [old],
+        )
+        assert result["findings"] == [finding]
+        assert result["history"][0]["event_id"] == old["event_id"]
+
     def test_pending_dismiss_leaves_history_and_removes_current(self) -> None:
         finding = current_finding()
         dismissed = {
@@ -77,6 +94,7 @@ def read_model(finding: dict) -> dict:
     return {
         "clip": {"duration_s": 70.0, "scene": 12, "shot": 2},
         "findings": [finding],
+        "history": [],
     }
 
 
@@ -85,7 +103,7 @@ class TestFindingCommandSafety:
     async def test_a_stale_finding_action_is_a_409(self, monkeypatch: pytest.MonkeyPatch) -> None:
         finding = current_finding()
 
-        async def no_replay(key: str, actor: str):
+        async def no_replay(*args):
             return None
 
         async def read(project_id: int, clip_id):
@@ -94,7 +112,7 @@ class TestFindingCommandSafety:
         async def stale(**kwargs):
             raise revisions.Conflict(kwargs["expected_rev"], 1)
 
-        monkeypatch.setattr(analysis.revisions, "replay", no_replay)
+        monkeypatch.setattr(analysis.finding_actions, "replay", no_replay)
         monkeypatch.setattr(analysis, "_read", read)
         monkeypatch.setattr(analysis.finding_actions, "commit", stale)
 
@@ -123,13 +141,23 @@ class TestFindingCommandSafety:
             "archive_pending": False,
         }
 
-        async def replay(key: str, actor: str):
-            return expected
+        async def replay(*args):
+            return finding_actions.Committed(
+                event_id=UUID(expected["event_id"]),
+                finding_id=finding["finding_id"],
+                rev=1,
+                action="human_dismissed",
+                replayed=True,
+            )
+
+        async def delivered(*args):
+            return True
 
         async def should_not_commit(**kwargs):
             raise AssertionError("a replay must not create a second event")
 
-        monkeypatch.setattr(analysis.revisions, "replay", replay)
+        monkeypatch.setattr(analysis.finding_actions, "replay", replay)
+        monkeypatch.setattr(analysis.finding_actions, "deliver", delivered)
         monkeypatch.setattr(analysis.finding_actions, "commit", should_not_commit)
         result = await analysis.act_on_finding(
             1,

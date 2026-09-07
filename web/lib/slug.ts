@@ -52,6 +52,7 @@ const base = (id: number, name?: string) =>
   `/projects/${name ? projectSlug(name, id) : id}`;
 
 export const paths = {
+  film: (id: number, name?: string) => `${base(id, name)}/film`,
   project: (id: number, name?: string) => base(id, name),
   scene: (id: number, scene: number, name?: string) => `${base(id, name)}/scenes/${scene}`,
   shot: (id: number, scene: number, shot: number, name?: string) =>

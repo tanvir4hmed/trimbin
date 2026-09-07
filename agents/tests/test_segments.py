@@ -30,6 +30,7 @@ def test_vertex_wire_schema_stays_constraint_light() -> None:
         "camera_motion",
         "moments",
         "findings",
+        "attempts",
     }
 
 
