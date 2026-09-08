@@ -37,20 +37,22 @@ export default function ReviewQueuePage() {
     (item) => !projectId || item.project_id === projectId,
   );
   const shotsExist = projects.some((project) => (project.shots ?? 0) > 0);
+  const placementCount = (dashboard.data?.placements ?? [])
+    .filter((task) => !projectId || task.project_id === projectId)
+    .reduce((total, task) => total + task.count, 0);
   return (
     <main className="shell review-index">
-      <PlacementTasks projectId={projectId} />
       <header className="dash-top">
         <div>
           <p className="eyebrow">TEAM REVIEW</p>
-          <h1>Shots that need a person</h1>
+          <h1>Review queue</h1>
           <p className="dim">
-            Open a shot in the full cockpit. Decisions are never made from a
-            two-card shortcut.
+            Place footage, then review its shot and selected portions.
           </p>
         </div>
-        <span className="review-total">{queue.length} waiting</span>
+        <span className="review-total">{queue.length} shots · {placementCount} clips to place</span>
       </header>
+      <PlacementTasks projectId={projectId} />
       {queue.length ? (
         <div className="review-queue">
           {queue.map((item, index) => (
@@ -80,6 +82,8 @@ export default function ReviewQueuePage() {
             </Link>
           ))}
         </div>
+      ) : placementCount ? (
+        <p className="hint">Assign and commit the clips above to begin shot review.</p>
       ) : shotsExist ? (
         <div className="first-run">
           <h2>Nothing needs you</h2>
