@@ -229,12 +229,11 @@ def _parse_motion(output: str, m: RawMeasurements) -> None:
         return
     m.motion_mean = sum(diffs) / len(diffs)
     m.motion_peak = max(diffs)
-    # A full-frame difference cannot distinguish a camera lurch from an actor
-    # crossing frame, a practical light, or a cut. Keep the aggregate for
-    # relative take-to-take comparison, but do not manufacture a timecoded
-    # `stability.shake` finding from it. Visual analysis may still report a
-    # checkable shake with frame evidence.
-    m.motion_spikes = []
+    # Keep the deterministic candidate span. A full-frame difference can also
+    # be caused by an actor crossing, a practical light or a cut, so this is a
+    # review flag rather than an automatic rejection. Black/freeze spans are
+    # removed below, and the editor can accept a deliberate camera move.
+    m.motion_spikes = _spikes(diffs, m.duration_s)
 
 
 def _parse_spans(stderr: str, m: RawMeasurements) -> None:
