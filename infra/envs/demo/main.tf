@@ -210,7 +210,7 @@ resource "clickhouse_service" "main" {
   # The demo is bursty — quiet for hours, then a judge arrives. Idling costs
   # more than the few seconds of wake-up it saves.
   idle_scaling         = false
-  idle_timeout_minutes = 15
+  idle_timeout_minutes = null
 }
 
 resource "google_secret_manager_secret" "clickhouse_password" {
