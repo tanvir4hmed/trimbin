@@ -2661,9 +2661,9 @@ button:disabled { opacity: .48; cursor: not-allowed; }
 .range-inputs { gap: 3px; }
 .range-inputs input { width: 58px; }
 .lane-track { height: 32px; }
-.lane-shot-select { z-index: 4; height: 13px; }
+.lane-shot-select { z-index: 4; top: 0; bottom: 0; height: auto; }
 .lane-reviewed-clean { height: 13px; bottom: 14px; }
-.lane-finding { height: 11px !important; font-size: 9px; }
+.lane-finding { z-index: 5; height: 11px !important; font-size: 9px; }
 .finding-close { width: 26px; height: 26px; padding: 0; display: grid; place-items: center; font-size: 14px; }
 .policy-note { display: none; }
 .crumb-scene-path { padding: 3px 7px; color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 4px; font: inherit; }

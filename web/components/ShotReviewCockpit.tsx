@@ -69,6 +69,43 @@ function withinRanges(range: Range, valid: Range[]): Range[] {
     .filter((candidate) => candidate.to > candidate.from);
 }
 
+function rangesOutsideIssues(
+  duration: number,
+  findings: FindingEvent[],
+): Range[] {
+  const blocked = findings
+    .filter(
+      (finding) =>
+        finding.action !== "human_dismissed" &&
+        !(
+          finding.action === "human_retracted" &&
+          finding.restored_action === "human_dismissed"
+        ),
+    )
+    .map((finding) => ({
+      from: Math.max(0, finding.start_s),
+      to: Math.min(duration, finding.end_s),
+    }))
+    .filter((range) => range.to > range.from)
+    .sort((a, b) => a.from - b.from || a.to - b.to)
+    .reduce<Range[]>((merged, range) => {
+      const previous = merged.at(-1);
+      if (previous && range.from <= previous.to) {
+        previous.to = Math.max(previous.to, range.to);
+        return merged;
+      }
+      return [...merged, { ...range }];
+    }, []);
+  const available: Range[] = [];
+  let cursor = 0;
+  for (const issue of blocked) {
+    if (issue.from > cursor) available.push({ from: cursor, to: issue.from });
+    cursor = Math.max(cursor, issue.to);
+  }
+  if (cursor < duration) available.push({ from: cursor, to: duration });
+  return available;
+}
+
 const HUMAN_REASONS = [
   "better performance",
   "director's preference",
@@ -162,6 +199,7 @@ export default function ShotReviewCockpit({
   };
   const [focus, setFocus] = useState<Focus | null>(null);
   const [reviewFilter, setReviewFilter] = useState("unresolved");
+  const [issueClipId, setIssueClipId] = useState("");
   const [inspectorTab, setInspectorTab] = useState<
     "finding" | "selects" | "shot"
   >("selects");
@@ -371,13 +409,21 @@ export default function ShotReviewCockpit({
       }),
     );
     const sanitized = incoming.flatMap((item) => {
-      const safe = analyses.find((analysis) => String(analysis.clip_id) === item.clip_id)?.safe_ranges ??
-        takes.find((take) => take.clip_id === item.clip_id)?.safe_ranges ?? [];
-      return safe.length
+      const analysis = analyses.find(
+        (candidate) => String(candidate.clip_id) === item.clip_id,
+      );
+      const take = takes.find((candidate) => candidate.clip_id === item.clip_id);
+      const safe = analysis
+        ? rangesOutsideIssues(take?.duration_s ?? item.source_out_s, analysis.findings)
+        : (take?.safe_ranges ?? []).map((range) => ({
+            from: range.start_s,
+            to: range.end_s,
+          }));
+      return analysis || safe.length
         ? revalidateSelections(
             [item],
             item.clip_id,
-            safe.map((range) => ({ from: range.start_s, to: range.end_s })),
+            safe,
           )
         : [item];
     });
@@ -491,7 +537,8 @@ export default function ShotReviewCockpit({
     selectPlayer.current?.seek(segment.source_in_s, true);
   }, [selectPreviewIndex, selects]);
 
-  const issueTab = chosen?.clip_id ?? "";
+  const issueTab = issueClipId || chosen?.clip_id || "";
+  useEffect(() => setIssueClipId(chosen?.clip_id ?? ""), [chosen?.clip_id]);
 
   // The shot's standing decision, in one phrase.
   //
@@ -519,20 +566,14 @@ export default function ShotReviewCockpit({
         : null;
   function previewMoment(clipId: string, at: number, end?: number) {
     if (!takes.some((take) => take.clip_id === clipId)) return;
-    const keepPlaying = [playerA.current, playerB.current].some((handle) => {
-      const video = handle?.element();
-      return Boolean(video && !video.paused && !video.ended);
-    });
     setWorkspaceMode("inspect");
-    pendingSeek.current = { clipId, at, play: keepPlaying };
+    pendingSeek.current = { clipId, at, play: true };
     reviewRange.current = end === undefined ? null : { clipId, end };
     playerA.current?.element()?.pause();
     playerB.current?.element()?.pause();
-    if (clipId === chosen?.clip_id) {
-      const target = activePlayer(clipId);
-      target?.seek(at, keepPlaying);
-      if ((target?.element()?.readyState ?? 0) >= 1) pendingSeek.current = null;
-    } else setAId(clipId);
+    const target = activePlayer(clipId);
+    target?.seek(at, true);
+    if ((target?.element()?.readyState ?? 0) >= 1) pendingSeek.current = null;
   }
   const inspect = (clipId: string, finding: FindingEvent) => {
     // A second click on the finding already open closes it — the same gesture
@@ -548,7 +589,6 @@ export default function ShotReviewCockpit({
     }
     setFocus({ clipId, finding });
     setInspectorTab("finding");
-    // Opening a finding brings its take to the front of the stage.
     previewMoment(clipId, finding.start_s, finding.end_s);
   };
 
@@ -583,15 +623,24 @@ export default function ShotReviewCockpit({
       const updated = refreshed.data?.analyses.find(
         (analysis) => String(analysis.clip_id) === focus.clipId,
       );
-      const valid = (updated?.safe_ranges ?? []).map((item) => ({
-        from: item.start_s,
-        to: item.end_s,
-      }));
-      const nextSelects = revalidateSelections(selectsRef.current, focus.clipId, valid);
-      const clipped = selectionSignature(nextSelects) !== selectionSignature(selectsRef.current);
-      setSelects(nextSelects);
-      if (clipped)
-        setNotice("The reviewed issue cropped the overlapping shot select. Save the updated range.");
+      if (updated) {
+        const source = takes.find((take) => take.clip_id === focus.clipId);
+        const valid = rangesOutsideIssues(
+          source?.duration_s ?? focus.finding.end_s,
+          updated.findings,
+        );
+        const nextSelects = revalidateSelections(
+          selectsRef.current,
+          focus.clipId,
+          valid,
+        );
+        const clipped =
+          selectionSignature(nextSelects) !==
+          selectionSignature(selectsRef.current);
+        setSelects(nextSelects);
+        if (clipped)
+          setNotice("The reviewed issue cropped the overlapping shot select. Save the updated range.");
+      }
       const primary = updated?.primary_usable_range;
       if (primary)
         setRange({ from: primary.start_s, to: primary.end_s });
@@ -609,10 +658,17 @@ export default function ShotReviewCockpit({
   const addRange = () => {
     if (!selected) return;
     if (!(range.to > range.from)) return;
-    const safe = (selectedAnalysis?.safe_ranges ?? selected.safe_ranges ?? []).map(
-      (item) => ({ from: item.start_s, to: item.end_s }),
-    );
-    const pieces = safe.length ? withinRanges(range, safe) : [range];
+    const safe = selectedAnalysis
+      ? rangesOutsideIssues(selected.duration_s, selectedAnalysis.findings)
+      : (selected.safe_ranges ?? []).map((item) => ({
+          from: item.start_s,
+          to: item.end_s,
+        }));
+    const pieces = selectedAnalysis
+      ? withinRanges(range, safe)
+      : safe.length
+        ? withinRanges(range, safe)
+        : [range];
     if (!pieces.length) {
       setNotice("That range overlaps an issue and has no selectable portion.");
       return;
@@ -637,8 +693,33 @@ export default function ShotReviewCockpit({
     );
   };
 
+  const constrainSelectionsToIssues = (rows: CoverageSegment[]) =>
+    rows.flatMap((item) => {
+      const analysis = analyses.find(
+        (candidate) => String(candidate.clip_id) === item.clip_id,
+      );
+      if (!analysis) return [item];
+      const source = takes.find((take) => take.clip_id === item.clip_id);
+      return revalidateSelections(
+        [item],
+        item.clip_id,
+        rangesOutsideIssues(
+          source?.duration_s ?? item.source_out_s,
+          analysis.findings,
+        ),
+      );
+    });
+
   const saveSelects = async () => {
     try {
+      const constrained = constrainSelectionsToIssues(selects);
+      if (selectionSignature(constrained) !== selectionSignature(selects)) {
+        setSelects(constrained);
+        setNotice(
+          "Issue ranges were removed from the shot selects. Review the split ranges, then save.",
+        );
+        return;
+      }
       if (
         coverageBase.current !==
         selectionSignature(savedSelects as CoverageSegment[])
@@ -648,7 +729,7 @@ export default function ShotReviewCockpit({
         );
       await saveCoverage.mutateAsync({
         reason: reason || "human coverage selection",
-        segments: selects.map((item) => ({
+        segments: constrained.map((item) => ({
           segment_id: persistedSegmentId(item.segment_id),
           clip_id: item.clip_id,
           attempt_id: item.attempt_id,
@@ -869,11 +950,7 @@ export default function ShotReviewCockpit({
                       poster={take.sprite_uri}
                       onReady={() => {
                         const pending = pendingSeek.current;
-                        if (
-                          pending?.clipId !== take.clip_id ||
-                          take.clip_id !== chosen?.clip_id
-                        )
-                          return;
+                        if (pending?.clipId !== take.clip_id) return;
                         ref.current?.seek(pending.at, pending.play);
                         if ((ref.current?.element()?.readyState ?? 0) >= 1)
                           pendingSeek.current = null;
@@ -1048,7 +1125,8 @@ export default function ShotReviewCockpit({
               >
                 <button
                   className="lane-label"
-                  onClick={() => chooseTake(take.clip_id)}
+                  onClick={() => previewMoment(take.clip_id, 0, take.duration_s)}
+                  title={`Play ${takeName(take)}`}
                 >
                   {take.take_no ? `T${take.take_no}` : "UN"}
                   <small>{tc(take.duration_s)}</small>
@@ -1056,6 +1134,7 @@ export default function ShotReviewCockpit({
                 </button>
                 <div
                   className="lane-track"
+                  style={{ height: Math.max(32, markerEnds.length * 12) }}
                 >
                   <span
                     className="lane-empty"
@@ -1093,7 +1172,7 @@ export default function ShotReviewCockpit({
                         width: pct(
                           Math.max(0.4, finding.end_s - finding.start_s),
                         ),
-                        top: (row % 2) * 12,
+                        top: row * 12,
                         bottom: "auto",
                         height: 12,
                       }}
@@ -1241,27 +1320,30 @@ export default function ShotReviewCockpit({
             {/* Tabs per take rather than every take's issues stacked. Two takes
                 already filled the panel; six would have been a page of its own. */}
             <div className="finding-tabs" role="tablist">
-              {takes.map((take) => {
-                const count = openFindings.filter(
-                  ({ analysis }) => String(analysis.clip_id) === take.clip_id,
-                ).length;
-                return (
-                  <button
-                    key={take.clip_id}
-                    role="tab"
-                    aria-selected={take.clip_id === issueTab}
-                    className={
-                      take.clip_id === issueTab
-                        ? "finding-tab on"
-                        : "finding-tab"
-                    }
-                    onClick={() => chooseTake(take.clip_id)}
-                  >
-                    {takeName(take)}
-                    <span>{count}</span>
-                  </button>
-                );
-              })}
+              {[chosen, previous]
+                .filter((take): take is Take => Boolean(take))
+                .map((take) => {
+                  const count = openFindings.filter(
+                    ({ analysis }) =>
+                      String(analysis.clip_id) === take.clip_id,
+                  ).length;
+                  return (
+                    <button
+                      key={take.clip_id}
+                      role="tab"
+                      aria-selected={take.clip_id === issueTab}
+                      className={
+                        take.clip_id === issueTab
+                          ? "finding-tab on"
+                          : "finding-tab"
+                      }
+                      onClick={() => setIssueClipId(take.clip_id)}
+                    >
+                      {takeName(take)}
+                      <span>{count}</span>
+                    </button>
+                  );
+                })}
             </div>
             {(() => {
               const rows = findingsForReview.filter(({ analysis, finding }) => {
