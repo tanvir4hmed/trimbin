@@ -3,14 +3,47 @@
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Player, { type PlayerHandle } from "@/components/Player";
-import type { Stringout, StringoutEntry } from "@/lib/api";
+import type { FilmState, Stringout, StringoutEntry } from "@/lib/api";
 import { ApiError, api } from "@/lib/api";
+import { currentIdentity } from "@/lib/auth";
 import { paths, projectIdFromSlug } from "@/lib/slug";
 import { archiveLocal } from "@/lib/time";
 
 function clock(value: number) {
   const minutes = Math.floor(value / 60);
   return `${String(minutes).padStart(2, "0")}:${String(Math.floor(value % 60)).padStart(2, "0")}`;
+}
+
+type SequenceGroup = Stringout["timeline"][number] & {
+  entries: StringoutEntry[];
+};
+
+const entryKey = (entry: Pick<StringoutEntry, "clip_id" | "start_s" | "end_s">) =>
+  `${entry.clip_id}/${entry.start_s}/${entry.end_s}`;
+
+function arrangedTimeline(
+  data: Stringout,
+  film: FilmState,
+  sceneId: number,
+): SequenceGroup[] {
+  const saved = film.entries.filter((entry) => entry.source?.scene === sceneId);
+  const rank = new Map(saved.map((entry, index) => [entryKey(entry), index]));
+  return data.timeline
+    .map((item) => {
+      const entries = [...(item.entries?.length ? item.entries : item.entry ? [item.entry] : [])];
+      entries.sort(
+        (a, b) =>
+          (rank.get(entryKey(a)) ?? Number.MAX_SAFE_INTEGER) -
+          (rank.get(entryKey(b)) ?? Number.MAX_SAFE_INTEGER) ||
+          a.position - b.position,
+      );
+      return { ...item, entries };
+    })
+    .sort((a, b) => {
+      const aRank = Math.min(...a.entries.map((entry) => rank.get(entryKey(entry)) ?? Number.MAX_SAFE_INTEGER));
+      const bRank = Math.min(...b.entries.map((entry) => rank.get(entryKey(entry)) ?? Number.MAX_SAFE_INTEGER));
+      return aRank - bRank || a.shot - b.shot;
+    });
 }
 
 export default function SceneCoveragePage({
@@ -23,15 +56,36 @@ export default function SceneCoveragePage({
   const sceneId = Number(scene);
   const player = useRef<PlayerHandle>(null);
   const [data, setData] = useState<Stringout | null>(null);
+  const [film, setFilm] = useState<FilmState | null>(null);
+  const [coverageFilm, setCoverageFilm] = useState<FilmState | null>(null);
+  const [timeline, setTimeline] = useState<SequenceGroup[]>([]);
   const [error, setError] = useState("");
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [tab, setTab] = useState<"review" | "notes" | "activity">("review");
+  const [saving, setSaving] = useState(false);
+  const [sequenceMessage, setSequenceMessage] = useState("");
+  const [dragShot, setDragShot] = useState<number | null>(null);
+  const [dragEntry, setDragEntry] = useState<{ shot: number; key: string } | null>(null);
 
   useEffect(() => {
-    void api
-      .stringout(projectId, sceneId)
-      .then(setData)
+    void Promise.all([
+      api.stringout(projectId, sceneId),
+      api.film(projectId),
+      api.filmCoverage(projectId),
+    ])
+      .then(([nextData, nextFilm, nextCoverage]) => {
+        setData(nextData);
+        setFilm(nextFilm);
+        setCoverageFilm(nextCoverage.preview);
+        setTimeline(
+          arrangedTimeline(
+            nextData,
+            nextFilm.entries.length ? nextFilm : nextCoverage.preview,
+            sceneId,
+          ),
+        );
+      })
       .catch((cause) =>
         setError(
           cause instanceof ApiError && cause.waking
@@ -45,17 +99,13 @@ export default function SceneCoveragePage({
 
   const entries = useMemo(
     () =>
-      data?.timeline.flatMap((item) =>
-        item.entries?.length ? item.entries : item.entry ? [item.entry] : [],
-      ) ?? [],
-    [data],
+      timeline.flatMap((item) => item.entries),
+    [timeline],
   );
   const selectedShots = useMemo(
     () =>
-      data?.timeline.filter(
-        (item) => (item.entries?.length ?? 0) > 0 || item.entry,
-      ) ?? [],
-    [data],
+      timeline.filter((item) => item.entries.length > 0),
+    [timeline],
   );
   const active = entries[index];
   const activeShotIndex = selectedShots.findIndex((item) =>
@@ -115,6 +165,107 @@ export default function SceneCoveragePage({
     const entry = next?.entries?.[0] ?? next?.entry;
     if (entry) openEntry(entry);
   };
+  const reorderShot = (targetShot: number) => {
+    if (dragShot === null || dragShot === targetShot) return;
+    setTimeline((current) => {
+      const from = current.findIndex((item) => item.shot === dragShot);
+      const to = current.findIndex((item) => item.shot === targetShot);
+      if (from < 0 || to < 0) return current;
+      const next = [...current];
+      const [group] = next.splice(from, 1);
+      next.splice(to, 0, group);
+      return next;
+    });
+    setDragShot(null);
+  };
+  const reorderEntry = (shot: number, targetKey: string) => {
+    if (!dragEntry || dragEntry.shot !== shot || dragEntry.key === targetKey)
+      return;
+    setTimeline((current) =>
+      current.map((group) => {
+        if (group.shot !== shot) return group;
+        const from = group.entries.findIndex(
+          (entry) => entryKey(entry) === dragEntry.key,
+        );
+        const to = group.entries.findIndex(
+          (entry) => entryKey(entry) === targetKey,
+        );
+        if (from < 0 || to < 0) return group;
+        const entries = [...group.entries];
+        const [entry] = entries.splice(from, 1);
+        entries.splice(to, 0, entry);
+        return { ...group, entries };
+      }),
+    );
+    setDragEntry(null);
+  };
+  const restoreShotOrder = () => {
+    setTimeline((current) =>
+      [...current].sort((a, b) => a.shot - b.shot),
+    );
+    setSequenceMessage("Default shot order restored. Range order within each shot is unchanged.");
+  };
+  const saveSequence = async () => {
+    if (!film || !currentIdentity()) return;
+    setSaving(true);
+    setSequenceMessage("");
+    try {
+      const arranged = timeline.flatMap((group) => group.entries);
+      const sourceSequence = film.entries.length ? film : coverageFilm ?? film;
+      const existingByKey = new Map(
+        sourceSequence.entries.map((entry) => [entryKey(entry), entry]),
+      );
+      const sceneRanges = arranged.map((entry) => {
+        const existing = existingByKey.get(entryKey(entry));
+        return {
+          id: existing?.id ?? crypto.randomUUID(),
+          clip_id: entry.clip_id,
+          attempt_id: entry.attempt_id ?? null,
+          attempt_revision: entry.attempt_revision ?? 0,
+          start_s: entry.start_s,
+          end_s: entry.end_s,
+          note: entry.reason || "Scene Play selection",
+        };
+      });
+      const firstSceneIndex = sourceSequence.entries.findIndex(
+        (entry) => entry.source?.scene === sceneId,
+      );
+      const kept = sourceSequence.entries
+        .filter((entry) => entry.source?.scene !== sceneId)
+        .map((entry) => ({
+          id: entry.id,
+          clip_id: entry.clip_id,
+          attempt_id: entry.attempt_id ?? null,
+          attempt_revision: entry.attempt_revision ?? 0,
+          start_s: entry.start_s,
+          end_s: entry.end_s,
+          note: entry.note,
+        }));
+      const insertAt =
+        firstSceneIndex >= 0
+          ? sourceSequence.entries
+              .slice(0, firstSceneIndex)
+              .filter((entry) => entry.source?.scene !== sceneId).length
+          : sourceSequence.entries.findIndex(
+              (entry) => (entry.source?.scene ?? Number.MAX_SAFE_INTEGER) > sceneId,
+            );
+      kept.splice(insertAt < 0 ? kept.length : insertAt, 0, ...sceneRanges);
+      const next = await api.saveFilm(projectId, {
+        rev: film.rev,
+        command_id: crypto.randomUUID(),
+        name: film.name || "Saved sequence",
+        ranges: kept,
+      });
+      setFilm(next);
+      setSequenceMessage("Scene playback order saved to Film Preview.");
+    } catch (cause) {
+      setSequenceMessage(
+        cause instanceof Error ? cause.message : "Could not save playback order.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (error)
     return (
@@ -139,7 +290,7 @@ export default function SceneCoveragePage({
           <span>
             {selectedShots.length}/{data.shots} shots confirmed
           </span>
-          <span>{clock(data.duration_s)}</span>
+          <span>{clock(entries.reduce((total, entry) => total + entry.duration_s, 0))}</span>
           <a
             className="ghost small"
             href={api.edlUrl(projectId, sceneId, data.export_fps || 24)}
@@ -202,28 +353,28 @@ export default function SceneCoveragePage({
             </button>
           </div>
           <div className="coverage-takes">
-            {data.timeline.map((item) =>
-              item.entry ? (
+            {timeline.map((item) =>
+              item.entries.length ? (
                 <button
                   key={item.shot}
                   className={
-                    (item.entries ?? [item.entry]).some(
+                    item.entries.some(
                       (entry) => entry.segment_id === active?.segment_id,
                     )
                       ? "coverage-take on"
                       : "coverage-take"
                   }
-                  onClick={() => openEntry((item.entries?.[0] ?? item.entry)!)}
+                  onClick={() => openEntry(item.entries[0])}
                 >
-                  <img src={item.entry.sprite_uri} alt="" />
+                  <img src={item.entries[0].sprite_uri} alt="" />
                   <span>
                     <b>{item.slug}</b>
                     <small>
-                      {item.entries?.length || 1} range
-                      {(item.entries?.length || 1) === 1 ? "" : "s"} ·{" "}
+                      {item.entries.length} range
+                      {item.entries.length === 1 ? "" : "s"} ·{" "}
                       {Array.from(
                         new Set(
-                          (item.entries ?? [item.entry]).map(
+                          item.entries.map(
                             (entry) => `T${entry.take_no}`,
                           ),
                         ),
@@ -250,55 +401,76 @@ export default function SceneCoveragePage({
           <section className="nle-context">
             <header>
               <div>
-                <p className="eyebrow">READ-ONLY COVERAGE TIMELINE</p>
-                <h2>Scene {sceneCode} coverage</h2>
+                <p className="eyebrow">SCENE PLAY ARRANGEMENT</p>
+                <h2>Scene {sceneCode} playback sequence</h2>
               </div>
-              <span>V1 / A1 · selected source ranges, not an edit</span>
+              <div className="sequence-actions">
+                <button className="ghost small" onClick={restoreShotOrder}>
+                  Restore default shot order
+                </button>
+                {currentIdentity() && (
+                  <button
+                    className="primary small"
+                    disabled={saving}
+                    onClick={() => void saveSequence()}
+                  >
+                    {saving ? "Saving…" : "Save sequence"}
+                  </button>
+                )}
+              </div>
             </header>
-            <div className="nle-ruler">
-              <span>00:00</span>
-              <span>{clock(data.duration_s * 0.25)}</span>
-              <span>{clock(data.duration_s * 0.5)}</span>
-              <span>{clock(data.duration_s * 0.75)}</span>
-              <span>{clock(data.duration_s)}</span>
+            <p className="sequence-help">
+              Drag a shot to move all of its ranges. Drag ranges within a shot
+              to refine their playback order.
+            </p>
+            <div className="sequence-groups">
+              {timeline.map((item) => (
+                <section
+                  key={item.shot}
+                  className={`sequence-group${dragShot === item.shot ? " dragging" : ""}`}
+                  draggable
+                  onDragStart={() => setDragShot(item.shot)}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={() => reorderShot(item.shot)}
+                >
+                  <header>
+                    <span className="drag-handle" aria-hidden>⠿</span>
+                    <b>{item.slug}</b>
+                    <small>{item.entries.length} range{item.entries.length === 1 ? "" : "s"}</small>
+                  </header>
+                  <div className="sequence-ranges">
+                    {item.entries.length ? item.entries.map((entry, rangeIndex) => (
+                      <button
+                        key={entryKey(entry)}
+                        className={`sequence-range shot-${item.shot % 5}`}
+                        draggable
+                        onDragStart={(event) => {
+                          event.stopPropagation();
+                          setDragEntry({ shot: item.shot, key: entryKey(entry) });
+                        }}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={(event) => {
+                          event.stopPropagation();
+                          reorderEntry(item.shot, entryKey(entry));
+                        }}
+                        onClick={() => openEntry(entry)}
+                      >
+                        <b>T{entry.take_no} · range {rangeIndex + 1}</b>
+                        <small>{clock(entry.start_s)}–{clock(entry.end_s)}</small>
+                      </button>
+                    )) : (
+                      <Link
+                        href={`${paths.shot(projectId, sceneId, item.shot)}`}
+                        className="sequence-gap"
+                      >
+                        Choose source ranges
+                      </Link>
+                    )}
+                  </div>
+                </section>
+              ))}
             </div>
-            {(["V1", "A1"] as const).map((track) => (
-              <div className="nle-track" key={track}>
-                <b>{track}</b>
-                <div>
-                  {data.timeline.flatMap((item) =>
-                    item.entry
-                      ? (item.entries?.length
-                          ? item.entries
-                          : [item.entry]
-                        ).map((entry, segmentIndex) => (
-                          <button
-                            key={`${track}-${item.shot}-${entry.segment_id || segmentIndex}`}
-                            className={`nle-block shot-${item.shot % 5}`}
-                            style={{ flexGrow: Math.max(2, entry.duration_s) }}
-                            onClick={() => openEntry(entry)}
-                          >
-                            <span>
-                              {item.slug} / T{entry.take_no} · part{" "}
-                              {segmentIndex + 1}
-                            </span>
-                            {track === "A1" && <i className="waveform" />}
-                          </button>
-                        ))
-                      : [
-                          <Link
-                            key={`${track}-${item.shot}`}
-                            href={`${paths.shot(projectId, sceneId, item.shot)}`}
-                            className="nle-gap"
-                          >
-                            <span>GAP</span>
-                            <small>No confirmed ranges</small>
-                          </Link>,
-                        ],
-                  )}
-                </div>
-              </div>
-            ))}
+            {sequenceMessage && <p className="sequence-message" role="status">{sequenceMessage}</p>}
           </section>
         </section>
 

@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import UploadTray from "@/components/UploadTray";
+import ProjectTeam from "@/components/ProjectTeam";
 import { api } from "@/lib/api";
 import { currentIdentity, signOut, type Identity } from "@/lib/auth";
 import { paths } from "@/lib/slug";
@@ -47,6 +48,12 @@ function WorkspaceShell({ children }: { children: React.ReactNode }) {
     queryKey: ["projects", false, identity?.email ?? "anonymous"],
     queryFn: () => api.projects(),
     enabled: pathname !== "/",
+    staleTime: 30_000,
+  });
+  const meQuery = useQuery({
+    queryKey: ["me", identity?.email ?? "anonymous"],
+    queryFn: () => api.me(),
+    enabled: currentId > 0 && pathname !== "/",
     staleTime: 30_000,
   });
   const projects = projectQueryResult.data?.projects ?? [];
@@ -338,9 +345,12 @@ function WorkspaceShell({ children }: { children: React.ReactNode }) {
               onChange={(e) => setSearch(e.target.value)}
             />
           </form>
+          {current && meQuery.data && (
+            <ProjectTeam project={current} me={meQuery.data} />
+          )}
           {currentId > 0 && (
             <div className="app-top-actions">
-              <span>{identity ? "Team workspace" : "Read-only preview"}</span>
+              <span>{identity ? "Workspace" : "Read-only preview"}</span>
             </div>
           )}
         </header>

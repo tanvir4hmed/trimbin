@@ -80,16 +80,11 @@ export default function SceneTree({
 
   return (
     <nav className="tree" aria-label="Scenes and shots">
-      <p className="tree-summary">
-        {waiting === 0 ? (
-          // The empty-queue state, said where it will actually be read.
-          <>Everything is decided.</>
-        ) : (
-          <>
-            {waiting} shot{waiting === 1 ? "" : "s"} waiting
-          </>
-        )}
-      </p>
+      {waiting > 0 && (
+        <p className="tree-summary">
+          {waiting} shot{waiting === 1 ? "" : "s"} waiting
+        </p>
+      )}
 
       {scenes.map((scene) => (
         <section key={scene.scene}>
@@ -216,7 +211,7 @@ export default function SceneTree({
                             key={takeNo}
                             type="button"
                             className={
-                              openTake === takeNo ? "node-take on" : "node-take"
+                              `${openTake === takeNo ? "node-take on" : "node-take"}${openTake === takeNo && ["needs_review", "not_judged", "differs_from_circle", "too_few_takes"].includes(shot.status) ? " needs-review" : ""}`
                             }
                             aria-current={
                               openTake === takeNo ? "true" : undefined

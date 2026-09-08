@@ -30,6 +30,7 @@ export default function ProjectTeam({ project, me }: { project: Project; me: Me 
       setMessage(result.status === "already_a_member" ? "Already on this project." : "Editor added.");
       setEmail("");
       await queryClient.invalidateQueries({ queryKey: keys.project(project.project_id) });
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not add that editor.");
     } finally {

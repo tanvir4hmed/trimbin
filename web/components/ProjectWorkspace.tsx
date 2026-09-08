@@ -17,7 +17,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import AskArchive from "@/components/AskArchive";
 import PlacementBanner from "@/components/PlacementBanner";
 import ProjectOverview from "@/components/ProjectOverview";
-import ProjectTeam from "@/components/ProjectTeam";
 import SceneTree from "@/components/SceneTree";
 import ShotReviewCockpit from "@/components/ShotReviewCockpit";
 import EntityMenu from "@/components/EntityMenu";
@@ -334,7 +333,6 @@ export default function ProjectWorkspace({
               Film Preview
             </Link>
           )}
-          {project && me && <ProjectTeam project={project} me={me} />}
           {open && (
             <Link
               className="ghost"
