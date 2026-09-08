@@ -15,6 +15,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import NewProject from "@/components/NewProject";
+import EntityMenu from "@/components/EntityMenu";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Limits, Project, Role } from "@/lib/api";
 import { ApiError, api } from "@/lib/api";
 import { paths } from "@/lib/slug";
@@ -23,6 +25,7 @@ type SortKey = "name" | "waiting" | "progress" | "created";
 
 export default function ProjectsPage() {
   const router = useRouter();
+  const cache = useQueryClient();
   const [projects, setProjects] = useState<Project[]>([]);
   const [role, setRole] = useState<Role>("guest");
   const [limits, setLimits] = useState<Limits | null>(null);
@@ -31,7 +34,9 @@ export default function ProjectsPage() {
   const [sort, setSort] = useState<SortKey>("waiting");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [scope, setScope] = useState<"active" | "archived" | "trashed" | "deleted">("active");
+  const [scope, setScope] = useState<
+    "active" | "archived" | "trashed" | "deleted"
+  >("active");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -47,7 +52,9 @@ export default function ProjectsPage() {
         router.replace("/");
         return;
       }
-      setError(e instanceof Error ? e.message : "Could not load your projects.");
+      setError(
+        e instanceof Error ? e.message : "Could not load your projects.",
+      );
     } finally {
       setLoading(false);
     }
@@ -88,17 +95,32 @@ export default function ProjectsPage() {
     });
   }, [projects, filter, sort]);
 
-  const command = async (project: Project, action: "rename" | "archive" | "trash" | "restore" | "delete") => {
-    let name = "";
-    if (action === "rename") {
-      name = window.prompt("Project name", project.name)?.trim() ?? "";
-      if (!name || name === project.name) return;
-    }
-    if ((action === "trash" || action === "delete") && !window.confirm(action === "delete" ? "Remove this project from Trimbin?\n\nIt disappears from every list, and from the signed-out view if it was public. Its footage, decisions and audit records are all kept, and you can bring it back from the Removed tab." : "Move this project to Trash?")) return;
+  const command = async (
+    project: Project,
+    action: "archive" | "trash" | "restore" | "delete",
+  ) => {
+    if (
+      (action === "trash" || action === "delete") &&
+      !window.confirm(
+        action === "delete"
+          ? "Remove this project from Trimbin?\n\nIt disappears from every list, and from the signed-out view if it was public. Its footage, decisions and audit records are all kept, and you can bring it back from the Removed tab."
+          : "Move this project to Trash?",
+      )
+    )
+      return;
     try {
-      await api.changeProject(project.project_id, { rev: project.rev, action, name });
+      await api.changeProject(project.project_id, {
+        rev: project.rev,
+        action,
+      });
       await load();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not update the project."); }
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not update the project.",
+      );
+    }
   };
 
   if (loading) {
@@ -130,7 +152,21 @@ export default function ProjectsPage() {
       </header>
 
       <nav className="project-scope-tabs" aria-label="Project state">
-        {(["active", "archived", "trashed", "deleted"] as const).map((item) => <button key={item} className={scope === item ? "on" : ""} onClick={() => setScope(item)}>{item === "active" ? "Current" : item === "archived" ? "Archived" : item === "trashed" ? "Trash" : "Removed"}</button>)}
+        {(["active", "archived", "trashed", "deleted"] as const).map((item) => (
+          <button
+            key={item}
+            className={scope === item ? "on" : ""}
+            onClick={() => setScope(item)}
+          >
+            {item === "active"
+              ? "Current"
+              : item === "archived"
+                ? "Archived"
+                : item === "trashed"
+                  ? "Trash"
+                  : "Removed"}
+          </button>
+        ))}
       </nav>
 
       {error && <p className="error">{error}</p>}
@@ -165,7 +201,127 @@ export default function ProjectsPage() {
               : "No public projects are available. Sign in as Guest to open the working application."
             : "Nothing matches that."}
         </p>
-      ) : <div className="project-showcase-grid">{shown.map((p, index) => <article className="project-showcase" key={p.project_id}><Link className={`project-cover cover-${index % 6}`} href={`${paths.project(p.project_id, p.name)}`}><span>{p.you_are_owner ? "Owner" : p.you_can_upload ? "Editor" : "Guest"}</span></Link><div className="project-showcase-body"><header><Link href={`${paths.project(p.project_id, p.name)}`}>{p.name}</Link>{p.is_public && <span className="tag">public</span>}</header><div className="project-facts"><span><b>{p.scenes ?? "—"}</b> scenes</span><span><b>{p.shots ?? "—"}</b> shots</span><span><b>{p.takes ?? "—"}</b> clips</span><span className={p.waiting ? "bad" : ""}><b>{p.waiting ?? 0}</b> decisions</span></div>{p.progress_pct !== null && p.progress_pct !== undefined && <div className="project-progress"><i style={{ width: `${p.progress_pct}%` }}/><span>{p.progress_pct}% settled</span></div>}<footer><small>{p.owner_email === you ? "You" : p.owner_email.split("@")[0]}{p.member_emails.length ? ` + ${p.member_emails.length} editors` : ""}</small><Link href={`${paths.project(p.project_id, p.name)}`}>Open project →</Link></footer>{p.you_are_owner && <div className="project-actions">{scope === "active" && <><button onClick={() => void command(p,"rename")}>Rename</button><button onClick={() => void command(p,"archive")}>Archive</button><button onClick={() => void command(p,"trash")}>Trash</button></>}{scope === "archived" && <><button onClick={() => void command(p,"restore")}>Restore</button><button onClick={() => void command(p,"trash")}>Trash</button></>}{scope === "trashed" && <><button onClick={() => void command(p,"restore")}>Restore</button><button className="danger" onClick={() => void command(p,"delete")}>Delete</button></>}{scope === "deleted" && <button onClick={() => void command(p,"restore")}>Restore</button>}</div>}</div></article>)}</div>}
+      ) : (
+        <div className="project-showcase-grid">
+          {shown.map((p, index) => (
+            <article className="project-showcase" key={p.project_id}>
+              <Link
+                className={`project-cover cover-${index % 6}`}
+                href={`${paths.project(p.project_id, p.name)}`}
+              >
+                <span>
+                  {p.you_are_owner
+                    ? "Owner"
+                    : p.you_can_upload
+                      ? "Editor"
+                      : "Guest"}
+                </span>
+              </Link>
+              <div className="project-showcase-body">
+                <header>
+                  <Link href={`${paths.project(p.project_id, p.name)}`}>
+                    {p.name}
+                  </Link>
+                  {p.is_public && <span className="tag">public</span>}
+                </header>
+                <div className="project-facts">
+                  <span>
+                    <b>{p.scenes ?? "—"}</b> scenes
+                  </span>
+                  <span>
+                    <b>{p.shots ?? "—"}</b> shots
+                  </span>
+                  <span>
+                    <b>{p.takes ?? "—"}</b> clips
+                  </span>
+                  <span className={p.waiting ? "bad" : ""}>
+                    <b>{p.waiting ?? 0}</b> decisions
+                  </span>
+                </div>
+                {p.progress_pct !== null && p.progress_pct !== undefined && (
+                  <div className="project-progress">
+                    <i style={{ width: `${p.progress_pct}%` }} />
+                    <span>{p.progress_pct}% settled</span>
+                  </div>
+                )}
+                <footer>
+                  <small>
+                    {p.owner_email === you
+                      ? "You"
+                      : p.owner_email.split("@")[0]}
+                    {p.member_emails.length
+                      ? ` + ${p.member_emails.length} editors`
+                      : ""}
+                  </small>
+                  <Link href={`${paths.project(p.project_id, p.name)}`}>
+                    Open project →
+                  </Link>
+                </footer>
+                {p.you_are_owner && (
+                  <EntityMenu
+                    kind="Project"
+                    name={p.name}
+                    onRename={async (name) => {
+                      const updated = await api.changeProject(p.project_id, {
+                        rev: p.rev,
+                        action: "rename",
+                        name,
+                      });
+                      setProjects((old) =>
+                        old.map((item) =>
+                          item.project_id === updated.project_id
+                            ? updated
+                            : item,
+                        ),
+                      );
+                      await cache.invalidateQueries();
+                    }}
+                  >
+                    {scope === "active" && (
+                      <>
+                        <button onClick={() => void command(p, "archive")}>
+                          Archive
+                        </button>
+                        <button onClick={() => void command(p, "trash")}>
+                          Trash
+                        </button>
+                      </>
+                    )}
+                    {scope === "archived" && (
+                      <>
+                        <button onClick={() => void command(p, "restore")}>
+                          Restore
+                        </button>
+                        <button onClick={() => void command(p, "trash")}>
+                          Trash
+                        </button>
+                      </>
+                    )}
+                    {scope === "trashed" && (
+                      <>
+                        <button onClick={() => void command(p, "restore")}>
+                          Restore
+                        </button>
+                        <button
+                          className="danger"
+                          onClick={() => void command(p, "delete")}
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                    {scope === "deleted" && (
+                      <button onClick={() => void command(p, "restore")}>
+                        Restore
+                      </button>
+                    )}
+                  </EntityMenu>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
     </main>
   );
 }

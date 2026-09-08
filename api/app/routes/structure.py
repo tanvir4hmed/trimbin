@@ -35,6 +35,36 @@ class NewShot(BaseModel):
     description: str = Field(default="", max_length=structure.MAX_HEADING)
 
 
+class RenameStructure(BaseModel):
+    name: str = Field(min_length=1, max_length=structure.MAX_HEADING)
+    previous: str = Field(default="", max_length=structure.MAX_HEADING)
+
+
+@router.patch("/{project_id}/scenes/{scene}/name")
+async def rename_scene(
+    project_id: int,
+    scene: int,
+    body: RenameStructure,
+    principal: Annotated[Principal, Depends(require_signed_in)],
+) -> dict:
+    await principal.assert_can_curate(project_id)
+    result = await structure.rename(project_id, scene, 0, body.name, body.previous)
+    return result.as_dict()
+
+
+@router.patch("/{project_id}/scenes/{scene}/shots/{shot}/name")
+async def rename_shot(
+    project_id: int,
+    scene: int,
+    shot: int,
+    body: RenameStructure,
+    principal: Annotated[Principal, Depends(require_signed_in)],
+) -> dict:
+    await principal.assert_can_curate(project_id)
+    result = await structure.rename(project_id, scene, shot, body.name, body.previous)
+    return result.as_dict()
+
+
 @router.get("/{project_id}")
 async def plan(
     project_id: int,

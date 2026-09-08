@@ -1264,6 +1264,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/structure/{project_id}/scenes/{scene}/name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Rename Scene */
+        patch: operations["rename_scene_structure__project_id__scenes__scene__name_patch"];
+        trace?: never;
+    };
+    "/structure/{project_id}/scenes/{scene}/shots/{shot}/name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Rename Shot */
+        patch: operations["rename_shot_structure__project_id__scenes__scene__shots__shot__name_patch"];
+        trace?: never;
+    };
     "/structure/{project_id}": {
         parameters: {
             query?: never;
@@ -1677,7 +1711,7 @@ export interface components {
              * @default proposed
              * @enum {string}
              */
-            state: "proposed" | "reviewed" | "shortlisted" | "director_choice" | "rejected";
+            state: "proposed" | "reviewed" | "clean" | "shortlisted" | "director_choice" | "rejected";
             /**
              * Note
              * @default
@@ -3448,6 +3482,16 @@ export interface components {
              * @default false
              */
             archive_pending: boolean;
+        };
+        /** RenameStructure */
+        RenameStructure: {
+            /** Name */
+            name: string;
+            /**
+             * Previous
+             * @default
+             */
+            previous: string;
         };
         /**
          * Resolution
@@ -6319,6 +6363,83 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlacementResolved"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_scene_structure__project_id__scenes__scene__name_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                scene: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameStructure"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_shot_structure__project_id__scenes__scene__shots__shot__name_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                scene: number;
+                shot: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameStructure"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

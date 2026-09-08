@@ -149,6 +149,58 @@ async def get(project_id: int, scene: int) -> Scene:
     return _from_doc(project_id, snapshot.to_dict() or {})
 
 
+async def rename(project_id: int, scene: int, shot: int, name: str, previous: str) -> Scene:
+    """Change display text without changing slate codes or internal identity."""
+    name = " ".join(name.split())
+    if not name or len(name) > MAX_HEADING:
+        raise HTTPException(422, "Enter a name between 1 and 200 characters.")
+    if not 1 <= scene <= 9999 or not 0 <= shot <= 999:
+        raise HTTPException(422, "Invalid scene or shot identifier.")
+
+    snapshot = await _doc(project_id, scene).get()
+    plan = snapshot.to_dict() or {} if snapshot.exists else {}
+    observed = {}
+    if not snapshot.exists or (
+        shot and not any(int(s["shot"]) == shot for s in plan.get("shots", []))
+    ):
+        from .analytics import _many
+
+        rows = await _many(
+            """SELECT scene_code, shot_code FROM current_clip_placement
+            WHERE project_id={p:UInt32} AND group_id={s:UInt32} AND status='active'
+            AND ({h:UInt32}=0 OR subgroup_id={h:UInt32}) LIMIT 1""",
+            {"p": project_id, "s": scene, "h": shot},
+        )
+        if not rows:
+            raise HTTPException(404, "No such scene or shot.")
+        observed = rows[0]
+
+    def change(existing):
+        if not snapshot.exists and existing.get("scene_code") == str(scene):
+            existing = {**existing, "scene_code": observed.get("scene_code") or str(scene)}
+        if not shot:
+            if existing.get("heading", "") != previous:
+                raise HTTPException(409, "This scene was renamed. Reload before changing it.")
+            return {**existing, "heading": name}
+        shots = [dict(item) for item in existing.get("shots", [])]
+        target = next((item for item in shots if int(item["shot"]) == shot), None)
+        if target is None:
+            if not observed:
+                raise HTTPException(409, "This shot was removed. Reload before changing it.")
+            target = {
+                "shot": shot,
+                "slug": observed.get("shot_code") or str(shot),
+                "description": "",
+            }
+            shots.append(target)
+        if target.get("description", "") != previous:
+            raise HTTPException(409, "This shot was renamed. Reload before changing it.")
+        target["description"] = name
+        return {**existing, "shots": shots}
+
+    return await _edit_scene(project_id, scene, change)
+
+
 async def for_project(project_id: int) -> list[Scene]:
     found: list[Scene] = []
     async for snapshot in (

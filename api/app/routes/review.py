@@ -1011,6 +1011,9 @@ async def tree(
         (item.scene, planned.shot): planned.slug for item in plan for planned in item.shots
     }
     note_counts = await comments_service.counts_for_project(project_id)
+    shot_names = {
+        (item.scene, planned.shot): planned.description for item in plan for planned in item.shots
+    }
     threshold = assessment.review_margin()
 
     scenes: dict[int, dict] = {}
@@ -1080,7 +1083,7 @@ async def tree(
                 or shot_codes.get((scene_id, shot_id))
                 or shot_code
                 or "",
-                "label": label or "",
+                "label": shot_names.get((scene_id, shot_id)) or label or "",
                 "takes": int(takes),
                 "unusable": int(unusable),
                 "status": _status(

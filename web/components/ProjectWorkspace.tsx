@@ -20,7 +20,9 @@ import ProjectOverview from "@/components/ProjectOverview";
 import ProjectTeam from "@/components/ProjectTeam";
 import SceneTree from "@/components/SceneTree";
 import ShotReviewCockpit from "@/components/ShotReviewCockpit";
-import { ApiError } from "@/lib/api";
+import EntityMenu from "@/components/EntityMenu";
+import { useQueryClient } from "@tanstack/react-query";
+import { api, ApiError } from "@/lib/api";
 import { useProjectScreen } from "@/lib/queries";
 import { paths } from "@/lib/slug";
 
@@ -36,11 +38,15 @@ export default function ProjectWorkspace({
   urlShot: number;
 }) {
   const router = useRouter();
+  const cache = useQueryClient();
   // A search result links to a moment: which clip, and where in it. That is a
   // position inside the shot rather than another resource, so it stays a query
   // parameter while scene and shot became path segments.
   const query = useSearchParams();
-  const deepLink = { clip: query.get("clip") ?? "", at: Number(query.get("at") ?? 0) };
+  const deepLink = {
+    clip: query.get("clip") ?? "",
+    at: Number(query.get("at") ?? 0),
+  };
 
   const [camera, setCamera] = useState("");
   const [shootDay, setShootDay] = useState("");
@@ -59,13 +65,34 @@ export default function ProjectWorkspace({
   });
 
   const data = screen.data;
-  const tree = data?.tree;
+  const tree = useMemo(
+    () =>
+      data
+        ? {
+            ...data.tree,
+            scenes: data.tree.scenes.map((scene) => ({
+              ...scene,
+              shots: scene.shots.map((shot) => ({
+                ...shot,
+                label:
+                  data.plan.scenes
+                    .find((s) => s.scene === scene.scene)
+                    ?.shots.find((s) => s.shot === shot.shot)?.description ||
+                  shot.label,
+              })),
+            })),
+          }
+        : undefined,
+    [data],
+  );
   const project = data?.project;
   const me = data?.me;
 
   const teamEmails = useMemo(
     () =>
-      project ? [project.owner_email, ...project.member_emails].filter(Boolean) : [],
+      project
+        ? [project.owner_email, ...project.member_emails].filter(Boolean)
+        : [],
     [project],
   );
 
@@ -103,7 +130,8 @@ export default function ProjectWorkspace({
   const takesByShot = useMemo(() => {
     const counts = new Map<string, number>();
     for (const scene of tree?.scenes ?? []) {
-      for (const shot of scene.shots) counts.set(`${scene.scene}:${shot.shot}`, shot.takes);
+      for (const shot of scene.shots)
+        counts.set(`${scene.scene}:${shot.shot}`, shot.takes);
     }
     return counts;
   }, [tree]);
@@ -116,7 +144,7 @@ export default function ProjectWorkspace({
   // not about hiding work.
   const railScenes = useMemo(() => {
     if (!tree) return [];
-    const wanted = railScene || urlScene;
+    const wanted = railScene;
     return wanted ? tree.scenes.filter((s) => s.scene === wanted) : tree.scenes;
   }, [tree, railScene, urlScene]);
 
@@ -136,6 +164,9 @@ export default function ProjectWorkspace({
   // Told by the API rather than worked out here. A page that decides this by
   // comparing addresses is a second implementation of the permission rules.
   const canCurate = Boolean(project?.you_can_upload);
+  const refreshNames = async () => {
+    await cache.invalidateQueries();
+  };
 
   if (screen.isPending) {
     return (
@@ -183,10 +214,27 @@ export default function ProjectWorkspace({
               "Scene 2 - two perspectives" holding scene 1 put two different
               scene numbers side by side in one line and read as a fault.
               A link, because it is the step back from a shot to its project. */}
-          <Link className="crumb-project" href={`${paths.project(projectId, project?.name)}`}>
+          <Link
+            className="crumb-project"
+            href={`${paths.project(projectId, project?.name)}`}
+          >
             <small>project</small>
             {project?.name ?? `Project ${projectId}`}
           </Link>
+          {project?.you_are_owner && (
+            <EntityMenu
+              kind="Project"
+              name={project.name}
+              onRename={async (name) => {
+                await api.changeProject(projectId, {
+                  rev: project.rev,
+                  action: "rename",
+                  name,
+                });
+                await refreshNames();
+              }}
+            />
+          )}
           {(open || urlScene) && (
             <>
               <span aria-hidden>›</span>
@@ -201,21 +249,68 @@ export default function ProjectWorkspace({
                     // Changing scene lands on the scene, not on a shot inside
                     // it that nobody picked.
                     setRailTake(0);
-                    router.push(`${paths.scene(projectId, Number(event.target.value), project?.name)}`);
+                    router.push(
+                      `${paths.scene(projectId, Number(event.target.value), project?.name)}`,
+                    );
                   }}
                 >
                   {tree.scenes.map((scene) => (
                     <option key={scene.scene} value={scene.scene}>
                       Scene {scene.scene_code || scene.scene}
-                      {headings.get(scene.scene) ? ` · ${headings.get(scene.scene)}` : ""}
+                      {headings.get(scene.scene)
+                        ? ` · ${headings.get(scene.scene)}`
+                        : ""}
                     </option>
                   ))}
                 </select>
               </label>
+              {urlScene > 0 && canCurate && (
+                <EntityMenu
+                  kind="Scene"
+                  name={headings.get(urlScene) || ""}
+                  onRename={async (name) => {
+                    await api.renameStructure(
+                      projectId,
+                      urlScene,
+                      0,
+                      name,
+                      headings.get(urlScene) || "",
+                    );
+                    await refreshNames();
+                  }}
+                />
+              )}
               {open && (
                 <>
                   <span aria-hidden>›</span>
-                  <span className="crumb-shot">{openShot?.slug || `Shot ${open.shot}`}</span>
+                  <span className="crumb-shot">
+                    {openShot?.slug || `Shot ${open.shot}`}
+                    {openShot?.label ? ` · ${openShot.label}` : ""}
+                  </span>
+                  {canCurate && (
+                    <EntityMenu
+                      kind="Shot"
+                      name={
+                        data.plan.scenes
+                          .find((s) => s.scene === open.scene)
+                          ?.shots.find((s) => s.shot === open.shot)
+                          ?.description || ""
+                      }
+                      onRename={async (name) => {
+                        await api.renameStructure(
+                          projectId,
+                          open.scene,
+                          open.shot,
+                          name,
+                          data.plan.scenes
+                            .find((s) => s.scene === open.scene)
+                            ?.shots.find((s) => s.shot === open.shot)
+                            ?.description || "",
+                        );
+                        await refreshNames();
+                      }}
+                    />
+                  )}
                   {/* Back to the scene, which otherwise needed the browser's
                       back button. */}
                   <button
@@ -223,7 +318,9 @@ export default function ProjectWorkspace({
                     className="linkish crumb-close"
                     onClick={() => {
                       setRailTake(0);
-                      router.push(`${paths.scene(projectId, open.scene, project?.name)}`);
+                      router.push(
+                        `${paths.scene(projectId, open.scene, project?.name)}`,
+                      );
                     }}
                   >
                     close shot
@@ -235,20 +332,37 @@ export default function ProjectWorkspace({
         </div>
 
         <div className="project-tools">
-          {urlScene > 0 && <Link className="primary" href={paths.film(projectId, project?.name)}>Film Preview</Link>}
+          {urlScene > 0 && (
+            <Link
+              className="primary"
+              href={paths.film(projectId, project?.name)}
+            >
+              Film Preview
+            </Link>
+          )}
           {project && me && <ProjectTeam project={project} me={me} />}
           {open && (
-            <Link className="ghost" href={`${paths.coverage(projectId, open.scene, project?.name)}`}>
-              Play scene {tree.scenes.find((item) => item.scene === open.scene)?.scene_code || open.scene}
+            <Link
+              className="ghost"
+              href={`${paths.coverage(projectId, open.scene, project?.name)}`}
+            >
+              Play scene{" "}
+              {tree.scenes.find((item) => item.scene === open.scene)
+                ?.scene_code || open.scene}
             </Link>
           )}
           {canCurate ? (
-            <Link className="primary" href={`${paths.ingest(projectId, project?.name)}`}>Upload takes</Link>
+            <Link
+              className="primary"
+              href={`${paths.ingest(projectId, project?.name)}`}
+            >
+              Upload takes
+            </Link>
           ) : (
             me?.signed_in && (
               <span className="hint small">
-                Read and comment only. <Link href="/home">Make a project</Link> to
-                upload.
+                Read and comment only. <Link href="/home">Make a project</Link>{" "}
+                to upload.
               </span>
             )
           )}
@@ -260,7 +374,10 @@ export default function ProjectWorkspace({
           {tree.cameras.length > 0 && (
             <label>
               Camera
-              <select value={camera} onChange={(e) => setCamera(e.target.value)}>
+              <select
+                value={camera}
+                onChange={(e) => setCamera(e.target.value)}
+              >
                 <option value="">all</option>
                 {tree.cameras.map((c) => (
                   <option key={c} value={c}>
@@ -273,7 +390,10 @@ export default function ProjectWorkspace({
           {tree.shoot_days.length > 1 && (
             <label>
               Shoot day
-              <select value={shootDay} onChange={(e) => setShootDay(e.target.value)}>
+              <select
+                value={shootDay}
+                onChange={(e) => setShootDay(e.target.value)}
+              >
                 <option value="">all</option>
                 {tree.shoot_days.map((d) => (
                   <option key={d} value={d}>
@@ -285,7 +405,10 @@ export default function ProjectWorkspace({
           )}
           <label>
             Assigned
-            <select value={assignee} onChange={(e) => setAssignee(e.target.value)}>
+            <select
+              value={assignee}
+              onChange={(e) => setAssignee(e.target.value)}
+            >
               <option value="">anyone</option>
               <option value="unassigned">unclaimed</option>
               {me?.email && <option value={me.email}>me</option>}
@@ -324,20 +447,33 @@ export default function ProjectWorkspace({
         <AskArchive
           collapsible
           projectId={projectId}
-          onOpen={(scene, shot, at, clipId) => router.push(`${paths.shot(projectId, scene, shot, project?.name)}${at !== undefined ? `?at=${at}` : ""}${clipId ? `${at !== undefined ? "&" : "?"}clip=${clipId}` : ""}`)}
+          onOpen={(scene, shot, at, clipId) =>
+            router.push(
+              `${paths.shot(projectId, scene, shot, project?.name)}${at !== undefined ? `?at=${at}` : ""}${clipId ? `${at !== undefined ? "&" : "?"}clip=${clipId}` : ""}`,
+            )
+          }
         />
       )}
 
       {empty ? (
         <div className="empty-project">
-          <h2>{filtered ? "Nothing matches those filters" : "Nothing here yet"}</h2>
+          <h2>
+            {filtered ? "Nothing matches those filters" : "Nothing here yet"}
+          </h2>
           {!filtered && (
             <p>
               Declare the scenes and shots, then upload into them — or upload
               first and let the slate sort the footage.
             </p>
           )}
-          {!filtered && canCurate && <Link className="primary" href={`${paths.ingest(projectId, project?.name)}`}>Add scenes, shots &amp; footage</Link>}
+          {!filtered && canCurate && (
+            <Link
+              className="primary"
+              href={`${paths.ingest(projectId, project?.name)}`}
+            >
+              Add scenes, shots &amp; footage
+            </Link>
+          )}
         </div>
       ) : !open && !urlScene ? (
         // The production: its scenes. A scene is the unit people talk in.
@@ -377,7 +513,9 @@ export default function ProjectWorkspace({
                   {searchedScenes.map((scene) => (
                     <option key={scene.scene} value={scene.scene}>
                       {scene.scene_code || `Scene ${scene.scene}`}
-                      {headings.get(scene.scene) ? ` · ${headings.get(scene.scene)}` : ""}
+                      {headings.get(scene.scene)
+                        ? ` · ${headings.get(scene.scene)}`
+                        : ""}
                     </option>
                   ))}
                 </select>
@@ -393,14 +531,24 @@ export default function ProjectWorkspace({
             </div>
 
             <SceneTree
+              headings={headings}
               scenes={railScenes}
               selected={open}
               openTake={railTake}
-              onSelect={(scene, shot) => { setRailTake(0); router.push(paths.shot(projectId, scene, shot, project?.name)); }}
-              onSelectTake={(scene, shot, takeNo) => { setRailTake(takeNo); router.push(paths.shot(projectId, scene, shot, project?.name)); }}
-              onOpenScene={(scene) => router.push(`${paths.coverage(projectId, scene, project?.name)}`)}
+              onSelect={(scene, shot) => {
+                setRailTake(0);
+                router.push(paths.shot(projectId, scene, shot, project?.name));
+              }}
+              onSelectTake={(scene, shot, takeNo) => {
+                setRailTake(takeNo);
+                router.push(paths.shot(projectId, scene, shot, project?.name));
+              }}
+              onOpenScene={(scene) =>
+                router.push(
+                  `${paths.coverage(projectId, scene, project?.name)}`,
+                )
+              }
             />
-
           </div>
 
           <section className="pane">

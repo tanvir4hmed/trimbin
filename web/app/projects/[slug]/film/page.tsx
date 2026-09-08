@@ -43,11 +43,15 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
   const [error, setError] = useState("");
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [failedSources, setFailedSources] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState(false);
   const [position, setPosition] = useState(0);
   const [canEdit, setCanEdit] = useState(false);
   const [versions, setVersions] = useState<{ rev: number; name: string }[]>([]);
   const [coverageMode, setCoverageMode] = useState(false);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [undoRows, setUndoRows] = useState<FilmRange[][]>([]);
+  const [redoRows, setRedoRows] = useState<FilmRange[][]>([]);
   const [omissions, setOmissions] = useState<
     Awaited<ReturnType<typeof api.filmCoverage>>["omissions"]
   >([]);
@@ -72,6 +76,13 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
     .reduce((sum, r) => sum + Math.max(0, r.end_s - r.start_s), 0);
 
   function adopt(data: FilmState) {
+    setMessage("");
+    setError("");
+    setFailedSources(new Set());
+    player.current?.element()?.pause();
+    advancing.current = false;
+    setUndoRows([]);
+    setRedoRows([]);
     setEditing(false);
     setCoverageMode(false);
     setOmissions([]);
@@ -98,16 +109,9 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
         }),
       ),
     );
-    setSources((old) =>
-      Array.from(
-        new Map(
-          [
-            ...old,
-            ...(data.entries ?? []).flatMap((e) =>
-              e.source ? [e.source] : [],
-            ),
-          ].map((s) => [s.clip_id, s]),
-        ).values(),
+    setSources(
+      (data.entries ?? []).flatMap((entry) =>
+        entry.source ? [entry.source] : [],
       ),
     );
     setDirty(false);
@@ -121,20 +125,48 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
   }
   useEffect(() => {
     let cancelled = false;
-    setCanEdit(Boolean(currentIdentity()));
-    try {
-      const stored = JSON.parse(localStorage.getItem(draftKey()) || "null");
-      if (stored && Array.isArray(stored.rows) && stored.rows.length <= 1000)
-        setLocalDraft(stored);
-    } catch {
-      /* An unreadable local draft must not block the saved project. */
-    }
+    void api
+      .project(projectId)
+      .then((project) => {
+        if (!cancelled) setCanEdit(project.you_can_upload);
+      })
+      .catch(() => {});
     void api
       .film(projectId)
       .then(async (data) => {
         if (cancelled) return;
         adopt(data);
+        try {
+          const stored = JSON.parse(localStorage.getItem(draftKey()) || "null");
+          const savedRows = (data.entries ?? []).map(
+            ({ source, available, record_start_s, ...row }) => row,
+          );
+          const signature = (items: FilmRange[]) =>
+            JSON.stringify(
+              items.map((r) => [
+                r.id,
+                r.clip_id,
+                r.start_s,
+                r.end_s,
+                r.note ?? "",
+                r.attempt_id ?? null,
+                r.attempt_revision ?? 0,
+              ]),
+            );
+          if (
+            stored &&
+            Array.isArray(stored.rows) &&
+            stored.rows.length <= 1000 &&
+            (stored.name !== data.name ||
+              signature(stored.rows) !== signature(savedRows))
+          )
+            setLocalDraft(stored);
+          else localStorage.removeItem(draftKey());
+        } catch {
+          /* Recovery storage is optional. */
+        }
         if (data.rev === 0) {
+          setCoverageMode(true);
           setBusy(true);
           try {
             const coverage = await api.filmCoverage(projectId);
@@ -173,6 +205,9 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
     if (active && source) player.current?.seek(active.start_s, playing);
   }, [active?.id, active?.start_s, source?.clip_id]);
   function edit(next: FilmRange[]) {
+    setUndoRows((old) => [...old.slice(-49), rows]);
+    setRedoRows([]);
+    setCoverageMode(false);
     player.current?.element()?.pause();
     setPlaying(false);
     setRows(next);
@@ -186,8 +221,14 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
     if (!playing || advancing.current) return;
     advancing.current = true;
     player.current?.element()?.pause();
-    if (index + 1 < rows.length) setIndex(index + 1);
-    else {
+    const next = rows.findIndex((row, i) => i > index && playable(row));
+    if (next >= 0) {
+      if (next > index + 1)
+        setMessage(
+          `Skipped ${next - index - 1} unavailable portions. Saved order is unchanged.`,
+        );
+      setIndex(next);
+    } else {
       setPlaying(false);
       setMessage("End of sequence.");
     }
@@ -203,19 +244,32 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [playing, index, active?.end_s]);
-  const invalid = rows.find((row) => {
+  function validRange(row: FilmRange) {
     const media = sources.find((s) => s.clip_id === row.clip_id);
-    return (
-      !media?.proxy_uri ||
-      !Number.isFinite(row.start_s) ||
-      !Number.isFinite(row.end_s) ||
-      row.start_s < 0 ||
-      row.end_s <= row.start_s ||
-      row.end_s > media.duration_s + 0.001
+    return Boolean(
+      media?.proxy_uri &&
+      Number.isFinite(row.start_s) &&
+      Number.isFinite(row.end_s) &&
+      row.start_s >= 0 &&
+      row.end_s > row.start_s &&
+      row.end_s <= media.duration_s + 0.001,
     );
-  });
+  }
+  const playable = (row: FilmRange) =>
+    !failedSources.has(row.clip_id) && validRange(row);
+  const invalid = rows.find((row) => !validRange(row));
+  const firstPlayable = rows.findIndex(playable);
+  const unavailable = rows.filter((row) => !playable(row)).length;
+  function discardRecovery() {
+    try {
+      localStorage.removeItem(draftKey());
+    } catch {
+      /* optional */
+    }
+    setLocalDraft(null);
+  }
   async function save() {
-    if (!saved || invalid) return;
+    if (!saved || invalid || !name.trim()) return;
     setBusy(true);
     setError("");
     command.current ??= crypto.randomUUID();
@@ -303,9 +357,33 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
     setBusy(true);
     setError("");
     try {
-      showCoverage(await api.filmCoverage(projectId), false);
+      const coverage = await api.filmCoverage(projectId);
+      if (dirty) discardRecovery();
+      showCoverage(coverage, false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not import coverage.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function loadSaved() {
+    if (
+      dirty &&
+      !window.confirm("Discard unsaved edits and load the saved sequence?")
+    )
+      return;
+    setBusy(true);
+    setError("");
+    try {
+      const data = await api.film(projectId);
+      if (dirty) discardRecovery();
+      adopt(data);
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Could not load saved sequence.",
+      );
     } finally {
       setBusy(false);
     }
@@ -315,10 +393,14 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
     asDraft: boolean,
   ) {
     const entries = coverage.preview.entries ?? [];
+    setFailedSources(new Set());
+    setUndoRows([]);
+    setRedoRows([]);
     setEditing(false);
     player.current?.element()?.pause();
     setPlaying(false);
     setIndex(0);
+    advancing.current = false;
     setRows(
       entries.map(
         ({
@@ -340,14 +422,8 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
         }),
       ),
     );
-    setSources((old) =>
-      Array.from(
-        new Map(
-          [...old, ...entries.flatMap((e) => (e.source ? [e.source] : []))].map(
-            (s) => [s.clip_id, s],
-          ),
-        ).values(),
-      ),
+    setSources(
+      entries.flatMap((entry) => (entry.source ? [entry.source] : [])),
     );
     setName("Confirmed selects");
     setCoverageMode(true);
@@ -403,7 +479,12 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
               disabled={busy || !saved}
               onClick={() => {
                 setEditing(true);
-                if (!catalog.length) void loadSources(0);
+                if (coverageMode) {
+                  setCoverageMode(false);
+                  setName("Film sequence");
+                  setDirty(true);
+                }
+                void loadSources(0);
               }}
             >
               Arrange sequence
@@ -412,7 +493,7 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
           {canEdit && editing && (
             <button
               className="primary"
-              disabled={busy || (!dirty && !coverageMode) || !!invalid}
+              disabled={busy || !dirty || !!invalid || !name.trim()}
               onClick={() => void save()}
             >
               {busy ? "Working…" : "Save sequence"}
@@ -430,10 +511,25 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
           (dirty
             ? "Unsaved changes — save before leaving this page."
             : saved
-              ? `Saved revision ${saved.rev}${saved.updated_by ? ` · ${saved.updated_by.split("@")[0]}` : " · Start with an empty sequence or copy coverage once."}`
+              ? coverageMode
+                ? "Current confirmed selects · latest loaded shot decisions"
+                : saved.rev
+                  ? `Saved sequence · revision ${saved.rev}`
+                  : "No saved sequence yet. Arrange footage to create one."
               : "Loading sequence…")}
       </p>
-      <div className="film-view-modes" aria-label="Preview source">
+      <div
+        className="film-view-modes"
+        aria-label="Preview source"
+        hidden={!saved}
+      >
+        <strong>
+          {dirty
+            ? "Editing sequence · unsaved"
+            : coverageMode
+              ? "Current confirmed selects"
+              : "Saved sequence"}
+        </strong>
         <button
           className="ghost small"
           disabled={busy || !saved}
@@ -481,29 +577,25 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
           Current confirmed selects
         </button>
         <button
-          className={!coverageMode ? "primary small" : "ghost small"}
-          disabled={busy || !saved?.rev}
-          onClick={() => {
-            if (
-              !dirty ||
-              window.confirm(
-                "Discard draft changes and show the saved sequence?",
-              )
-            )
-              void api
-                .film(projectId)
-                .then(adopt)
-                .catch((e) => setError(e.message));
-          }}
+          className={!coverageMode && !dirty ? "primary small" : "ghost small"}
+          aria-pressed={!coverageMode && !dirty}
+          disabled={busy || !saved}
+          onClick={() => void loadSaved()}
         >
           Saved sequence
         </button>
         <span className="hint">
           {coverageMode
-            ? "Refresh selects to include new shot decisions."
+            ? "Select Current confirmed selects again to refresh shot decisions."
             : "A saved order, independent of scene coverage."}
         </span>
       </div>
+      {unavailable > 0 && (
+        <p role="status" className="hint">
+          {unavailable} unavailable or invalid portions remain in the order.
+          Playback skips them; edit or restore their sources to include them.
+        </p>
+      )}
       {coverageMode && omissions.length > 0 && (
         <details className="film-omissions">
           <summary>
@@ -558,6 +650,7 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
         <section>
           <div className="film-player">
             <Player
+              key={source?.clip_id ?? "empty"}
               ref={player}
               src={source?.proxy_uri ?? ""}
               controls={false}
@@ -567,9 +660,24 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
               }}
               onTimeUpdate={setPosition}
               onEnded={advance}
+              onPlaybackError={() => {
+                if (!active) return;
+                setFailedSources((old) => new Set([...old, active.clip_id]));
+                setMessage(
+                  `Source in portion ${index + 1} could not play. Its place is retained; refresh the sequence to retry.`,
+                );
+                const next = rows.findIndex(
+                  (row, i) =>
+                    i > index &&
+                    row.clip_id !== active.clip_id &&
+                    playable(row),
+                );
+                if (playing && next >= 0) setIndex(next);
+                else setPlaying(false);
+              }}
               emptyLabel={
                 active
-                  ? "Source unavailable. Replace or remove this row; it will not be silently skipped."
+                  ? "This portion is unavailable. Play continues with the next available portion; saved order is preserved."
                   : "No confirmed portions yet. Open a shot to choose ranges, or arrange a sequence from available takes."
               }
             />
@@ -577,21 +685,22 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
           <div className="film-transport">
             <button
               className="ghost"
-              disabled={!rows.length || !!invalid}
+              disabled={firstPlayable < 0}
               onClick={() => {
                 player.current?.element()?.pause();
                 setPlaying(false);
                 advancing.current = false;
-                setIndex(0);
-                setPosition(rows[0].start_s);
-                player.current?.seek(rows[0].start_s, false);
+                setIndex(firstPlayable);
+                setPosition(rows[firstPlayable].start_s);
+                if (firstPlayable === index)
+                  player.current?.seek(rows[firstPlayable].start_s, false);
               }}
             >
               Back to start
             </button>
             <button
               className="primary"
-              disabled={!rows.length || !!invalid}
+              disabled={firstPlayable < 0}
               onClick={() => {
                 if (playing) {
                   player.current?.element()?.pause();
@@ -599,6 +708,13 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
                 } else {
                   advancing.current = false;
                   setPlaying(true);
+                  if (!active || !playable(active)) {
+                    const next = rows.findIndex(
+                      (row, i) => i > index && playable(row),
+                    );
+                    setIndex(next >= 0 ? next : firstPlayable);
+                    return;
+                  }
                   if (position >= (active?.end_s ?? 0))
                     player.current?.seek(active.start_s, true);
                   else
@@ -647,11 +763,47 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
             }}
           />
           <p className="hint">
-            {source ? label(source) : "No source selected"} · Browser preview,
-            not a rendered master. Only listed ranges play.
+            {source
+              ? label(source)
+              : active
+                ? "Source unavailable"
+                : "Sequence is empty"}{" "}
+            · Browser preview, not a rendered master. Only listed ranges play.
           </p>
         </section>
         <aside className="film-tools" hidden={!editing}>
+          <div className="film-row-actions">
+            <button
+              disabled={busy || !undoRows.length}
+              onClick={() => {
+                setRedoRows((old) => [...old, rows]);
+                setRows(undoRows[undoRows.length - 1]);
+                setUndoRows((old) => old.slice(0, -1));
+                setDirty(true);
+                setPlaying(false);
+                player.current?.element()?.pause();
+                setIndex(0);
+                command.current = null;
+              }}
+            >
+              Undo
+            </button>
+            <button
+              disabled={busy || !redoRows.length}
+              onClick={() => {
+                setUndoRows((old) => [...old, rows]);
+                setRows(redoRows[redoRows.length - 1]);
+                setRedoRows((old) => old.slice(0, -1));
+                setDirty(true);
+                setPlaying(false);
+                player.current?.element()?.pause();
+                setIndex(0);
+                command.current = null;
+              }}
+            >
+              Redo
+            </button>
+          </div>
           <button
             className="ghost small"
             disabled={dirty}
@@ -748,18 +900,7 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
               <button
                 className="ghost"
                 disabled={busy}
-                onClick={() => {
-                  if (
-                    !dirty ||
-                    window.confirm(
-                      "Discard unsaved sequence edits and load the latest saved version?",
-                    )
-                  )
-                    void api
-                      .film(projectId)
-                      .then(adopt)
-                      .catch((e) => setError(e.message));
-                }}
+                onClick={() => void loadSaved()}
               >
                 Reload saved sequence
               </button>
@@ -883,7 +1024,7 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
         {invalid && (
           <p className="error">
             A row has an invalid range or missing source. Correct it before
-            saving or playing.
+            saving. Available portions can still play.
           </p>
         )}
         <div className="film-table-scroll">
@@ -903,7 +1044,35 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
               {rows.map((r, i) => {
                 const s = sources.find((v) => v.clip_id === r.clip_id);
                 return (
-                  <tr key={r.id} className={i === index ? "active" : ""}>
+                  <tr
+                    key={r.id}
+                    className={i === index ? "active" : ""}
+                    draggable={canEdit && !busy}
+                    onDragStart={(event) => {
+                      setDragId(r.id);
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("text/plain", r.id);
+                    }}
+                    onDragOver={(event) => {
+                      if (dragId) {
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = "move";
+                      }
+                    }}
+                    onDragEnd={() => setDragId(null)}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      if (!dragId || dragId === r.id) return;
+                      const from = rows.findIndex((row) => row.id === dragId);
+                      if (from < 0) return;
+                      const next = [...rows];
+                      const [moved] = next.splice(from, 1);
+                      next.splice(i, 0, moved);
+                      edit(next);
+                      setIndex(next.findIndex((row) => row.id === active?.id));
+                      setDragId(null);
+                    }}
+                  >
                     <td>
                       <button
                         className="ghost small"

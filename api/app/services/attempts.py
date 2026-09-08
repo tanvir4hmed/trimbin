@@ -22,9 +22,9 @@ class AttemptItem(BaseModel):
     label: str = Field(min_length=1, max_length=100)
     start_s: float = Field(ge=0)
     end_s: float = Field(gt=0)
-    state: Literal["proposed", "reviewed", "shortlisted", "director_choice", "rejected"] = (
-        "proposed"
-    )
+    state: Literal[
+        "proposed", "reviewed", "clean", "shortlisted", "director_choice", "rejected"
+    ] = "proposed"
     note: str = Field(default="", max_length=1000)
 
     @model_validator(mode="after")

@@ -42,6 +42,7 @@ function validDraft(value: unknown): value is AttemptItem[] {
         [
           "proposed",
           "reviewed",
+          "clean",
           "shortlisted",
           "director_choice",
           "rejected",
@@ -88,6 +89,7 @@ export default function PerformanceWorkspace({
   const [recording, setRecording] = useState(takes[0]?.clip_id ?? "");
   const [selected, setSelected] = useState<string[]>([]);
   const [ranked, setRanked] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("all");
   const [audio, setAudio] = useState("");
   const [notice, setNotice] = useState("");
   const [transport, setTransport] = useState<Transport>({
@@ -180,6 +182,21 @@ export default function PerformanceWorkspace({
           Order by least flagged time
         </label>
       </header>
+      <label>
+        Review status{" "}
+        <select
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value)}
+        >
+          <option value="all">All candidates</option>
+          <option value="proposed">Unresolved</option>
+          <option value="reviewed">Reviewed</option>
+          <option value="clean">Reviewed clean</option>
+          <option value="shortlisted">Shortlisted</option>
+          <option value="director_choice">Director choice</option>
+          <option value="rejected">Rejected / not preferred</option>
+        </select>
+      </label>
       <p className="policy-note">
         Compare any candidates, including portions of the same recording. Flags
         are evidence to review, not artistic scores. Shortlist and director
@@ -208,67 +225,78 @@ export default function PerformanceWorkspace({
         </p>
       )}
       <div className="performance-candidates">
-        {ordered.map((c) => {
-          const id = identity(c),
-            evidence = c.data.proposals.find(
-              (p) => p.attempt_id === c.item.proposal_id,
-            );
-          return (
-            <article key={id} className={selected.includes(id) ? "active" : ""}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={selected.includes(id)}
-                  onChange={() => toggle(id)}
-                />{" "}
-                <strong>{c.item.label}</strong>
-              </label>
-              <small>
-                {c.take.take_no
-                  ? `Slate take ${c.take.take_no}`
-                  : "Unnumbered recording"}{" "}
-                · {time(c.item.start_s)}–{time(c.item.end_s)}
-              </small>
-              <span>
-                {c.item.state.replaceAll("_", " ")} ·{" "}
-                {c.risk === null
-                  ? "analysis incomplete"
-                  : `${Math.round(c.risk * 100)}% flagged time`}
-              </span>
-              {evidence && (
-                <details>
-                  <summary>Evidence & interpretation</summary>
-                  <p>
-                    <b>Observed:</b> {evidence.observation}
-                  </p>
-                  <p>
-                    <b>Interpretation:</b> {evidence.interpretation}
-                  </p>
-                  <p>
-                    <b>Review suggestion:</b> {evidence.recommendation}
-                  </p>
-                  <p>
-                    Intent: {evidence.intent}. Model confidence{" "}
-                    {Math.round(evidence.confidence * 100)}% — uncalibrated.
-                  </p>
-                  {(evidence.starts_before_window ||
-                    evidence.ends_after_window) && (
-                    <p>
-                      Boundary incomplete at an analysis-window edge; review or
-                      merge manually.
-                    </p>
-                  )}
-                </details>
-              )}
-              <button
-                disabled={!canEdit}
-                onClick={() => onAddRange(c.take, c.item, c.data.rev)}
+        {ordered
+          .filter(
+            (c) =>
+              statusFilter === "all" ||
+              (statusFilter === "reviewed"
+                ? c.item.state !== "proposed"
+                : c.item.state === statusFilter),
+          )
+          .map((c) => {
+            const id = identity(c),
+              evidence = c.data.proposals.find(
+                (p) => p.attempt_id === c.item.proposal_id,
+              );
+            return (
+              <article
+                key={id}
+                className={selected.includes(id) ? "active" : ""}
               >
-                Add portion to shot draft
-              </button>
-            </article>
-          );
-        })}
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(id)}
+                    onChange={() => toggle(id)}
+                  />{" "}
+                  <strong>{c.item.label}</strong>
+                </label>
+                <small>
+                  {c.take.take_no
+                    ? `Slate take ${c.take.take_no}`
+                    : "Unnumbered recording"}{" "}
+                  · {time(c.item.start_s)}–{time(c.item.end_s)}
+                </small>
+                <span>
+                  {c.item.state.replaceAll("_", " ")} ·{" "}
+                  {c.risk === null
+                    ? "analysis incomplete"
+                    : `${Math.round(c.risk * 100)}% flagged time`}
+                </span>
+                {evidence && (
+                  <details>
+                    <summary>Evidence & interpretation</summary>
+                    <p>
+                      <b>Observed:</b> {evidence.observation}
+                    </p>
+                    <p>
+                      <b>Interpretation:</b> {evidence.interpretation}
+                    </p>
+                    <p>
+                      <b>Review suggestion:</b> {evidence.recommendation}
+                    </p>
+                    <p>
+                      Intent: {evidence.intent}. Model confidence{" "}
+                      {Math.round(evidence.confidence * 100)}% — uncalibrated.
+                    </p>
+                    {(evidence.starts_before_window ||
+                      evidence.ends_after_window) && (
+                      <p>
+                        Boundary incomplete at an analysis-window edge; review
+                        or merge manually.
+                      </p>
+                    )}
+                  </details>
+                )}
+                <button
+                  disabled={!canEdit}
+                  onClick={() => onAddRange(c.take, c.item, c.data.rev)}
+                >
+                  Add portion to shot draft
+                </button>
+              </article>
+            );
+          })}
       </div>
       {limit < takes.length && (
         <button onClick={() => setLimit((n) => n + 8)}>
@@ -773,6 +801,7 @@ function BoundaryEditor({
               >
                 <option value="proposed">Needs review</option>
                 <option value="reviewed">Reviewed</option>
+                <option value="clean">Reviewed clean</option>
                 <option value="shortlisted">Shortlist</option>
                 <option value="director_choice">Director choice</option>
                 <option value="rejected">Not preferred</option>

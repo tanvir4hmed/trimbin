@@ -210,15 +210,15 @@ async def sources(
         return []
     rows = await _many(
         """
-        SELECT DISTINCT toString(clip_id) AS clip_id, group_id AS scene, subgroup_id AS shot,
-               scene_code, shot_code, take_no, duration_ms / 1000 AS duration_s,
-               fps, proxy_uri, sprite_uri
-        FROM current_clip_placement
-        WHERE project_id={p:UInt32} AND status='active' AND group_id > 0 AND subgroup_id > 0
+        SELECT DISTINCT c.clip_id AS clip_id, c.group_id AS scene, c.subgroup_id AS shot,
+               c.scene_code, c.shot_code, c.take_no, c.duration_ms / 1000 AS duration_s,
+               c.fps, c.proxy_uri, c.sprite_uri
+        FROM current_clip_placement AS c
+        WHERE c.project_id={p:UInt32} AND c.status='active' AND c.group_id > 0 AND c.subgroup_id > 0
     """
-        + (" AND clip_id IN {ids:Array(UUID)}" if ids is not None else "")
+        + (" AND c.clip_id IN {ids:Array(UUID)}" if ids is not None else "")
         + """
-        ORDER BY group_id, subgroup_id, take_no, clip_id
+        ORDER BY c.group_id, c.subgroup_id, c.take_no, c.clip_id
         LIMIT {limit:UInt32} OFFSET {offset:UInt32}
     """,
         {"p": project_id, "ids": ids or [], "limit": limit, "offset": offset},

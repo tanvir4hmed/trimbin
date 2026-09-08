@@ -2540,3 +2540,54 @@ body{background:var(--bg);color:var(--ink)}
 .performance-edit-list input[type=number], .performance-viewers input[type=number] { width: 90px; font-variant-numeric: tabular-nums; }
 .issue-lanes .lane-safe { background: #344b64; }
 .issue-lanes .clean-key { color: #a7bdd8; }
+
+/* Shared workspace controls and panel hierarchy. */
+[hidden] { display: none !important; }
+button, input, select, textarea { font: inherit; }
+button, summary, a { -webkit-tap-highlight-color: transparent; }
+button:not(:disabled), summary { cursor: pointer; }
+button:disabled { opacity: .48; cursor: not-allowed; }
+:where(button, a, input, select, textarea, summary):focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+.app-scroll h1, .app-scroll h2, .app-scroll h3 { font-family: var(--sans); letter-spacing: -.015em; }
+.app-scroll { font-size: 14px; line-height: 1.5; }
+.workspace { max-width: none; }
+.project-head { position: sticky; top: 0; z-index: 15; background: var(--bg); padding: 12px 0; }
+.crumbs { flex-wrap: wrap; gap: 8px; min-width: 0; }
+.crumb-project, .crumb-shot { max-width: 34ch; overflow-wrap: anywhere; }
+.workspace-split { align-items: start; }
+.rail { position: sticky; top: 82px; max-height: calc(100vh - 160px); overflow: auto; }
+.cockpit-inspector { position: sticky; top: 82px; max-height: calc(100vh - 160px); overflow: auto; padding: 16px; }
+.inspector-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: -4px -4px 16px; padding-bottom: 8px; }
+.inspector-tabs button { flex: 1; padding: 8px 5px; font-size: 12px; border: 0; color: var(--mid); background: transparent; border-radius: 4px; }
+.inspector-tabs button[aria-pressed=true] { color: var(--ink); background: var(--surface-2); box-shadow: inset 0 -2px var(--blue); }
+.take-details { display: grid; gap: 4px; padding: 12px; font-size: 12px; color: var(--mid); border-top: 1px solid var(--line); }
+.take-details strong { font-size: 14px; color: var(--ink); }
+.compare-players.single { grid-template-columns: 1fr; }
+.compare-players.single .compare-player { grid-column: auto; }
+.review-status { font-size: 12px; font-weight: 600; }
+.review-human_confirmed, .review-human_corrected, .review-human_range_adjusted { color: #9ed5b0; }
+.lane-finding:not(.review-machine_open) { opacity: .55; border-bottom: 2px solid #9ed5b0; }
+.reviewed-ranges { padding: 12px 0; border-block: 1px solid var(--line); margin: 12px 0; }
+.reviewed-ranges h3 { margin: 0; font-size: 13px; }
+.reviewed-range { display: flex; gap: 4px; margin: 6px 0; }
+.reviewed-ranges button { padding: 7px; font-size: 11px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; }
+.reviewed-range button[aria-pressed=true] { border-color: var(--green); }
+.entity-menu { position: relative; display: inline-block; }
+.entity-menu summary { list-style: none; padding: 0 9px; font-size: 22px; line-height: 30px; border: 1px solid var(--line); border-radius: 5px; }
+.entity-menu summary::-webkit-details-marker { display: none; }
+.entity-menu-items { position: absolute; z-index: 40; min-width: 170px; top: 100%; right: 0; display: grid; padding: 5px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); box-shadow: 0 8px 30px #0008; }
+.entity-menu-items button { text-align: left; padding: 9px 12px; color: var(--ink); background: transparent; border: 0; border-radius: 3px; font-size: 13px; }
+.entity-menu-items button:hover { background: var(--surface-2); }
+.rename-dialog { color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; width: min(440px, calc(100vw - 32px)); padding: 24px; }
+.rename-dialog::backdrop { background: #0009; }
+.rename-dialog h2 { margin: 0 0 20px; font: 600 20px var(--sans); }
+.rename-dialog label { display: grid; gap: 8px; }
+.rename-dialog input { padding: 10px; width: 100%; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 5px; }
+.rename-dialog footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+.rename-dialog button { padding: 8px 18px; border-radius: 5px; }
+.film-view-modes { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.film-view-modes strong { width: 100%; font-size: 13px; }
+.film-list tr[draggable=true] { cursor: grab; }
+.film-list tr[draggable=true]:active { cursor: grabbing; }
+.film-list tr:hover { background: var(--surface-2); }
+@media (max-width: 1000px) { .cockpit-inspector, .rail { position: static; max-height: none; } .project-head { position: static; } }

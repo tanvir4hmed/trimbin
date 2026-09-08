@@ -153,7 +153,7 @@ async def act_on_finding(
         if str(row["finding_id"]) == str(finding_id)
         and str(row["run_id"]) == str((read_model.get("run") or {}).get("run_id", ""))
     ]
-    if current is None and body.action == "retract" and history:
+    if current is None and history:
         current = max(history, key=lambda row: int(row["revision"]))
     if current is None:
         raise HTTPException(

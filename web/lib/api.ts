@@ -721,6 +721,10 @@ export const api = {
 
   /** The scenes and shots somebody declared, before any footage exists. */
   plan: (projectId: number) => request<Plan>(`/structure/${projectId}`),
+  renameStructure: (projectId: number, scene: number, shot: number, name: string, previous: string) =>
+    request<PlannedScene>(`/structure/${projectId}/scenes/${scene}${shot ? `/shots/${shot}` : ""}/name`, {
+      method: "PATCH", body: JSON.stringify({ name, previous }),
+    }),
 
   /** Clips whose placement nobody has agreed with, with the evidence. */
   placementInbox: (projectId: number) =>

@@ -45,6 +45,7 @@ export default function SceneTree({
   onOpenScene,
   openTake,
   onSelectTake,
+  headings,
 }: {
   scenes: SceneNode[];
   selected: { scene: number; shot: number } | null;
@@ -53,6 +54,7 @@ export default function SceneTree({
   /** Which take the cockpit is showing, and how to change it from here. */
   openTake?: number;
   onSelectTake?: (scene: number, shot: number, takeNo: number) => void;
+  headings?: Map<number, string>;
 }) {
   if (scenes.length === 0) {
     return (
@@ -88,7 +90,14 @@ export default function SceneTree({
       {scenes.map((scene) => (
         <section key={scene.scene}>
           <h3>
-            <span>Scene {scene.scene_code || scene.scene}</span>
+            <span>
+              Scene {scene.scene_code || scene.scene}
+              {headings?.get(scene.scene) && (
+                <small className="node-label">
+                  {headings.get(scene.scene)}
+                </small>
+              )}
+            </span>
             {onOpenScene && (
               <button
                 type="button"
@@ -104,12 +113,13 @@ export default function SceneTree({
             {[...scene.shots]
               .sort(
                 (a, b) =>
-                  STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) ||
-                  a.shot - b.shot,
+                  STATUS_ORDER.indexOf(a.status) -
+                    STATUS_ORDER.indexOf(b.status) || a.shot - b.shot,
               )
               .map((shot) => {
                 const isOpen =
-                  selected?.scene === scene.scene && selected?.shot === shot.shot;
+                  selected?.scene === scene.scene &&
+                  selected?.shot === shot.shot;
                 return (
                   <li key={shot.shot}>
                     <button
@@ -129,7 +139,6 @@ export default function SceneTree({
                       </span>
                       <span className="node-meta">
                         {shot.takes} take{shot.takes === 1 ? "" : "s"}
-
                         {shot.cameras.length > 1 && (
                           <span className="node-cam">
                             {" "}
@@ -149,7 +158,9 @@ export default function SceneTree({
                         {shot.circled_take > 0 && (
                           <span
                             className={
-                              shot.differs_from_circle ? "circle differs" : "circle"
+                              shot.differs_from_circle
+                                ? "circle differs"
+                                : "circle"
                             }
                             title={
                               shot.differs_from_circle
@@ -161,7 +172,10 @@ export default function SceneTree({
                           </span>
                         )}
                         {shot.open_notes > 0 && (
-                          <span className="notes" title={`${shot.open_notes} open notes`}>
+                          <span
+                            className="notes"
+                            title={`${shot.open_notes} open notes`}
+                          >
                             {shot.open_notes}
                           </span>
                         )}
@@ -171,7 +185,9 @@ export default function SceneTree({
                           </span>
                         )}
                       </span>
-                      <span className="sr-only">{STATUS_LABEL[shot.status]}</span>
+                      <span className="sr-only">
+                        {STATUS_LABEL[shot.status]}
+                      </span>
                     </button>
                     {/* The takes themselves, reachable from here. The rail
                         listed them as text, so getting to take 2 still meant
@@ -182,9 +198,15 @@ export default function SceneTree({
                           <button
                             key={takeNo}
                             type="button"
-                            className={openTake === takeNo ? "node-take on" : "node-take"}
-                            aria-current={openTake === takeNo ? "true" : undefined}
-                            onClick={() => onSelectTake(scene.scene, shot.shot, takeNo)}
+                            className={
+                              openTake === takeNo ? "node-take on" : "node-take"
+                            }
+                            aria-current={
+                              openTake === takeNo ? "true" : undefined
+                            }
+                            onClick={() =>
+                              onSelectTake(scene.scene, shot.shot, takeNo)
+                            }
                           >
                             T{takeNo}
                           </button>

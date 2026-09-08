@@ -12,7 +12,11 @@ In-app navigation can retain an active browser transfer. Reload or browser closu
 
 Open a scene, then a shot. The cockpit brings together take players, timecoded findings, comparison and human notes. Independent full-duration analysis does not require sibling takes or the comparative panel.
 
-A finding can be confirmed, corrected, range-adjusted or dismissed. Dismissal removes it from the working view without erasing its history. An unanalysed take is not presented as fault-free.
+A finding can be confirmed, corrected, range-adjusted or dismissed. The inspector shows its current decision and supports Change decision and author-only Withdraw. The issue list filters unresolved, reviewed or all findings, including dismissed findings. An unanalysed take is not presented as fault-free.
+
+Each take's player contains its own source and technical details. Inspector tabs separate finding review, ranges and selects, and the shot brief and notes. Click an unexcluded source range to adjust its boundaries; explicitly mark it reviewed clean to persist your judgement. Reviewed clean ranges support adjustment, withdrawal and undo, and remain independent of shot selects.
+
+Project, scene and shot titles have an actions menu with Rename and a Save/Cancel dialog. Scene headings and shot display descriptions can change while slate codes and internal IDs remain stable. Concurrent renames are checked against the previous display name.
 
 Confirm multiple useful portions from one or several takes. Alternatives remain available even when a different take is preferred. A creative reason belongs to the editor; changing a performance preference is not automatically a technical model error.
 
@@ -23,6 +27,8 @@ Confirm multiple useful portions from one or several takes. Alternatives remain 
 **Film Preview** opens current confirmed portions across the project when no saved sequence exists. Missing selections are listed rather than silently declared complete. Current selects are a snapshot; refresh them to include later decisions.
 
 **Saved sequence** is an independent ordered list of source portions. Arrange, trim within the source, add alternatives, repeat deliberately and save a revision. History can be loaded as a draft. Source recordings and shot selections are unchanged.
+
+Drag rows to reorder them, or use the up/down controls. Draft undo/redo reverses order, range and removal edits. Saving writes a revision on the server and clears browser recovery data; an unsaved browser draft is offered separately. The saved sequence opens on return. Unavailable portions remain visible in their original positions; playback skips them with an explicit notice and continues through available portions in order.
 
 The browser preview uses hard cuts and source audio. It is not a rendered master, frame-accurate conform, colour grade or audio mix. Scene exports and the sequence JSON list support hand-off; JSON is not advertised as universal NLE interchange.
 

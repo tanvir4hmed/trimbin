@@ -14,7 +14,13 @@
  * engine to watch a clip their browser already handles.
  */
 
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 
 export interface PlayerHandle {
   seek: (to: number, play?: boolean) => void;
@@ -33,26 +39,48 @@ const Player = forwardRef<
     controls?: boolean;
     onEnded?: () => void;
     onReady?: () => void;
+    onPlaybackError?: () => void;
     /** Shown instead of the video when there is no source. Say why. */
     emptyLabel?: string;
   }
 >(function Player(
-  { src, poster, className, onTimeUpdate, onPlay, onPause, controls = true, onEnded, onReady, emptyLabel },
+  {
+    src,
+    poster,
+    className,
+    onTimeUpdate,
+    onPlay,
+    onPause,
+    controls = true,
+    onEnded,
+    onReady,
+    onPlaybackError,
+    emptyLabel,
+  },
   ref,
 ) {
   const video = useRef<HTMLVideoElement>(null);
   const readyCallback = useRef(onReady);
   readyCallback.current = onReady;
+  const failureCallback = useRef(onPlaybackError);
+  failureCallback.current = onPlaybackError;
   const [failed, setFailed] = useState(false);
   const [failure, setFailure] = useState("");
   const [retry, setRetry] = useState(0);
+  const pendingSeek = useRef<{ to: number; play: boolean } | null>(null);
+  useEffect(() => {
+    if (failed) failureCallback.current?.();
+  }, [failed]);
 
   useImperativeHandle(ref, () => ({
     seek: (to: number, play = false) => {
       const el = video.current;
       if (!el) return;
+      pendingSeek.current = { to, play };
+      if (el.readyState < 1) return;
       try {
         el.currentTime = Math.max(0, to);
+        pendingSeek.current = null;
       } catch {
         /* not seekable yet; the caller seeks again on ready */
       }
@@ -63,20 +91,32 @@ const Player = forwardRef<
 
   useEffect(() => {
     const el = video.current;
-    if (!el || !src) return;
+    if (!el) return;
+    el.pause();
+    pendingSeek.current = null;
     setFailed(false);
     setFailure("");
+    el.removeAttribute("src");
+    el.load();
+    if (!src) {
+      return;
+    }
 
     // Safari, and iOS anything. Native is better: hardware decode, no second
     // buffer, and no library to keep current.
     if (el.canPlayType("application/vnd.apple.mpegurl")) {
       el.src = src;
-      const ready = () => readyCallback.current?.();
-      const fail = () => { setFailed(true); setFailure("The proxy playlist or one of its media segments could not be loaded."); };
-      el.addEventListener("loadedmetadata", ready, { once: true });
+      const fail = () => {
+        setFailed(true);
+        setFailure(
+          "The proxy playlist or one of its media segments could not be loaded.",
+        );
+      };
       el.addEventListener("error", fail, { once: true });
       el.load();
-      return () => { el.removeEventListener("loadedmetadata", ready); el.removeEventListener("error", fail); };
+      return () => {
+        el.removeEventListener("error", fail);
+      };
     }
 
     let destroyed = false;
@@ -89,20 +129,40 @@ const Player = forwardRef<
           setFailed(true);
           return;
         }
-        const hls = new Hls({ enableWorker: true, lowLatencyMode: false, manifestLoadingMaxRetry: 3, fragLoadingMaxRetry: 4 });
+        const hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: false,
+          manifestLoadingMaxRetry: 3,
+          fragLoadingMaxRetry: 4,
+        });
         let networkRecoveries = 0;
         let mediaRecoveries = 0;
         instance = hls;
         hls.loadSource(src);
         hls.attachMedia(el);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => readyCallback.current?.());
         hls.on(Hls.Events.ERROR, (_e, data) => {
           // Only fatal errors are worth showing. Recoverable ones happen on
           // every seek across a segment boundary and mean nothing to a viewer.
           if (!data.fatal) return;
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && networkRecoveries++ < 2) { hls.startLoad(); return; }
-          if (data.type === Hls.ErrorTypes.MEDIA_ERROR && mediaRecoveries++ < 2) { hls.recoverMediaError(); return; }
-          setFailure(data.type === Hls.ErrorTypes.NETWORK_ERROR ? "The proxy playlist or media segment could not be reached." : "The browser could not decode this proxy.");
+          if (
+            data.type === Hls.ErrorTypes.NETWORK_ERROR &&
+            networkRecoveries++ < 2
+          ) {
+            hls.startLoad();
+            return;
+          }
+          if (
+            data.type === Hls.ErrorTypes.MEDIA_ERROR &&
+            mediaRecoveries++ < 2
+          ) {
+            hls.recoverMediaError();
+            return;
+          }
+          setFailure(
+            data.type === Hls.ErrorTypes.NETWORK_ERROR
+              ? "The proxy playlist or media segment could not be reached."
+              : "The browser could not decode this proxy.",
+          );
           setFailed(true);
         });
       })
@@ -131,13 +191,33 @@ const Player = forwardRef<
         onPlay={onPlay}
         onPause={onPause}
         onEnded={onEnded}
+        onLoadedMetadata={() => {
+          readyCallback.current?.();
+          const pending = pendingSeek.current;
+          if (pending && video.current) {
+            video.current.currentTime = Math.max(0, pending.to);
+            if (pending.play) void video.current.play().catch(() => {});
+            pendingSeek.current = null;
+          }
+        }}
       />
       {/* No source is not the same as a source that is not ready yet. The scene
           reel passes an empty src when no range has been chosen for a shot, and
           this blamed the encoder for a decision nobody had made. The caller
           says which it is; the honest default is neither. */}
-      {!src && <p className="hint small">{emptyLabel ?? "Nothing to play here yet."}</p>}
-      {failed && <p className="hint small player-error">{failure || "This clip could not be played."} <button type="button" onClick={() => setRetry((value) => value + 1)}>Retry playback</button></p>}
+      {!src && (
+        <p className="hint small">
+          {emptyLabel ?? "Nothing to play here yet."}
+        </p>
+      )}
+      {failed && (
+        <p className="hint small player-error">
+          {failure || "This clip could not be played."}{" "}
+          <button type="button" onClick={() => setRetry((value) => value + 1)}>
+            Retry playback
+          </button>
+        </p>
+      )}
     </>
   );
 });
