@@ -768,13 +768,12 @@ export default function ShotReviewCockpit({
           <div
             className={previous ? "compare-players" : "compare-players single"}
           >
-            {/* Take 1 stands alone — there is nothing before it to compare
-              against. Every later take sits on the right with its predecessor
-              on the left, which is the direction a shoot runs in. */}
+            {/* The take under Reviewing is always the primary, left-hand player.
+              The optional Reference take stays on the right for comparison. */}
             {(previous
               ? [
-                  { side: "a" as const, take: previous, ref: playerA },
-                  { side: "b" as const, take: chosen, ref: playerB },
+                  { side: "a" as const, take: chosen, ref: playerA },
+                  { side: "b" as const, take: previous, ref: playerB },
                 ]
               : [{ side: "a" as const, take: chosen, ref: playerA }]
             ).map(
