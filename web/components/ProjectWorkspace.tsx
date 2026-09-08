@@ -225,7 +225,6 @@ export default function ProjectWorkspace({
             className="crumb-project"
             href={`${paths.project(projectId, project?.name)}`}
           >
-            <small>project</small>
             {project?.name ?? `Project ${projectId}`}
           </Link>
           {project?.you_are_owner && (
@@ -250,16 +249,41 @@ export default function ProjectWorkspace({
                 className="crumb-scene-path"
                 onClick={() => navigateScene(urlScene)}
               >
-                Scene {tree.scenes.find((item) => item.scene === urlScene)?.scene_code || urlScene}
+                {urlScene
+                  ? `Scene ${tree.scenes.find((item) => item.scene === urlScene)?.scene_code || urlScene}`
+                  : "All scenes"}
               </button>
-              {open && (
+              {urlScene > 0 && (
                 <>
                   <span aria-hidden>›</span>
-                  <span className="crumb-shot">
-                    {openShot?.slug || `Shot ${open.shot}`}
-                    {openShot?.label ? ` · ${openShot.label}` : ""}
-                  </span>
-                  {canCurate && (
+                  <label className="crumb-shot-picker">
+                    <span>Shot</span>
+                    <select
+                      aria-label="Shot"
+                      value={urlShot}
+                      onChange={(event) => {
+                        const nextShot = Number(event.target.value);
+                        if (nextShot) {
+                          router.push(
+                            paths.shot(projectId, urlScene, nextShot, project?.name),
+                          );
+                        } else {
+                          navigateScene(urlScene);
+                        }
+                      }}
+                    >
+                      <option value={0}>All shots</option>
+                      {tree.scenes
+                        .find((item) => item.scene === urlScene)
+                        ?.shots.map((shot) => (
+                          <option key={shot.shot} value={shot.shot}>
+                            {shot.slug || `Shot ${shot.shot}`}
+                            {shot.label ? ` · ${shot.label}` : ""}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  {open && canCurate && (
                     <EntityMenu
                       kind="Shot"
                       name={
@@ -304,7 +328,7 @@ export default function ProjectWorkspace({
           )}
           {urlScene > 0 && (
             <Link
-              className="ghost"
+              className="primary"
               href={`${paths.coverage(projectId, urlScene, project?.name)}`}
             >
               Play scene{" "}

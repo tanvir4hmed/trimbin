@@ -2668,6 +2668,8 @@ button:disabled { opacity: .48; cursor: not-allowed; }
 .policy-note { display: none; }
 .crumb-scene-path { padding: 3px 7px; color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 4px; font: inherit; }
 .crumb-scene-path:hover { color: #fff; background: var(--surface-2); border-color: var(--line); }
+.crumb-shot-picker { display: inline-flex; align-items: center; gap: 5px; color: var(--low); font-size: 11px; }
+.crumb-shot-picker select { max-width: 220px; padding: 3px 6px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; font-size: 11px; }
 .shot-select-row { min-width: 0; }
 .shot-select-row > span:first-child { min-width: 0; flex: 1; overflow: hidden; }
 .select-range-inputs input { width: 48px; }
