@@ -45,18 +45,28 @@ function revalidateSelections(
 ): CoverageSegment[] {
   return rows.flatMap((row) => {
     if (row.clip_id !== clipId) return [row];
-    const overlaps = valid
+    return valid
       .map((candidate) => ({
-        candidate,
         from: Math.max(row.source_in_s, candidate.from),
         to: Math.min(row.source_out_s, candidate.to),
       }))
       .filter((candidate) => candidate.to > candidate.from)
-      .sort((a, b) => b.to - b.from - (a.to - a.from));
-    const next = overlaps[0];
-    if (!next) return [];
-    return [{ ...row, source_in_s: next.from, source_out_s: next.to }];
+      .map((candidate, index) => ({
+        ...row,
+        segment_id: index ? crypto.randomUUID() : row.segment_id,
+        source_in_s: candidate.from,
+        source_out_s: candidate.to,
+      }));
   });
+}
+
+function withinRanges(range: Range, valid: Range[]): Range[] {
+  return valid
+    .map((candidate) => ({
+      from: Math.max(range.from, candidate.from),
+      to: Math.min(range.to, candidate.to),
+    }))
+    .filter((candidate) => candidate.to > candidate.from);
 }
 
 const HUMAN_REASONS = [
@@ -95,17 +105,6 @@ function persistedSegmentId(value: string): string | undefined {
 
 function findingSeverity(value: string): "note" | "attention" | "blocking" {
   return value === "note" || value === "blocking" ? value : "attention";
-}
-
-/** What the pipeline is doing, in words a person can act on. */
-function stageLabel(stage: string) {
-  if (stage === "processing") return "analysing…";
-  if (stage === "pending" || stage === "queued") return "queued for analysis";
-  if (stage === "failed" || stage === "publish_failed")
-    return "analysis failed — retry available";
-  if (stage === "stalled") return "analysis stalled — retry available";
-  if (stage === "completed") return "analysed";
-  return "not analysed yet";
 }
 
 function analysisFor(analyses: TakeAnalysis[], clipId: string) {
@@ -371,13 +370,26 @@ export default function ShotReviewCockpit({
         position,
       }),
     );
+    const sanitized = incoming.flatMap((item) => {
+      const safe = analyses.find((analysis) => String(analysis.clip_id) === item.clip_id)?.safe_ranges ??
+        takes.find((take) => take.clip_id === item.clip_id)?.safe_ranges ?? [];
+      return safe.length
+        ? revalidateSelections(
+            [item],
+            item.clip_id,
+            safe.map((range) => ({ from: range.start_s, to: range.end_s })),
+          )
+        : [item];
+    });
     if (
       coverageBase.current !== null &&
       coverageBase.current !== selectionSignature(selectsRef.current)
     )
       return;
     coverageBase.current = selectionSignature(incoming);
-    setSelects(incoming);
+    setSelects(sanitized);
+    if (selectionSignature(sanitized) !== selectionSignature(incoming))
+      setNotice("An issue overlaps a saved shot select. The select was cropped; save the updated range.");
     setSelectsInitialized(true);
   }, [screen.data?.coverage_segments]);
 
@@ -496,9 +508,6 @@ export default function ShotReviewCockpit({
     return `Custom · ${ranges} from take${used.length === 1 ? "" : "s"} ${used.join(", ")}`;
   }, [selects]);
 
-  const stageOf = (clipId: string) =>
-    screen.data?.analysis_state?.[clipId] ?? "";
-
   // A take picked in the rail opens on the A side, swapping B out of the way
   // if it was already showing it.
 
@@ -578,9 +587,11 @@ export default function ShotReviewCockpit({
         from: item.start_s,
         to: item.end_s,
       }));
-      setSelects((current) =>
-        revalidateSelections(current, focus.clipId, valid),
-      );
+      const nextSelects = revalidateSelections(selectsRef.current, focus.clipId, valid);
+      const clipped = selectionSignature(nextSelects) !== selectionSignature(selectsRef.current);
+      setSelects(nextSelects);
+      if (clipped)
+        setNotice("The reviewed issue cropped the overlapping shot select. Save the updated range.");
       const primary = updated?.primary_usable_range;
       if (primary)
         setRange({ from: primary.start_s, to: primary.end_s });
@@ -598,20 +609,28 @@ export default function ShotReviewCockpit({
   const addRange = () => {
     if (!selected) return;
     if (!(range.to > range.from)) return;
+    const safe = (selectedAnalysis?.safe_ranges ?? selected.safe_ranges ?? []).map(
+      (item) => ({ from: item.start_s, to: item.end_s }),
+    );
+    const pieces = safe.length ? withinRanges(range, safe) : [range];
+    if (!pieces.length) {
+      setNotice("That range overlaps an issue and has no selectable portion.");
+      return;
+    }
     setSelects((current) => [
       ...current,
-      {
-        segment_id: crypto.randomUUID(),
-        clip_id: selected.clip_id,
-        attempt_revision: 0,
-        take_no: selected.take_no,
-        source_in_s: range.from,
-        source_out_s: range.to,
-        position: current.length,
-        reason,
-        created_by: you,
-        origin: "human",
-      },
+      ...pieces.map((piece, index) => ({
+          segment_id: crypto.randomUUID(),
+          clip_id: selected.clip_id,
+          attempt_revision: 0,
+          take_no: selected.take_no,
+          source_in_s: piece.from,
+          source_out_s: piece.to,
+          position: current.length + index,
+          reason,
+          created_by: you,
+          origin: "human" as const,
+        })),
     ]);
     setNotice(
       `Take ${selected.take_no} ${tc(range.from)}–${tc(range.to)} added. Save the shot selects when ready.`,
@@ -907,11 +926,6 @@ export default function ShotReviewCockpit({
                           (f) => f.action !== "machine_open",
                         ).length ?? 0}{" "}
                         reviewed
-                      </span>
-                      <span>
-                        {verdicts?.takes.some((item) => item.clip_id === take.clip_id)
-                          ? `${Math.round(take.score * 100)} technical · ${take.reason || "Relative technical comparison"}`
-                          : `Not compared · ${stageLabel(stageOf(take.clip_id))}`}
                       </span>
                     </div>
                   </div>
@@ -1387,10 +1401,6 @@ export default function ShotReviewCockpit({
                       <small> / 100 technical</small>
                     </b>
                   </div>
-                  <p className="policy-note">
-                    Technical, continuity and completion evidence only.
-                    Performance remains your decision.
-                  </p>
                 </>
               ) : (
                 <>
@@ -2001,7 +2011,7 @@ function FindingInspector({
           onClick={onClose}
           aria-label="Close this finding"
         >
-          ✕ Close
+          ✕
         </button>
       </header>
       <h2>

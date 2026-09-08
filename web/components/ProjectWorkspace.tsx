@@ -333,14 +333,14 @@ export default function ProjectWorkspace({
               Film Preview
             </Link>
           )}
-          {open && (
+          {urlScene > 0 && (
             <Link
               className="ghost"
-              href={`${paths.coverage(projectId, open.scene, project?.name)}`}
+              href={`${paths.coverage(projectId, urlScene, project?.name)}`}
             >
               Play scene{" "}
-              {tree.scenes.find((item) => item.scene === open.scene)
-                ?.scene_code || open.scene}
+              {tree.scenes.find((item) => item.scene === urlScene)
+                ?.scene_code || urlScene}
             </Link>
           )}
           {canCurate ? (

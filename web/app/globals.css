@@ -2634,3 +2634,35 @@ button:disabled { opacity: .48; cursor: not-allowed; }
 .film-list tr[draggable=true]:active { cursor: grabbing; }
 .film-list tr:hover { background: var(--surface-2); }
 @media (max-width: 1000px) { .cockpit-inspector, .rail { position: static; max-height: none; } .project-head { position: static; } }
+
+/* Keep navigation and review chrome compact so the footage owns the screen. */
+.app-frame { grid-template-columns: 188px minmax(0, 1fr); }
+.app-sidebar header { height: 56px; padding: 0 10px; }
+.app-sidebar nav { gap: 3px; padding: 12px 7px; }
+.app-sidebar nav a { height: 38px; gap: 9px; padding: 0 9px; }
+.app-sidebar nav a i { width: 19px; font-size: 16px; }
+.sidebar-collapsed { grid-template-columns: 56px minmax(0, 1fr); }
+.sidebar-collapsed .app-sidebar header { padding: 0 5px; }
+.sidebar-collapsed .app-sidebar nav { padding-inline: 4px; }
+.sidebar-collapsed .app-sidebar nav a { padding-inline: 0; }
+.sidebar-collapsed .app-sidebar header button { width: 26px; height: 26px; }
+.workspace-split { grid-template-columns: 164px minmax(0, 1fr); gap: 8px; }
+.tree .node { box-sizing: border-box; min-width: 0; overflow: hidden; padding: 5px 6px; gap: 6px; }
+.tree .node-name, .tree .node-meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.node-take-row { max-width: 124px; margin-left: 8px; padding: 3px 0 5px; gap: 3px; }
+.node-take { flex-basis: 32px; padding: 2px 6px; font-size: 10px; }
+.shot-cockpit { grid-template-columns: minmax(0, 1fr) 260px; min-height: 680px; }
+.cockpit-main { padding: 14px; }
+.cockpit-inspector { padding: 12px; }
+.take-details { gap: 2px; padding: 7px; font-size: 11px; }
+.take-details strong { font-size: 12px; }
+.selection-card { padding: 10px; margin-top: 10px; }
+.selection-take { margin-bottom: 8px; font-size: 14px; }
+.range-inputs { gap: 3px; }
+.range-inputs input { width: 58px; }
+.lane-track { height: 32px; }
+.lane-shot-select { z-index: 4; height: 13px; }
+.lane-reviewed-clean { height: 13px; bottom: 14px; }
+.lane-finding { height: 11px !important; font-size: 9px; }
+.finding-close { width: 26px; height: 26px; padding: 0; display: grid; place-items: center; font-size: 14px; }
+.policy-note { display: none; }
