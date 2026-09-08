@@ -2666,3 +2666,10 @@ button:disabled { opacity: .48; cursor: not-allowed; }
 .lane-finding { height: 11px !important; font-size: 9px; }
 .finding-close { width: 26px; height: 26px; padding: 0; display: grid; place-items: center; font-size: 14px; }
 .policy-note { display: none; }
+.crumb-scene-path { padding: 3px 7px; color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 4px; font: inherit; }
+.crumb-scene-path:hover { color: #fff; background: var(--surface-2); border-color: var(--line); }
+.shot-select-row { min-width: 0; }
+.shot-select-row > span:first-child { min-width: 0; flex: 1; overflow: hidden; }
+.select-range-inputs input { width: 48px; }
+.select-order { flex: 0 0 auto; }
+.select-order .remove-select { width: 24px; height: 24px; padding: 0; display: grid; place-items: center; color: #ef9298; }

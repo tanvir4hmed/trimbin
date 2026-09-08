@@ -1681,14 +1681,18 @@ export default function ShotReviewCockpit({
                             ↓
                           </button>
                           <button
+                            type="button"
                             disabled={!canComment}
+                            className="remove-select"
+                            aria-label={`Remove select ${index + 1}`}
+                            title="Remove select"
                             onClick={() =>
                               setSelects((rows) =>
                                 rows.filter((_, at) => at !== index),
                               )
                             }
                           >
-                            Remove
+                            ✕
                           </button>
                         </span>
                       </div>

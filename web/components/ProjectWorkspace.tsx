@@ -245,30 +245,13 @@ export default function ProjectWorkspace({
           {tree.scenes.length > 0 && (
             <>
               <span aria-hidden>›</span>
-              {/* The scene is a choice, not a label. With one scene it read as
-                  decoration; with several there was no way to move between them
-                  from here at all. */}
-              <label className="crumb-scene">
-                <select
-                  aria-label="Scene"
-                  value={open?.scene ?? urlScene}
-                  onChange={(event) => {
-                    // Changing scene lands on the scene, not on a shot inside
-                    // it that nobody picked.
-                    navigateScene(Number(event.target.value));
-                  }}
-                >
-                  <option value={0}>All scenes</option>
-                  {tree.scenes.map((scene) => (
-                    <option key={scene.scene} value={scene.scene}>
-                      Scene {scene.scene_code || scene.scene}
-                      {headings.get(scene.scene)
-                        ? ` · ${headings.get(scene.scene)}`
-                        : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <button
+                type="button"
+                className="crumb-scene-path"
+                onClick={() => navigateScene(urlScene)}
+              >
+                Scene {tree.scenes.find((item) => item.scene === urlScene)?.scene_code || urlScene}
+              </button>
               {open && (
                 <>
                   <span aria-hidden>›</span>
@@ -300,20 +283,6 @@ export default function ProjectWorkspace({
                       }}
                     />
                   )}
-                  {/* Back to the scene, which otherwise needed the browser's
-                      back button. */}
-                  <button
-                    type="button"
-                    className="linkish crumb-close"
-                    onClick={() => {
-                      setRailTake(0);
-                      router.push(
-                        `${paths.scene(projectId, open.scene, project?.name)}`,
-                      );
-                    }}
-                  >
-                    close shot
-                  </button>
                 </>
               )}
             </>
