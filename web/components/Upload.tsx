@@ -5,6 +5,7 @@ import type { JobStatus, PlannedScene } from "@/lib/api";
 import { ApiError, api } from "@/lib/api";
 import { type Progress, type Ticket, uploadAll } from "@/lib/upload";
 import IngestRecordingReview from "./IngestRecordingReview";
+import { useQueryClient } from "@tanstack/react-query";
 
 type Stage = "add" | "read" | "verify" | "ingest";
 type Resolution = {
@@ -86,6 +87,8 @@ export default function Upload({
   const [targetScene, setTargetScene] = useState(0);
   const [targetShot, setTargetShot] = useState(0);
   const [targetTake, setTargetTake] = useState(0);
+  const queryClient = useQueryClient();
+  const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, { scene: number; shot: number; take: number }>>({});
   const [createNew, setCreateNew] = useState(false);
   const [evidenceUri, setEvidenceUri] = useState("");
   const [error, setError] = useState("");
@@ -151,6 +154,11 @@ export default function Upload({
   useEffect(() => {
     if (!selected) return;
     const draft = decisions[selected.clip_id];
+    setAssignmentDrafts((old) => old[selected.clip_id] ? old : { ...old, [selected.clip_id]: {
+      scene: draft?.action === "unassign" ? 0 : draft?.scene ?? selected.scene,
+      shot: draft?.action === "unassign" ? 0 : draft?.shot ?? selected.shot,
+      take: draft?.take ?? selected.take_no,
+    }});
     setTargetScene(draft?.scene ?? selected.scene);
     setTargetShot(draft?.shot ?? selected.shot);
     setTargetTake(draft?.take ?? selected.take_no);
@@ -305,6 +313,12 @@ export default function Upload({
   ]);
 
   const choose = async (clipId: string, resolution: Resolution) => {
+    const item = items.find((row) => row.clip_id === clipId);
+    if (item) setAssignmentDrafts((old) => ({ ...old, [clipId]: {
+      scene: resolution.action === "unassign" ? 0 : resolution.scene ?? item.scene,
+      shot: resolution.action === "unassign" ? 0 : resolution.shot ?? item.shot,
+      take: resolution.take ?? item.take_no,
+    }}));
     setDecisions((current) => ({ ...current, [clipId]: resolution }));
     if (!jobId) return;
     try {
@@ -335,6 +349,11 @@ export default function Upload({
       const found = await api.jobStatus(jobId);
       setStatus(found);
       setStage("ingest");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["projects"] }),
+      ]);
       window.localStorage.removeItem(storageKey);
       onFinished?.();
     } catch (cause) {
@@ -661,11 +680,13 @@ export default function Upload({
                           <span className="dim">Not detected</span>
                         )}
                       </td>
-                      <td>
-                        {item.scene
-                          ? `Scene ${item.scene} / Shot ${item.shot || "—"} / Take ${item.take_no || "—"}`
-                          : "Unassigned"}
-                      </td>
+                      <td>{(() => {
+                        const draft = assignmentDrafts[item.clip_id];
+                        const sceneId = draft?.scene ?? item.scene;
+                        const shotId = draft?.shot ?? item.shot;
+                        const planned = plan.find((s) => s.scene === sceneId);
+                        return sceneId ? `Scene ${planned?.scene_code || sceneId} / Shot ${planned?.shots.find((s) => s.shot === shotId)?.slug || shotId || "—"} / Take ${draft?.take ?? item.take_no ?? "—"}${draft ? " · draft" : ""}` : "Unassigned";
+                      })()}</td>
                       <td>
                         <span className="confidence-meter">
                           <i style={{ width: `${item.confidence * 100}%` }} />
@@ -734,13 +755,13 @@ export default function Upload({
                 />
                 <div className="slate-read">
                   <span>
-                    Scene <b>{selected.scene || "—"}</b>
+                    Scene <b>{plan.find((s) => s.scene === (assignmentDrafts[selected.clip_id]?.scene ?? selected.scene))?.scene_code || assignmentDrafts[selected.clip_id]?.scene || selected.scene || "—"}</b>
                   </span>
                   <span>
-                    Shot <b>{selected.shot || "—"}</b>
+                    Shot <b>{plan.find((s) => s.scene === (assignmentDrafts[selected.clip_id]?.scene ?? selected.scene))?.shots.find((s) => s.shot === (assignmentDrafts[selected.clip_id]?.shot ?? selected.shot))?.slug || (assignmentDrafts[selected.clip_id]?.shot ?? selected.shot) || "—"}</b>
                   </span>
                   <span>
-                    Take <b>{selected.take_no || "—"}</b>
+                    Take <b>{(assignmentDrafts[selected.clip_id]?.take ?? selected.take_no) || "—"}</b>
                   </span>
                   <span>
                     Camera <b>{selected.camera || "Not detected"}</b>
@@ -776,10 +797,12 @@ export default function Upload({
                       <label>
                         Scene
                         <select
-                          value={targetScene || selected.scene}
+                          value={assignmentDrafts[selected.clip_id]?.scene ?? selected.scene}
                           onChange={(event) => {
-                            setTargetScene(Number(event.target.value));
-                            setTargetShot(0);
+                            setAssignmentDrafts((old) => ({ ...old, [selected.clip_id]: {
+                              scene: Number(event.target.value), shot: 0,
+                              take: old[selected.clip_id]?.take ?? selected.take_no,
+                            }}));
                           }}
                         >
                           <option value={0}>Unassigned</option>
@@ -793,16 +816,19 @@ export default function Upload({
                       <label>
                         Shot
                         <select
-                          value={targetShot || selected.shot}
+                          value={assignmentDrafts[selected.clip_id]?.shot ?? selected.shot}
                           onChange={(event) =>
-                            setTargetShot(Number(event.target.value))
+                            setAssignmentDrafts((old) => ({ ...old, [selected.clip_id]: {
+                              scene: old[selected.clip_id]?.scene ?? selected.scene,
+                              shot: Number(event.target.value), take: old[selected.clip_id]?.take ?? selected.take_no,
+                            }}))
                           }
                         >
                           <option value={0}>Choose shot</option>
                           {(
                             plan.find(
                               (item) =>
-                                item.scene === (targetScene || selected.scene),
+                                item.scene === (assignmentDrafts[selected.clip_id]?.scene ?? selected.scene),
                             )?.shots ?? []
                           ).map((item) => (
                             <option key={item.shot} value={item.shot}>
@@ -816,9 +842,12 @@ export default function Upload({
                         <input
                           type="number"
                           min="0"
-                          value={targetTake || selected.take_no || ""}
+                          value={assignmentDrafts[selected.clip_id]?.take ?? selected.take_no ?? ""}
                           onChange={(event) =>
-                            setTargetTake(Number(event.target.value))
+                            setAssignmentDrafts((old) => ({ ...old, [selected.clip_id]: {
+                              scene: old[selected.clip_id]?.scene ?? selected.scene,
+                              shot: old[selected.clip_id]?.shot ?? selected.shot, take: Number(event.target.value),
+                            }}))
                           }
                         />
                       </label>
@@ -840,16 +869,16 @@ export default function Upload({
                             createNew
                               ? {
                                   action: "create",
-                                  scene: targetScene || selected.scene,
-                                  shot: targetShot || selected.shot,
-                                  take: targetTake || selected.take_no,
+                                  scene: assignmentDrafts[selected.clip_id]?.scene ?? selected.scene,
+                                  shot: assignmentDrafts[selected.clip_id]?.shot ?? selected.shot,
+                                  take: assignmentDrafts[selected.clip_id]?.take ?? selected.take_no,
                                   evidence_uri: evidenceUri,
                                 }
                               : {
                                   action: "move",
-                                  scene: targetScene || selected.scene,
-                                  shot: targetShot || selected.shot,
-                                  take: targetTake || selected.take_no,
+                                  scene: assignmentDrafts[selected.clip_id]?.scene ?? selected.scene,
+                                  shot: assignmentDrafts[selected.clip_id]?.shot ?? selected.shot,
+                                  take: assignmentDrafts[selected.clip_id]?.take ?? selected.take_no,
                                   evidence_uri: evidenceUri,
                                 },
                           )

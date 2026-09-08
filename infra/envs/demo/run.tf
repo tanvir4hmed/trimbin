@@ -92,7 +92,7 @@ resource "google_cloud_run_v2_service" "api" {
     scaling {
       # Zero when nobody is looking. The demo is quiet for hours at a time and
       # a warm instance would spend the credit on latency nobody is waiting on.
-      min_instance_count = 0
+      min_instance_count = 1
       max_instance_count = 4
     }
 
@@ -289,7 +289,7 @@ resource "google_cloud_run_v2_service" "web" {
     service_account = google_service_account.web.email
 
     scaling {
-      min_instance_count = 0
+      min_instance_count = 1
       max_instance_count = 4
     }
 

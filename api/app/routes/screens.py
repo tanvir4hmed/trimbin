@@ -125,11 +125,33 @@ async def shot_screen(
     # a range out of it do not. Reading the takes only out of the verdicts is
     # why a freshly uploaded clip had no player, no lanes and no way to be
     # selected — while its proxy sat built and reachable.
-    takes = (
-        list(verdicts.takes)
-        if verdicts and verdicts.takes
-        else [schemas.Take(**row) for row in present]
-    )
+    # Placement owns membership. A previous comparison must never hide a newly
+    # committed take (or resurrect footage removed since that comparison).
+    judged = {take.clip_id: take for take in verdicts.takes} if verdicts else {}
+    takes = []
+    for row in present:
+        take = schemas.Take(**row)
+        previous = judged.get(take.clip_id)
+        if previous:
+            take = previous.model_copy(
+                update={
+                    key: getattr(take, key)
+                    for key in (
+                        "take_no",
+                        "proxy_uri",
+                        "sprite_uri",
+                        "uploaded_by",
+                        "duration_s",
+                        "fps",
+                        "camera",
+                        "captured_at",
+                        "scene_code",
+                        "shot_code",
+                        "filename",
+                    )
+                }
+            )
+        takes.append(take)
     for take in takes:
         take.can_delete = bool(
             members.is_staff(principal.email)

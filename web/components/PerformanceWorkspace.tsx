@@ -76,17 +76,26 @@ export default function PerformanceWorkspace({
   analyses,
   canEdit,
   onAddRange,
+  reviewingClipId,
+  referenceClipId,
+  onReviewingChange,
+  onReferenceChange,
 }: {
   projectId: number;
   takes: Take[];
   analyses: TakeAnalysis[];
   canEdit: boolean;
+  reviewingClipId: string;
+  referenceClipId: string;
+  onReviewingChange: (clipId: string) => void;
+  onReferenceChange: (clipId: string) => void;
   onAddRange: (take: Take, item: AttemptItem, revision: number) => void;
 }) {
   const client = useQueryClient();
   const previousStates = useRef<Record<string, string>>({});
   const [limit, setLimit] = useState(8);
-  const [recording, setRecording] = useState(takes[0]?.clip_id ?? "");
+  const recording = reviewingClipId;
+  const setRecording = onReviewingChange;
   const [selected, setSelected] = useState<string[]>([]);
   const [ranked, setRanked] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -96,7 +105,9 @@ export default function PerformanceWorkspace({
     sequence: 0,
     action: "pause",
   });
-  const loaded = takes.slice(0, limit);
+  const pinned = new Set([reviewingClipId, referenceClipId, ...selected.map((id) => id.split("/")[0])]);
+  const loaded = [...takes.filter((take) => pinned.has(take.clip_id)),
+    ...takes.filter((take) => !pinned.has(take.clip_id))].slice(0, limit);
   const queries = useQueries({
     queries: loaded.map((take) => ({
       queryKey: key(projectId, take.clip_id),
@@ -171,7 +182,7 @@ export default function PerformanceWorkspace({
       <header>
         <div>
           <p className="eyebrow">PERFORMANCE ATTEMPTS</p>
-          <h2>One recording can contain several alternatives</h2>
+          <h2>Compare portions, then choose</h2>
         </div>
         <label>
           <input
@@ -182,6 +193,14 @@ export default function PerformanceWorkspace({
           Order by least flagged time
         </label>
       </header>
+      <div className="compare-toolbar">
+        <label>Reviewing <select value={reviewingClipId} onChange={(e) => onReviewingChange(e.target.value)}>
+          {takes.map((t) => <option key={t.clip_id} value={t.clip_id}>Take {t.take_no}</option>)}
+        </select></label>
+        {takes.length > 1 && <label>Reference <select value={referenceClipId} onChange={(e) => onReferenceChange(e.target.value)}>
+          {takes.filter((t) => t.clip_id !== reviewingClipId).map((t) => <option key={t.clip_id} value={t.clip_id}>Take {t.take_no}</option>)}
+        </select></label>}
+      </div>
       <label>
         Review status{" "}
         <select
@@ -198,9 +217,8 @@ export default function PerformanceWorkspace({
         </select>
       </label>
       <p className="policy-note">
-        Compare any candidates, including portions of the same recording. Flags
-        are evidence to review, not artistic scores. Shortlist and director
-        choice do not automatically change shot selects.
+        Select 2–4 portions, compare playback, then add your choice to Shot Selects.
+        Flagged time describes issues, not performance quality.
       </p>
       {notice && <p role="status">{notice}</p>}
       {queries.some((q) => q.isPending) && (
@@ -241,7 +259,7 @@ export default function PerformanceWorkspace({
             return (
               <article
                 key={id}
-                className={selected.includes(id) ? "active" : ""}
+                className={`${selected.includes(id) ? "active" : ""} attempt-state-${c.item.state}`}
               >
                 <label>
                   <input
@@ -263,6 +281,11 @@ export default function PerformanceWorkspace({
                     ? "analysis incomplete"
                     : `${Math.round(c.risk * 100)}% flagged time`}
                 </span>
+                <button onClick={() => onReviewingChange(c.take.clip_id)}
+                  aria-pressed={c.take.clip_id === reviewingClipId}>
+                  {c.take.clip_id === reviewingClipId ? "Reviewing" : "Review this take"}
+                </button>
+                {c.take.clip_id === referenceClipId && <small>Reference take</small>}
                 {evidence && (
                   <details>
                     <summary>Evidence & interpretation</summary>

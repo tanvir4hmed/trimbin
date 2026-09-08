@@ -19,6 +19,7 @@
 
 import type { SceneNode, ShotStatus } from "@/lib/api";
 import { waitingCount } from "@/lib/shot";
+import { useState } from "react";
 
 const STATUS_LABEL: Record<ShotStatus, string> = {
   too_few_takes: "one take",
@@ -46,6 +47,7 @@ export default function SceneTree({
   openTake,
   onSelectTake,
   headings,
+  compact = false,
 }: {
   scenes: SceneNode[];
   selected: { scene: number; shot: number } | null;
@@ -55,7 +57,9 @@ export default function SceneTree({
   openTake?: number;
   onSelectTake?: (scene: number, shot: number, takeNo: number) => void;
   headings?: Map<number, string>;
+  compact?: boolean;
 }) {
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
   if (scenes.length === 0) {
     return (
       <nav className="tree empty">
@@ -90,14 +94,21 @@ export default function SceneTree({
       {scenes.map((scene) => (
         <section key={scene.scene}>
           <h3>
-            <span>
+            <button className="tree-scene-toggle" disabled={!scene.shots.length}
+              aria-expanded={!compact || expanded.has(scene.scene)}
+              onClick={() => setExpanded((old) => {
+                const next = new Set(old);
+                if (next.has(scene.scene)) next.delete(scene.scene); else next.add(scene.scene);
+                return next;
+              })}>
+              {compact && scene.shots.length > 0 && <span aria-hidden>{expanded.has(scene.scene) ? "▾ " : "▸ "}</span>}
               Scene {scene.scene_code || scene.scene}
               {headings?.get(scene.scene) && (
                 <small className="node-label">
                   {headings.get(scene.scene)}
                 </small>
               )}
-            </span>
+            </button>
             {onOpenScene && (
               <button
                 type="button"
@@ -109,7 +120,7 @@ export default function SceneTree({
               </button>
             )}
           </h3>
-          <ul>
+          <ul hidden={compact && !expanded.has(scene.scene)}>
             {[...scene.shots]
               .sort(
                 (a, b) =>
@@ -194,7 +205,13 @@ export default function SceneTree({
                         opening the shot and hunting through the player. */}
                     {isOpen && onSelectTake && shot.take_numbers.length > 1 && (
                       <div className="node-take-row">
-                        {shot.take_numbers.map((takeNo) => (
+                        {shot.take_numbers.length > 12 ? (
+                          <select aria-label="Review take" value={openTake || ""}
+                            onChange={(e) => onSelectTake(scene.scene, shot.shot, Number(e.target.value))}>
+                            <option value="" disabled>Choose take</option>
+                            {shot.take_numbers.map((n) => <option key={n} value={n}>Take {n}</option>)}
+                          </select>
+                        ) : shot.take_numbers.map((takeNo) => (
                           <button
                             key={takeNo}
                             type="button"

@@ -98,6 +98,11 @@ def stubbed(monkeypatch: pytest.MonkeyPatch):
     async def nothing(ids):
         return []
 
+    async def placements(ids, names):
+        return [{"project_id": 1, "project_name": names[1], "count": 2}] if 1 in ids else []
+
+    monkeypatch.setattr(dashboard_route, "_placement_tasks", placements)
+
     monkeypatch.setattr(dashboard_route.projects, "visible_to", visible_to)
     monkeypatch.setattr(dashboard_route.dashboard_service, "for_projects", for_projects)
     monkeypatch.setattr(dashboard_route.dashboard_service, "recent_decisions", nothing)
@@ -137,6 +142,9 @@ class TestTheDashboardRoute:
         assert body["queue_total"] == 1
         assert body["queue"][0]["slug"] == "1B"
         assert body["queue"][0]["project_name"] == "Scene 1 - two perspectives"
+        assert body["placements"] == [
+            {"project_id": 1, "project_name": "Scene 1 - two perspectives", "count": 2}
+        ]
 
     def test_a_project_with_no_footage_reports_no_progress(
         self, client: TestClient, signed_in, stubbed

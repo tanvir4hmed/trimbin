@@ -38,7 +38,7 @@ export default function IngestRecordingReview({
   const busy = queuing || ["pending", "queued", "processing"].includes(phase);
   const data = analysis.data;
   return (
-    <details className="performance-entry">
+    <details className="performance-entry recording-preview">
       <summary>
         Recording preview & analysis ·{" "}
         {phase.replaceAll("_", " ") || "checking"}
@@ -48,6 +48,7 @@ export default function IngestRecordingReview({
           ref={player}
           src={data.clip.proxy_uri}
           poster={data.clip.sprite_uri}
+          className="recording-player"
         />
       )}
       <p>

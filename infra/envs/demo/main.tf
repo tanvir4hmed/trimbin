@@ -209,7 +209,7 @@ resource "clickhouse_service" "main" {
 
   # The demo is bursty — quiet for hours, then a judge arrives. Idling costs
   # more than the few seconds of wake-up it saves.
-  idle_scaling         = true
+  idle_scaling         = false
   idle_timeout_minutes = 15
 }
 

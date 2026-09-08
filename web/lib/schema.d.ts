@@ -2102,6 +2102,11 @@ export interface components {
         };
         /** DashboardScreen */
         DashboardScreen: {
+            /**
+             * Placements
+             * @default []
+             */
+            placements: components["schemas"]["PlacementTask"][];
             /** You */
             you?: string | null;
             /**
@@ -3058,6 +3063,15 @@ export interface components {
              */
             analysis_queued: number;
         };
+        /** PlacementTask */
+        PlacementTask: {
+            /** Project Id */
+            project_id: number;
+            /** Project Name */
+            project_name: string;
+            /** Count */
+            count: number;
+        };
         /** Plan */
         Plan: {
             /** Project Id */
@@ -3383,6 +3397,11 @@ export interface components {
         };
         /** QueueItem */
         QueueItem: {
+            /**
+             * Clip Id
+             * @default
+             */
+            clip_id: string;
             /** Project Id */
             project_id: number;
             /** Project Name */

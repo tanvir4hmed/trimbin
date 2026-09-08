@@ -311,6 +311,35 @@ class TestAShotWithOneTake:
         body = client.get("/screens/shot/1/12/1").json()
         assert len(body["analyses"]) == 1
 
+    def test_old_comparison_cannot_hide_new_take(self, client, one_take, monkeypatch):
+        from app import schemas
+
+        original = client.get("/screens/shot/1/12/1").json()["takes"][0]
+        new = {**original, "clip_id": "62469df0-9ca9-465c-b345-a709080552c2", "take_no": 2}
+        removed = {**original, "clip_id": "62469df0-9ca9-465c-b345-a709080552c3", "take_no": 3}
+
+        async def present(*args):
+            return [original, new]
+
+        async def verdicts(*args):
+            return schemas.Verdicts(
+                project_id=1,
+                scene=12,
+                shot=1,
+                takes=[schemas.Take(**original), schemas.Take(**removed)],
+                circled_take=0,
+                circled_by="",
+                differs_from_circle=False,
+                assignee="",
+                state="",
+            )
+
+        monkeypatch.setattr(screens.review_routes.review_service, "takes_in_shot", present)
+        monkeypatch.setattr(screens, "_verdicts_or_none", verdicts)
+        body = client.get("/screens/shot/1/12/1").json()
+        assert [t["take_no"] for t in body["takes"]] == [1, 2]
+        assert len(body["analyses"]) == 2
+
 
 class TestTheTreeAgreesWithTheReel:
     """One shot, one answer.

@@ -431,7 +431,7 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
     setDirty(asDraft);
     command.current = null;
     setMessage(
-      `Confirmed portions across ${coverage.scene_count} scenes. Scene → shot → selected-range order. This is coverage, not an automatically edited film. Save a sequence to keep your own order.`,
+      `${coverage.scene_count} scenes · ${coverage.preview.entries?.length ?? 0} confirmed portions`,
     );
   }
   function download() {
@@ -465,8 +465,7 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
           <Link href={paths.project(projectId)}>← Project</Link>
           <h1>Film Preview</h1>
           <p>
-            Watch confirmed portions across the project, or arrange a saved
-            sequence. Original footage and shot selections stay unchanged.
+            Preview selects or arrange your sequence.
           </p>
         </div>
         <div>
@@ -587,7 +586,7 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
         <span className="hint">
           {coverageMode
             ? "Select Current confirmed selects again to refresh shot decisions."
-            : "A saved order, independent of scene coverage."}
+            : "Saved sequence"}
         </span>
       </div>
       {unavailable > 0 && (
@@ -776,7 +775,7 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
               : active
                 ? "Source unavailable"
                 : "Sequence is empty"}{" "}
-            · Browser preview, not a rendered master. Only listed ranges play.
+            · Source-range preview
           </p>
         </section>
         <aside className="film-tools" hidden={!editing}>

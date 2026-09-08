@@ -6,6 +6,7 @@ import Player, { type PlayerHandle } from "@/components/Player";
 import ShotBrief from "@/components/ShotBrief";
 import PerformanceWorkspace from "@/components/PerformanceWorkspace";
 import ReviewedRanges from "@/components/ReviewedRanges";
+import { useQuery } from "@tanstack/react-query";
 import {
   api,
   type CoverageSegment,
@@ -101,6 +102,8 @@ export default function ShotReviewCockpit({
   initialClipId = "",
   initialAt = 0,
   focusTake = 0,
+  reviewingClipId = "",
+  onReviewingChange,
   sceneLabel = "",
   shotLabel = "",
 }: {
@@ -115,6 +118,8 @@ export default function ShotReviewCockpit({
   initialAt?: number;
   /** A take chosen in the rail. Opens it on the A side. */
   focusTake?: number;
+  reviewingClipId?: string;
+  onReviewingChange: (clipId: string, takeNo: number) => void;
   /** Canonical production identity; numeric route ids remain storage keys. */
   sceneLabel?: string;
   shotLabel?: string;
@@ -131,7 +136,10 @@ export default function ShotReviewCockpit({
   const recommended = compared
     ? (takes.find((take) => take.clip_id === verdicts?.recommended) ?? takes[0])
     : undefined;
-  const [aId, setAId] = useState("");
+  const setAId = (clipId: string) => {
+    const take = takes.find((item) => item.clip_id === clipId);
+    if (take) onReviewingChange(clipId, take.take_no);
+  };
   const [focus, setFocus] = useState<Focus | null>(null);
   const [reviewFilter, setReviewFilter] = useState("unresolved");
   const [inspectorTab, setInspectorTab] = useState<
@@ -181,6 +189,7 @@ export default function ShotReviewCockpit({
   }, [findingsForReview]);
   const [range, setRange] = useState<Range>({ from: 0, to: 0 });
   const pendingRange = useRef<{ clipId: string; range: Range } | null>(null);
+  const reviewRange = useRef<{ clipId: string; end: number; segmentId?: string } | null>(null);
   const coverageBase = useRef<string | null>(null);
   const selectsRef = useRef<CoverageSegment[]>([]);
   const [selectsInitialized, setSelectsInitialized] = useState(false);
@@ -231,15 +240,6 @@ export default function ShotReviewCockpit({
     }
   }, [workspaceMode]);
 
-  useEffect(() => {
-    if (!takes.length) return;
-    // Open on the recommended take when there is one, otherwise the last take
-    // shot — which is the one an editor is usually coming to look at.
-    setAId(
-      (current) =>
-        current || recommended?.clip_id || takes[takes.length - 1].clip_id,
-    );
-  }, [takes, recommended]);
 
   useEffect(() => {
     if (!initialClipId || !takes.some((take) => take.clip_id === initialClipId))
@@ -251,7 +251,14 @@ export default function ShotReviewCockpit({
   }, [initialAt, initialClipId, takes]);
 
   // Source preview and reference are separate from confirmed editorial choices.
-  const chosen = takes.find((take) => take.clip_id === aId) ?? takes[0];
+  const chosen = takes.find((take) => take.clip_id === reviewingClipId)
+    ?? takes.find((take) => take.take_no === focusTake)
+    ?? takes.find((take) => take.clip_id === initialClipId)
+    ?? recommended ?? takes[takes.length - 1];
+  useEffect(() => {
+    if (chosen && chosen.clip_id !== reviewingClipId)
+      onReviewingChange(chosen.clip_id, chosen.take_no);
+  }, [chosen?.clip_id, reviewingClipId]);
   const chosenIndex = takes.findIndex(
     (take) => take.clip_id === chosen?.clip_id,
   );
@@ -264,6 +271,7 @@ export default function ShotReviewCockpit({
       ? takes[chosenIndex - 1]
       : takes.find((take) => take.clip_id !== chosen?.clip_id));
   const chooseTake = (clipId: string) => {
+    reviewRange.current = null;
     pendingSeek.current = null;
     pendingRange.current = null;
     const wanted = takes.find((take) => take.clip_id === clipId);
@@ -272,6 +280,11 @@ export default function ShotReviewCockpit({
   const a = previous ?? chosen;
   const b = chosen;
   const selected = chosen;
+  const cleanRanges = useQuery({
+    queryKey: ["project", projectId, "attempts", selected?.clip_id ?? ""],
+    queryFn: () => api.attempts(projectId, selected!.clip_id),
+    enabled: Boolean(selected),
+  });
   const selectedAnalysis = selected
     ? analysisFor(analyses, selected.clip_id)
     : undefined;
@@ -432,10 +445,7 @@ export default function ShotReviewCockpit({
     selectPlayer.current?.seek(segment.source_in_s, true);
   }, [selectPreviewIndex, selects]);
 
-  const [issueTab, setIssueTab] = useState("");
-  useEffect(() => {
-    if (chosen?.clip_id) setIssueTab(chosen.clip_id);
-  }, [chosen?.clip_id]);
+  const issueTab = chosen?.clip_id ?? "";
 
   // The shot's standing decision, in one phrase.
   //
@@ -457,11 +467,6 @@ export default function ShotReviewCockpit({
 
   // A take picked in the rail opens on the A side, swapping B out of the way
   // if it was already showing it.
-  useEffect(() => {
-    if (!focusTake) return;
-    const wanted = takes.find((take) => take.take_no === focusTake);
-    if (wanted) setAId(wanted.clip_id);
-  }, [focusTake, takes]);
 
   const activePlayer = (clipId: string) =>
     clipId === a?.clip_id
@@ -710,6 +715,13 @@ export default function ShotReviewCockpit({
             <span>{screen.data.decision_freshness_reason}</span>
           </div>
         )}
+        {chosen && (!verdicts?.takes.some((take) => take.clip_id === chosen.clip_id) ||
+          (initialClipId === chosen.clip_id && (!humanChoiceRecorded || !screen.data?.decision_fresh))) && (
+          <div className="decision-stale" role="status">
+            <b>Take {chosen.take_no} · needs shot review</b>
+            <span>Inspect findings, adjust source ranges, then save Shot Selects to confirm your decision.</span>
+          </div>
+        )}
 
         <nav className="performance-actions" aria-label="Shot workspace mode">
           <button
@@ -728,23 +740,10 @@ export default function ShotReviewCockpit({
         <div hidden={workspaceMode !== "inspect"}>
           {takes.length > 1 && (
             <div className="compare-toolbar" aria-label="Which take">
-              <span className="compare-vs">Reviewing</span>
-              {takes.map((take) => (
-                <button
-                  key={take.clip_id}
-                  className={
-                    take.clip_id === chosen?.clip_id
-                      ? "compare-side on"
-                      : "compare-side"
-                  }
-                  aria-current={
-                    take.clip_id === chosen?.clip_id ? "true" : undefined
-                  }
-                  onClick={() => chooseTake(take.clip_id)}
-                >
-                  {takeName(take)}
-                </button>
-              ))}
+              <label>Reviewing <select aria-label="Reviewing take"
+                value={chosen?.clip_id ?? ""} onChange={(e) => chooseTake(e.target.value)}>
+                {takes.map((take) => <option key={take.clip_id} value={take.clip_id}>{takeName(take)}</option>)}
+              </select></label>
               {previous && (
                 <label className="compare-hint">
                   Reference{" "}
@@ -824,6 +823,14 @@ export default function ShotReviewCockpit({
                           pendingSeek.current = null;
                       }}
                       onTimeUpdate={(at) => {
+                        const bounded = reviewRange.current;
+                        const live = selects.find((s) => s.segment_id === bounded?.segmentId);
+                        const end = live?.source_out_s ?? bounded?.end;
+                        if (bounded?.clipId === take.clip_id && end !== undefined && at >= end) {
+                          ref.current?.element()?.pause();
+                          ref.current?.seek(end);
+                          reviewRange.current = null;
+                        }
                         setPlayheads((current) => ({
                           ...current,
                           [take.clip_id]: at,
@@ -865,9 +872,9 @@ export default function ShotReviewCockpit({
                         reviewed
                       </span>
                       <span>
-                        {compared
+                        {verdicts?.takes.some((item) => item.clip_id === take.clip_id)
                           ? `${Math.round(take.score * 100)} technical · ${take.reason || "Relative technical comparison"}`
-                          : stageLabel(stageOf(take.clip_id))}
+                          : `Not compared · ${stageLabel(stageOf(take.clip_id))}`}
                       </span>
                     </div>
                   </div>
@@ -911,6 +918,10 @@ export default function ShotReviewCockpit({
             takes={takes}
             analyses={analyses}
             canEdit={canCurate}
+            reviewingClipId={chosen?.clip_id || ""}
+            referenceClipId={previous?.clip_id || ""}
+            onReviewingChange={chooseTake}
+            onReferenceChange={setReferenceId}
             onAddRange={(take, item, revision) => {
               setSelects((current) => [
                 ...current,
@@ -944,7 +955,9 @@ export default function ShotReviewCockpit({
               <h2>Every take on one clock</h2>
             </div>
             <div className="lane-legend">
-              <span className="clean-key">Not excluded · verify context</span>
+              <span className="clean-key">Candidate usable</span>
+              <span className="selected-key">Shot select</span>
+              <span className="reviewed-clean-key">Reviewed clean</span>
               <span className="warn-key">Issue</span>
               <span className="slate-key">Slate / exit</span>
             </div>
@@ -988,7 +1001,7 @@ export default function ShotReviewCockpit({
                 </button>
                 <div
                   className="lane-track"
-                  style={{ height: 31 + (markerRows - 1) * 15 }}
+                  style={{ height: 66 + (markerRows - 1) * 15 }}
                 >
                   <span
                     className="lane-empty"
@@ -1035,6 +1048,29 @@ export default function ShotReviewCockpit({
                     >
                       <span>{label(finding.code)}</span>
                     </button>
+                  ))}
+                  {take.clip_id === selected?.clip_id && (cleanRanges.data?.items ?? []).filter((item) => item.state === "clean").map((item) => (
+                    <button key={`clean-${item.id}`} className="lane-reviewed-clean"
+                      style={{ left: pct(item.start_s), width: pct(item.end_s - item.start_s) }}
+                      title={`Reviewed clean ${tc(item.start_s)}–${tc(item.end_s)}`}
+                      onClick={() => {
+                        setRange({ from: item.start_s, to: item.end_s });
+                        reviewRange.current = { clipId: take.clip_id, end: item.end_s };
+                        previewMoment(take.clip_id, item.start_s);
+                        setInspectorTab("selects");
+                      }}>Clean</button>
+                  ))}
+                  {selects.filter((s) => s.clip_id === take.clip_id).map((segment) => (
+                    <button key={segment.segment_id} className="lane-shot-select"
+                      style={{ left: pct(segment.source_in_s), width: pct(segment.source_out_s - segment.source_in_s) }}
+                      title={`Shot select ${tc(segment.source_in_s)}–${tc(segment.source_out_s)}`}
+                      onClick={() => {
+                        reviewRange.current = { clipId: take.clip_id, end: segment.source_out_s, segmentId: segment.segment_id };
+                        pendingRange.current = { clipId: take.clip_id, range: { from: segment.source_in_s, to: segment.source_out_s } };
+                        setRange({ from: segment.source_in_s, to: segment.source_out_s });
+                        setInspectorTab("selects");
+                        previewMoment(take.clip_id, segment.source_in_s);
+                      }}>Selected</button>
                   ))}
                 </div>
               </div>
@@ -1163,7 +1199,7 @@ export default function ShotReviewCockpit({
                         ? "finding-tab on"
                         : "finding-tab"
                     }
-                    onClick={() => setIssueTab(take.clip_id)}
+                    onClick={() => chooseTake(take.clip_id)}
                   >
                     {takeName(take)}
                     <span>{count}</span>
@@ -1560,6 +1596,20 @@ export default function ShotReviewCockpit({
                           </span>
                         </span>
                         <span className="select-order">
+                          <button disabled={!canComment || item.source_out_s <= item.source_in_s}
+                            onClick={() => setSelects((rows) => rows.flatMap((row, at) => {
+                              if (at !== index) return [row];
+                              const middle = (row.source_in_s + row.source_out_s) / 2;
+                              return [{ ...row, source_out_s: middle },
+                                { ...row, segment_id: crypto.randomUUID(), source_in_s: middle }];
+                            }))}>Split</button>
+                          <button title="Review and trim a portion for Film Sequence" onClick={() => {
+                            pendingRange.current = { clipId: item.clip_id, range: { from: item.source_in_s, to: item.source_out_s } };
+                            setRange({ from: item.source_in_s, to: item.source_out_s });
+                            reviewRange.current = { clipId: item.clip_id, end: item.source_out_s, segmentId: item.segment_id };
+                            previewMoment(item.clip_id, item.source_in_s);
+                            setNotice("Trim In / Out above, then Add range to Film sequence. The shot select stays unchanged.");
+                          }}>Trim for Film</button>
                           <button
                             disabled={!canComment || !index}
                             onClick={() =>

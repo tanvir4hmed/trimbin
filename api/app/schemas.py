@@ -439,6 +439,7 @@ class CommentList(Model):
 
 
 class QueueItem(Model):
+    clip_id: str = ""
     project_id: int
     project_name: str
     scene: int
@@ -501,7 +502,14 @@ class ProjectCard(Project):
     members: int = 1
 
 
+class PlacementTask(Model):
+    project_id: int
+    project_name: str
+    count: int
+
+
 class DashboardScreen(Model):
+    placements: list[PlacementTask] = []
     you: str | None = None
     role: Role
     queue: list[QueueItem]

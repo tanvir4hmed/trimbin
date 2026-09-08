@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { currentIdentity } from "@/lib/auth";
 import { useDashboard } from "@/lib/queries";
 import { paths } from "@/lib/slug";
+import PlacementTasks from "@/components/PlacementTasks";
 
 export default function ReviewQueuePage() {
   const router = useRouter();
@@ -38,6 +39,7 @@ export default function ReviewQueuePage() {
   const shotsExist = projects.some((project) => (project.shots ?? 0) > 0);
   return (
     <main className="shell review-index">
+      <PlacementTasks projectId={projectId} />
       <header className="dash-top">
         <div>
           <p className="eyebrow">TEAM REVIEW</p>
@@ -53,7 +55,7 @@ export default function ReviewQueuePage() {
         <div className="review-queue">
           {queue.map((item, index) => (
             <Link
-              href={`${paths.shot(item.project_id, item.scene, item.shot, item.project_name)}`}
+              href={`${paths.shot(item.project_id, item.scene, item.shot, item.project_name)}?clip=${encodeURIComponent(item.clip_id || "")}&review=1`}
               key={`${item.project_id}-${item.scene}-${item.shot}`}
             >
               <span className="queue-rank">

@@ -17,6 +17,9 @@ import Link from "next/link";
 import type { SceneNode, ShotNode, ShotStatus } from "@/lib/api";
 import { needsAPerson } from "@/lib/shot";
 import { paths } from "@/lib/slug";
+import EntityMenu from "./EntityMenu";
+import { api } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
 
 const STATUS_LABEL: Record<ShotStatus, string> = {
   too_few_takes: "choose a range",
@@ -51,6 +54,11 @@ export default function ProjectOverview({
   /** The scene being looked at, or 0 for the production as a whole. */
   scene: number;
 }) {
+  const cache = useQueryClient();
+  const rename = async (sceneId: number, shotId: number, name: string, previous: string) => {
+    await api.renameStructure(projectId, sceneId, shotId, name, previous);
+    await cache.invalidateQueries();
+  };
   const open = scene ? scenes.find((item) => item.scene === scene) : undefined;
 
   // -- one scene: its shots ------------------------------------------------
@@ -58,6 +66,8 @@ export default function ProjectOverview({
     return (
       <div className="project-overview">
         <div className="overview-stats">
+          {canCurate && <EntityMenu kind="Scene" name={headings.get(open.scene) || ""}
+            onRename={(name) => rename(open.scene, 0, name, headings.get(open.scene) || "")} />}
           <span>
             <b>{open.shots.length}</b> shot{open.shots.length === 1 ? "" : "s"}
           </span>
@@ -81,8 +91,7 @@ export default function ProjectOverview({
 
         <div className="overview-shots">
           {open.shots.map((shot) => (
-            <Link
-              key={shot.shot}
+            <div className="entity-overview-row" key={shot.shot}><Link
               className="overview-shot"
               href={`${paths.shot(projectId, open.scene, shot.shot)}`}
             >
@@ -95,7 +104,7 @@ export default function ProjectOverview({
               )}
               <span className="overview-shot-meta">
                 {shot.takes} take{shot.takes === 1 ? "" : "s"}
-                {shot.take_numbers.length > 1 &&
+                {shot.take_numbers.length > 1 && shot.take_numbers.length <= 8 &&
                   ` · ${shot.take_numbers.map((t) => `T${t}`).join(" ")}`}
               </span>
               <span className="overview-shot-state">{standing(shot)}</span>
@@ -104,7 +113,8 @@ export default function ProjectOverview({
                   {shot.open_notes} open notes
                 </span>
               )}
-            </Link>
+            </Link>{canCurate && <EntityMenu kind="Shot" name={shot.label || ""}
+              onRename={(name) => rename(open.scene, shot.shot, name, shot.label || "")} />}</div>
           ))}
           {open.shots.length === 0 && (
             <p className="hint small">No shots declared in this scene yet.</p>
@@ -126,12 +136,9 @@ export default function ProjectOverview({
     <div className="project-overview">
       <section className="project-next-step">
         <div>
-          <p className="eyebrow">PRODUCTION WORKSPACE</p>
-          <h2>From footage to a film you can review</h2>
+          <h2>Scenes & shots</h2>
           <p>
-            {selected} of {shots.length} shots have confirmed selections. Review
-            the evidence, choose your portions, then watch them across the
-            project.
+            {selected} shots with saved selects · {waiting} awaiting review
           </p>
         </div>
         <div>
@@ -164,8 +171,7 @@ export default function ProjectOverview({
         {scenes.map((item) => {
           const sceneWaiting = item.shots.filter(needsAPerson).length;
           return (
-            <Link
-              key={item.scene}
+            <div className="entity-overview-row" key={item.scene}><Link
               className="scene-row"
               href={`${paths.scene(projectId, item.scene)}`}
             >
@@ -185,7 +191,8 @@ export default function ProjectOverview({
                 {sceneWaiting ? `${sceneWaiting} waiting` : "settled"}
               </span>
               <i aria-hidden>›</i>
-            </Link>
+            </Link>{canCurate && <EntityMenu kind="Scene" name={headings.get(item.scene) || ""}
+              onRename={(name) => rename(item.scene, 0, name, headings.get(item.scene) || "")} />}</div>
           );
         })}
       </div>

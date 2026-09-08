@@ -17,6 +17,7 @@ shape in one pass.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 
@@ -49,9 +50,11 @@ class Waiting:
     circled_take: int
     chosen_take: int
     open_comments: int
+    clip_id: str = ""
 
     def as_dict(self, project_names: dict[int, str]) -> dict:
         return {
+            "clip_id": self.clip_id,
             "project_id": self.project_id,
             "project_name": project_names.get(self.project_id, f"Project {self.project_id}"),
             "scene": self.scene,
@@ -105,8 +108,9 @@ async def for_projects(project_ids: list[int], viewer: str) -> dict:
         # No database call to make, but the same answer shape as if there were.
         return _assembled([], [], viewer)
 
-    rows = await _shot_rows(project_ids)
-    meta = await shots_service.for_projects(project_ids)
+    rows, meta = await asyncio.gather(
+        _shot_rows(project_ids), shots_service.for_projects(project_ids)
+    )
     margin_threshold = assessment.review_margin()
 
     waiting: list[Waiting] = []
@@ -172,6 +176,7 @@ async def for_projects(project_ids: list[int], viewer: str) -> dict:
                 circled_take=circled,
                 chosen_take=row["chosen_take"],
                 open_comments=0,
+                clip_id=row.get("latest_clip_id", ""),
             )
         )
 
@@ -290,7 +295,8 @@ async def _shot_rows(project_ids: list[int]) -> list[dict]:
                 AND l.outcome = 'selected'
             ) AS chosen_take,
             anyIf(c.shot_code, c.shot_code != '')                 AS shot_code,
-            arraySort(groupArray(toString(c.clip_id)))            AS clip_ids
+            arraySort(groupArray(toString(c.clip_id)))            AS clip_ids,
+            argMax(toString(c.clip_id), tuple(c.ingested_at, c.clip_id)) AS latest_clip_id
         FROM current_clip_placement AS c
         LEFT JOIN latest AS l
             ON l.project_id = c.project_id
@@ -298,6 +304,7 @@ async def _shot_rows(project_ids: list[int]) -> list[dict]:
            AND l.subgroup_id = c.subgroup_id
            AND l.clip_id = c.clip_id
         WHERE c.project_id IN {ids:Array(UInt32)} AND c.status = 'active'
+          AND c.group_id > 0 AND c.subgroup_id > 0
         GROUP BY c.project_id, c.group_id, c.subgroup_id
         ORDER BY c.project_id, c.group_id, c.subgroup_id
         """,
@@ -316,6 +323,7 @@ async def _shot_rows(project_ids: list[int]) -> list[dict]:
             "chosen_take": int(r[7] or 0),
             "shot_code": r[8] or "",
             "clip_ids": [str(item) for item in r[9]],
+            "latest_clip_id": str(r[10]),
         }
         for r in result.result_rows
     ]

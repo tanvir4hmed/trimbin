@@ -11,7 +11,7 @@
  * sign-in is what is *possible*, never what is visible.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AskArchive from "@/components/AskArchive";
@@ -54,9 +54,17 @@ export default function ProjectWorkspace({
   // Which scene the rail is showing. 0 is every scene, which is right for a
   // three-scene project and wrong for a thirty-scene one — so it is a choice
   // rather than a fixed answer.
-  const [railScene, setRailScene] = useState(0);
+  const railScene = urlScene;
   const [sceneQuery, setSceneQuery] = useState("");
   const [railTake, setRailTake] = useState(0);
+  const [reviewingClipId, setReviewingClipId] = useState("");
+  useEffect(() => {
+    setRailTake(0);
+    setReviewingClipId("");
+  }, [projectId, urlScene, urlShot]);
+  const navigateScene = (scene: number) => router.push(scene
+    ? paths.scene(projectId, scene, project?.name)
+    : paths.project(projectId, project?.name));
 
   const screen = useProjectScreen(projectId, {
     camera: camera || undefined,
@@ -235,7 +243,7 @@ export default function ProjectWorkspace({
               }}
             />
           )}
-          {(open || urlScene) && (
+          {tree.scenes.length > 0 && (
             <>
               <span aria-hidden>›</span>
               {/* The scene is a choice, not a label. With one scene it read as
@@ -248,12 +256,10 @@ export default function ProjectWorkspace({
                   onChange={(event) => {
                     // Changing scene lands on the scene, not on a shot inside
                     // it that nobody picked.
-                    setRailTake(0);
-                    router.push(
-                      `${paths.scene(projectId, Number(event.target.value), project?.name)}`,
-                    );
+                    navigateScene(Number(event.target.value));
                   }}
                 >
+                  <option value={0}>All scenes</option>
                   {tree.scenes.map((scene) => (
                     <option key={scene.scene} value={scene.scene}>
                       Scene {scene.scene_code || scene.scene}
@@ -264,22 +270,6 @@ export default function ProjectWorkspace({
                   ))}
                 </select>
               </label>
-              {urlScene > 0 && canCurate && (
-                <EntityMenu
-                  kind="Scene"
-                  name={headings.get(urlScene) || ""}
-                  onRename={async (name) => {
-                    await api.renameStructure(
-                      projectId,
-                      urlScene,
-                      0,
-                      name,
-                      headings.get(urlScene) || "",
-                    );
-                    await refreshNames();
-                  }}
-                />
-              )}
               {open && (
                 <>
                   <span aria-hidden>›</span>
@@ -329,6 +319,10 @@ export default function ProjectWorkspace({
               )}
             </>
           )}
+          <label className="crumb-assignee">Assigned <select value={assignee} onChange={(e) => setAssignee(e.target.value)}>
+            <option value="">Anyone</option><option value="unassigned">Unclaimed</option>
+            {teamEmails.map((email) => <option key={email} value={email}>{email === me?.email ? "Me" : email.split("@")[0]}</option>)}
+          </select></label>
         </div>
 
         <div className="project-tools">
@@ -369,7 +363,7 @@ export default function ProjectWorkspace({
         </div>
       </header>
 
-      {!empty && (
+      {!empty && (tree.cameras.length > 0 || tree.shoot_days.length > 1 || filtered) && (
         <div className="filters">
           {tree.cameras.length > 0 && (
             <label>
@@ -403,24 +397,6 @@ export default function ProjectWorkspace({
               </select>
             </label>
           )}
-          <label>
-            Assigned
-            <select
-              value={assignee}
-              onChange={(e) => setAssignee(e.target.value)}
-            >
-              <option value="">anyone</option>
-              <option value="unassigned">unclaimed</option>
-              {me?.email && <option value={me.email}>me</option>}
-              {teamEmails
-                .filter((t) => t !== me?.email)
-                .map((t) => (
-                  <option key={t} value={t}>
-                    {t.split("@")[0]}
-                  </option>
-                ))}
-            </select>
-          </label>
           {filtered && (
             <button
               type="button"
@@ -475,15 +451,6 @@ export default function ProjectWorkspace({
             </Link>
           )}
         </div>
-      ) : !open && !urlScene ? (
-        // The production: its scenes. A scene is the unit people talk in.
-        <ProjectOverview
-          projectId={projectId}
-          scenes={tree.scenes}
-          headings={headings}
-          canCurate={canCurate}
-          scene={0}
-        />
       ) : (
         <div className="workspace-split">
           <div className="rail">
@@ -507,7 +474,7 @@ export default function ProjectWorkspace({
                 Scene
                 <select
                   value={railScene}
-                  onChange={(event) => setRailScene(Number(event.target.value))}
+                  onChange={(event) => navigateScene(Number(event.target.value))}
                 >
                   <option value={0}>All scenes ({tree.scenes.length})</option>
                   {searchedScenes.map((scene) => (
@@ -520,18 +487,11 @@ export default function ProjectWorkspace({
                   ))}
                 </select>
               </label>
-              {open && (
-                <Link
-                  className="ghost small"
-                  href={`${paths.coverage(projectId, open.scene, project?.name)}`}
-                >
-                  Play
-                </Link>
-              )}
             </div>
 
             <SceneTree
               headings={headings}
+              compact={railScene === 0}
               scenes={railScenes}
               selected={open}
               openTake={railTake}
@@ -541,13 +501,9 @@ export default function ProjectWorkspace({
               }}
               onSelectTake={(scene, shot, takeNo) => {
                 setRailTake(takeNo);
+                setReviewingClipId("");
                 router.push(paths.shot(projectId, scene, shot, project?.name));
               }}
-              onOpenScene={(scene) =>
-                router.push(
-                  `${paths.coverage(projectId, scene, project?.name)}`,
-                )
-              }
             />
           </div>
 
@@ -568,6 +524,15 @@ export default function ProjectWorkspace({
                 initialClipId={deepLink.clip}
                 initialAt={deepLink.at}
                 focusTake={railTake}
+                reviewingClipId={reviewingClipId}
+                onReviewingChange={(clipId, takeNo) => {
+                  setReviewingClipId(clipId);
+                  setRailTake(takeNo);
+                  try {
+                    sessionStorage.setItem(`trimbin.navigation.${projectId}`,
+                      `${paths.shot(projectId, open.scene, open.shot, project?.name)}?clip=${encodeURIComponent(clipId)}`);
+                  } catch { /* Navigation state is optional. */ }
+                }}
                 sceneLabel={
                   tree.scenes.find((item) => item.scene === open.scene)
                     ?.scene_code || String(open.scene)

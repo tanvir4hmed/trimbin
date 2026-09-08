@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import NewProject from "@/components/NewProject";
 import EntityMenu from "@/components/EntityMenu";
+import PlacementTasks from "@/components/PlacementTasks";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Limits, Project, Role } from "@/lib/api";
 import { ApiError, api } from "@/lib/api";
@@ -133,6 +134,7 @@ export default function ProjectsPage() {
 
   return (
     <main className="shell">
+      <PlacementTasks />
       <header className="dash-top">
         <div>
           <h1>Projects</h1>

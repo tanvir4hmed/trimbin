@@ -10,6 +10,7 @@ them open each one is a dashboard that gets opened once.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Annotated
 
@@ -20,6 +21,22 @@ from ..auth import Principal, current_principal, require_signed_in
 from ..config import settings
 from ..services import activity, members, projects
 from ..services import dashboard as dashboard_service
+from ..services.analytics import client
+
+
+async def _placement_tasks(ids: list[int], names: dict[int, str]) -> list[dict]:
+    if not ids:
+        return []
+    result = await (await client()).query(
+        "SELECT project_id, uniqExact(clip_id) FROM placement_inbox "
+        "WHERE project_id IN {ids:Array(UInt32)} GROUP BY project_id",
+        parameters={"ids": ids},
+    )
+    return [
+        {"project_id": int(p), "project_name": names[int(p)], "count": int(n)}
+        for p, n in result.result_rows
+    ]
+
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["dashboard"])
@@ -66,10 +83,13 @@ async def dashboard(
     ids = [p.project_id for p in mine]
     names = {p.project_id: p.name for p in mine}
 
-    built = await dashboard_service.for_projects(ids, principal.email or "")
-    recent = await dashboard_service.recent_decisions(ids)
-    happened = await activity.for_projects(ids)
-    notes = await dashboard_service.recent_notes(ids)
+    built, recent, happened, notes, placements = await asyncio.gather(
+        dashboard_service.for_projects(ids, principal.email or ""),
+        dashboard_service.recent_decisions(ids),
+        activity.for_projects(ids),
+        dashboard_service.recent_notes(ids),
+        _placement_tasks(ids, names),
+    )
 
     cards = []
     for p in mine:
@@ -109,6 +129,7 @@ async def dashboard(
 
     return {
         "you": principal.email,
+        "placements": placements,
         "role": members.role_of(principal.email),
         "queue": [w.as_dict(names) for w in built["queue"]],
         "queue_total": built["queue_total"],

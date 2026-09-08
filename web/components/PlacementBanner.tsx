@@ -38,8 +38,7 @@ export default function PlacementBanner({ projectId }: { projectId: number }) {
           placed yet
         </b>
         <small>
-          They are not takes in a shot until somebody confirms where they go —
-          and nothing is analysed until then.
+          Assign and commit to continue in Shot Review.
         </small>
       </span>
       <i aria-hidden>Settle them →</i>

@@ -13,7 +13,6 @@ const WORKSPACE = [
   ["/home", "⌂", "Home"],
   ["/projects", "□", "Projects"],
   ["/review", "▷", "Review queue"],
-  ["/search", "⌕", "Search"],
 ] as const;
 const SUPPORT = [
   ["/activity", "⌁", "Activity"],
@@ -38,6 +37,7 @@ function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const [switching, setSwitching] = useState(false);
   const [projectQuery, setProjectQuery] = useState("");
   const [search, setSearch] = useState("");
+  const [lastReview, setLastReview] = useState<Record<number, string>>({});
   const currentId = Number(
     pathname.match(/\/projects\/(?:[^/]*?-)?(\d+)(?:$|\/)/)?.[1] ||
       params.get("project") ||
@@ -59,6 +59,21 @@ function WorkspaceShell({ children }: { children: React.ReactNode }) {
     [projects, projectQuery],
   );
   const context = currentId ? `?project=${currentId}` : "";
+  useEffect(() => {
+    if (!currentId) return;
+    const storageKey = `trimbin.navigation.${currentId}`;
+    try {
+      if (/\/scenes\/\d+/.test(pathname) || /^\/projects\/[^/]+$/.test(pathname)) {
+        const href = `${pathname}${params.size ? `?${params.toString()}` : ""}`;
+        sessionStorage.setItem(storageKey, href);
+        setLastReview((old) => old[currentId] === href ? old : { ...old, [currentId]: href });
+      } else {
+        const href = sessionStorage.getItem(storageKey);
+        if (href?.startsWith("/projects/"))
+          setLastReview((old) => old[currentId] === href ? old : { ...old, [currentId]: href });
+      }
+    } catch { /* Navigation still works when storage is unavailable. */ }
+  }, [currentId, pathname, params]);
   const scopeHref = (href: string) =>
     ["/search", "/review", "/accuracy"].includes(href) ? href + context : href;
   const switchDestination = (id: number, name: string) => {
@@ -122,7 +137,7 @@ function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const projectNav = currentId
     ? ([
         [
-          paths.project(currentId),
+          lastReview[currentId] || paths.project(currentId),
           "▤",
           "Scenes & shots",
           pathname.startsWith("/projects/") &&
