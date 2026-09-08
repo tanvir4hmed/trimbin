@@ -26,7 +26,7 @@ function arrangedTimeline(
   film: FilmState,
   sceneId: number,
 ): SequenceGroup[] {
-  const saved = film.entries.filter((entry) => entry.source?.scene === sceneId);
+  const saved = (film.entries ?? []).filter((entry) => entry.source?.scene === sceneId);
   const rank = new Map(saved.map((entry, index) => [entryKey(entry), index]));
   return data.timeline
     .map((item) => {
@@ -81,7 +81,7 @@ export default function SceneCoveragePage({
         setTimeline(
           arrangedTimeline(
             nextData,
-            nextFilm.entries.length ? nextFilm : nextCoverage.preview,
+            nextFilm.entries?.length ? nextFilm : nextCoverage.preview,
             sceneId,
           ),
         );
@@ -211,9 +211,10 @@ export default function SceneCoveragePage({
     setSequenceMessage("");
     try {
       const arranged = timeline.flatMap((group) => group.entries);
-      const sourceSequence = film.entries.length ? film : coverageFilm ?? film;
+      const sourceSequence = film.entries?.length ? film : coverageFilm ?? film;
+      const sourceEntries = sourceSequence.entries ?? [];
       const existingByKey = new Map(
-        sourceSequence.entries.map((entry) => [entryKey(entry), entry]),
+        sourceEntries.map((entry) => [entryKey(entry), entry]),
       );
       const sceneRanges = arranged.map((entry) => {
         const existing = existingByKey.get(entryKey(entry));
@@ -227,10 +228,10 @@ export default function SceneCoveragePage({
           note: entry.reason || "Scene Play selection",
         };
       });
-      const firstSceneIndex = sourceSequence.entries.findIndex(
+      const firstSceneIndex = sourceEntries.findIndex(
         (entry) => entry.source?.scene === sceneId,
       );
-      const kept = sourceSequence.entries
+      const kept = sourceEntries
         .filter((entry) => entry.source?.scene !== sceneId)
         .map((entry) => ({
           id: entry.id,
@@ -243,10 +244,10 @@ export default function SceneCoveragePage({
         }));
       const insertAt =
         firstSceneIndex >= 0
-          ? sourceSequence.entries
+          ? sourceEntries
               .slice(0, firstSceneIndex)
               .filter((entry) => entry.source?.scene !== sceneId).length
-          : sourceSequence.entries.findIndex(
+          : sourceEntries.findIndex(
               (entry) => (entry.source?.scene ?? Number.MAX_SAFE_INTEGER) > sceneId,
             );
       kept.splice(insertAt < 0 ? kept.length : insertAt, 0, ...sceneRanges);
