@@ -81,12 +81,6 @@ export default function ProjectOverview({
           >
             <b>{open.shots.filter(needsAPerson).length}</b> waiting
           </span>
-          <Link
-            className="ghost small"
-            href={`${paths.coverage(projectId, open.scene)}`}
-          >
-            Play scene
-          </Link>
         </div>
 
         <div className="overview-shots">
@@ -141,16 +135,6 @@ export default function ProjectOverview({
             {selected} shots with saved selects · {waiting} awaiting review
           </p>
         </div>
-        <div>
-          <Link className="primary" href={paths.film(projectId)}>
-            Film Preview
-          </Link>
-          {canCurate && (
-            <Link className="ghost" href={paths.ingest(projectId)}>
-              Add footage
-            </Link>
-          )}
-        </div>
       </section>
       <div className="overview-stats">
         <span>
@@ -197,14 +181,6 @@ export default function ProjectOverview({
         })}
       </div>
 
-      {canCurate && (
-        <Link
-          className="ghost overview-add"
-          href={`${paths.ingest(projectId)}`}
-        >
-          Add scenes, shots &amp; footage →
-        </Link>
-      )}
     </div>
   );
 }

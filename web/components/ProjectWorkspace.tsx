@@ -318,14 +318,12 @@ export default function ProjectWorkspace({
         </div>
 
         <div className="project-tools">
-          {urlScene > 0 && (
-            <Link
-              className="primary"
-              href={paths.film(projectId, project?.name)}
-            >
-              Film Preview
-            </Link>
-          )}
+          <Link
+            className="primary"
+            href={paths.film(projectId, project?.name)}
+          >
+            Film Preview
+          </Link>
           {urlScene > 0 && (
             <Link
               className="primary"

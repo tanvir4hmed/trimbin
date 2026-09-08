@@ -2666,6 +2666,9 @@ button:disabled { opacity: .48; cursor: not-allowed; }
 .lane-finding { z-index: 5; height: 11px !important; font-size: 9px; }
 .finding-close { width: 26px; height: 26px; padding: 0; display: grid; place-items: center; font-size: 14px; }
 .policy-note { display: none; }
+.primary { background: #285b91 !important; border-color: #3b70a6 !important; }
+.primary:hover { background: #326da8 !important; border-color: #4a83b9 !important; }
+.project-tools .primary { text-decoration: none; }
 .crumb-scene-path { padding: 3px 7px; color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 4px; font: inherit; }
 .crumb-scene-path:hover { color: #fff; background: var(--surface-2); border-color: var(--line); }
 .crumb-shot-picker { display: inline-flex; align-items: center; gap: 5px; color: var(--low); font-size: 11px; }
