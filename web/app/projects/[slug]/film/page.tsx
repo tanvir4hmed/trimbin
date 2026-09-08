@@ -656,7 +656,15 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
               controls={false}
               className="player"
               onReady={() => {
-                if (active) player.current?.seek(active.start_s, playing);
+                if (active) {
+                  setFailedSources((old) => {
+                    if (!old.has(active.clip_id)) return old;
+                    const next = new Set(old);
+                    next.delete(active.clip_id);
+                    return next;
+                  });
+                  player.current?.seek(active.start_s, playing);
+                }
               }}
               onTimeUpdate={setPosition}
               onEnded={advance}

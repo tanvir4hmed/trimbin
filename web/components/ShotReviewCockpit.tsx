@@ -180,7 +180,7 @@ export default function ShotReviewCockpit({
     });
   }, [findingsForReview]);
   const [range, setRange] = useState<Range>({ from: 0, to: 0 });
-  const pendingRange = useRef<Range | null>(null);
+  const pendingRange = useRef<{ clipId: string; range: Range } | null>(null);
   const coverageBase = useRef<string | null>(null);
   const selectsRef = useRef<CoverageSegment[]>([]);
   const [selectsInitialized, setSelectsInitialized] = useState(false);
@@ -265,6 +265,7 @@ export default function ShotReviewCockpit({
       : takes.find((take) => take.clip_id !== chosen?.clip_id));
   const chooseTake = (clipId: string) => {
     pendingSeek.current = null;
+    pendingRange.current = null;
     const wanted = takes.find((take) => take.clip_id === clipId);
     if (wanted) setAId(wanted.clip_id);
   };
@@ -302,7 +303,9 @@ export default function ShotReviewCockpit({
     const analysis = analysisFor(analyses, selected.clip_id);
     const primary = analysis?.primary_usable_range;
     setRange(
-      pendingRange.current ?? {
+      (pendingRange.current?.clipId === selected.clip_id
+        ? pendingRange.current.range
+        : null) ?? {
         from: primary?.start_s ?? selected.usable_from_s ?? 0,
         to: primary?.end_s ?? selected.usable_to_s ?? selected.duration_s,
       },
@@ -344,15 +347,10 @@ export default function ShotReviewCockpit({
   );
   const verifiedFindings = useMemo(
     () =>
-      analyses.reduce(
-        (total, analysis) =>
-          total +
-          analysis.findings.filter(
-            (finding) => finding.action !== "machine_open",
-          ).length,
-        0,
-      ),
-    [analyses],
+      findingsForReview.filter(
+        ({ finding }) => finding.action !== "machine_open",
+      ).length,
+    [findingsForReview],
   );
 
   // Escape closes the finding. It was the first thing tried and did nothing.
@@ -837,7 +835,10 @@ export default function ShotReviewCockpit({
                               : old,
                           );
                       }}
-                      onPlay={() => setPlayingClipId(take.clip_id)}
+                      onPlay={() => {
+                        (ref === playerA ? playerB : playerA).current?.element()?.pause();
+                        setPlayingClipId(take.clip_id);
+                      }}
                     />
                     <div className="take-details">
                       <strong>
@@ -1003,8 +1004,8 @@ export default function ShotReviewCockpit({
                       }}
                       onClick={() => {
                         pendingRange.current = {
-                          from: item.start_s,
-                          to: item.end_s,
+                          clipId: take.clip_id,
+                          range: { from: item.start_s, to: item.end_s },
                         };
                         previewMoment(take.clip_id, item.start_s);
                         setRange({ from: item.start_s, to: item.end_s });
@@ -1350,7 +1351,7 @@ export default function ShotReviewCockpit({
                     Take {selected.take_no}
                     <span>
                       {!compared
-                        ? "Only take"
+                        ? "Not compared"
                         : selected.clip_id === recommended?.clip_id
                           ? "AI suggestion"
                           : "Alternative"}

@@ -1847,7 +1847,7 @@ select {
   --cockpit-cyan: #56d7e5;
   --cockpit-amber: #f5b74b;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
+  grid-template-columns: minmax(0, 1fr) 290px;
   min-height: 760px;
   color: var(--cockpit-text);
   background: var(--cockpit-bg);
@@ -1878,7 +1878,7 @@ select {
 .compare-vs { color: #6e829d; font-weight: 800; }
 
 .compare-players { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #020812; border: 1px solid var(--cockpit-line); border-radius: 8px; padding: 8px; }
-.compare-player { position: relative; opacity: .68; border: 2px solid transparent; border-radius: 6px; overflow: hidden; }
+.compare-player { position: relative; opacity: 1; border: 2px solid transparent; border-radius: 6px; overflow: hidden; }
 .compare-player.active { opacity: 1; border-color: var(--cockpit-blue); }
 .compare-player .player { display: block; width: 100%; aspect-ratio: 16/9; background: #02050b; }
 .player-badge { position: absolute; z-index: 2; left: 8px; top: 8px; padding: 4px 7px; background: rgba(3, 9, 17, .78); border: 1px solid transparent; border-radius: 4px; font-size: 11px; font-weight: 800; color: inherit; font-family: inherit; cursor: pointer; }
@@ -1943,7 +1943,7 @@ select {
 .cockpit-inspector .comments { margin-top: 22px; border-top: 1px solid var(--cockpit-line); padding-top: 16px; }.cockpit-inspector .comments h3 { color: var(--cockpit-text); }.cockpit-inspector .comment-list { padding: 0; }.cockpit-inspector textarea { width: 100%; color: var(--cockpit-text); background: #091524; border-color: var(--cockpit-line); }
 .cockpit-state { min-height: 480px; display: grid; place-items: center; background: #07111f; color: #93a9c2; }
 
-@container (max-width: 1000px) {
+@container (max-width: 680px) {
   .shot-cockpit { grid-template-columns: 1fr; }
   .cockpit-inspector { border-left: 0; border-top: 1px solid var(--cockpit-line); }
 }
@@ -2542,6 +2542,9 @@ body{background:var(--bg);color:var(--ink)}
 .issue-lanes .clean-key { color: #a7bdd8; }
 
 /* Shared workspace controls and panel hierarchy. */
+:where(.app-scroll) button { padding: 7px 10px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 5px; }
+:where(.app-scroll) button:hover:not(:disabled) { border-color: var(--blue); }
+:where(.app-scroll) button[aria-pressed=true] { background: #193455; border-color: var(--blue); }
 [hidden] { display: none !important; }
 button, input, select, textarea { font: inherit; }
 button, summary, a { -webkit-tap-highlight-color: transparent; }

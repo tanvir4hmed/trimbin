@@ -185,7 +185,7 @@ const Player = forwardRef<
         controls={controls}
         playsInline
         preload="metadata"
-        poster={poster || undefined}
+        poster={poster && !/\/sprite\.jpg(?:[?#]|$)/.test(poster) ? poster : undefined}
         tabIndex={0}
         onTimeUpdate={(e) => onTimeUpdate?.(e.currentTarget.currentTime)}
         onPlay={onPlay}
