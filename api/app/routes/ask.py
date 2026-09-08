@@ -147,6 +147,10 @@ async def ask(
         "filters": plan.model_dump(exclude_defaults=True),
         "elapsed_ms": elapsed_ms,
         "prompt_version": PROMPT_VERSION,
+        # This is set only after the search completed through the official
+        # read-only MCP path. It gives deploy smoke tests a stable signal that
+        # does not depend on Cloud Logging choosing textPayload vs jsonPayload.
+        "execution_path": "mcp-clickhouse",
     }
 
 

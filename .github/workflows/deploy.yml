@@ -261,14 +261,16 @@ jobs:
           # stack trace nobody reads. So ask, then check which path served it.
           echo "Checking the search reaches ClickHouse through MCP..."
           SEARCH_PROJECT=${PROJECT:-1}
-          curl --fail --silent --show-error --max-time 240             -X POST "$URL/ask/$SEARCH_PROJECT"             -H "Content-Type: application/json"             -d '{"question":"Which takes were rejected for continuity?"}'             > /dev/null
+          SEARCH_RESPONSE=$(curl --fail --silent --show-error --max-time 240 \
+            -X POST "$URL/ask/$SEARCH_PROJECT" \
+            -H "Content-Type: application/json" \
+            -d '{"question":"Which takes were rejected for continuity?"}')
 
-          sleep 10
-          if gcloud logging read               'resource.labels.service_name="'"${{ env.SERVICE }}"'" AND textPayload:"via MCP"'               --project="${{ secrets.GCP_PROJECT_ID }}" --limit=1 --freshness=5m               --format="value(textPayload)" | grep -q "via MCP"; then
+          if jq -e '.execution_path == "mcp-clickhouse"' <<<"$SEARCH_RESPONSE" > /dev/null; then
             echo "  search served through mcp-clickhouse."
           else
-            echo "  search did NOT go through MCP — it fell back." >&2
-            gcloud logging read               'resource.labels.service_name="'"${{ env.SERVICE }}"'" AND severity>=WARNING'               --project="${{ secrets.GCP_PROJECT_ID }}" --limit=3 --freshness=5m               --format="value(textPayload)" >&2
+            echo "  search did NOT report mcp-clickhouse execution." >&2
+            jq . <<<"$SEARCH_RESPONSE" >&2 || true
             exit 1
           fi
 
