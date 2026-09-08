@@ -1,11 +1,13 @@
 # Every check that can run without credentials.
 #
-# Runs on pull requests, on pushes to any branch including main, and — the part
-# that matters — as a reusable workflow that deploy.yml calls before it deploys.
+# Runs on pull requests, on pushes to non-main branches, and — the part that
+# matters for production — as a reusable workflow that deploy.yml calls before
+# it deploys. Main is intentionally covered only by that deploy gate, so one
+# push cannot create both a standalone CI run and a deploy-check run.
 #
 # It ran zero times before today. The triggers were `pull_request` and
 # `push: branches-ignore: [main]`, and the only way anything reaches production
-# here is a push to main, so no test has ever gated a deployment. The job was
+# here is a push to main, so the reusable gate is the only main check. The job was
 # even named "Agents & API" while every step ran in `agents/`.
 
 name: CI
@@ -13,6 +15,7 @@ name: CI
 on:
   pull_request:
   push:
+    branches-ignore: [main]
   workflow_call:
 
 permissions:
