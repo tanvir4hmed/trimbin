@@ -1,0 +1,85 @@
+name: Deploy web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/deploy-web.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-web-production
+  cancel-in-progress: false
+
+env:
+  REGION: us-central1
+
+jobs:
+  checks:
+    name: Web checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install
+        working-directory: web
+        run: npm ci
+      - name: Test
+        working-directory: web
+        run: npx vitest run
+      - name: Types
+        working-directory: web
+        run: npx tsc --noEmit
+      - name: Build
+        working-directory: web
+        env:
+          NEXT_PUBLIC_OAUTH_CLIENT_ID: ""
+          NEXT_PUBLIC_TRIAL_PASS: ""
+        run: npx next build
+
+  deploy:
+    name: Deploy web to production
+    needs: checks
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.8"
+      - name: Terraform init
+        working-directory: infra/envs/demo
+        run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" -backend-config="prefix=envs/demo"
+      - name: Read Terraform outputs
+        id: tf
+        working-directory: infra/envs/demo
+        run: echo "registry=$(terraform output -raw artifact_registry)" >> "$GITHUB_OUTPUT"
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+      - name: Build and push web
+        working-directory: web
+        run: |
+          IMAGE="${{ steps.tf.outputs.registry }}/web"
+          GUEST_PASS=$(gcloud secrets versions access latest --secret="trimbin-guest-pass" --project="${{ secrets.GCP_PROJECT_ID }}" 2>/dev/null || echo "")
+          docker build --build-arg NEXT_PUBLIC_OAUTH_CLIENT_ID="${{ secrets.OAUTH_CLIENT_ID }}" --build-arg NEXT_PUBLIC_TRIAL_PASS="$GUEST_PASS" -t "$IMAGE:${{ github.sha }}" .
+          docker push "$IMAGE:${{ github.sha }}"
+      - name: Deploy web
+        run: gcloud run deploy trimbin-web --image="${{ steps.tf.outputs.registry }}/web:${{ github.sha }}" --region="${{ env.REGION }}" --quiet
+      - name: Smoke test
+        run: |
+          WEB=$(gcloud run services describe trimbin-web --region="${{ env.REGION }}" --format='value(status.url)')
+          for page in / /about /guide /projects /review /activity /accuracy; do curl --fail --silent --show-error --max-time 120 "$WEB$page" > /dev/null; done

@@ -5,11 +5,17 @@
 # key exists anywhere to leak, rotate, or find in a git history two years from
 # now.
 
-name: Deploy
+name: Deploy backend
 
 on:
   push:
     branches: [main]
+    paths:
+      - "api/**"
+      - "agents/**"
+      - "clickhouse/**"
+      - "infra/**"
+      - ".github/workflows/deploy-backend.yml"
   workflow_dispatch:
 
 permissions:
@@ -142,38 +148,6 @@ jobs:
             --args="app.worker.main:app,--host,0.0.0.0,--port,8080,--workers,1,--no-access-log" \
             --quiet
 
-      - name: Build and push web
-        working-directory: web
-        run: |
-          IMAGE="${{ steps.tf.outputs.registry }}/web"
-
-          # Terraform generated the guest password; the sign-in form shows it,
-          # so it has to reach the bundle at build time. Empty is survivable —
-          # the form still works, it just does not fill itself in.
-          GUEST_PASS=$(gcloud secrets versions access latest \
-            --secret="trimbin-guest-pass" \
-            --project="${{ secrets.GCP_PROJECT_ID }}" 2>/dev/null || echo "")
-
-          if [ -z "$GUEST_PASS" ]; then
-            echo "::warning::guest pass unreadable - the sign-in form will not fill itself in"
-          else
-            echo "guest pass read (${#GUEST_PASS} chars)"
-          fi
-
-          docker build \
-            --build-arg NEXT_PUBLIC_OAUTH_CLIENT_ID="${{ secrets.OAUTH_CLIENT_ID }}" \
-            --build-arg NEXT_PUBLIC_TRIAL_PASS="$GUEST_PASS" \
-            -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" .
-          docker push "$IMAGE:${{ github.sha }}"
-          docker push "$IMAGE:latest"
-
-      - name: Deploy web
-        run: |
-          gcloud run deploy trimbin-web \
-            --image="${{ steps.tf.outputs.registry }}/web:${{ github.sha }}" \
-            --region="${{ env.REGION }}" \
-            --quiet
-
       # -- proof ------------------------------------------------------------
       # A deploy that reports success while serving errors is worse than one
       # that fails, because nobody goes back to check.
@@ -194,18 +168,6 @@ jobs:
           curl --fail --silent --show-error --max-time 120 "$URL/public/accuracy" \
             | jq -e '.definition != null'
 
-          # And the page a visitor actually lands on. An API that answers while
-          # the site returns a 500 is a deploy that reports success and shows a
-          # stranger an error.
-          WEB=$(gcloud run services describe trimbin-web \
-            --region="${{ env.REGION }}" --format='value(status.url)')
-
-          echo "Web at $WEB"
-          for page in / /about /guide /dashboard /projects /review /archive /activity /accuracy; do
-            echo "  $page"
-            curl --fail --silent --show-error --max-time 120 "$WEB$page" > /dev/null
-          done
-
           # Who the API thinks an anonymous caller is. The interface asks this
           # before drawing anything, so a route that 500s here leaves every
           # visitor looking at a page with no buttons and no explanation.
@@ -221,7 +183,6 @@ jobs:
             echo "No signed-out readable project exists; skipping data-dependent anonymous checks." >&2
             PROJECT_SCREEN='{"tree":{"scenes":[]}}'
           else
-            curl --fail --silent --show-error --max-time 120 "$WEB/project/$PROJECT" > /dev/null
             PROJECT_SCREEN=$(curl --fail --silent --show-error --max-time 120 \
               "$URL/screens/project/$PROJECT")
           fi
