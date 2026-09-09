@@ -51,10 +51,12 @@ class Waiting:
     chosen_take: int
     open_comments: int
     clip_id: str = ""
+    take_no: int = 0
 
     def as_dict(self, project_names: dict[int, str]) -> dict:
         return {
             "clip_id": self.clip_id,
+            "take_no": self.take_no,
             "project_id": self.project_id,
             "project_name": project_names.get(self.project_id, f"Project {self.project_id}"),
             "scene": self.scene,
@@ -177,6 +179,7 @@ async def for_projects(project_ids: list[int], viewer: str) -> dict:
                 chosen_take=row["chosen_take"],
                 open_comments=0,
                 clip_id=row.get("latest_clip_id", ""),
+                take_no=row.get("latest_take_no", 0),
             )
         )
 
@@ -296,7 +299,8 @@ async def _shot_rows(project_ids: list[int]) -> list[dict]:
             ) AS chosen_take,
             anyIf(c.shot_code, c.shot_code != '')                 AS shot_code,
             arraySort(groupArray(toString(c.clip_id)))            AS clip_ids,
-            argMax(toString(c.clip_id), tuple(c.ingested_at, c.clip_id)) AS latest_clip_id
+            argMax(toString(c.clip_id), tuple(c.ingested_at, c.clip_id)) AS latest_clip_id,
+            argMax(c.take_no, tuple(c.ingested_at, c.clip_id)) AS latest_take_no
         FROM current_clip_placement AS c
         LEFT JOIN latest AS l
             ON l.project_id = c.project_id
@@ -324,6 +328,7 @@ async def _shot_rows(project_ids: list[int]) -> list[dict]:
             "shot_code": r[8] or "",
             "clip_ids": [str(item) for item in r[9]],
             "latest_clip_id": str(r[10]),
+            "latest_take_no": int(r[11] or 0),
         }
         for r in result.result_rows
     ]

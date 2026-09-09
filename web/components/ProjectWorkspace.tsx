@@ -21,8 +21,9 @@ import ShotReviewCockpit from "@/components/ShotReviewCockpit";
 import EntityMenu from "@/components/EntityMenu";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
-import { useProjectScreen } from "@/lib/queries";
+import { keys, useProjectScreen } from "@/lib/queries";
 import { paths } from "@/lib/slug";
+import { shotDisplayName } from "@/lib/labels";
 
 export default function ProjectWorkspace({
   projectId,
@@ -276,8 +277,12 @@ export default function ProjectWorkspace({
                         .find((item) => item.scene === urlScene)
                         ?.shots.map((shot) => (
                           <option key={shot.shot} value={shot.shot}>
-                            {shot.slug || `Shot ${shot.shot}`}
-                            {shot.label ? ` · ${shot.label}` : ""}
+                            {shotDisplayName(
+                              urlScene,
+                              tree.scenes.find((item) => item.scene === urlScene)?.scene_code || "",
+                              shot.slug,
+                              shot.shot,
+                            )}
                           </option>
                         ))}
                     </select>
@@ -523,6 +528,9 @@ export default function ProjectWorkspace({
                       `${paths.shot(projectId, open.scene, open.shot, project?.name)}?clip=${encodeURIComponent(clipId)}`);
                   } catch { /* Navigation state is optional. */ }
                 }}
+                onProjectChange={() =>
+                  cache.invalidateQueries({ queryKey: keys.project(projectId) })
+                }
                 sceneLabel={
                   tree.scenes.find((item) => item.scene === open.scene)
                     ?.scene_code || String(open.scene)

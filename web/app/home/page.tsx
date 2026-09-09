@@ -12,6 +12,7 @@ import { ApiError } from "@/lib/api";
 import { currentIdentity } from "@/lib/auth";
 import { useDashboard } from "@/lib/queries";
 import { paths } from "@/lib/slug";
+import { queueShotDisplayName } from "@/lib/labels";
 import { archiveDate } from "@/lib/time";
 
 const THUMBS = [
@@ -174,7 +175,7 @@ export default function DashboardPage() {
           ))}
         </div></>
       )}
-      <div className="home-lower"><section><div className="home-section-head"><h2>Needs your decision</h2><Link href="/review">View all {waiting} →</Link></div><div className="home-decisions">{data.queue.length ? data.queue.slice(0,4).map((item) => <Link key={`${item.project_id}-${item.scene}-${item.shot}`} href={`${paths.shot(item.project_id, item.scene, item.shot, item.project_name)}?clip=${encodeURIComponent(item.clip_id || "")}&review=1`}><span><b>{item.project_name}</b><small>Scene {item.scene} · {item.slug || `Shot ${item.shot}`}</small></span><span>{item.reason.replaceAll("_", " ")}<small>{item.takes} takes · {item.assignee ? `owner ${item.assignee.split("@")[0]}` : "unassigned"}</small></span><i>Review →</i></Link>)
+      <div className="home-lower"><section><div className="home-section-head"><h2>Needs your decision</h2><Link href="/review">View all {waiting} →</Link></div><div className="home-decisions">{data.queue.length ? data.queue.slice(0,4).map((item) => <Link key={`${item.project_id}-${item.scene}-${item.shot}`} href={`${paths.shot(item.project_id, item.scene, item.shot, item.project_name)}?clip=${encodeURIComponent(item.clip_id || "")}&review=1`}><span><b>{item.project_name}</b><small>Scene {item.scene} · {queueShotDisplayName(item.scene, item.slug, item.shot)}</small></span><span>{item.reason.replaceAll("_", " ")}<small>{item.take_no ? `Take ${item.take_no} · ` : ""}{item.takes} takes · {item.assignee ? `owner ${item.assignee.split("@")[0]}` : "unassigned"}</small></span><i>Review →</i></Link>)
         : /* An empty column beside a full one read as something failing to
              load. It says which of the two empties it is instead. */
           <div className="home-empty">{(data.placements?.length ?? 0) > 0

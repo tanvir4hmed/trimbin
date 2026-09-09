@@ -141,6 +141,7 @@ class TestTheDashboardRoute:
         body = client.get("/dashboard").json()
         assert body["queue_total"] == 1
         assert body["queue"][0]["slug"] == "1B"
+        assert body["queue"][0]["take_no"] == 0
         assert body["queue"][0]["project_name"] == "Scene 1 - two perspectives"
         assert body["placements"] == [
             {"project_id": 1, "project_name": "Scene 1 - two perspectives", "count": 2}

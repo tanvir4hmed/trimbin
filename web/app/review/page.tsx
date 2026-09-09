@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { currentIdentity } from "@/lib/auth";
 import { useDashboard } from "@/lib/queries";
 import { paths } from "@/lib/slug";
+import { queueShotDisplayName } from "@/lib/labels";
 import PlacementTasks from "@/components/PlacementTasks";
 
 export default function ReviewQueuePage() {
@@ -66,10 +67,10 @@ export default function ReviewQueuePage() {
               <span>
                 <b>{item.project_name}</b>
                 <strong>
-                  Scene {item.scene} / {item.slug || `Shot ${item.shot}`}
+                  Scene {item.scene} / {queueShotDisplayName(item.scene, item.slug, item.shot)}
                 </strong>
                 <small>
-                  {item.takes} takes · {item.reason.replaceAll("_", " ")}
+                  {item.take_no ? `Take ${item.take_no} · ` : ""}{item.takes} takes · {item.reason.replaceAll("_", " ")}
                   {item.open_comments
                     ? ` · ${item.open_comments} open notes`
                     : ""}

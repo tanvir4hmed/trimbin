@@ -3402,6 +3402,11 @@ export interface components {
              * @default
              */
             clip_id: string;
+            /**
+             * Take No
+             * @default 0
+             */
+            take_no: number;
             /** Project Id */
             project_id: number;
             /** Project Name */

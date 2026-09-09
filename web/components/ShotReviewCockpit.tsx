@@ -181,6 +181,7 @@ export default function ShotReviewCockpit({
   focusTake = 0,
   reviewingClipId = "",
   onReviewingChange,
+  onProjectChange,
   sceneLabel = "",
   shotLabel = "",
 }: {
@@ -197,6 +198,8 @@ export default function ShotReviewCockpit({
   focusTake?: number;
   reviewingClipId?: string;
   onReviewingChange: (clipId: string, takeNo: number) => void;
+  /** Keep the scene rail in sync after a take enters or leaves the shot. */
+  onProjectChange?: () => void | Promise<void>;
   /** Canonical production identity; numeric route ids remain storage keys. */
   sceneLabel?: string;
   shotLabel?: string;
@@ -1364,6 +1367,7 @@ export default function ShotReviewCockpit({
                     `${removed.name} removed from current project views.`,
                   );
                   await screen.refetch();
+                  await onProjectChange?.();
                 }}
               >
                 Remove my clip
@@ -2429,6 +2433,7 @@ export default function ShotReviewCockpit({
                   setNotice(`${removedClip.name} restored.`);
                   setRemovedClip(null);
                   await screen.refetch();
+                  await onProjectChange?.();
                 }}
               >
                 Undo remove

@@ -440,6 +440,7 @@ class CommentList(Model):
 
 class QueueItem(Model):
     clip_id: str = ""
+    take_no: int = 0
     project_id: int
     project_name: str
     scene: int

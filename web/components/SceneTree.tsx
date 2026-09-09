@@ -18,6 +18,7 @@
  */
 
 import type { SceneNode, ShotStatus } from "@/lib/api";
+import { shotDisplayName, supplementarySceneHeading } from "@/lib/labels";
 import { waitingCount } from "@/lib/shot";
 import { useState } from "react";
 
@@ -98,9 +99,17 @@ export default function SceneTree({
               })}>
               {compact && scene.shots.length > 0 && <span aria-hidden>{expanded.has(scene.scene) ? "▾ " : "▸ "}</span>}
               Scene {scene.scene_code || scene.scene}
-              {headings?.get(scene.scene) && (
+              {supplementarySceneHeading(
+                scene.scene,
+                scene.scene_code,
+                headings?.get(scene.scene),
+              ) && (
                 <small className="node-label">
-                  {headings.get(scene.scene)}
+                  {supplementarySceneHeading(
+                    scene.scene,
+                    scene.scene_code,
+                    headings?.get(scene.scene),
+                  )}
                 </small>
               )}
             </button>
@@ -136,11 +145,11 @@ export default function SceneTree({
                     >
                       <span className={`dot ${shot.status}`} aria-hidden />
                       <span className="node-name">
-                        {/* The slug the slate carries, when there is one. "12A"
-                            reads as a shot; "Shot 1" reads as a database row. */}
-                        {shot.slug || `Shot ${shot.shot}`}
-                        {shot.label && (
-                          <span className="node-label">{shot.label}</span>
+                        {shotDisplayName(
+                          scene.scene,
+                          scene.scene_code,
+                          shot.slug,
+                          shot.shot,
                         )}
                       </span>
                       <span className="node-meta">
