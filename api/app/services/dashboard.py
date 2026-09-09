@@ -21,10 +21,9 @@ import asyncio
 import logging
 from dataclasses import dataclass
 
-from . import assessment
+from . import assessment, structure
 from . import comments as comments_service
 from . import shots as shots_service
-from . import structure
 from .analytics import client
 
 log = logging.getLogger(__name__)
