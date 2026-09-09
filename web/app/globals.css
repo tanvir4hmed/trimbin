@@ -1911,8 +1911,9 @@ select {
 .player-badge { position: absolute; z-index: 2; left: 8px; top: 8px; padding: 4px 7px; background: rgba(3, 9, 17, .78); border: 1px solid transparent; border-radius: 4px; font-size: 11px; font-weight: 800; color: inherit; font-family: inherit; cursor: pointer; }
 .player-badge:hover { background: rgba(3, 9, 17, .92); border-color: var(--cockpit-blue); }
 .player-badge[aria-pressed="true"] { border-color: var(--cockpit-blue); }
-.player-badge small,.player-badge span { display:block; line-height:1.05; }
-.player-badge small { margin-bottom:2px; color:#8ea2bb; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; }
+.player-badge small { display:block; margin-bottom:1px; color:#8ea2bb; font-size:9px; font-weight:800; line-height:1.05; text-transform:uppercase; letter-spacing:.08em; }
+.player-badge span { display:flex; align-items:baseline; gap:4px; line-height:1.05; }
+.player-badge em { color:#b9cce2; font:700 10px ui-monospace, monospace; }
 
 .take-card-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(116px, 1fr)); gap: 7px; margin: 10px 0 18px; }
 .take-card { display: grid; gap: 6px; min-width: 0; padding: 10px; text-align: left; color: var(--cockpit-text); background: var(--cockpit-panel); border: 1px solid var(--cockpit-line); border-radius: 7px; }
@@ -1936,7 +1937,6 @@ select {
 .issue-lane { display: grid; grid-template-columns: 72px 1fr; gap: 7px; align-items: center; margin: 3px 0; }
 .lane-label { display: flex; gap: 5px; justify-content: space-between; align-items: center; border: 0; background: transparent; color: #b8c9dc; font: 700 11px ui-monospace, monospace; padding: 0; }
 .lane-label small { font-size: 11px; color: #637b98; }
-.lane-label i { padding: 1px 4px; border-radius: 8px; color: #ffd28a; background: #5b3b12; font: 8px var(--sans); text-transform: uppercase; }
 .issue-lane.selected .lane-label { color: #79a9ff; }
 .issue-lane.needs-review .lane-track { border-color: #b97928; box-shadow: inset 0 0 0 1px #6e461b; }
 .lane-track { position: relative; height: 48px; overflow: hidden; border: 1px solid #273a51; border-radius: 4px; background: repeating-linear-gradient(90deg, #0a1422 0, #0a1422 calc(25% - 1px), #1b2a3d 25%); }
@@ -2593,10 +2593,14 @@ body{background:var(--bg);color:var(--ink)}
 /* Source-local performance review: neutral evidence, explicit human choices. */
 .performance-entry { margin: 18px 0; border: 1px solid #334155; border-radius: 10px; padding: 14px; }
 .performance-entry > summary { cursor: pointer; font-weight: 600; }
-.performance-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.workspace-mode-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.performance-actions .compare-toolbar { margin: 0; margin-left: auto; }
+.performance-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; }
+.performance-actions > button:last-child { justify-self: end; }
+.performance-actions .compare-toolbar { margin: 0; }
 .reviewing-picker select:disabled { color: var(--cockpit-text); opacity: 1; cursor: default; }
+@media (max-width: 700px) {
+  .performance-actions { grid-template-columns: 1fr auto; }
+  .performance-actions .compare-toolbar { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; }
+}
 .issue-lanes .lane-safe { z-index: 2; background: #225645; border: 1px solid #58b994; color: #d8f4e8; }
 .issue-lanes .lane-safe span { display: block; overflow: hidden; padding: 0 4px; color: #c8f5df; font-size: 9px; font-weight: 700; line-height: 16px; text-align: left; white-space: nowrap; text-overflow: ellipsis; }
 .issue-lanes .clean-key { color: #a7bdd8; }

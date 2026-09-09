@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -90,15 +91,51 @@ class _Principal:
         return None
 
 
-def read_model(finding: dict) -> dict:
+def read_model(finding: dict, duration_s: float = 70.0) -> dict:
     return {
-        "clip": {"duration_s": 70.0, "scene": 12, "shot": 2},
+        "clip": {"duration_s": duration_s, "scene": 12, "shot": 2},
         "findings": [finding],
         "history": [],
     }
 
 
 class TestFindingCommandSafety:
+    @pytest.mark.asyncio
+    async def test_dismiss_clamps_an_overlong_full_take_finding(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        finding = {**current_finding(), "start_s": 0.0, "end_s": 59.6264}
+        committed = finding_actions.Committed(
+            uuid4(), finding["finding_id"], 1, "human_dismissed"
+        )
+        captured: dict = {}
+
+        async def read(project_id: int, clip_id):
+            return read_model(finding, duration_s=59.626)
+
+        async def commit(**kwargs):
+            captured.update(kwargs)
+            return committed
+
+        monkeypatch.setattr(analysis.finding_actions, "replay", AsyncMock(return_value=None))
+        monkeypatch.setattr(analysis, "_read", read)
+        monkeypatch.setattr(analysis.finding_actions, "commit", commit)
+        monkeypatch.setattr(analysis.finding_actions, "deliver", AsyncMock(return_value=True))
+        monkeypatch.setattr(analysis.activity, "record", AsyncMock())
+
+        result = await analysis.act_on_finding(
+            1,
+            uuid4(),
+            finding["finding_id"],
+            analysis.FindingCommand(rev=0, action="dismiss"),
+            _Principal(),
+            "dismiss-0001",
+        )
+
+        assert result["action"] == "human_dismissed"
+        assert captured["changes"]["start_s"] == 0.0
+        assert captured["changes"]["end_s"] == 59.626
+
     @pytest.mark.asyncio
     async def test_a_stale_finding_action_is_a_409(self, monkeypatch: pytest.MonkeyPatch) -> None:
         finding = current_finding()

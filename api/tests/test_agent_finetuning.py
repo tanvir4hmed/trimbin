@@ -21,6 +21,10 @@ def test_sustained_motion_from_digital_stillness_and_isolated_flash():
     assert not ffmpeg_ops._spikes([0.0] * 30 + [30.0] + [0.0] * 69, 10)
 
 
+def test_mild_handheld_motion_is_not_reported_as_camera_shake():
+    assert not ffmpeg_ops._spikes([0.0] * 30 + [3.5] * 10 + [0.0] * 60, 10)
+
+
 def test_black_and_freeze_boundaries_do_not_become_camera_shake():
     measured = RawMeasurements(
         duration_s=10,

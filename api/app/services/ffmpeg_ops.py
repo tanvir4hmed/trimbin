@@ -294,9 +294,10 @@ def _spikes(series: list[float], duration_s: float) -> list[Span]:
     # what does this clip look like when nothing is wrong?
     ordered = sorted(series)
     baseline = ordered[len(ordered) // 4]
-    # Digital stillness has a zero baseline; sustained motion must remain
-    # detectable while codec noise and isolated cuts stay below the gate.
-    threshold = max(1.0, baseline * 2.5)
+    # Digital stillness has a zero baseline. A tiny movement still clears a
+    # relative threshold of zero, but ordinary handheld texture is not a
+    # stability fault. Reserve a finding for visibly disruptive movement.
+    threshold = max(4.0, baseline * 2.5)
     seconds_per_frame = duration_s / len(series)
 
     # Half a second. Anything briefer is a cut, a flash, or a subject crossing

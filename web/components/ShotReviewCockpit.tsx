@@ -667,7 +667,6 @@ export default function ShotReviewCockpit({
         : null;
   function previewMoment(clipId: string, at: number, end?: number) {
     if (!takes.some((take) => take.clip_id === clipId)) return;
-    setWorkspaceMode("inspect");
     pendingSeek.current = { clipId, at, play: true };
     reviewRange.current = end === undefined ? null : { clipId, end };
     playerA.current?.element()?.pause();
@@ -690,9 +689,9 @@ export default function ShotReviewCockpit({
     }
     // An issue opened from the shot list is an instruction to review that take,
     // not to leave it parked as the reference. Carry the exact issue range
-    // through the player swap, then play it in the Reviewing pane.
+    // through the player swap, then play it in the Reviewing pane without
+    // leaving an active comparison.
     if (clipId !== chosen?.clip_id) {
-      setWorkspaceMode("inspect");
       chooseTake(clipId, { at: finding.start_s, end: finding.end_s });
     }
     setFocus({ clipId, finding });
@@ -1130,26 +1129,12 @@ export default function ShotReviewCockpit({
           </div>
         </header>
         <nav className="performance-actions" aria-label="Shot workspace mode">
-          <div className="workspace-mode-actions">
-            <button
-              aria-pressed={workspaceMode === "inspect"}
-              onClick={() => setWorkspaceMode("inspect")}
-            >
-              Inspect footage & issues
-            </button>
-            <button
-              aria-pressed={workspaceMode === "compare"}
-              onClick={() => setWorkspaceMode("compare")}
-              disabled={takes.length < 2}
-              title={
-                takes.length < 2
-                  ? "Upload another take to compare performances."
-                  : undefined
-              }
-            >
-              Compare performances
-            </button>
-          </div>
+          <button
+            aria-pressed={workspaceMode === "inspect"}
+            onClick={() => setWorkspaceMode("inspect")}
+          >
+            Inspect footage & issues
+          </button>
           <div className="compare-toolbar" aria-label="Which take">
             <label className="reviewing-picker">Reviewing <select aria-label="Reviewing take"
               value={chosen?.clip_id ?? ""}
@@ -1176,6 +1161,18 @@ export default function ShotReviewCockpit({
               </label>
             )}
           </div>
+          <button
+            aria-pressed={workspaceMode === "compare"}
+            onClick={() => setWorkspaceMode("compare")}
+            disabled={takes.length < 2}
+            title={
+              takes.length < 2
+                ? "Upload another take to compare performances."
+                : undefined
+            }
+          >
+            Compare performances
+          </button>
         </nav>
         <div className="inspect-preview-group">
 
@@ -1216,7 +1213,10 @@ export default function ShotReviewCockpit({
                       title={`Choose ${takeName(take)}`}
                     >
                       <small>{side === "a" ? "Reviewing" : "Reference"}</small>
-                      <span>{takeName(take).toUpperCase()}</span>
+                      <span>
+                        {takeName(take).toUpperCase()}
+                        <em>{tc(take.duration_s)}</em>
+                      </span>
                     </button>
                     <Player
                       ref={ref}
@@ -1256,12 +1256,7 @@ export default function ShotReviewCockpit({
                       }}
                     />
                     <div className="take-details">
-                      <strong>
-                        {takeName(take)}
-                        {take.clip_id === chosen?.clip_id
-                          ? " · Reviewing"
-                          : " · Reference"}
-                      </strong>
+                      <strong>{takeName(take)}</strong>
                       <span>
                         {take.proxy_uri ? "Proxy ready" : "Proxy unavailable"} ·{" "}
                         {take.fps
@@ -1456,7 +1451,6 @@ export default function ShotReviewCockpit({
                 >
                   {take.take_no ? `T${take.take_no}` : "UN"}
                   <small>{tc(take.duration_s)}</small>
-                  {needsReview && <i>review</i>}
                 </button>
                 <div
                   className="lane-track"

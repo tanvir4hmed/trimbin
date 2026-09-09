@@ -23,6 +23,7 @@ from ..services import (
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/analysis", tags=["analysis"])
+RANGE_EPSILON_S = 0.01
 
 
 class FindingCommand(BaseModel):
@@ -162,13 +163,21 @@ async def act_on_finding(
         )
 
     duration = float(read_model["clip"]["duration_s"])
-    start_s = float(body.start_s) if body.start_s is not None else float(current["start_s"])
-    end_s = float(body.end_s) if body.end_s is not None else float(current["end_s"])
-    if not 0 <= start_s < end_s <= duration:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            f"The range must satisfy 0 <= start < end <= {duration:.3f}.",
-        )
+    if body.action == "adjust_range":
+        start_s = float(body.start_s)
+        end_s = float(body.end_s)
+        if not 0 <= start_s < end_s <= duration + RANGE_EPSILON_S:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                f"The range must satisfy 0 <= start < end <= {duration:.3f}.",
+            )
+    else:
+        # An old analysis can end a few milliseconds beyond the media's stored
+        # duration. Reviewing that finding must remain possible; only an editor
+        # changing its range needs strict input validation.
+        start_s = max(0.0, min(float(current["start_s"]), duration))
+        end_s = max(0.0, min(float(current["end_s"]), duration))
+    end_s = min(end_s, duration)
 
     archived_action = {
         "confirm": "human_confirmed",
@@ -181,8 +190,8 @@ async def act_on_finding(
         "code": body.code.value if body.code is not None else None,
         "detail": body.detail,
         "severity": body.severity,
-        "start_s": start_s if body.action == "adjust_range" else None,
-        "end_s": end_s if body.action == "adjust_range" else None,
+        "start_s": start_s,
+        "end_s": end_s,
     }
     if body.action == "retract":
         durable = await finding_actions.pending_history(project_id, finding_id)
