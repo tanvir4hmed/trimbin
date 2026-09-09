@@ -1317,12 +1317,8 @@ export default function ShotReviewCockpit({
             </span>
           </header>
           <div className="finding-list">
-            {/* Tabs per take rather than every take's issues stacked. Two takes
-                already filled the panel; six would have been a page of its own. */}
             <div className="finding-tabs" role="tablist">
-              {[chosen, previous]
-                .filter((take): take is Take => Boolean(take))
-                .map((take) => {
+              {takes.map((take) => {
                   const count = openFindings.filter(
                     ({ analysis }) =>
                       String(analysis.clip_id) === take.clip_id,
