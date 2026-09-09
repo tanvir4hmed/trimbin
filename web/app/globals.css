@@ -1943,13 +1943,6 @@ select {
 .lane-empty, .lane-safe, .lane-finding { position: absolute; top: 0; bottom: 0; border: 0; }
 .lane-empty { left: 0; background: #18273a; }
 .lane-safe { background: #1e7779; opacity: .85; }
-.lane-safe span { display: block; overflow: hidden; padding: 0 4px; color: #b9f1d9; font-size: 9px; font-weight: 700; line-height: 16px; text-align: left; white-space: nowrap; text-overflow: ellipsis; }
-.ai-safe-ranges { margin: 12px 0; padding: 10px; background: #0d2230; border: 1px solid #27516a; border-radius: 6px; }
-.ai-safe-ranges h3 { margin: 0; color: #b9f1d9; font-size: 11px; }
-.ai-safe-ranges p { margin: 3px 0 7px; color: var(--cockpit-dim); font-size: 10px; }
-.ai-safe-ranges > div { display: flex; gap: 5px; flex-wrap: wrap; }
-.ai-safe-ranges button { padding: 4px 6px; color: #b9f1d9; background: #163b4a; border: 1px solid #32748a; border-radius: 4px; font: 10px var(--mono); }
-.ai-safe-ranges button.on { background: #245b61; border-color: #69d8a8; }
 .lane-finding { min-width: 3px; z-index: 3; overflow: hidden; padding: 0 4px; background: var(--cockpit-amber); color: #2e2109; text-align: left; font-size: 11px; font-weight: 800; white-space: nowrap; }
 .lane-finding.severity-blocking, .finding-dot.severity-blocking { background: #ef6f76; }
 .lane-finding.severity-note, .finding-dot.severity-note { background: #6e8faa; }

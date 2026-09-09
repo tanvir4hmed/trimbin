@@ -1286,7 +1286,7 @@ export default function ShotReviewCockpit({
             </div>
             <div className="lane-header-actions">
               <div className="lane-legend">
-                <span className="clean-key">AI suggested</span>
+                <span className="clean-key">Candidate usable</span>
                 <span className="selected-key">Shot select</span>
                 <span className="reviewed-clean-key">Reviewed clean</span>
                 <span className="warn-key">Issue</span>
@@ -1432,8 +1432,8 @@ export default function ShotReviewCockpit({
                           "Range selected. Adjust In / Out in the inspector, then mark reviewed clean or add to shot selects.",
                         );
                       }}
-                      title={`AI-suggested usable range ${tc(item.start_s)}–${tc(item.end_s)}. Review it before accepting as clean or adding it to shot selects.`}
-                    ><span>AI suggested</span></button>
+                      title={`No range-excluding finding ${tc(item.start_s)}–${tc(item.end_s)}. This is not proof of clean footage; inspect all issue markers and performance attempts.`}
+                    />
                   ))}
                   {findingMarkers.map(({ finding, row }) => (
                     <button
@@ -1868,26 +1868,6 @@ export default function ShotReviewCockpit({
                       />
                     </div>
                   </label>
-                  {(selectedAnalysis?.safe_ranges ?? selected.safe_ranges).length > 0 && (
-                    <section className="ai-safe-ranges" aria-label="AI suggested usable ranges">
-                      <h3>AI suggested clean ranges</h3>
-                      <p>Review a suggested usable portion, then verify it as clean if it holds up.</p>
-                      <div>
-                        {(selectedAnalysis?.safe_ranges ?? selected.safe_ranges).map((item, index) => (
-                          <button
-                            key={`ai-safe-${index}`}
-                            className={range.from === item.start_s && range.to === item.end_s ? "on" : ""}
-                            onClick={() => {
-                              setRange({ from: item.start_s, to: item.end_s });
-                              previewMoment(selected.clip_id, item.start_s, item.end_s);
-                            }}
-                          >
-                            {tc(item.start_s)}–{tc(item.end_s)} · AI suggested
-                          </button>
-                        ))}
-                      </div>
-                    </section>
-                  )}
                   <ReviewedRanges
                     key={selected.clip_id}
                     projectId={projectId}
