@@ -412,9 +412,7 @@ async def test_ingest_can_remove_one_clip_without_waiting_for_the_batch(monkeypa
 
     result = await uploads.commit_ingest(
         JOB,
-        uploads.CommitIngest(
-            items=[uploads.IngestResolution(clip_id=CLIP, action="remove")]
-        ),
+        uploads.CommitIngest(items=[uploads.IngestResolution(clip_id=CLIP, action="remove")]),
         Principal(),
     )
 
