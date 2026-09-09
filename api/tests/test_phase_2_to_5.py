@@ -365,6 +365,64 @@ async def test_retrying_an_ingest_commit_does_not_append_another_event(monkeypat
     assert result == {"status": "committed", "committed": 0, "analysis_queued": 0}
 
 
+@pytest.mark.asyncio
+async def test_ingest_can_remove_one_clip_without_waiting_for_the_batch(monkeypatch) -> None:
+    removed: list[UUID] = []
+    verified: list[set[str]] = []
+    job = jobs.Job(
+        job_id=JOB,
+        project_id=7,
+        kind="ingest",
+        state=jobs.State.DONE,
+        total_items=2,
+        completed_items=2,
+        failed_items=0,
+        items=[
+            {"clip_id": str(CLIP), "scene": 0, "shot": 0, "verified": False},
+            {
+                "clip_id": "b5770117-81de-4fb8-a064-6f136df0966a",
+                "scene": 0,
+                "shot": 0,
+                "verified": False,
+            },
+        ],
+    )
+
+    async def get_job(job_id):
+        return job
+
+    async def record(project_id, clip_id, action, actor, detail):
+        assert action == "deleted"
+        removed.append(clip_id)
+
+    async def record_activity(*args, **kwargs):
+        assert args[2] == "deleted_clip"
+
+    async def mark_verified(job_id, clip_ids):
+        verified.append(clip_ids)
+
+    async def limits(project_id):
+        return SimpleNamespace(takes_per_shot=0)
+
+    monkeypatch.setattr(uploads.jobs, "get_job", get_job)
+    monkeypatch.setattr(uploads.clip_lifecycle, "record", record)
+    monkeypatch.setattr(uploads.activity, "record", record_activity)
+    monkeypatch.setattr(uploads.jobs, "mark_verified", mark_verified)
+    monkeypatch.setattr(uploads.quota, "limits_for_project", limits)
+
+    result = await uploads.commit_ingest(
+        JOB,
+        uploads.CommitIngest(
+            items=[uploads.IngestResolution(clip_id=CLIP, action="remove")]
+        ),
+        Principal(),
+    )
+
+    assert result == {"status": "committed", "committed": 1, "analysis_queued": 0}
+    assert removed == [CLIP]
+    assert verified == [{str(CLIP)}]
+
+
 def test_verified_placement_migration_never_promotes_an_open_proposal() -> None:
     sql = (
         Path(__file__).parents[2] / "clickhouse/migrations/022_verified_placements.sql"

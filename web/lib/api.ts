@@ -686,7 +686,7 @@ export const api = {
     jobId: string,
     items: {
       clip_id: string;
-      action: "move" | "keep" | "unassign" | "create";
+      action: "move" | "keep" | "unassign" | "create" | "remove";
       scene?: number;
       shot?: number;
       take?: number;
@@ -705,7 +705,7 @@ export const api = {
     jobId: string,
     item: {
       clip_id: string;
-      action: "move" | "keep" | "unassign" | "create";
+      action: "move" | "keep" | "unassign" | "create" | "remove";
       scene?: number;
       shot?: number;
       take?: number;

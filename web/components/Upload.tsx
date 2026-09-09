@@ -9,7 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 type Stage = "add" | "read" | "verify" | "ingest";
 type Resolution = {
-  action: "move" | "keep" | "unassign" | "create";
+  action: "move" | "keep" | "unassign" | "create" | "remove";
   scene?: number;
   shot?: number;
   take?: number;
@@ -92,6 +92,7 @@ export default function Upload({
   const [createNew, setCreateNew] = useState(false);
   const [evidenceUri, setEvidenceUri] = useState("");
   const [error, setError] = useState("");
+  const [committingId, setCommittingId] = useState("");
   const [dragging, setDragging] = useState(false);
   const [interrupted, setInterrupted] = useState<SavedGrant | null>(null);
 
@@ -334,33 +335,72 @@ export default function Upload({
   const unresolved = items.filter(
     (item) => !item.verified && !decisions[item.clip_id],
   );
+  const ready = items.filter(
+    (item) => !item.verified && Boolean(decisions[item.clip_id]),
+  );
   // A file that fails is recorded on its row and was never drawn. Silence is
   // the worst possible report on an upload: the batch appears to progress and
   // then simply stops existing.
   const failed = rows.filter((row) => row.state === "failed");
 
-  const commit = async () => {
-    if (!jobId || unresolved.length) return;
+  const commit = async (
+    clipIds?: string[],
+    overrides: Record<string, Resolution> = {},
+  ) => {
+    if (!jobId) return;
+    const wanted = clipIds ? new Set(clipIds) : null;
+    const pending = items
+      .filter((item) => !item.verified && (!wanted || wanted.has(item.clip_id)))
+      .flatMap((item) => {
+        const decision = overrides[item.clip_id] ?? decisions[item.clip_id];
+        return decision ? [{ clip_id: item.clip_id, ...decision }] : [];
+      });
+    if (!pending.length) return;
+    setCommittingId(clipIds?.length === 1 ? clipIds[0] : "batch");
+    setError("");
     try {
-      const pending = items
-        .filter((item) => !item.verified)
-        .map((item) => ({ clip_id: item.clip_id, ...decisions[item.clip_id] }));
-      if (pending.length) await api.commitIngest(jobId, pending);
+      await api.commitIngest(jobId, pending);
       const found = await api.jobStatus(jobId);
       setStatus(found);
-      setStage("ingest");
+      const remaining = found.items.filter((item) => !item.verified);
+      if (remaining.length) {
+        setStage("verify");
+        setSelectedId(remaining[0].clip_id);
+        setDecisions((current) => {
+          const next = { ...current };
+          for (const item of pending) delete next[item.clip_id];
+          return next;
+        });
+      } else {
+        setStage("ingest");
+        window.localStorage.removeItem(storageKey);
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
         queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
         queryClient.invalidateQueries({ queryKey: ["projects"] }),
       ]);
-      window.localStorage.removeItem(storageKey);
       onFinished?.();
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Could not commit ingest.",
       );
+    } finally {
+      setCommittingId("");
     }
+  };
+
+  const removeFromIngest = async (clipId: string) => {
+    const item = items.find((row) => row.clip_id === clipId);
+    if (
+      !item ||
+      !window.confirm(
+        `Remove ${item.filename || "this footage"} from the project? You can restore it later.`,
+      )
+    ) return;
+    const resolution: Resolution = { action: "remove" };
+    await choose(clipId, resolution);
+    await commit([clipId], { [clipId]: resolution });
   };
 
   const reset = () => {
@@ -637,7 +677,7 @@ export default function Upload({
                 </p>
               </div>
               <div className="status-filter">
-                Verify every row before commit
+                Review and ingest clips independently
               </div>
             </header>
             <div className="ingest-table-wrap">
@@ -791,7 +831,7 @@ export default function Upload({
                   <span>Folder target</span>
                   <span>Container duration</span>
                 </div>
-                {stage === "verify" && canResolve && (
+                {stage === "verify" && canResolve && !selected.verified && (
                   <>
                     <div className="resolve-target">
                       <label>
@@ -912,11 +952,29 @@ export default function Upload({
                       >
                         Leave unassigned
                       </button>
+                      <button
+                        className="ghost danger"
+                        disabled={Boolean(committingId)}
+                        onClick={() => void removeFromIngest(selected.clip_id)}
+                      >
+                        Remove footage
+                      </button>
                     </div>
                     {decisions[selected.clip_id] && (
-                      <p className="decision-ready">
-                        ✓ Decision ready: {decisions[selected.clip_id].action}
-                      </p>
+                      <div className="decision-ready-row">
+                        <p className="decision-ready">
+                          ✓ Decision ready: {decisions[selected.clip_id].action}
+                        </p>
+                        <button
+                          className="primary small"
+                          disabled={Boolean(committingId)}
+                          onClick={() => void commit([selected.clip_id])}
+                        >
+                          {committingId === selected.clip_id
+                            ? "Ingesting…"
+                            : "Ingest this clip"}
+                        </button>
+                      </div>
                     )}
                   </>
                 )}
@@ -936,18 +994,19 @@ export default function Upload({
               needs review; nothing is auto-deleted.
             </b>
             <span>
-              {unresolved.length
-                ? `${unresolved.length} clip${unresolved.length === 1 ? "" : "s"} still need a decision.`
-                : "All assignments are ready."}
+              {ready.length
+                ? `${ready.length} ready · ${unresolved.length} still need a decision.`
+                : `${unresolved.length} clip${unresolved.length === 1 ? "" : "s"} still need a decision.`}
             </span>
           </div>
           <button
             className="primary"
-            disabled={Boolean(unresolved.length) || !items.length}
+            disabled={!ready.length || Boolean(committingId)}
             onClick={() => void commit()}
           >
-            Commit {items.filter((item) => !item.verified).length} clips to
-            project
+            {committingId === "batch"
+              ? "Ingesting…"
+              : `Ingest ${ready.length} ready clip${ready.length === 1 ? "" : "s"}`}
           </button>
         </footer>
       )}

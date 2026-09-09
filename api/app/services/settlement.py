@@ -76,10 +76,9 @@ async def settle(
     )
 
     if unassign or not queue_analysis_now:
-        # A batch defers queueing until every clip in it is settled and the job
-        # is marked verified. A worker that started on the first clip while the
-        # job still read unverified would be racing a state the interface has
-        # not caught up with.
+        # Ingest defers queueing until the requested clip or subset is marked
+        # verified. That keeps placement and job state ordered while allowing
+        # the remaining clips in the batch to stay pending.
         return 0
     return await queue_analysis(project_id, [clip_id])
 

@@ -2265,6 +2265,10 @@ kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:
 .ir-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:3px}
 .ir-actions label{display:flex;gap:6px;align-items:center;font-size:11.5px;color:var(--low)}
 .ir-duplicate{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding-top:2px}
+.ir-duplicate-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.inbox .danger,.ingest-inspector .danger{color:#ef9298;border-color:#6c3840}
+.decision-ready-row{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:8px}
+.decision-ready-row .decision-ready{margin:0}
 
 .pill{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:20px;border:1px solid var(--line)}
 .pill.warn{color:var(--amber);border-color:rgba(217,164,65,.45)}

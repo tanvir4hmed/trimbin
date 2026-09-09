@@ -6,8 +6,8 @@ Cloud Run would cost twice — once in ingress, once in egress — and would mak
 service scale with footage volume rather than with request count.
 
 The interaction is a persisted four-stage batch. Storage receives the bytes,
-workers read each slate and build proxies, then a person verifies every proposed
-assignment before any clip becomes canonical project footage.
+workers read each slate and build proxies, then a person can verify and commit
+each proposed assignment independently while the rest of the batch waits.
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ from .. import schemas
 from ..auth import Principal, current_principal, require_signed_in
 from ..services import (
     activity,
+    clip_lifecycle,
     jobs,
     members,
     quota,
@@ -96,7 +97,7 @@ class UploadComplete(BaseModel):
 
 class IngestResolution(BaseModel):
     clip_id: UUID
-    action: Literal["move", "keep", "unassign", "create"]
+    action: Literal["move", "keep", "unassign", "create", "remove"]
     scene: int = Field(default=0, ge=0)
     shot: int = Field(default=0, ge=0)
     take: int = Field(default=0, ge=0)
@@ -334,8 +335,11 @@ async def job_status(
         scene = int(item.get("scene", 0) or 0)
         shot = int(item.get("shot", 0) or 0)
         confident = bool(item.get("confident"))
+        draft_action = str((item.get("draft") or {}).get("action") or "")
         item_status = (
-            "Committed"
+            "Removed"
+            if item.get("verified") and draft_action == "remove"
+            else "Committed"
             if item.get("verified")
             else "Duplicate"
             if duplicate
@@ -391,7 +395,7 @@ async def commit_ingest(
     body: CommitIngest,
     principal: Annotated[Principal, Depends(require_signed_in)],
 ) -> dict[str, object]:
-    """Commit verified assignments and only then start full-take analysis."""
+    """Commit any verified subset and start analysis for those assigned clips."""
     job = await jobs.get_job(job_id)
     if job is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such ingest batch.")
@@ -413,6 +417,23 @@ async def commit_ingest(
         # publish the same full-take task again. Verification is durable on the
         # job item, so an already committed clip is a successful no-op.
         if proposed.get("verified"):
+            continue
+        if decision.action == "remove":
+            await clip_lifecycle.record(
+                job.project_id,
+                decision.clip_id,
+                "deleted",
+                principal.email or "",
+                "removed during ingest verification",
+            )
+            await activity.record(
+                job.project_id,
+                principal.email or "",
+                "deleted_clip",
+                detail=f"clip {str(decision.clip_id)[:8]} removed during ingest (recoverable)",
+                actor_role=members.role_of(principal.email),
+            )
+            committed.add(str(decision.clip_id))
             continue
         if decision.action == "keep":
             scene, shot = int(proposed.get("scene", 0)), int(proposed.get("shot", 0))
@@ -472,8 +493,8 @@ async def commit_ingest(
             detail=detail,
             unassign=decision.action == "unassign",
             verb="ingest_committed",
-            # Deferred: the whole batch settles, the job is marked verified,
-            # and only then is analysis queued for what was assigned.
+            # Deferred only until this requested subset is marked verified;
+            # each clip may enter the project without waiting on its batch.
             queue_analysis_now=False,
         )
         committed.add(str(decision.clip_id))
@@ -485,7 +506,7 @@ async def commit_ingest(
     assigned = [
         item.clip_id
         for item in body.items
-        if item.action != "unassign" and str(item.clip_id) in committed
+        if item.action not in {"unassign", "remove"} and str(item.clip_id) in committed
     ]
     queued = await settlement.queue_analysis(job.project_id, assigned)
     return {

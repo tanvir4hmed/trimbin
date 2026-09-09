@@ -59,6 +59,25 @@ export default function PlacementInbox({
     },
   });
 
+  const remove = useMutation({
+    mutationFn: (clipId: string) => api.removeClip(projectId, clipId),
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["project", projectId, "placements"] }),
+        client.invalidateQueries({ queryKey: keys.project(projectId) }),
+        client.invalidateQueries({ queryKey: keys.dashboard() }),
+      ]);
+    },
+  });
+
+  const removeFootage = (clipId: string, filename: string) => {
+    if (
+      window.confirm(
+        `Remove ${filename || "this footage"} from the project? You can restore it later.`,
+      )
+    ) remove.mutate(clipId);
+  };
+
   const waiting = inbox.data?.waiting ?? [];
   const unassigned = inbox.data?.unassigned ?? [];
   if (inbox.isPending || (waiting.length === 0 && unassigned.length === 0)) return null;
@@ -211,6 +230,16 @@ export default function PlacementInbox({
                   >
                     Leave unassigned
                   </button>
+                  {!duplicate && (
+                    <button
+                      type="button"
+                      className="ghost small danger"
+                      disabled={resolve.isPending || remove.isPending}
+                      onClick={() => removeFootage(row.clip_id, row.filename)}
+                    >
+                      Remove footage
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -221,20 +250,30 @@ export default function PlacementInbox({
                     <b className="mono">
                       {row.duplicate_scene}/{row.duplicate_shot} take {row.duplicate_take}
                     </b>
-                    . Kept, not deleted — replacing only changes which of the
-                    two is current for that take.
+                    . It remains available until you replace the current take
+                    or remove this copy.
                   </p>
                   {canResolve && (
-                    <button
-                      type="button"
-                      className="ghost small"
-                      disabled={resolve.isPending}
-                      onClick={() =>
-                        resolve.mutate({ clipId: row.clip_id, body: { action: "replace" } })
-                      }
-                    >
-                      Replace the existing take with this one
-                    </button>
+                    <div className="ir-duplicate-actions">
+                      <button
+                        type="button"
+                        className="ghost small"
+                        disabled={resolve.isPending || remove.isPending}
+                        onClick={() =>
+                          resolve.mutate({ clipId: row.clip_id, body: { action: "replace" } })
+                        }
+                      >
+                        Replace the existing take with this one
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost small danger"
+                        disabled={resolve.isPending || remove.isPending}
+                        onClick={() => removeFootage(row.clip_id, row.filename)}
+                      >
+                        Remove footage
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
@@ -249,7 +288,26 @@ export default function PlacementInbox({
           {unassigned.map((row) => (
             <div className="inbox-row compact" key={`unassigned-${row.clip_id}`}>
               {row.sprite_uri ? <img className="slate-frame" src={row.sprite_uri} alt="Clip thumbnail" /> : <div className="slate-frame none">no preview</div>}
-              <div className="inbox-main"><div className="ir-head"><span className="mono">{row.filename || row.clip_id.slice(0, 8)}</span><span className="pill quiet">Unassigned</span><span className="dim small">{row.duration_s.toFixed(0)}s</span></div><div className="ir-why">{row.detail || "Waiting for a scene and shot"}</div></div>
+              <div className="inbox-main">
+                <div className="ir-head">
+                  <span className="mono">{row.filename || row.clip_id.slice(0, 8)}</span>
+                  <span className="pill quiet">Unassigned</span>
+                  <span className="dim small">{row.duration_s.toFixed(0)}s</span>
+                </div>
+                <div className="ir-why">{row.detail || "Waiting for a scene and shot"}</div>
+                {canResolve && (
+                  <div className="ir-actions">
+                    <button
+                      type="button"
+                      className="ghost small danger"
+                      disabled={remove.isPending}
+                      onClick={() => removeFootage(row.clip_id, row.filename)}
+                    >
+                      Remove footage
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -260,6 +318,13 @@ export default function PlacementInbox({
           {resolve.error instanceof Error
             ? resolve.error.message
             : "Could not settle that clip."}
+        </p>
+      )}
+      {remove.isError && (
+        <p className="error small">
+          {remove.error instanceof Error
+            ? remove.error.message
+            : "Could not remove that footage."}
         </p>
       )}
     </section>
