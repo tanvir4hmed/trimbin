@@ -24,7 +24,7 @@ export default function ReviewedRanges({
   canEdit: boolean;
   onSelect: (start: number, end: number) => void;
   candidate?: boolean;
-  onVerified?: () => void;
+  onVerified?: (start: number, end: number) => void;
   blockedRanges?: { from: number; to: number }[];
 }) {
   const cache = useQueryClient();
@@ -63,7 +63,7 @@ export default function ReviewedRanges({
       setMessage("Reviewed ranges saved.");
       setSelected(null);
       setEditingRevision(null);
-      onVerified?.();
+      onVerified?.(start, end);
     } catch (error) {
       setMessage(
         error instanceof Error

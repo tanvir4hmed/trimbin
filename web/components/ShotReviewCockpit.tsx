@@ -224,6 +224,13 @@ export default function ShotReviewCockpit({
   const [bulkFindingCode, setBulkFindingCode] = useState("");
   const [reviewFilter, setReviewFilter] = useState("unresolved");
   const [issueClipId, setIssueClipId] = useState("");
+  const activeReviewerId =
+    reviewingClipId ||
+    (focusTake ? takes.find((take) => take.take_no === focusTake)?.clip_id : "") ||
+    initialClipId ||
+    recommended?.clip_id ||
+    takes.at(-1)?.clip_id ||
+    "";
   const [inspectorTab, setInspectorTab] = useState<
     "finding" | "selects" | "shot"
   >("selects");
@@ -259,12 +266,19 @@ export default function ShotReviewCockpit({
   const bulkFindings = useMemo(
     () =>
       findingsForReview.filter(({ analysis, finding }) =>
+        String(analysis.clip_id) === activeReviewerId &&
         bulkFindingKeys.has(
           findingKey(String(analysis.clip_id), String(finding.finding_id)),
         ),
       ),
-    [bulkFindingKeys, findingsForReview],
+    [activeReviewerId, bulkFindingKeys, findingsForReview],
   );
+  useEffect(() => {
+    // Bulk review belongs to the take currently being reviewed, never the
+    // comparison/reference take.
+    setBulkFindingKeys(new Set());
+    setBulkFindingCode("");
+  }, [activeReviewerId]);
   useEffect(() => {
     setFocus((old) => {
       if (!old) return old;
@@ -675,12 +689,20 @@ export default function ShotReviewCockpit({
       setAdjusting(false);
       return;
     }
+    // An issue opened from the shot list is an instruction to review that take,
+    // not to leave it parked as the reference. Promote it before seeking so
+    // the issue remains visible in the Reviewing player after the switch.
+    if (clipId !== chosen?.clip_id) chooseTake(clipId);
     setFocus({ clipId, finding });
     setInspectorTab("finding");
     previewMoment(clipId, finding.start_s, finding.end_s);
   };
 
   const toggleBulkFinding = (clipId: string, finding: FindingEvent) => {
+    if (clipId !== activeReviewerId) {
+      setNotice("Bulk issue review is limited to the take currently being reviewed.");
+      return;
+    }
     if (finding.action !== "machine_open") {
       setNotice("That issue has already been reviewed.");
       return;
@@ -866,6 +888,44 @@ export default function ShotReviewCockpit({
     setNotice(
       `Take ${selected.take_no} ${tc(range.from)}–${tc(range.to)} added. Save the shot selects when ready.`,
     );
+  };
+
+  const promoteVerifiedClean = (from: number, to: number) => {
+    if (!selected || !(to > from)) return;
+    const analysis = analysisFor(analyses, selected.clip_id);
+    const safe = analysis
+      ? rangesOutsideIssues(selected.duration_s, analysis.findings)
+      : selected.safe_ranges.map((item) => ({
+          from: item.start_s,
+          to: item.end_s,
+        }));
+    const verifiedPieces = withinRanges({ from, to }, safe);
+    const occupied = selectsRef.current
+      .filter((item) => item.clip_id === selected.clip_id)
+      .map((item) => ({ from: item.source_in_s, to: item.source_out_s }));
+    const pieces = verifiedPieces.flatMap((piece) => subtractRanges(piece, occupied));
+    if (!pieces.length) {
+      setNotice("This verified clean range is already selected or overlaps an issue.");
+      return;
+    }
+    setSelects((current) => [
+      ...current,
+      ...pieces.map((piece, index) => ({
+        segment_id: crypto.randomUUID(),
+        clip_id: selected.clip_id,
+        attempt_revision: 0,
+        take_no: selected.take_no,
+        source_in_s: piece.from,
+        source_out_s: piece.to,
+        position: current.length + index,
+        reason: "verified clean range",
+        created_by: you,
+        origin: "human" as const,
+      })),
+    ]);
+    setRange({ from, to });
+    setCleanCandidate(null);
+    setNotice("Verified clean range is now a shot select. Save the shot selects when ready.");
   };
 
   const updateSelectBoundary = (
@@ -1313,7 +1373,7 @@ export default function ShotReviewCockpit({
                       <button
                         onClick={() => {
                           const visible = new Set(
-                            [chosen?.clip_id, previous?.clip_id].filter(Boolean),
+                            [chosen?.clip_id].filter(Boolean),
                           );
                           setBulkFindingKeys(
                             new Set(
@@ -1386,9 +1446,16 @@ export default function ShotReviewCockpit({
             // the last completed comparison suggestion visible until the new
             // run is complete, then replace it with the freshly issue-adjusted
             // clean portions.
-            const safe = analysis?.coverage_complete
-              ? analysis.safe_ranges
-              : take.safe_ranges;
+            // Candidate bars use every current finding, including note-level
+            // slate/exit evidence. Backend safe_ranges intentionally omits
+            // some notes, but a Verify clean candidate must never cross any
+            // visible issue.
+            const safe = analysis
+              ? rangesOutsideIssues(take.duration_s, findings)
+              : take.safe_ranges.map((item) => ({
+                  from: item.start_s,
+                  to: item.end_s,
+                }));
             const needsReview =
               take.clip_id === chosen?.clip_id &&
               (!screen.data?.decision_fresh ||
@@ -1424,24 +1491,24 @@ export default function ShotReviewCockpit({
                       key={`safe-${index}`}
                       className="lane-safe"
                       style={{
-                        left: pct(item.start_s),
-                        width: pct(item.end_s - item.start_s),
+                        left: pct(item.from),
+                        width: pct(item.to - item.from),
                       }}
                       onClick={() => {
                         pendingRange.current = {
                           clipId: take.clip_id,
-                          range: { from: item.start_s, to: item.end_s },
+                          range: { from: item.from, to: item.to },
                         };
-                        previewMoment(take.clip_id, item.start_s, item.end_s);
-                        setRange({ from: item.start_s, to: item.end_s });
-                        setCleanCandidate({ from: item.start_s, to: item.end_s });
+                        previewMoment(take.clip_id, item.from, item.to);
+                        setRange({ from: item.from, to: item.to });
+                        setCleanCandidate({ from: item.from, to: item.to });
                         setInspectorTab("selects");
                         setNotice(
                           "Range selected. Adjust In / Out in the inspector, then mark reviewed clean or add to shot selects.",
                         );
                       }}
-                      aria-label={`Clean candidate ${tc(item.start_s)} to ${tc(item.end_s)}`}
-                      title={`Clean candidate ${tc(item.start_s)}–${tc(item.end_s)}. Review it before marking clean or adding it to shot selects.`}
+                      aria-label={`Clean candidate ${tc(item.from)} to ${tc(item.to)}`}
+                      title={`Clean candidate ${tc(item.from)}–${tc(item.to)}. Review it before marking clean or adding it to shot selects.`}
                     ><span>Clean candidate</span></button>
                   ))}
                   {findingMarkers.map(({ finding, row }) => (
@@ -1891,7 +1958,11 @@ export default function ShotReviewCockpit({
                     blockedRanges={(selectedAnalysis?.findings ?? [])
                       .filter((finding) => finding.action !== "human_dismissed" && !(finding.action === "human_retracted" && finding.restored_action === "human_dismissed"))
                       .map((finding) => ({ from: finding.start_s, to: finding.end_s }))}
-                    onVerified={() => setCleanCandidate(null)}
+                    onVerified={
+                      cleanCandidate
+                        ? (from, to) => promoteVerifiedClean(from, to)
+                        : undefined
+                    }
                     onSelect={(from, to) => {
                       setCleanCandidate(null);
                       setRange({ from, to });
