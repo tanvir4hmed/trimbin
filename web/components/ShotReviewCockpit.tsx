@@ -1204,9 +1204,9 @@ export default function ShotReviewCockpit({
                         width: pct(
                           Math.max(0.4, finding.end_s - finding.start_s),
                         ),
-                        top: row * 12,
+                        top: row * 18,
                         bottom: "auto",
-                        height: 12,
+                        height: 16,
                       }}
                       onClick={() => inspect(take.clip_id, finding)}
                       title={`${label(finding.code)} · ${finding.action === "machine_open" ? "Unresolved" : label(finding.action.replace("human_", ""))} · ${tc(finding.start_s)}–${tc(finding.end_s)}`}
