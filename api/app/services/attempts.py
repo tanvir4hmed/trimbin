@@ -104,6 +104,28 @@ async def context(project_id: int, clip_id: UUID) -> tuple[float, list[dict]]:
     return float(result["duration_s"]), proposals
 
 
+def _dedupe_clean_items(items: list[dict | AttemptItem]) -> list[dict | AttemptItem]:
+    """One reviewed-clean record per exact source interval.
+
+    Attempt IDs are immutable history, but identical clean intervals are not
+    distinct evidence. Keeping the earliest row makes old duplicate saves safe
+    to read and makes every later write repair the current snapshot.
+    """
+    seen: set[tuple[float, float]] = set()
+    deduped: list[dict | AttemptItem] = []
+    for item in items:
+        state = item.state if isinstance(item, AttemptItem) else item.get("state")
+        if state == "clean":
+            start = item.start_s if isinstance(item, AttemptItem) else item.get("start_s", 0)
+            end = item.end_s if isinstance(item, AttemptItem) else item.get("end_s", 0)
+            key = (round(float(start), 3), round(float(end), 3))
+            if key in seen:
+                continue
+            seen.add(key)
+        deduped.append(item)
+    return deduped
+
+
 def materialize(
     project_id: int, clip_id: UUID, duration: float, proposals: list[dict], document: dict
 ) -> AttemptState:
@@ -123,7 +145,7 @@ def materialize(
         clip_id=clip_id,
         duration_s=duration,
         rev=int(document.get("rev", 0)),
-        items=document.get("items", default_items),
+        items=_dedupe_clean_items(document.get("items", default_items)),
         proposals=proposals,
         analysis_changed=bool(document and document.get("proposal_ids", []) != proposal_ids),
         updated_at=document.get("updated_at"),
@@ -164,7 +186,10 @@ async def save(project_id: int, clip_id: UUID, body: AttemptSave, actor: str) ->
         raise HTTPException(422, "A boundary extends beyond the source recording.")
     ref = reference(project_id, clip_id)
     receipt = ref.collection("commands").document(str(body.command_id))
-    items = [row.model_dump(mode="json") for row in body.items]
+    # A clean review identifies a source interval. Re-clicking the same range
+    # is not another editorial fact, so retain the first record instead of
+    # growing a visually identical stack on every save.
+    items = _dedupe_clean_items([row.model_dump(mode="json") for row in body.items])
     request = {"actor": actor, "rev": body.rev, "items": items}
     proposal_ids = list({row.proposal_id for row in body.items if row.proposal_id})
     historical_ids: set[str] = set()

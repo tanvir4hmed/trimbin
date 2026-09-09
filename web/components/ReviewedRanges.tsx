@@ -41,8 +41,24 @@ export default function ReviewedRanges({
     rev: number;
     items: AttemptItem[];
   } | null>(null);
-  const clean = query.data?.items.filter((row) => row.state === "clean") ?? [];
-  async function commit(items: AttemptItem[], rev: number) {
+  const allItems = query.data?.items ?? [];
+  // Older saves allowed the same clean interval to be appended repeatedly.
+  // Keep the first record as the editable source of truth in this UI.
+  const clean = allItems.filter(
+    (row, index, rows) =>
+      row.state === "clean" &&
+      rows.findIndex(
+        (candidate) =>
+          candidate.state === "clean" &&
+          Math.abs(candidate.start_s - row.start_s) < 0.001 &&
+          Math.abs(candidate.end_s - row.end_s) < 0.001,
+      ) === index,
+  );
+  async function commit(
+    items: AttemptItem[],
+    rev: number,
+    options: { selectedId?: string | null; promote?: boolean } = {},
+  ) {
     if (items.some((item) => blockedRanges.some(
       (blocked) => item.start_s < blocked.to && blocked.from < item.end_s,
     ))) {
@@ -61,9 +77,9 @@ export default function ReviewedRanges({
       cache.setQueryData(key, next);
       setUndo({ rev: next.rev, items: previous });
       setMessage("Reviewed ranges saved.");
-      setSelected(null);
+      setSelected(options.selectedId ?? null);
       setEditingRevision(null);
-      onVerified?.(start, end);
+      if (options.promote) onVerified?.(start, end);
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -98,7 +114,15 @@ export default function ReviewedRanges({
             onClick={() =>
               query.data &&
               void commit(
-                query.data.items.filter((item) => item.id !== row.id),
+                query.data.items.filter(
+                  (item) =>
+                    item.id !== row.id &&
+                    !(
+                      item.state === "clean" &&
+                      Math.abs(item.start_s - row.start_s) < 0.001 &&
+                      Math.abs(item.end_s - row.end_s) < 0.001
+                    ),
+                ),
                 query.data.rev,
               )
             }
@@ -122,6 +146,18 @@ export default function ReviewedRanges({
             );
             return;
           }
+          const existing = clean.find(
+            (item) =>
+              Math.abs(item.start_s - start) < 0.001 &&
+              Math.abs(item.end_s - end) < 0.001,
+          );
+          if (!selected && existing) {
+            setSelected(existing.id);
+            setEditingRevision(query.data.rev);
+            setMessage("This clean range is already reviewed.");
+            if (candidate) onVerified?.(start, end);
+            return;
+          }
           const row: AttemptItem = {
             id: selected ?? crypto.randomUUID(),
             label: "Reviewed clean range",
@@ -139,6 +175,7 @@ export default function ReviewedRanges({
                 )
               : [...query.data.items, row],
             query.data.rev,
+            { selectedId: row.id, promote: candidate },
           );
         }}
       >

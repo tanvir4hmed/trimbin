@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from . import assessment
 from . import comments as comments_service
 from . import shots as shots_service
+from . import structure
 from .analytics import client
 
 log = logging.getLogger(__name__)
@@ -110,9 +111,17 @@ async def for_projects(project_ids: list[int], viewer: str) -> dict:
         # No database call to make, but the same answer shape as if there were.
         return _assembled([], [], viewer)
 
-    rows, meta = await asyncio.gather(
-        _shot_rows(project_ids), shots_service.for_projects(project_ids)
+    rows, meta, plans = await asyncio.gather(
+        _shot_rows(project_ids),
+        shots_service.for_projects(project_ids),
+        asyncio.gather(*(structure.for_project(project_id) for project_id in project_ids)),
     )
+    planned_slugs = {
+        (project_id, scene.scene, shot.shot): shot.slug
+        for project_id, scenes in zip(project_ids, plans, strict=True)
+        for scene in scenes
+        for shot in scene.shots
+    }
     margin_threshold = assessment.review_margin()
 
     waiting: list[Waiting] = []
@@ -134,7 +143,14 @@ async def for_projects(project_ids: list[int], viewer: str) -> dict:
         circled = described.circled_take if described else 0
         state = described.state if described else ""
         assignee = described.assignee if described else ""
-        slug = (described.slug if described else "") or row["shot_code"]
+        # The plan is the authoritative human-facing name. The integer is only
+        # a durable routing key; showing it as "Shot 2" when the plan says A
+        # sends an editor to the right URL with the wrong mental model.
+        slug = (
+            (described.slug if described else "")
+            or planned_slugs.get((pid, row["scene"], row["shot"]), "")
+            or row["shot_code"]
+        )
 
         reason = assessment.assess(
             takes=row["takes"],

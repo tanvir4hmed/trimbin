@@ -1501,12 +1501,12 @@ export default function ShotReviewCockpit({
             const candidates = safe.flatMap((range) =>
               subtractRanges(range, selectedRanges),
             );
-            const needsReview =
-              take.clip_id === chosen?.clip_id &&
-              (!screen.data?.decision_fresh ||
-                !verdicts?.takes.some(
-                  (item) => item.clip_id === take.clip_id,
-                ));
+            // Orange on the clock means an unresolved issue, not merely that
+            // a take has not been compared. A clean one-take shot otherwise
+            // looked broken even when no review action remained.
+            const needsReview = findings.some(
+              (finding) => finding.action === "machine_open",
+            );
             return (
               <div
                 className={

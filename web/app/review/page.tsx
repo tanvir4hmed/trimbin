@@ -57,7 +57,7 @@ export default function ReviewQueuePage() {
       {queue.length ? (
         <div className="review-queue">
           {queue.map((item, index) => (
-            <Link
+            <a
               href={`${paths.shot(item.project_id, item.scene, item.shot, item.project_name)}?clip=${encodeURIComponent(item.clip_id || "")}&review=1`}
               key={`${item.project_id}-${item.scene}-${item.shot}`}
             >
@@ -67,10 +67,10 @@ export default function ReviewQueuePage() {
               <span>
                 <b>{item.project_name}</b>
                 <strong>
-                  Scene {item.scene} / {queueShotDisplayName(item.scene, item.slug, item.shot)}
+                  Scene {item.scene} / {queueShotDisplayName(item.scene, item.slug, item.shot)} / {item.take_no ? `Take ${item.take_no}` : "Latest take"}
                 </strong>
                 <small>
-                  {item.take_no ? `Take ${item.take_no} · ` : ""}{item.takes} takes · {item.reason.replaceAll("_", " ")}
+                  {item.takes} takes · {item.reason.replaceAll("_", " ")}
                   {item.open_comments
                     ? ` · ${item.open_comments} open notes`
                     : ""}
@@ -80,7 +80,7 @@ export default function ReviewQueuePage() {
                 {item.state?.replaceAll("_", " ") || "needs review"}
               </span>
               <i>Open cockpit →</i>
-            </Link>
+            </a>
           ))}
         </div>
       ) : placementCount ? (

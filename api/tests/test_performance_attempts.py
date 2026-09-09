@@ -8,7 +8,7 @@ from trimbin_agents.contracts.base import TimeRange
 from trimbin_agents.contracts.segments import PerformanceAttempt, SegmentObservation
 
 from app.services.attempt_detection import absolute_attempts, consolidate_attempts
-from app.services.attempts import AttemptItem, AttemptSave
+from app.services.attempts import AttemptItem, AttemptSave, _dedupe_clean_items
 from app.services.full_take import Window
 
 
@@ -59,3 +59,13 @@ def test_boundary_commands_reject_nan_and_duplicate_ids():
     item = AttemptItem(id=uuid4(), label="Pass", start_s=0, end_s=3)
     with pytest.raises(ValidationError):
         AttemptSave(rev=0, command_id=uuid4(), items=[item, item])
+
+
+def test_identical_reviewed_clean_ranges_are_one_record():
+    first = AttemptItem(id=uuid4(), label="Clean", start_s=18, end_s=46, state="clean")
+    duplicate = AttemptItem(id=uuid4(), label="Clean again", start_s=18, end_s=46, state="clean")
+    separate = AttemptItem(id=uuid4(), label="Pass", start_s=0, end_s=10, state="reviewed")
+
+    kept = _dedupe_clean_items([first, duplicate, separate])
+
+    assert [item.id for item in kept] == [first.id, separate.id]
