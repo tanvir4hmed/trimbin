@@ -32,6 +32,7 @@ type SegmentDrag = TimelineDrag & {
   pointerId: number;
 };
 type Focus = { clipId: string; finding: FindingEvent };
+const findingKey = (clipId: string, findingId: string) => `${clipId}:${findingId}`;
 const selectionSignature = (rows: CoverageSegment[]) =>
   JSON.stringify(
     rows.map((row) => [
@@ -218,6 +219,9 @@ export default function ShotReviewCockpit({
     if (take) onReviewingChange(clipId, take.take_no);
   };
   const [focus, setFocus] = useState<Focus | null>(null);
+  const [bulkReview, setBulkReview] = useState(false);
+  const [bulkFindingKeys, setBulkFindingKeys] = useState<Set<string>>(new Set());
+  const [bulkFindingCode, setBulkFindingCode] = useState("");
   const [reviewFilter, setReviewFilter] = useState("unresolved");
   const [issueClipId, setIssueClipId] = useState("");
   const [inspectorTab, setInspectorTab] = useState<
@@ -251,6 +255,15 @@ export default function ShotReviewCockpit({
         return [...current.values()].map((finding) => ({ analysis, finding }));
       }),
     [analyses],
+  );
+  const bulkFindings = useMemo(
+    () =>
+      findingsForReview.filter(({ analysis, finding }) =>
+        bulkFindingKeys.has(
+          findingKey(String(analysis.clip_id), String(finding.finding_id)),
+        ),
+      ),
+    [bulkFindingKeys, findingsForReview],
   );
   useEffect(() => {
     setFocus((old) => {
@@ -666,6 +679,29 @@ export default function ShotReviewCockpit({
     previewMoment(clipId, finding.start_s, finding.end_s);
   };
 
+  const toggleBulkFinding = (clipId: string, finding: FindingEvent) => {
+    if (finding.action !== "machine_open") {
+      setNotice("That issue has already been reviewed.");
+      return;
+    }
+    const code = String(finding.code);
+    if (bulkFindingCode && bulkFindingCode !== code) {
+      setNotice(
+        `Bulk review is limited to ${label(bulkFindingCode)}. Finish or cancel it first.`,
+      );
+      return;
+    }
+    const key = findingKey(clipId, String(finding.finding_id));
+    setBulkFindingKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      if (!next.size) setBulkFindingCode("");
+      else if (!bulkFindingCode) setBulkFindingCode(code);
+      return next;
+    });
+  };
+
   const act = async (
     action: "confirm" | "dismiss" | "correct" | "adjust_range" | "retract",
     changes: {
@@ -725,6 +761,66 @@ export default function ShotReviewCockpit({
           (error instanceof Error
             ? error.message
             : "Could not record that review."),
+      );
+    }
+  };
+
+  const actOnBulkFindings = async (action: "confirm" | "dismiss") => {
+    if (!bulkFindings.length) return;
+    const failed = new Set<string>();
+    let completed = 0;
+    for (const { analysis, finding } of bulkFindings) {
+      const clipId = String(analysis.clip_id);
+      const key = findingKey(clipId, String(finding.finding_id));
+      try {
+        await findingAction.mutateAsync({
+          clipId,
+          findingId: String(finding.finding_id),
+          body: { rev: finding.revision, action },
+        });
+        completed += 1;
+      } catch {
+        failed.add(key);
+      }
+    }
+
+    const refreshed = await screen.refetch();
+    let selectionAdjusted = false;
+    if (action === "confirm" && refreshed.data) {
+      let adjusted = selectsRef.current;
+      const clipIds = new Set(
+        bulkFindings.map(({ analysis }) => String(analysis.clip_id)),
+      );
+      for (const clipId of clipIds) {
+        const updated = refreshed.data.analyses.find(
+          (analysis) => String(analysis.clip_id) === clipId,
+        );
+        const source = takes.find((take) => take.clip_id === clipId);
+        if (updated && source)
+          adjusted = revalidateSelections(
+            adjusted,
+            clipId,
+            rangesOutsideIssues(source.duration_s, updated.findings),
+          );
+      }
+      selectionAdjusted =
+        selectionSignature(adjusted) !== selectionSignature(selectsRef.current);
+      if (selectionAdjusted) setSelects(adjusted);
+    }
+
+    setBulkFindingKeys(failed);
+    if (!failed.size) {
+      setBulkReview(false);
+      setBulkFindingCode("");
+      setFocus(null);
+      setNotice(
+        selectionAdjusted
+          ? `${completed} issues accepted. Overlapping shot selects were adjusted; review and save them.`
+          : `${completed} matching issues ${action === "confirm" ? "accepted" : "ignored"}. History is preserved.`,
+      );
+    } else {
+      setNotice(
+        `${completed} issues updated; ${failed.size} changed elsewhere and remain selected.`,
       );
     }
   };
@@ -1188,12 +1284,82 @@ export default function ShotReviewCockpit({
               </p>
               <h2>Every take on one clock</h2>
             </div>
-            <div className="lane-legend">
-              <span className="clean-key">Candidate usable</span>
-              <span className="selected-key">Shot select</span>
-              <span className="reviewed-clean-key">Reviewed clean</span>
-              <span className="warn-key">Issue</span>
-              <span className="slate-key">Slate / exit</span>
+            <div className="lane-header-actions">
+              <div className="lane-legend">
+                <span className="clean-key">Candidate usable</span>
+                <span className="selected-key">Shot select</span>
+                <span className="reviewed-clean-key">Reviewed clean</span>
+                <span className="warn-key">Issue</span>
+                <span className="slate-key">Slate / exit</span>
+              </div>
+              <div className="bulk-review-actions">
+                {!bulkReview ? (
+                  <button
+                    disabled={!canComment}
+                    onClick={() => {
+                      setBulkReview(true);
+                      setFocus(null);
+                      setInspectorTab("finding");
+                      setNotice("Select matching unresolved issues from the timeline.");
+                    }}
+                  >
+                    Select issues
+                  </button>
+                ) : (
+                  <>
+                    <span>{bulkFindingKeys.size} selected</span>
+                    {bulkFindingCode && (
+                      <button
+                        onClick={() => {
+                          const visible = new Set(
+                            [chosen?.clip_id, previous?.clip_id].filter(Boolean),
+                          );
+                          setBulkFindingKeys(
+                            new Set(
+                              findingsForReview
+                                .filter(
+                                  ({ analysis, finding }) =>
+                                    visible.has(String(analysis.clip_id)) &&
+                                    String(finding.code) === bulkFindingCode &&
+                                    finding.action === "machine_open",
+                                )
+                                .map(({ analysis, finding }) =>
+                                  findingKey(
+                                    String(analysis.clip_id),
+                                    String(finding.finding_id),
+                                  ),
+                                ),
+                            ),
+                          );
+                        }}
+                      >
+                        All matching
+                      </button>
+                    )}
+                    <button
+                      disabled={!bulkFindingKeys.size || findingAction.isPending}
+                      onClick={() => void actOnBulkFindings("confirm")}
+                    >
+                      Accept
+                    </button>
+                    <button
+                      disabled={!bulkFindingKeys.size || findingAction.isPending}
+                      onClick={() => void actOnBulkFindings("dismiss")}
+                    >
+                      Ignore
+                    </button>
+                    <button
+                      onClick={() => {
+                        setBulkReview(false);
+                        setBulkFindingKeys(new Set());
+                        setBulkFindingCode("");
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </header>
           <div className="time-ruler">
@@ -1272,7 +1438,7 @@ export default function ShotReviewCockpit({
                   {findingMarkers.map(({ finding, row }) => (
                     <button
                       key={String(finding.finding_id)}
-                      className={`lane-finding severity-${finding.severity} review-${finding.action}${focus && String(focus.finding.finding_id) === String(finding.finding_id) ? " open" : ""}`}
+                      className={`lane-finding severity-${finding.severity} review-${finding.action}${focus && String(focus.finding.finding_id) === String(finding.finding_id) ? " open" : ""}${bulkFindingKeys.has(findingKey(take.clip_id, String(finding.finding_id))) ? " bulk-selected" : ""}`}
                       style={{
                         left: pct(finding.start_s),
                         width: pct(
@@ -1282,7 +1448,18 @@ export default function ShotReviewCockpit({
                         bottom: "auto",
                         height: 16,
                       }}
-                      onClick={() => inspect(take.clip_id, finding)}
+                      onClick={() =>
+                        bulkReview
+                          ? toggleBulkFinding(take.clip_id, finding)
+                          : inspect(take.clip_id, finding)
+                      }
+                      aria-pressed={
+                        bulkReview
+                          ? bulkFindingKeys.has(
+                              findingKey(take.clip_id, String(finding.finding_id)),
+                            )
+                          : undefined
+                      }
                       title={`${label(finding.code)} · ${finding.action === "machine_open" ? "Unresolved" : label(finding.action.replace("human_", ""))} · ${tc(finding.start_s)}–${tc(finding.end_s)}`}
                     >
                       <span>{label(finding.code)}</span>

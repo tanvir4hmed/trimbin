@@ -2648,6 +2648,11 @@ body{background:var(--bg);color:var(--ink)}
 .project-next-step p { margin: 5px 0 0; }
 .issue-lanes { max-height: none; overflow: visible; }
 .issue-lanes { position: relative; padding-bottom: 10px; background: var(--bg); }
+.lane-header-actions { display: grid; justify-items: end; gap: 7px; }
+.bulk-review-actions { display: flex; align-items: center; justify-content: flex-end; gap: 5px; flex-wrap: wrap; }
+.bulk-review-actions span { color: var(--mid); font-size: 10px; }
+.bulk-review-actions button { padding: 4px 7px; font-size: 10px; }
+.lane-finding.bulk-selected { outline: 2px solid var(--cockpit-blue); outline-offset: 2px; opacity: 1; z-index: 7; }
 .shot-cockpit { overflow: visible; }
 .inspect-preview-group { display: contents; }
 .compare-players { position:sticky; top:74px; z-index:9; padding-block:6px; background:var(--cockpit-bg); }
