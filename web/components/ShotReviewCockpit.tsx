@@ -387,6 +387,11 @@ export default function ShotReviewCockpit({
   const a = chosen;
   const b = previous;
   const showComparison = workspaceMode === "compare" && Boolean(previous);
+  const timelineTakes = (
+    showComparison
+      ? [chosen, previous]
+      : [chosen, ...takes.filter((take) => take.clip_id !== chosen?.clip_id)]
+  ).filter((take): take is Take => Boolean(take));
   const selected = chosen;
   const cleanRanges = useQuery({
     queryKey: ["project", projectId, "attempts", selected?.clip_id ?? ""],
@@ -665,6 +670,13 @@ export default function ShotReviewCockpit({
     target?.seek(at, true);
     if ((target?.element()?.readyState ?? 0) >= 1) pendingSeek.current = null;
   }
+  const previewInReviewingTake = (clipId: string, from: number, to: number) => {
+    if (clipId !== chosen?.clip_id) {
+      chooseTake(clipId, { at: from, end: to });
+      return;
+    }
+    previewMoment(clipId, from, to);
+  };
   const inspect = (clipId: string, finding: FindingEvent) => {
     // A second click on the finding already open closes it — the same gesture
     // that opened it, which is what a person reaches for before they look for
@@ -1448,9 +1460,7 @@ export default function ShotReviewCockpit({
             <span>{tc(duration * 0.75)}</span>
             <span>{tc(duration)}</span>
           </div>
-          {(showComparison ? [chosen, previous] : [chosen])
-            .filter((take): take is Take => Boolean(take))
-            .map((take) => {
+          {timelineTakes.map((take) => {
             const analysis = analysisFor(analyses, take.clip_id);
             const findings = analysis?.findings ?? [];
             const markerEnds: number[] = [];
@@ -1476,6 +1486,17 @@ export default function ShotReviewCockpit({
                   from: item.start_s,
                   to: item.end_s,
                 }));
+            // A candidate is only the part of an issue-free range that has not
+            // already become a blue shot select.
+            const selectedRanges = selects
+              .filter((segment) => segment.clip_id === take.clip_id)
+              .map((segment) => ({
+                from: segment.source_in_s,
+                to: segment.source_out_s,
+              }));
+            const candidates = safe.flatMap((range) =>
+              subtractRanges(range, selectedRanges),
+            );
             const needsReview =
               take.clip_id === chosen?.clip_id &&
               (!screen.data?.decision_fresh ||
@@ -1491,7 +1512,9 @@ export default function ShotReviewCockpit({
               >
                 <button
                   className="lane-label"
-                  onClick={() => previewMoment(take.clip_id, 0, take.duration_s)}
+                  onClick={() =>
+                    previewInReviewingTake(take.clip_id, 0, take.duration_s)
+                  }
                   title={`Play ${takeName(take)}`}
                 >
                   {take.take_no ? `T${take.take_no}` : "UN"}
@@ -1505,7 +1528,7 @@ export default function ShotReviewCockpit({
                     className="lane-empty"
                     style={{ width: pct(take.duration_s) }}
                   />
-                  {safe.map((item, index) => (
+                  {candidates.map((item, index) => (
                     <button
                       key={`safe-${index}`}
                       className="lane-safe"
@@ -1518,7 +1541,7 @@ export default function ShotReviewCockpit({
                           clipId: take.clip_id,
                           range: { from: item.from, to: item.to },
                         };
-                        previewMoment(take.clip_id, item.from, item.to);
+                        previewInReviewingTake(take.clip_id, item.from, item.to);
                         setRange({ from: item.from, to: item.to });
                         setCleanCandidate({ from: item.from, to: item.to });
                         setInspectorTab("selects");
@@ -1566,7 +1589,7 @@ export default function ShotReviewCockpit({
                       title={`Reviewed clean ${tc(item.start_s)}–${tc(item.end_s)}`}
                       onClick={() => {
                         setRange({ from: item.start_s, to: item.end_s });
-                        previewMoment(take.clip_id, item.start_s, item.end_s);
+                        previewInReviewingTake(take.clip_id, item.start_s, item.end_s);
                         setInspectorTab("selects");
                       }}>Clean</button>
                   ))}
@@ -1580,6 +1603,11 @@ export default function ShotReviewCockpit({
                         if (!track) return;
                         const width = track.getBoundingClientRect().width;
                         if (width <= 0) return;
+                        if (take.clip_id !== chosen?.clip_id)
+                          chooseTake(take.clip_id, {
+                            at: segment.source_in_s,
+                            end: segment.source_out_s,
+                          });
                         const handle = (event.target as HTMLElement).closest(".range-handle");
                         const bounds = segmentBounds(segment, selectsRef.current);
                         if (!bounds) {
@@ -1611,7 +1639,11 @@ export default function ShotReviewCockpit({
                         pendingRange.current = { clipId: take.clip_id, range: { from: segment.source_in_s, to: segment.source_out_s } };
                         setRange({ from: segment.source_in_s, to: segment.source_out_s });
                         setInspectorTab("selects");
-                        previewMoment(take.clip_id, segment.source_in_s, segment.source_out_s);
+                        previewInReviewingTake(
+                          take.clip_id,
+                          segment.source_in_s,
+                          segment.source_out_s,
+                        );
                       }}><i className="range-handle range-handle-in" /><span>Selected</span><i className="range-handle range-handle-out" /></button>
                   ))}
                 </div>
