@@ -6,6 +6,7 @@ import Player, { type PlayerHandle } from "@/components/Player";
 import ShotBrief from "@/components/ShotBrief";
 import PerformanceWorkspace from "@/components/PerformanceWorkspace";
 import ReviewedRanges from "@/components/ReviewedRanges";
+import { draggedRange, type TimelineDrag } from "@/lib/timeline-drag";
 import { useQuery } from "@tanstack/react-query";
 import {
   api,
@@ -25,16 +26,10 @@ import {
 } from "@/lib/queries";
 
 type Range = { from: number; to: number };
-type SegmentDrag = {
+type SegmentDrag = TimelineDrag & {
   id: string;
-  kind: "in" | "out" | "move";
-  track: HTMLElement;
-  duration: number;
-  min: number;
-  max: number;
-  pointerStart: number;
-  rangeStart: number;
-  rangeEnd: number;
+  clipId: string;
+  pointerId: number;
 };
 type Focus = { clipId: string; finding: FindingEvent };
 const selectionSignature = (rows: CoverageSegment[]) =>
@@ -425,40 +420,20 @@ export default function ShotReviewCockpit({
   useEffect(() => {
     const move = (event: PointerEvent) => {
       const drag = segmentDrag.current;
-      if (!drag) return;
-      const rect = drag.track.getBoundingClientRect();
-      const delta = ((event.clientX - drag.pointerStart) / rect.width) * drag.duration;
-      const absolute = Math.max(0, Math.min(drag.duration, ((event.clientX - rect.left) / rect.width) * drag.duration));
-      const tolerance = Math.max(0.08, drag.duration * 0.003);
-      const snap = (value: number, target: number) =>
-        Math.abs(value - target) <= tolerance ? target : value;
-      setSelects((rows) => rows.map((row) => {
-        if (row.segment_id !== drag.id) return row;
-        if (drag.kind === "move") {
-          const length = drag.rangeEnd - drag.rangeStart;
-          const wanted = drag.rangeStart + delta;
-          const snapped = snap(snap(wanted, drag.min), drag.max - length);
-          const source_in_s = Math.max(drag.min, Math.min(drag.max - length, snapped));
-          const source_out_s = source_in_s + length;
-          setRange({ from: source_in_s, to: source_out_s });
-          previewMoment(row.clip_id, source_in_s, source_out_s);
-          return { ...row, source_in_s, source_out_s };
-        }
-        const next = drag.kind === "in"
-          ? Math.max(drag.min, Math.min(snap(absolute, drag.min), row.source_out_s - 0.05))
-          : Math.min(drag.max, Math.max(snap(absolute, drag.max), row.source_in_s + 0.05));
-        const updated = drag.kind === "in"
-          ? { ...row, source_in_s: next }
-          : { ...row, source_out_s: next };
-        setRange({ from: updated.source_in_s, to: updated.source_out_s });
-        previewMoment(row.clip_id, updated.source_in_s, updated.source_out_s);
-        return updated;
-      }));
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      const next = draggedRange(drag, event.clientX);
+      setSelects((rows) => rows.map((row) => row.segment_id === drag.id
+        ? { ...row, source_in_s: next.from, source_out_s: next.to }
+        : row));
+      setRange(next);
+      previewMoment(drag.clipId, next.from, next.to);
     };
     const up = () => { segmentDrag.current = null; };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
-    return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+    window.addEventListener("pointercancel", up);
+    window.addEventListener("blur", up);
+    return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up); window.removeEventListener("blur", up); };
   }, [analyses, takes]);
   const [selectPreviewIndex, setSelectPreviewIndex] = useState<number | null>(
     null,
@@ -1015,7 +990,7 @@ export default function ShotReviewCockpit({
             Compare performance attempts
           </button>
         </nav>
-        <div hidden={workspaceMode !== "inspect"}>
+        <div className="inspect-preview-group" hidden={workspaceMode !== "inspect"}>
           {takes.length > 1 && (
             <div className="compare-toolbar" aria-label="Which take">
               <label>Reviewing <select aria-label="Reviewing take"
@@ -1335,20 +1310,25 @@ export default function ShotReviewCockpit({
                       style={{ left: pct(segment.source_in_s), width: pct(segment.source_out_s - segment.source_in_s) }}
                       title={`Shot select ${tc(segment.source_in_s)}–${tc(segment.source_out_s)}`}
                       onPointerDown={(event) => {
-                        if (!canComment) return;
+                        if (!canComment || event.button !== 0) return;
                         const track = event.currentTarget.parentElement;
                         if (!track) return;
+                        const width = track.getBoundingClientRect().width;
+                        if (width <= 0) return;
+                        event.currentTarget.setPointerCapture(event.pointerId);
                         const handle = (event.target as HTMLElement).closest(".range-handle");
                         const bounds = segmentBounds(segment, selectsRef.current);
                         segmentDrag.current = {
                           id: segment.segment_id,
+                          clipId: segment.clip_id,
+                          pointerId: event.pointerId,
                           kind: handle
                             ? handle.classList.contains("range-handle-in")
                               ? "in"
                               : "out"
                             : "move",
-                          track,
-                          duration: take.duration_s,
+                          width,
+                          duration,
                           min: bounds.min,
                           max: bounds.max,
                           pointerStart: event.clientX,

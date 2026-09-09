@@ -160,7 +160,7 @@ export default function SceneTree({
                           </span>
                         )}
                       </span>
-                      <span className="node-marks">
+                      {(shot.circled_take > 0 || shot.open_notes > 0) && <span className="node-marks">
                         {shot.circled_take > 0 && (
                           <span
                             className={
@@ -185,12 +185,7 @@ export default function SceneTree({
                             {shot.open_notes}
                           </span>
                         )}
-                        {shot.assignee && (
-                          <span className="who" title={shot.assignee}>
-                            {shot.assignee.slice(0, 2)}
-                          </span>
-                        )}
-                      </span>
+                      </span>}
                       <span className="sr-only">
                         {STATUS_LABEL[shot.status]}
                       </span>
@@ -198,15 +193,9 @@ export default function SceneTree({
                     {/* The takes themselves, reachable from here. The rail
                         listed them as text, so getting to take 2 still meant
                         opening the shot and hunting through the player. */}
-                    {isOpen && onSelectTake && shot.take_numbers.length > 1 && (
+                    {isOpen && onSelectTake && shot.take_numbers.length > 0 && (
                       <div className="node-take-row">
-                        {shot.take_numbers.length > 12 ? (
-                          <select aria-label="Review take" value={openTake || ""}
-                            onChange={(e) => onSelectTake(scene.scene, shot.shot, Number(e.target.value))}>
-                            <option value="" disabled>Choose take</option>
-                            {shot.take_numbers.map((n) => <option key={n} value={n}>Take {n}</option>)}
-                          </select>
-                        ) : shot.take_numbers.map((takeNo) => (
+                        {shot.take_numbers.map((takeNo) => (
                           <button
                             key={takeNo}
                             type="button"
