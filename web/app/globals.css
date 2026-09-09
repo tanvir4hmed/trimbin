@@ -51,6 +51,11 @@
 .quality-method { max-width:900px; font-size:14px; }
 .quality-method h2, .film-page h2 { font:600 18px var(--sans); }
 .film-heading { justify-content:space-between; }
+.film-heading .eyebrow { margin:0 0 8px; color:var(--amber); }
+.film-mode-status { width:100%; margin:2px 0 0; color:var(--low); font-size:11px; }
+.film-draft-notice { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:8px 0 12px; padding:7px 10px; color:var(--low); background:var(--surface); border:1px solid var(--line); border-radius:6px; font-size:11px; }
+.film-page .film-view-modes { margin:10px 0; }
+.film-page .film-grid { margin:12px 0; }
 .film-heading > div:last-child { display:flex; gap:10px; }
 .film-grid { display:grid; grid-template-columns:minmax(0, 1fr) 320px; gap:24px; margin:24px 0; }
 .film-player { background:#050608; border:1px solid var(--line); border-radius:8px; overflow:hidden; }

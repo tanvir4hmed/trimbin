@@ -15,7 +15,6 @@
  */
 
 import { use, useMemo } from "react";
-import Link from "next/link";
 import PlacementInbox from "@/components/PlacementInbox";
 import Structure from "@/components/Structure";
 import Upload from "@/components/Upload";
@@ -56,10 +55,6 @@ export default function IngestPage({ params }: { params: Promise<{ slug: string 
 
   return (
     <main className="ingest-page">
-      <div className="ingest-page-crumb">
-        <Link href={`${paths.project(projectId)}`}>← {screen.data.project.name}</Link>
-      </div>
-
       <Upload
         projectId={projectId}
         plan={screen.data.plan.scenes}

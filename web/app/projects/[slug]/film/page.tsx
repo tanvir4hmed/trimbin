@@ -462,11 +462,8 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
     <main className="film-page">
       <header className="film-heading">
         <div>
-          <Link href={paths.project(projectId)}>← Project</Link>
+          <p className="eyebrow">EDITORIAL SEQUENCE</p>
           <h1>Film Preview</h1>
-          <p>
-            Preview selects or arrange your sequence.
-          </p>
         </div>
         <div>
           <button className="ghost" onClick={download} disabled={!rows.length}>
@@ -505,18 +502,6 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
           {error}
         </p>
       )}
-      <p role="status" className="hint">
-        {message ||
-          (dirty
-            ? "Unsaved changes — save before leaving this page."
-            : saved
-              ? coverageMode
-                ? "Current confirmed selects · latest loaded shot decisions"
-                : saved.rev
-                  ? `Saved sequence · revision ${saved.rev}`
-                  : "No saved sequence yet. Arrange footage to create one."
-              : "Loading sequence…")}
-      </p>
       <div
         className="film-view-modes"
         aria-label="Preview source"
@@ -529,45 +514,6 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
               ? "Current confirmed selects"
               : "Saved sequence"}
         </strong>
-        <button
-          className="ghost small"
-          disabled={busy || !saved}
-          onClick={async () => {
-            setBusy(true);
-            setError("");
-            try {
-              const [latest, coverage] = await Promise.all([
-                api.film(projectId),
-                api.filmCoverage(projectId),
-              ]);
-              const signature = (
-                items: { clip_id: string; start_s: number; end_s: number }[],
-              ) =>
-                JSON.stringify(
-                  items.map(({ clip_id, start_s, end_s }) => [
-                    clip_id,
-                    start_s,
-                    end_s,
-                  ]),
-                );
-              const matches =
-                signature(rows) === signature(coverage.preview.entries ?? []);
-              setMessage(
-                `${latest.rev !== saved?.rev ? `Another editor saved revision ${latest.rev}. ` : "Saved revision is current. "}${matches ? "This order matches current shot selects." : "This order differs from current shot selects; that may be intentional."} ${coverage.omissions.length} shots lack confirmed portions. Your draft and saved sequence are unchanged.`,
-              );
-            } catch (e) {
-              setError(
-                e instanceof Error
-                  ? e.message
-                  : "Could not check current decisions.",
-              );
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          Check latest decisions
-        </button>
         <button
           className={coverageMode ? "primary small" : "ghost small"}
           disabled={busy}
@@ -583,11 +529,9 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
         >
           Saved sequence
         </button>
-        <span className="hint">
-          {coverageMode
-            ? "Select Current confirmed selects again to refresh shot decisions."
-            : "Saved sequence"}
-        </span>
+        <p role="status" className="film-mode-status">
+          {message || (dirty ? "Unsaved changes" : saved?.rev ? `Saved sequence · revision ${saved.rev}` : "Loading sequence…")}
+        </p>
       </div>
       {unavailable > 0 && (
         <p role="status" className="hint">
@@ -612,7 +556,7 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
         </details>
       )}
       {localDraft && canEdit && (
-        <div className="hint">
+        <div className="film-draft-notice">
           <span>
             An unsaved draft from revision {localDraft.rev} is stored in this
             browser.{" "}
