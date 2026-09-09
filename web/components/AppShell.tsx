@@ -57,6 +57,14 @@ function WorkspaceShell({ children }: { children: React.ReactNode }) {
     staleTime: 30_000,
   });
   const projects = projectQueryResult.data?.projects ?? [];
+  const dashboardResult = useQuery({
+    queryKey: ["dashboard"],
+    queryFn: api.dashboard,
+    enabled: Boolean(identity),
+    staleTime: 15_000,
+  });
+  const reviewNotifications = (dashboardResult.data?.queue.length ?? 0) +
+    (dashboardResult.data?.placements?.reduce((count, item) => count + item.count, 0) ?? 0);
   const current = projects.find((p) => p.project_id === currentId);
   const filtered = useMemo(
     () =>
@@ -193,6 +201,11 @@ function WorkspaceShell({ children }: { children: React.ReactNode }) {
               >
                 <i aria-hidden>{icon}</i>
                 <span>{label}</span>
+                {href === "/review" && reviewNotifications > 0 && (
+                  <b className="nav-notification" aria-label={`${reviewNotifications} items need review`}>
+                    {reviewNotifications > 99 ? "99+" : reviewNotifications}
+                  </b>
+                )}
               </Link>
             ))}
           </nav>

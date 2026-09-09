@@ -8,7 +8,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import NewProject from "@/components/NewProject";
-import PlacementTasks from "@/components/PlacementTasks";
 import { ApiError } from "@/lib/api";
 import { currentIdentity } from "@/lib/auth";
 import { useDashboard } from "@/lib/queries";
@@ -107,7 +106,6 @@ export default function DashboardPage() {
 
   return (
     <main className="shell dash home-command">
-      <PlacementTasks />
       <div className="dash-top">
         <div>
           <p className="eyebrow">EDITORIAL WORKSPACE</p><h1>Your workspace</h1>

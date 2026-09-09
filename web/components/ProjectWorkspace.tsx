@@ -15,7 +15,6 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AskArchive from "@/components/AskArchive";
-import PlacementBanner from "@/components/PlacementBanner";
 import ProjectOverview from "@/components/ProjectOverview";
 import SceneTree from "@/components/SceneTree";
 import ShotReviewCockpit from "@/components/ShotReviewCockpit";
@@ -410,8 +409,6 @@ export default function ProjectWorkspace({
           rendered here — every waiting clip with its slate frame and its three
           buttons — which is right for two clips and would bury the workspace
           under forty. Settling happens on the ingest page, once. */}
-      <PlacementBanner projectId={projectId} />
-
       {!empty && (
         <AskArchive
           collapsible
