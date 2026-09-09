@@ -926,8 +926,6 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
       {!editing && rows.length > 0 && (
         <section className="film-chapters">
           <h2>Playback order</h2>
-          <p className="hint">
-          </p>
           <div>
             {rows.map((row, i) => {
               const media = sources.find((s) => s.clip_id === row.clip_id);
