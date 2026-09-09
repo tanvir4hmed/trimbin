@@ -133,7 +133,7 @@ export default function ProjectsPage() {
   }
 
   return (
-    <main className="shell">
+    <main className="shell projects-page">
       <PlacementTasks />
       <header className="dash-top">
         <div>

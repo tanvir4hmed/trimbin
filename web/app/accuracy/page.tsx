@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default function AccuracyPage() {
   return (
-    <main className="shell">
+    <main className="shell accuracy-page">
       <AccuracyDashboard />
     </main>
   );

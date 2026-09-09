@@ -37,7 +37,7 @@ const steps = [
 
 export default function Guide() {
   return (
-    <main className="shell prose">
+    <main className="shell prose guide-page">
       <section>
         <p className="eyebrow">WORKFLOW GUIDE</p>
         <h1>From shoot day to Film Preview</h1>
