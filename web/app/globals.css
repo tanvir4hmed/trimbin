@@ -1272,6 +1272,13 @@ button.primary:disabled {
   flex-wrap: wrap;
   min-height: 44px;
 }
+.door-example { margin: 14px 0 0; display:flex; flex-direction:column; align-items:center; gap:7px; text-align: center; color:var(--faint); }
+.pass-form button.primary:disabled {
+  opacity: 1;
+  background: #397be7;
+  border-color: #4b8bf4;
+  color: #fff;
+}
 .door-note {
   margin-top: 30px;
   font-size: 13px;
@@ -2165,11 +2172,12 @@ kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:
 .creds>div{display:flex;gap:7px;align-items:baseline}
 .creds dt{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
 .creds dd{margin:0;font-size:13px;color:var(--amber);user-select:all}
-.trial-password{display:inline-flex;align-items:center;gap:5px}
-.trial-icon{padding:1px 4px!important;min-width:24px;color:var(--low);background:transparent!important;border:0!important;font-size:13px;line-height:1;cursor:pointer}
+.trial-password{display:inline-flex;align-items:center;gap:1px}
+.trial-icon{padding:1px 2px!important;min-width:20px;color:var(--low);background:transparent!important;border:0!important;font-size:13px;line-height:1;cursor:pointer}
 .trial-icon:hover{color:var(--ink)}
+.trial-icon svg{width:15px;height:15px;display:block;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .under-door{border-top:1px solid var(--line-soft);padding-top:14px}
-.trial{border-bottom:1px solid var(--line-soft);padding-bottom:12px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px;align-items:center}
+.trial{border-bottom:1px solid var(--line-soft);padding-bottom:9px;margin-bottom:9px;display:flex;flex-direction:column;gap:6px;align-items:center}
 
 .with-reveal{position:relative;display:block}
 .with-reveal input{width:100%;padding-right:52px}

@@ -55,8 +55,8 @@ export default function Home() {
             <SignInPanel onSignedIn={() => router.push("/home")} />
           )}
         </div>
+        <div className="door-example"><span>or</span><Link className="ghost" href="/demo">Explore the example project →</Link></div>
 
-        <p><Link className="ghost" href="/demo">Explore the example project →</Link></p>
         <div className="door-workflow" aria-label="What Trimbin does"><span><b>01</b> Organize footage</span><span><b>02</b> Review takes &amp; portions</span><span><b>03</b> Film Preview</span></div>
 
         <p className="door-links">

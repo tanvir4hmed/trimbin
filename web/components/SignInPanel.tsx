@@ -116,7 +116,7 @@ export default function SignInPanel({
                       title={showTrialPass ? "Hide password" : "Show password"}
                       onClick={() => setShowTrialPass((visible) => !visible)}
                     >
-                      {showTrialPass ? "◉" : "◌"}
+                      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>
                     </button>
                     <button
                       type="button"
@@ -131,7 +131,7 @@ export default function SignInPanel({
                         });
                       }}
                     >
-                      {copiedTrialPass ? "✓" : "▣"}
+                      {copiedTrialPass ? <span aria-hidden="true">✓</span> : <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="12" rx="1.5"/><path d="M5 16V5.5C5 4.7 5.7 4 6.5 4H16"/></svg>}
                     </button>
                   </dd>
                 </div>
