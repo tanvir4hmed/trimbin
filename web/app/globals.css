@@ -1253,6 +1253,10 @@ button.primary:disabled {
   max-width: 560px;
   text-align: center;
 }
+.door-kicker {
+  width: 100%;
+  text-align: center;
+}
 .door-inner h1 {
   font-family: var(--serif);
   font-size: clamp(34px, 6vw, 52px);
@@ -1278,9 +1282,12 @@ button.primary:disabled {
 }
 .door-links {
   margin-top: 26px;
+  width: 100%;
   display: flex;
   gap: 10px;
   justify-content: center;
+  align-items: center;
+  text-align: center;
   font-size: 13px;
   color: var(--faint);
 }
@@ -2158,8 +2165,11 @@ kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:
 .creds>div{display:flex;gap:7px;align-items:baseline}
 .creds dt{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
 .creds dd{margin:0;font-size:13px;color:var(--amber);user-select:all}
+.trial-password{display:inline-flex;align-items:center;gap:5px}
+.trial-icon{padding:1px 4px!important;min-width:24px;color:var(--low);background:transparent!important;border:0!important;font-size:13px;line-height:1;cursor:pointer}
+.trial-icon:hover{color:var(--ink)}
 .under-door{border-top:1px solid var(--line-soft);padding-top:14px}
-.trial{border-top:1px solid var(--line-soft);padding-top:12px;margin-top:4px;display:flex;flex-direction:column;gap:10px;align-items:center}
+.trial{border-bottom:1px solid var(--line-soft);padding-bottom:12px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px;align-items:center}
 
 .with-reveal{position:relative;display:block}
 .with-reveal input{width:100%;padding-right:52px}

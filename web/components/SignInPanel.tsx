@@ -37,6 +37,8 @@ export default function SignInPanel({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [reveal, setReveal] = useState(false);
+  const [showTrialPass, setShowTrialPass] = useState(false);
+  const [copiedTrialPass, setCopiedTrialPass] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const buttonRef = useRef<HTMLDivElement>(null);
@@ -84,6 +86,58 @@ export default function SignInPanel({
 
       {options.password && (
         <>
+          {showTrial && TRIAL_PASS && (
+            <div className="trial">
+              <button
+                type="button"
+                className="try-it"
+                onClick={() => {
+                  setUsername(TRIAL_USER);
+                  setPassword(TRIAL_PASS);
+                  setReveal(true);
+                  void submit(TRIAL_USER, TRIAL_PASS);
+                }}
+              >
+                Try it as a guest
+              </button>
+              <dl className="creds">
+                <div>
+                  <dt>User</dt>
+                  <dd className="mono">{TRIAL_USER}</dd>
+                </div>
+                <div>
+                  <dt>Password</dt>
+                  <dd className="trial-password">
+                    <span className="mono">{showTrialPass ? TRIAL_PASS : "••••••••"}</span>
+                    <button
+                      type="button"
+                      className="trial-icon"
+                      aria-label={showTrialPass ? "Hide guest password" : "Show guest password"}
+                      title={showTrialPass ? "Hide password" : "Show password"}
+                      onClick={() => setShowTrialPass((visible) => !visible)}
+                    >
+                      {showTrialPass ? "◉" : "◌"}
+                    </button>
+                    <button
+                      type="button"
+                      className="trial-icon"
+                      aria-label="Copy guest password"
+                      title="Copy password"
+                      onClick={() => {
+                        if (!navigator.clipboard) return;
+                        void navigator.clipboard.writeText(TRIAL_PASS).then(() => {
+                          setCopiedTrialPass(true);
+                          window.setTimeout(() => setCopiedTrialPass(false), 1600);
+                        });
+                      }}
+                    >
+                      {copiedTrialPass ? "✓" : "▣"}
+                    </button>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          )}
           <form
             className="pass-form"
             onSubmit={(e) => {
@@ -135,32 +189,6 @@ export default function SignInPanel({
             {error && <p className="error small">{error}</p>}
           </form>
 
-          {showTrial && TRIAL_PASS && (
-            <div className="trial">
-              <button
-                type="button"
-                className="try-it"
-                onClick={() => {
-                  setUsername(TRIAL_USER);
-                  setPassword(TRIAL_PASS);
-                  setReveal(true);
-                  void submit(TRIAL_USER, TRIAL_PASS);
-                }}
-              >
-                Try it as a guest
-              </button>
-              <dl className="creds">
-                <div>
-                  <dt>User</dt>
-                  <dd className="mono">{TRIAL_USER}</dd>
-                </div>
-                <div>
-                  <dt>Password</dt>
-                  <dd className="mono">{TRIAL_PASS}</dd>
-                </div>
-              </dl>
-            </div>
-          )}
         </>
       )}
     </div>

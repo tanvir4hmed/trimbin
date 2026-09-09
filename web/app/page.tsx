@@ -42,10 +42,10 @@ export default function Home() {
     <main className="door">
       <section className="door-inner">
         <p className="door-kicker">EDITORIAL OPERATIONS · TAKE INTELLIGENCE</p>
-        <h1>Review the day. Keep the decision.</h1>
+        <h1>Review with clarity. Edit with confidence.</h1>
         <p className="lede">
-          Trimbin organizes footage by scene and shot, shows every take’s usable
-          ranges and technical issues, and keeps human choices searchable.
+          Trimbin brings footage, usable moments, technical insight, and
+          editorial decisions into one clear workspace.
         </p>
 
         <div className="door-actions">
