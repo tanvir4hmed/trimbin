@@ -261,16 +261,6 @@ export default function ShotReviewCockpit({
       }),
     [analyses],
   );
-  const bulkFindings = useMemo(
-    () =>
-      findingsForReview.filter(({ analysis, finding }) =>
-        String(analysis.clip_id) === activeReviewerId &&
-        bulkFindingKeys.has(
-          findingKey(String(analysis.clip_id), String(finding.finding_id)),
-        ),
-      ),
-    [activeReviewerId, bulkFindingKeys, findingsForReview],
-  );
   useEffect(() => {
     // Bulk review belongs to the take currently being reviewed, never the
     // comparison/reference take.
@@ -727,6 +717,27 @@ export default function ShotReviewCockpit({
     });
   };
 
+  const beginBulkReview = () => {
+    const canSeed =
+      focus?.clipId === activeReviewerId &&
+      focus.finding.action === "machine_open";
+    setBulkReview(true);
+    setInspectorTab("finding");
+    if (!canSeed) {
+      setBulkFindingKeys(new Set());
+      setBulkFindingCode("");
+      setNotice("Choose one unresolved issue, then select matching issues from the timeline.");
+      return;
+    }
+    setBulkFindingKeys(
+      new Set([
+        findingKey(focus.clipId, String(focus.finding.finding_id)),
+      ]),
+    );
+    setBulkFindingCode(String(focus.finding.code));
+    setNotice("Issue selected. Add the same issue type, or select all matching issues.");
+  };
+
   const act = async (
     action: "confirm" | "dismiss" | "correct" | "adjust_range" | "retract",
     changes: {
@@ -791,12 +802,37 @@ export default function ShotReviewCockpit({
   };
 
   const actOnBulkFindings = async (action: "confirm" | "dismiss") => {
-    if (!bulkFindings.length) return;
+    const selectedKeys = [...bulkFindingKeys];
+    if (!selectedKeys.length || !activeReviewerId) return;
+    const findingForKey = (
+      data: typeof screen.data | undefined,
+      key: string,
+    ) =>
+      data?.analyses
+        .filter((analysis) => String(analysis.clip_id) === activeReviewerId)
+        .flatMap((analysis) =>
+          analysis.findings.map((finding) => ({ analysis, finding })),
+        )
+        .find(
+          ({ analysis, finding }) =>
+            finding.action === "machine_open" &&
+            findingKey(
+              String(analysis.clip_id),
+              String(finding.finding_id),
+            ) === key,
+        );
+    const initial = await screen.refetch();
     const failed = new Set<string>();
+    let skipped = 0;
     let completed = 0;
-    for (const { analysis, finding } of bulkFindings) {
+    for (const key of selectedKeys) {
+      let target = findingForKey(initial.data, key);
+      if (!target) {
+        skipped += 1;
+        continue;
+      }
+      let { analysis, finding } = target;
       const clipId = String(analysis.clip_id);
-      const key = findingKey(clipId, String(finding.finding_id));
       try {
         await findingAction.mutateAsync({
           clipId,
@@ -805,7 +841,23 @@ export default function ShotReviewCockpit({
         });
         completed += 1;
       } catch {
-        failed.add(key);
+        const retried = await screen.refetch();
+        target = findingForKey(retried.data, key);
+        if (!target) {
+          skipped += 1;
+          continue;
+        }
+        ({ analysis, finding } = target);
+        try {
+          await findingAction.mutateAsync({
+            clipId: String(analysis.clip_id),
+            findingId: String(finding.finding_id),
+            body: { rev: finding.revision, action },
+          });
+          completed += 1;
+        } catch {
+          failed.add(key);
+        }
       }
     }
 
@@ -813,9 +865,7 @@ export default function ShotReviewCockpit({
     let selectionAdjusted = false;
     if (action === "confirm" && refreshed.data) {
       let adjusted = selectsRef.current;
-      const clipIds = new Set(
-        bulkFindings.map(({ analysis }) => String(analysis.clip_id)),
-      );
+      const clipIds = new Set([activeReviewerId]);
       for (const clipId of clipIds) {
         const updated = refreshed.data.analyses.find(
           (analysis) => String(analysis.clip_id) === clipId,
@@ -841,11 +891,11 @@ export default function ShotReviewCockpit({
       setNotice(
         selectionAdjusted
           ? `${completed} issues accepted. Overlapping shot selects were adjusted; review and save them.`
-          : `${completed} matching issues ${action === "confirm" ? "accepted" : "ignored"}. History is preserved.`,
+          : `${completed} matching issues ${action === "confirm" ? "accepted" : "ignored"}.${skipped ? ` ${skipped} no longer needed review.` : " History is preserved."}`,
       );
     } else {
       setNotice(
-        `${completed} issues updated; ${failed.size} changed elsewhere and remain selected.`,
+        `${completed} issues updated. ${failed.size} could not be saved; they remain selected.`,
       );
     }
   };
@@ -1330,12 +1380,7 @@ export default function ShotReviewCockpit({
                 {!bulkReview ? (
                   <button
                     disabled={!canComment}
-                    onClick={() => {
-                      setBulkReview(true);
-                      setFocus(null);
-                      setInspectorTab("finding");
-                      setNotice("Select matching unresolved issues from the timeline.");
-                    }}
+                    onClick={beginBulkReview}
                   >
                     Select issues
                   </button>

@@ -2594,6 +2594,7 @@ body{background:var(--bg);color:var(--ink)}
 .performance-entry { margin: 18px 0; border: 1px solid #334155; border-radius: 10px; padding: 14px; }
 .performance-entry > summary { cursor: pointer; font-weight: 600; }
 .performance-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; }
+.performance-actions > button:first-child { justify-self: start; }
 .performance-actions > button:last-child { justify-self: end; }
 .performance-actions .compare-toolbar { margin: 0; }
 .reviewing-picker select:disabled { color: var(--cockpit-text); opacity: 1; cursor: default; }
