@@ -2624,6 +2624,8 @@ body{background:var(--bg);color:var(--ink)}
 .ingest-verify { grid-template-columns: minmax(0, 1fr) minmax(320px, 40%); }
 @media (max-width: 1000px) { .ingest-verify { grid-template-columns: 1fr; } }
 .lane-shot-select { position: absolute; bottom: 0; height: 15px; padding: 0 3px; border: 1px solid #7eafff; border-radius: 2px; background: #245998; color: #eff6ff; font-size: 9px; overflow: hidden; white-space: nowrap; }
+.lane-shot-select { display:flex; align-items:center; justify-content:space-between; gap:3px; cursor:ew-resize; touch-action:none; }
+.lane-shot-select .range-handle { display:block; flex:0 0 3px; height:100%; border-radius:2px; background:#dbeaff; opacity:.9; }
 .selected-key { color: #7eafff; }
 .reviewed-clean-key { color: #58b994; }
 .lane-reviewed-clean { position: absolute; bottom: 17px; height: 15px; padding: 0 3px; background: #225645; border: 1px solid #58b994; color: #d8f4e8; font-size: 9px; overflow: hidden; white-space: nowrap; }

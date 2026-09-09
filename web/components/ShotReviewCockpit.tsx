@@ -25,6 +25,7 @@ import {
 } from "@/lib/queries";
 
 type Range = { from: number; to: number };
+type SegmentDrag = { id: string; edge: "in" | "out"; track: HTMLElement; duration: number };
 type Focus = { clipId: string; finding: FindingEvent };
 const selectionSignature = (rows: CoverageSegment[]) =>
   JSON.stringify(
@@ -371,7 +372,38 @@ export default function ShotReviewCockpit({
     screen.data?.brief.rev ?? 0,
   );
   const [selects, setSelects] = useState<CoverageSegment[]>([]);
+  const segmentDrag = useRef<SegmentDrag | null>(null);
   selectsRef.current = selects;
+  useEffect(() => {
+    const move = (event: PointerEvent) => {
+      const drag = segmentDrag.current;
+      if (!drag) return;
+      const rect = drag.track.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+      const time = ratio * drag.duration;
+      setSelects((rows) => rows.map((row) => {
+        if (row.segment_id !== drag.id) return row;
+        const next = drag.edge === "in"
+          ? Math.min(time, row.source_out_s - 0.05)
+          : Math.max(time, row.source_in_s + 0.05);
+        return drag.edge === "in" ? { ...row, source_in_s: next } : { ...row, source_out_s: next };
+      }));
+      const current = selectsRef.current.find((row) => row.segment_id === drag.id);
+      if (current) {
+        const next = drag.edge === "in"
+          ? { from: time, to: current.source_out_s }
+          : { from: current.source_in_s, to: time };
+        if (next.to > next.from) {
+          setRange(next);
+          previewMoment(current.clip_id, next.from, next.to);
+        }
+      }
+    };
+    const up = () => { segmentDrag.current = null; };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+  }, []);
   const [selectPreviewIndex, setSelectPreviewIndex] = useState<number | null>(
     null,
   );
@@ -1196,12 +1228,25 @@ export default function ShotReviewCockpit({
                     <button key={segment.segment_id} className="lane-shot-select"
                       style={{ left: pct(segment.source_in_s), width: pct(segment.source_out_s - segment.source_in_s) }}
                       title={`Shot select ${tc(segment.source_in_s)}–${tc(segment.source_out_s)}`}
+                      onPointerDown={(event) => {
+                        if (!canComment) return;
+                        const track = event.currentTarget.parentElement;
+                        if (!track) return;
+                        const rect = event.currentTarget.getBoundingClientRect();
+                        segmentDrag.current = {
+                          id: segment.segment_id,
+                          edge: Math.abs(event.clientX - rect.left) < 10 ? "in" : "out",
+                          track,
+                          duration: take.duration_s,
+                        };
+                        event.preventDefault();
+                      }}
                       onClick={() => {
                         pendingRange.current = { clipId: take.clip_id, range: { from: segment.source_in_s, to: segment.source_out_s } };
                         setRange({ from: segment.source_in_s, to: segment.source_out_s });
                         setInspectorTab("selects");
                         previewMoment(take.clip_id, segment.source_in_s, segment.source_out_s);
-                      }}>Selected</button>
+                      }}><i className="range-handle range-handle-in" /><span>Selected</span><i className="range-handle range-handle-out" /></button>
                   ))}
                 </div>
               </div>
