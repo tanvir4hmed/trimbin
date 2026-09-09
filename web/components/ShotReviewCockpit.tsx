@@ -6,7 +6,7 @@ import Player, { type PlayerHandle } from "@/components/Player";
 import ShotBrief from "@/components/ShotBrief";
 import PerformanceWorkspace from "@/components/PerformanceWorkspace";
 import ReviewedRanges from "@/components/ReviewedRanges";
-import { draggedRange, type TimelineDrag } from "@/lib/timeline-drag";
+import { draggedRange, rangeDragBounds, type TimelineDrag } from "@/lib/timeline-drag";
 import { useQuery } from "@tanstack/react-query";
 import {
   api,
@@ -400,21 +400,13 @@ export default function ShotReviewCockpit({
     const safe = take && analysis
       ? rangesOutsideIssues(take.duration_s, analysis.findings)
       : [{ from: 0, to: take?.duration_s ?? segment.source_out_s }];
-    const safeRange = safe.find(
-      (item) => item.from <= segment.source_in_s && item.to >= segment.source_out_s,
-    ) ?? safe.find(
-      (item) => item.to > segment.source_in_s && item.from < segment.source_out_s,
-    ) ?? { from: segment.source_in_s, to: segment.source_out_s };
     const others = rows.filter(
       (item) => item.segment_id !== segment.segment_id && item.clip_id === segment.clip_id,
     );
-    const previous = others
-      .filter((item) => item.source_out_s <= segment.source_in_s)
-      .reduce((value, item) => Math.max(value, item.source_out_s), safeRange.from);
-    const next = others
-      .filter((item) => item.source_in_s >= segment.source_out_s)
-      .reduce((value, item) => Math.min(value, item.source_in_s), safeRange.to);
-    return { min: Math.max(safeRange.from, previous), max: Math.min(safeRange.to, next) };
+    return rangeDragBounds(
+      { from: segment.source_in_s, to: segment.source_out_s }, safe,
+      others.map((item) => ({ from: item.source_in_s, to: item.source_out_s })),
+    );
   };
 
   useEffect(() => {
@@ -788,6 +780,7 @@ export default function ShotReviewCockpit({
       const item = rows[index];
       if (!item || !Number.isFinite(value)) return rows;
       const bounds = segmentBounds(item, rows);
+      if (!bounds) return rows;
       const next = [...rows];
       next[index] = edge === "in"
         ? {
@@ -1315,9 +1308,14 @@ export default function ShotReviewCockpit({
                         if (!track) return;
                         const width = track.getBoundingClientRect().width;
                         if (width <= 0) return;
-                        event.currentTarget.setPointerCapture(event.pointerId);
                         const handle = (event.target as HTMLElement).closest(".range-handle");
                         const bounds = segmentBounds(segment, selectsRef.current);
+                        if (!bounds) {
+                          event.preventDefault();
+                          setNotice("This selection overlaps an issue or another selection. Use Save shot selects to review the usable portions before trimming; dragging will not shorten it automatically.");
+                          return;
+                        }
+                        event.currentTarget.setPointerCapture(event.pointerId);
                         segmentDrag.current = {
                           id: segment.segment_id,
                           clipId: segment.clip_id,
