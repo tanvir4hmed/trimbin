@@ -469,10 +469,10 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
           <button className="ghost" onClick={download} disabled={!rows.length}>
             Export list
           </button>
-          {canEdit && !editing && (
+          {!editing && (
             <button
               className="primary"
-              disabled={busy || !saved}
+              disabled={busy || !saved || !canEdit}
               onClick={() => {
                 setEditing(true);
                 if (coverageMode) {
