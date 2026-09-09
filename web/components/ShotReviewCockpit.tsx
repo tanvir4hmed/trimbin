@@ -227,8 +227,7 @@ export default function ShotReviewCockpit({
     reviewingClipId ||
     (focusTake ? takes.find((take) => take.take_no === focusTake)?.clip_id : "") ||
     initialClipId ||
-    recommended?.clip_id ||
-    takes.at(-1)?.clip_id ||
+    takes[0]?.clip_id ||
     "";
   const [inspectorTab, setInspectorTab] = useState<
     "finding" | "selects" | "shot"
@@ -360,7 +359,7 @@ export default function ShotReviewCockpit({
   const chosen = takes.find((take) => take.clip_id === reviewingClipId)
     ?? takes.find((take) => take.take_no === focusTake)
     ?? takes.find((take) => take.clip_id === initialClipId)
-    ?? recommended ?? takes[takes.length - 1];
+    ?? takes[0];
   useEffect(() => {
     if (chosen && chosen.clip_id !== reviewingClipId)
       onReviewingChange(chosen.clip_id, chosen.take_no);
@@ -1131,29 +1130,31 @@ export default function ShotReviewCockpit({
           </div>
         </header>
         <nav className="performance-actions" aria-label="Shot workspace mode">
-          <button
-            aria-pressed={workspaceMode === "inspect"}
-            onClick={() => setWorkspaceMode("inspect")}
-          >
-            Inspect footage & issues
-          </button>
-          <button
-            aria-pressed={workspaceMode === "compare"}
-            onClick={() => setWorkspaceMode("compare")}
-            disabled={takes.length < 2}
-            title={
-              takes.length < 2
-                ? "Upload another take to compare performances."
-                : undefined
-            }
-          >
-            Compare performances
-          </button>
-        </nav>
-        <div className="inspect-preview-group">
+          <div className="workspace-mode-actions">
+            <button
+              aria-pressed={workspaceMode === "inspect"}
+              onClick={() => setWorkspaceMode("inspect")}
+            >
+              Inspect footage & issues
+            </button>
+            <button
+              aria-pressed={workspaceMode === "compare"}
+              onClick={() => setWorkspaceMode("compare")}
+              disabled={takes.length < 2}
+              title={
+                takes.length < 2
+                  ? "Upload another take to compare performances."
+                  : undefined
+              }
+            >
+              Compare performances
+            </button>
+          </div>
           <div className="compare-toolbar" aria-label="Which take">
-            <label>Reviewing <select aria-label="Reviewing take"
-              value={chosen?.clip_id ?? ""} onChange={(e) => chooseTake(e.target.value)}>
+            <label className="reviewing-picker">Reviewing <select aria-label="Reviewing take"
+              value={chosen?.clip_id ?? ""}
+              disabled={takes.length < 2}
+              onChange={(e) => chooseTake(e.target.value)}>
               {takes.map((take) => <option key={take.clip_id} value={take.clip_id}>{takeName(take)}</option>)}
             </select></label>
             {showComparison && previous && (
@@ -1175,6 +1176,8 @@ export default function ShotReviewCockpit({
               </label>
             )}
           </div>
+        </nav>
+        <div className="inspect-preview-group">
 
           <div
             className={showComparison ? "compare-players" : "compare-players single"}

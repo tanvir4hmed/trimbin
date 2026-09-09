@@ -2594,6 +2594,9 @@ body{background:var(--bg);color:var(--ink)}
 .performance-entry { margin: 18px 0; border: 1px solid #334155; border-radius: 10px; padding: 14px; }
 .performance-entry > summary { cursor: pointer; font-weight: 600; }
 .performance-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.workspace-mode-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.performance-actions .compare-toolbar { margin: 0; margin-left: auto; }
+.reviewing-picker select:disabled { color: var(--cockpit-text); opacity: 1; cursor: default; }
 .issue-lanes .lane-safe { z-index: 2; background: #225645; border: 1px solid #58b994; color: #d8f4e8; }
 .issue-lanes .lane-safe span { display: block; overflow: hidden; padding: 0 4px; color: #c8f5df; font-size: 9px; font-weight: 700; line-height: 16px; text-align: left; white-space: nowrap; text-overflow: ellipsis; }
 .issue-lanes .clean-key { color: #a7bdd8; }
