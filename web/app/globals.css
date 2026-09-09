@@ -2552,6 +2552,7 @@ body{background:var(--bg);color:var(--ink)}
 .prose code{padding:1px 5px;background:var(--surface-2);border-radius:4px;font:12px var(--mono)}
 /* Main navigation pages share Home's breathing room and content width. */
 .activity-page, .accuracy-page, .guide-page, .projects-page, .review-index { max-width:1380px; padding-top:34px; }
+.home-command, .activity-page, .accuracy-page, .guide-page, .projects-page, .review-index { width:100%; box-sizing:border-box; }
 .guide-page > section, .guide-page > header { max-width:none; }
 .accuracy-page > .quality-page { max-width:none; padding:0; margin:0; }
 .home-command h1,
@@ -2561,6 +2562,7 @@ body{background:var(--bg);color:var(--ink)}
 .accuracy-page h1,
 .guide-page h1 { font-family:var(--serif); font-size:34px; line-height:1.08; font-weight:600; letter-spacing:-.02em; color:var(--ink); margin:0 0 14px; }
 .projects-page .eyebrow,
+.home-command .eyebrow,
 .review-index .eyebrow,
 .activity-page .eyebrow,
 .accuracy-page .eyebrow,
