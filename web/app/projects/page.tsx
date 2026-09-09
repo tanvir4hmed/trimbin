@@ -137,6 +137,7 @@ export default function ProjectsPage() {
       <PlacementTasks />
       <header className="dash-top">
         <div>
+          <p className="eyebrow">ALL PROJECTS</p>
           <h1>Projects</h1>
           <p className="dim">
             {projects.length} project{projects.length === 1 ? "" : "s"} you can

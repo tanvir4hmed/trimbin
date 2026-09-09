@@ -2554,7 +2554,17 @@ body{background:var(--bg);color:var(--ink)}
 .activity-page, .accuracy-page, .guide-page, .projects-page, .review-index { max-width:1380px; padding-top:34px; }
 .guide-page > section, .guide-page > header { max-width:none; }
 .accuracy-page > .quality-page { max-width:none; padding:0; margin:0; }
-.accuracy-page h1, .review-index h1 { font-size:34px; line-height:1.08; margin:0 0 14px; }
+.home-command h1,
+.projects-page h1,
+.review-index h1,
+.activity-page h1,
+.accuracy-page h1,
+.guide-page h1 { font-family:var(--serif); font-size:34px; line-height:1.08; font-weight:600; letter-spacing:-.02em; color:var(--ink); margin:0 0 14px; }
+.projects-page .eyebrow,
+.review-index .eyebrow,
+.activity-page .eyebrow,
+.accuracy-page .eyebrow,
+.guide-page .eyebrow { color:var(--amber); }
 .accuracy-page h2, .review-index h2 { font-size:16px; line-height:1.2; }
 .page-heading, .dash-top { min-height:72px; align-items:flex-start; }
 /* Source-local performance review: neutral evidence, explicit human choices. */
