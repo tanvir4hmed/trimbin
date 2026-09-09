@@ -2551,7 +2551,8 @@ body{background:var(--bg);color:var(--ink)}
 .prose ul.plain strong{color:var(--ink)}
 .prose code{padding:1px 5px;background:var(--surface-2);border-radius:4px;font:12px var(--mono)}
 /* Main navigation pages share Home's breathing room and content width. */
-.activity-page, .accuracy-page, .guide-page, .projects-page, .review-index { max-width:1100px; padding-top:34px; }
+.activity-page, .accuracy-page, .guide-page, .projects-page, .review-index { max-width:1380px; padding-top:34px; }
+.guide-page > section, .guide-page > header { max-width:none; }
 .page-heading, .dash-top { min-height:72px; align-items:flex-start; }
 /* Source-local performance review: neutral evidence, explicit human choices. */
 .performance-entry { margin: 18px 0; border: 1px solid #334155; border-radius: 10px; padding: 14px; }
