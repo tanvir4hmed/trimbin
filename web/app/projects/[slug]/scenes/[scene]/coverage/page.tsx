@@ -2,6 +2,7 @@
 
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import Player, { type PlayerHandle } from "@/components/Player";
 import type { FilmState, Stringout, StringoutEntry } from "@/lib/api";
 import { ApiError, api } from "@/lib/api";
@@ -54,6 +55,11 @@ export default function SceneCoveragePage({
   const { slug, scene } = use(params);
   const projectId = projectIdFromSlug(slug);
   const sceneId = Number(scene);
+  const searchParams = useSearchParams();
+  const requestedReturn = searchParams.get("returnTo");
+  const returnTo = requestedReturn?.startsWith("/projects/")
+    ? requestedReturn
+    : paths.scene(projectId, sceneId);
   const player = useRef<PlayerHandle>(null);
   const [data, setData] = useState<Stringout | null>(null);
   const [film, setFilm] = useState<FilmState | null>(null);
@@ -282,7 +288,7 @@ export default function SceneCoveragePage({
     <main className="coverage-shell">
       <header className="coverage-head">
         <div className="crumbs">
-          <Link href={`${paths.project(projectId)}`}>Project</Link>
+          <Link href={returnTo}>Back</Link>
           <span>›</span>
           <b>Scene {sceneCode}</b>
           <span className="coverage-mode">Coverage Reel</span>
@@ -322,7 +328,11 @@ export default function SceneCoveragePage({
               onEnded={advance}
             />
             <div className="coverage-now">
-              <span>{active?.slug ?? "No confirmed take"}</span>
+              <span>
+                {active
+                  ? `Scene ${active.scene_code} / Shot ${active.shot_code}`
+                  : "No confirmed take"}
+              </span>
               {active && (
                 <span>
                   Take {active.take_no} · {clock(active.start_s)}–

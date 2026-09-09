@@ -927,8 +927,6 @@ function FilmWorkspace({ projectId }: { projectId: number }) {
         <section className="film-chapters">
           <h2>Playback order</h2>
           <p className="hint">
-            Click any portion to preview it. Switch to Arrange sequence to
-            change the order.
           </p>
           <div>
             {rows.map((row, i) => {

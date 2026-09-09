@@ -327,7 +327,11 @@ export default function ProjectWorkspace({
           {urlScene > 0 && (
             <Link
               className="primary"
-              href={`${paths.coverage(projectId, urlScene, project?.name)}`}
+              href={`${paths.coverage(projectId, urlScene, project?.name)}?returnTo=${encodeURIComponent(
+                open?.shot
+                  ? paths.shot(projectId, open.scene, open.shot, project?.name)
+                  : paths.scene(projectId, urlScene, project?.name),
+              )}`}
             >
               Play scene{" "}
               {tree.scenes.find((item) => item.scene === urlScene)
