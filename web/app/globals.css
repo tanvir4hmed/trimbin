@@ -2642,6 +2642,7 @@ body{background:var(--bg);color:var(--ink)}
 .project-next-step p { margin: 5px 0 0; }
 .issue-lanes { max-height: none; overflow: visible; }
 .issue-lanes { position: sticky; top: 74px; z-index: 8; padding-bottom: 10px; background: var(--bg); }
+.shot-cockpit { overflow: visible; }
 .issue-lanes .lane-track { min-height: 48px; }
 .issue-lanes .lane-finding { min-height: 18px; }
 :where(.app-scroll) button { padding: 7px 10px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 5px; }
@@ -2724,7 +2725,8 @@ button:disabled { opacity: .48; cursor: not-allowed; }
 .range-inputs input { width: 58px; }
 .lane-track { height: 32px; }
 .lane-track { height: 54px; }
-.lane-shot-select { z-index: 4; top: auto; bottom: 0; height: 18px; border:1px solid #3b70a6; border-radius:4px; background:#285b91; color:#69d8a8; font-size:11px; cursor:ew-resize; }
+.lane-shot-select { z-index: 4; top:50%; bottom:auto; height:36px; transform:translateY(-50%); border:1px solid #3b70a6; border-radius:4px; background:#285b91; color:#587c45; font-size:11px; cursor:default; }
+.lane-shot-select .range-handle { cursor:ew-resize; }
 .lane-shot-select:hover { border-color:#69d8a8; }
 .lane-reviewed-clean { height: 13px; bottom: 14px; }
 .lane-finding { z-index: 5; height: 16px !important; font-size: 11px; border-radius:4px; }

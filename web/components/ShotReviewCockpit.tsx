@@ -70,6 +70,20 @@ function withinRanges(range: Range, valid: Range[]): Range[] {
     .filter((candidate) => candidate.to > candidate.from);
 }
 
+function subtractRanges(range: Range, blocked: Range[]): Range[] {
+  let pieces = [range];
+  for (const occupied of blocked) {
+    pieces = pieces.flatMap((piece) => {
+      if (occupied.to <= piece.from || occupied.from >= piece.to) return [piece];
+      return [
+        { from: piece.from, to: Math.min(piece.to, occupied.from) },
+        { from: Math.max(piece.from, occupied.to), to: piece.to },
+      ].filter((item) => item.to - item.from >= 0.05);
+    });
+  }
+  return pieces;
+}
+
 function rangesOutsideIssues(
   duration: number,
   findings: FindingEvent[],
@@ -383,16 +397,28 @@ export default function ShotReviewCockpit({
       const time = ratio * drag.duration;
       setSelects((rows) => rows.map((row) => {
         if (row.segment_id !== drag.id) return row;
+        const others = rows
+          .filter((item) => item.segment_id !== drag.id && item.clip_id === row.clip_id)
+          .map((item) => ({ from: item.source_in_s, to: item.source_out_s }));
+        const free = subtractRanges(
+          drag.edge === "in"
+            ? { from: 0, to: row.source_out_s - 0.05 }
+            : { from: row.source_in_s + 0.05, to: drag.duration },
+          others,
+        );
+        const boundary = drag.edge === "in"
+          ? Math.max(...free.map((item) => item.to).filter((value) => value <= row.source_out_s))
+          : Math.min(...free.map((item) => item.from).filter((value) => value >= row.source_in_s));
         const next = drag.edge === "in"
-          ? Math.min(time, row.source_out_s - 0.05)
-          : Math.max(time, row.source_in_s + 0.05);
+          ? Math.min(time, boundary)
+          : Math.max(time, boundary);
         return drag.edge === "in" ? { ...row, source_in_s: next } : { ...row, source_out_s: next };
       }));
       const current = selectsRef.current.find((row) => row.segment_id === drag.id);
       if (current) {
         const next = drag.edge === "in"
-          ? { from: time, to: current.source_out_s }
-          : { from: current.source_in_s, to: time };
+          ? { from: Math.min(time, current.source_out_s - 0.05), to: current.source_out_s }
+          : { from: current.source_in_s, to: Math.max(time, current.source_in_s + 0.05) };
         if (next.to > next.from) {
           setRange(next);
           previewMoment(current.clip_id, next.from, next.to);
@@ -696,11 +722,15 @@ export default function ShotReviewCockpit({
           from: item.start_s,
           to: item.end_s,
         }));
-    const pieces = selectedAnalysis
+    const safePieces = selectedAnalysis
       ? withinRanges(range, safe)
       : safe.length
         ? withinRanges(range, safe)
         : [range];
+    const occupied = selectsRef.current
+      .filter((item) => item.clip_id === selected.clip_id)
+      .map((item) => ({ from: item.source_in_s, to: item.source_out_s }));
+    const pieces = safePieces.flatMap((piece) => subtractRanges(piece, occupied));
     if (!pieces.length) {
       setNotice("That range overlaps an issue and has no selectable portion.");
       return;
@@ -1232,10 +1262,13 @@ export default function ShotReviewCockpit({
                         if (!canComment) return;
                         const track = event.currentTarget.parentElement;
                         if (!track) return;
-                        const rect = event.currentTarget.getBoundingClientRect();
+                        const handle = (event.target as HTMLElement).closest(".range-handle");
+                        if (!handle) return;
+                        const rect = handle.getBoundingClientRect();
+                        const edge = handle.classList.contains("range-handle-in") ? "in" : "out";
                         segmentDrag.current = {
                           id: segment.segment_id,
-                          edge: Math.abs(event.clientX - rect.left) < 10 ? "in" : "out",
+                          edge,
                           track,
                           duration: take.duration_s,
                         };
