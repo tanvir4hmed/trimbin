@@ -696,7 +696,7 @@ export interface paths {
         put?: never;
         /**
          * Commit Ingest
-         * @description Commit verified assignments and only then start full-take analysis.
+         * @description Commit any verified subset and start analysis for those assigned clips.
          */
         post: operations["commit_ingest_uploads_jobs__job_id__commit_post"];
         delete?: never;
@@ -2684,7 +2684,7 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "move" | "keep" | "unassign" | "create";
+            action: "move" | "keep" | "unassign" | "create" | "remove";
             /**
              * Scene
              * @default 0
