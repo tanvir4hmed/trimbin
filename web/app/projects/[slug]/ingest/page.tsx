@@ -58,7 +58,6 @@ export default function IngestPage({ params }: { params: Promise<{ slug: string 
     <main className="ingest-page">
       <div className="ingest-page-crumb">
         <Link href={`${paths.project(projectId)}`}>← {screen.data.project.name}</Link>
-        <span>Footage ingest</span>
       </div>
 
       <Upload

@@ -35,8 +35,8 @@
 }
 
 /* Editorial sequence and live review metrics share the workspace palette. */
-.quality-page, .film-page { padding: 28px; max-width: 1600px; margin: auto; }
-.quality-page h1, .film-page h1 { font: 600 28px var(--sans); margin: 10px 0; }
+.quality-page, .film-page { padding: 14px; max-width: 1680px; margin: auto; }
+.quality-page h1, .film-page h1 { font: 600 22px var(--sans); margin: 3px 0; }
 .quality-page p, .film-page p { color: var(--mid); line-height: 1.6; }
 .quality-toolbar, .quality-breakdown, .film-heading, .film-transport { display:flex; align-items:center; flex-wrap:wrap; gap:16px; }
 .quality-toolbar { margin:28px 0; }

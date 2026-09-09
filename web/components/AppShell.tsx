@@ -151,7 +151,7 @@ function WorkspaceShell({ children }: { children: React.ReactNode }) {
             !pathname.endsWith("/ingest") &&
             !pathname.endsWith("/film"),
         ],
-        [paths.ingest(currentId), "↑", "Footage", pathname.endsWith("/ingest")],
+        [paths.ingest(currentId), "↑", "Footage ingest", pathname.endsWith("/ingest")],
         [
           paths.film(currentId),
           "▶",
