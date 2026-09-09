@@ -105,9 +105,7 @@ class TestFindingCommandSafety:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         finding = {**current_finding(), "start_s": 0.0, "end_s": 59.6264}
-        committed = finding_actions.Committed(
-            uuid4(), finding["finding_id"], 1, "human_dismissed"
-        )
+        committed = finding_actions.Committed(uuid4(), finding["finding_id"], 1, "human_dismissed")
         captured: dict = {}
 
         async def read(project_id: int, clip_id):
