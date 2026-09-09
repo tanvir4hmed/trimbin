@@ -412,6 +412,8 @@ async def read(project_id: int, clip_id: UUID) -> dict:
 
 
 async def active_clips_without_analysis(project_id: int) -> list[dict]:
+    from trimbin_agents.segment.agent import PROMPT_VERSION
+
     result = await (await client()).query(
         """
         SELECT c.clip_id, c.group_id, c.subgroup_id, c.take_no,
@@ -421,10 +423,11 @@ async def active_clips_without_analysis(project_id: int) -> list[dict]:
           ON r.project_id=c.project_id AND r.clip_id=c.clip_id
         WHERE c.project_id={p:UInt32} AND c.status='active'
           AND (r.clip_id=toUUID('00000000-0000-0000-0000-000000000000')
-               OR r.state = 'failed')
+               OR r.state = 'failed'
+               OR (r.state = 'completed' AND r.prompt_version != {version:String}))
         ORDER BY c.ingested_at, c.clip_id
         """,
-        parameters={"p": project_id},
+        parameters={"p": project_id, "version": PROMPT_VERSION},
     )
     return [dict(zip(result.column_names, row, strict=True)) for row in result.result_rows]
 
@@ -509,14 +512,14 @@ async def working_findings_for_clips(
     findings: dict[str, list[dict]] = {clip_id: [] for clip_id in complete}
     current_result = await ch.query(
         """
-        SELECT clip_id, code, start_s, end_s, detail, severity
+        SELECT clip_id, code, start_s, end_s, detail, severity, action
         FROM current_findings
         WHERE project_id={p:UInt32} AND clip_id IN {ids:Array(UUID)}
         ORDER BY clip_id, start_s, finding_id
         """,
         parameters={"p": project_id, "ids": selected},
     )
-    for clip_id, code, start, end, detail, severity in current_result.result_rows:
+    for clip_id, code, start, end, detail, severity, action in current_result.result_rows:
         findings[str(clip_id)].append(
             {
                 "code": str(code),
@@ -524,6 +527,7 @@ async def working_findings_for_clips(
                 "end_s": float(end),
                 "detail": str(detail),
                 "severity": str(severity),
+                "action": str(action),
             }
         )
     return complete, findings

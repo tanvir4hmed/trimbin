@@ -166,16 +166,15 @@ class TestMarkers:
         )
         assert "focus.lost" not in csv_text
 
-    def test_a_finding_past_the_trim_is_pinned_to_the_last_used_frame(self) -> None:
-        """A fault at 0:52 of a take trimmed at 0:12 did happen. The honest place
-        for it on this timeline is the last frame that survived."""
+    def test_a_finding_past_the_trim_does_not_label_a_clean_frame(self) -> None:
+        """An excluded fault belongs in the archive, not on a different frame."""
         csv_text = exports.markers(
             self.ENTRIES,
             [{"clip_id": "aaa", "start_s": 52.0, "end_s": 53.0, "code": "focus.lost"}],
             [],
             fps=24,
         )
-        assert "00:00:10:00" in csv_text
+        assert "focus.lost" not in csv_text
 
     def test_severity_becomes_a_colour_an_editor_already_knows(self) -> None:
         csv_text = exports.markers(

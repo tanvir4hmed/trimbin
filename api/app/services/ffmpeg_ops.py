@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import re
 import tempfile
 from pathlib import Path
@@ -52,6 +53,7 @@ _BLACK = re.compile(r"black_start:([\d.]+).*?black_end:([\d.]+)", re.S)
 _FREEZE_START = re.compile(r"freeze_start: ([\d.]+)")
 _FREEZE_END = re.compile(r"freeze_end: ([\d.]+)")
 _LOUDNORM = re.compile(r"\{.*?\}", re.S)
+_SILENCE = re.compile(r"silence_(start|end):\s*([\d.]+)")
 
 
 async def analyse(source: Path) -> RawMeasurements:
@@ -292,10 +294,9 @@ def _spikes(series: list[float], duration_s: float) -> list[Span]:
     # what does this clip look like when nothing is wrong?
     ordered = sorted(series)
     baseline = ordered[len(ordered) // 4]
-    if baseline <= 0:
-        return []
-
-    threshold = baseline * 2.5
+    # Digital stillness has a zero baseline; sustained motion must remain
+    # detectable while codec noise and isolated cuts stay below the gate.
+    threshold = max(1.0, baseline * 2.5)
     seconds_per_frame = duration_s / len(series)
 
     # Half a second. Anything briefer is a cut, a flash, or a subject crossing
@@ -335,7 +336,7 @@ async def _measure_audio(source: Path, m: RawMeasurements) -> None:
             "-i",
             str(source),
             "-af",
-            "loudnorm=print_format=json",
+            "silencedetect=noise=-50dB:d=0.25,loudnorm=print_format=json",
             "-f",
             "null",
             "-",
@@ -345,6 +346,8 @@ async def _measure_audio(source: Path, m: RawMeasurements) -> None:
 
     if code != 0:
         return
+
+    m.silence_spans = _silence_spans(err, m.duration_s)
 
     blocks = _LOUDNORM.findall(err)
     if not blocks:
@@ -357,8 +360,30 @@ async def _measure_audio(source: Path, m: RawMeasurements) -> None:
         # dynamic range is either silent or buried in hiss, and both are worth
         # a person's eye.
         m.noise_floor_db = m.audio_lufs - float(data.get("input_lra", 0))
+        # ffmpeg emits -inf for digital silence. Keep durable JSON finite;
+        # localized silence evidence carries the actual observation.
+        for field in ("audio_lufs", "audio_peak_db", "noise_floor_db"):
+            if not math.isfinite(getattr(m, field)):
+                setattr(m, field, -120.0)
     except (json.JSONDecodeError, ValueError, TypeError):
         log.warning("loudnorm output was not parseable for %s", source.name)
+
+
+def _silence_spans(stderr: str, duration_s: float) -> list[Span]:
+    """Bound low-level audio intervals; silence is not proof of a mic failure."""
+    result: list[Span] = []
+    start: float | None = None
+    for kind, value in _SILENCE.findall(stderr):
+        time = min(duration_s, max(0.0, float(value)))
+        if kind == "start":
+            start = time
+        elif start is not None:
+            if time > start:
+                result.append(Span(start, time))
+            start = None
+    if start is not None and duration_s > start:
+        result.append(Span(start, duration_s))
+    return result
 
 
 async def build_proxy(source: Path, out_dir: Path) -> Path:

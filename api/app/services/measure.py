@@ -130,6 +130,7 @@ class RawMeasurements:
     audio_peak_db: float = 0.0
     noise_floor_db: float = 0.0
     has_audio: bool = False
+    silence_spans: list[Span] = field(default_factory=list)
 
     # Faults with no interpretation needed.
     dropped_frames: int = 0

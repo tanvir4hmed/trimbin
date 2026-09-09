@@ -161,8 +161,14 @@ def _findings_columns(m: RawMeasurements) -> tuple[list[str], list[float], list[
         ("stability.shake", m.motion_spikes),
         ("frames.frozen", m.freeze_spans),
         ("clip.black", m.black_spans),
+        ("audio.silence", m.silence_spans),
     ):
-        for start, end in _events(spans):
+        events = (
+            [(span.start_s, span.end_s) for span in spans]
+            if code == "audio.silence"
+            else _events(spans)
+        )
+        for start, end in events:
             codes.append(code)
             starts.append(round(start, 2))
             ends.append(round(end, 2))

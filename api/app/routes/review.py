@@ -550,6 +550,16 @@ async def set_coverage(
             }
         )
 
+    # Validate the same source intervals regardless of which browser control
+    # produced them. Read the operational finding overlay as well as the archive
+    # so accepting an issue is effective even while ClickHouse delivery waits.
+    from .analysis import _read as read_analysis
+
+    evidence = {}
+    for clip_ref in {row["clip_id"] for row in prepared}:
+        evidence[clip_ref] = await read_analysis(project_id, UUID(clip_ref))
+    ranges.validate_selections(prepared, evidence)
+
     committed = await selections.commit_coverage(
         project_id,
         group_id,

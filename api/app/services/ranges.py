@@ -106,10 +106,16 @@ def safe_ranges(
     blocked: list[Range] = []
     causes: list[str] = []
     for f in findings:
-        if f.get("severity") == "note":
+        action = f.get("action", "")
+        if action == "human_retracted":
+            action = f.get("restored_action", "machine_open")
+        if action == "human_dismissed":
+            continue
+        confirmed = action in {"human_confirmed", "human_corrected", "human_range_adjusted"}
+        if f.get("severity") == "note" and not confirmed:
             continue
         code = f.get("code")
-        if code not in removable:
+        if code not in removable and not confirmed:
             continue
         start = max(0.0, float(f.get("start_s") or 0.0))
         end = min(duration_s, float(f.get("end_s") or 0.0))
@@ -126,7 +132,7 @@ def safe_ranges(
                 return [], [str(code)]
             continue
 
-        if end - start < MIN_GAP_S:
+        if end - start < MIN_GAP_S and not confirmed:
             continue
 
         blocked.append(Range(start, end))
@@ -156,11 +162,11 @@ def _subtract(duration_s: float, blocked: list[Range]) -> list[Range]:
     cursor = 0.0
     for span in merged:
         if span.start_s - cursor >= MIN_USABLE_S:
-            safe.append(Range(round(cursor, 2), round(span.start_s, 2)))
+            safe.append(Range(cursor, span.start_s))
         cursor = max(cursor, span.end_s)
 
     if duration_s - cursor >= MIN_USABLE_S:
-        safe.append(Range(round(cursor, 2), round(duration_s, 2)))
+        safe.append(Range(cursor, duration_s))
 
     return safe
 
@@ -172,3 +178,34 @@ def longest(ranges: list[Range]) -> Range | None:
     take, and the longest clean run is the least surprising choice.
     """
     return max(ranges, key=lambda r: r.duration_s, default=None)
+
+
+def validate_selections(segments: list[dict], evidence: dict[str, dict]) -> None:
+    """Reject overlaps without silently rewriting the editor's saved draft.
+
+    Adjacent half-open source intervals can share an endpoint. Never discard
+    an arbitrary second of valid frames between selections.
+    """
+    from fastapi import HTTPException
+
+    occupied: dict[str, list[tuple[float, float]]] = {}
+    for segment in segments:
+        clip = str(segment["clip_id"])
+        start, end = float(segment["source_in_s"]), float(segment["source_out_s"])
+        if any(start < b and a < end for a, b in occupied.get(clip, [])):
+            raise HTTPException(
+                422, "Selected source ranges overlap. Adjust the draft and save again."
+            )
+        for finding in evidence.get(clip, {}).get("findings", []):
+            action = finding.get("action")
+            if action == "human_retracted":
+                action = finding.get("restored_action")
+            if action == "human_dismissed":
+                continue
+            if start < float(finding["end_s"]) and float(finding["start_s"]) < end:
+                raise HTTPException(
+                    422,
+                    "A selected range overlaps an issue. Adjust the range or explicitly dismiss "
+                    "the finding, then save again.",
+                )
+        occupied.setdefault(clip, []).append((start, end))

@@ -13,8 +13,8 @@ from ..config import settings
 from ..contracts.base import Finding, TimeRange
 from ..contracts.segments import Moment, SegmentObservation
 
-PROMPT_VERSION = "segment/v3"
-PROMPT = (Path(__file__).parent / "prompt_v3.md").read_text(encoding="utf-8")
+PROMPT_VERSION = "segment/v4"
+PROMPT = (Path(__file__).parent / "prompt_v4.md").read_text(encoding="utf-8")
 RUBRIC = (Path(__file__).parent.parent / "common" / "editorial_rubric.md").read_text(
     encoding="utf-8"
 )
