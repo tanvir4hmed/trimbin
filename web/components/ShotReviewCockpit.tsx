@@ -279,6 +279,7 @@ export default function ShotReviewCockpit({
     });
   }, [findingsForReview]);
   const [range, setRange] = useState<Range>({ from: 0, to: 0 });
+  const [cleanCandidate, setCleanCandidate] = useState<Range | null>(null);
   const pendingRange = useRef<{ clipId: string; range: Range } | null>(null);
   const reviewRange = useRef<{ clipId: string; end: number; segmentId?: string } | null>(null);
   const coverageBase = useRef<string | null>(null);
@@ -1381,7 +1382,13 @@ export default function ShotReviewCockpit({
                 markerEnds[row] = finding.end_s;
                 return { finding, row };
               });
-            const safe = analysis?.safe_ranges ?? take.safe_ranges;
+            // An in-progress analysis deliberately exposes no safe ranges. Keep
+            // the last completed comparison suggestion visible until the new
+            // run is complete, then replace it with the freshly issue-adjusted
+            // clean portions.
+            const safe = analysis?.coverage_complete
+              ? analysis.safe_ranges
+              : take.safe_ranges;
             const needsReview =
               take.clip_id === chosen?.clip_id &&
               (!screen.data?.decision_fresh ||
@@ -1427,13 +1434,15 @@ export default function ShotReviewCockpit({
                         };
                         previewMoment(take.clip_id, item.start_s, item.end_s);
                         setRange({ from: item.start_s, to: item.end_s });
+                        setCleanCandidate({ from: item.start_s, to: item.end_s });
                         setInspectorTab("selects");
                         setNotice(
                           "Range selected. Adjust In / Out in the inspector, then mark reviewed clean or add to shot selects.",
                         );
                       }}
-                      title={`No range-excluding finding ${tc(item.start_s)}–${tc(item.end_s)}. This is not proof of clean footage; inspect all issue markers and performance attempts.`}
-                    />
+                      aria-label={`Clean candidate ${tc(item.start_s)} to ${tc(item.end_s)}`}
+                      title={`Clean candidate ${tc(item.start_s)}–${tc(item.end_s)}. Review it before marking clean or adding it to shot selects.`}
+                    ><span>Clean candidate</span></button>
                   ))}
                   {findingMarkers.map(({ finding, row }) => (
                     <button
@@ -1848,12 +1857,13 @@ export default function ShotReviewCockpit({
                         min="0"
                         max={selected.duration_s}
                         value={range.from}
-                        onChange={(event) =>
+                        onChange={(event) => {
+                          setCleanCandidate(null);
                           setRange({
                             ...range,
                             from: Number(event.target.value),
-                          })
-                        }
+                          });
+                        }}
                       />
                       <span>→</span>
                       <input
@@ -1862,9 +1872,10 @@ export default function ShotReviewCockpit({
                         min="0"
                         max={selected.duration_s}
                         value={range.to}
-                        onChange={(event) =>
-                          setRange({ ...range, to: Number(event.target.value) })
-                        }
+                        onChange={(event) => {
+                          setCleanCandidate(null);
+                          setRange({ ...range, to: Number(event.target.value) });
+                        }}
                       />
                     </div>
                   </label>
@@ -1876,7 +1887,13 @@ export default function ShotReviewCockpit({
                     end={range.to}
                     duration={selected.duration_s}
                     canEdit={canCurate}
+                    candidate={Boolean(cleanCandidate && cleanCandidate.from === range.from && cleanCandidate.to === range.to)}
+                    blockedRanges={(selectedAnalysis?.findings ?? [])
+                      .filter((finding) => finding.action !== "human_dismissed" && !(finding.action === "human_retracted" && finding.restored_action === "human_dismissed"))
+                      .map((finding) => ({ from: finding.start_s, to: finding.end_s }))}
+                    onVerified={() => setCleanCandidate(null)}
                     onSelect={(from, to) => {
+                      setCleanCandidate(null);
                       setRange({ from, to });
                       previewMoment(selected.clip_id, from);
                     }}

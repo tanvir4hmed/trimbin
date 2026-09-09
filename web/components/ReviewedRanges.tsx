@@ -12,6 +12,9 @@ export default function ReviewedRanges({
   duration,
   canEdit,
   onSelect,
+  candidate = false,
+  onVerified,
+  blockedRanges = [],
 }: {
   projectId: number;
   clipId: string;
@@ -20,6 +23,9 @@ export default function ReviewedRanges({
   duration: number;
   canEdit: boolean;
   onSelect: (start: number, end: number) => void;
+  candidate?: boolean;
+  onVerified?: () => void;
+  blockedRanges?: { from: number; to: number }[];
 }) {
   const cache = useQueryClient();
   const key = ["project", projectId, "attempts", clipId];
@@ -37,6 +43,12 @@ export default function ReviewedRanges({
   } | null>(null);
   const clean = query.data?.items.filter((row) => row.state === "clean") ?? [];
   async function commit(items: AttemptItem[], rev: number) {
+    if (items.some((item) => blockedRanges.some(
+      (blocked) => item.start_s < blocked.to && blocked.from < item.end_s,
+    ))) {
+      setMessage("A clean range overlaps an issue. Adjust it to the usable portion first.");
+      return;
+    }
     setBusy(true);
     setMessage("");
     try {
@@ -51,6 +63,7 @@ export default function ReviewedRanges({
       setMessage("Reviewed ranges saved.");
       setSelected(null);
       setEditingRevision(null);
+      onVerified?.();
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -129,7 +142,7 @@ export default function ReviewedRanges({
           );
         }}
       >
-        {selected ? "Save adjusted clean range" : "Mark range reviewed clean"}
+        {selected ? "Save adjusted clean range" : candidate ? "Verify clean" : "Mark range reviewed clean"}
       </button>
       {selected && (
         <button

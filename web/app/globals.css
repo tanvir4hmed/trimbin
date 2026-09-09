@@ -2605,7 +2605,8 @@ body{background:var(--bg);color:var(--ink)}
 .performance-edit-list { display: grid; gap: 10px; max-height: 520px; overflow: auto; margin-top: 12px; }
 .performance-edit-list > div { display: flex; gap: 8px; flex-wrap: wrap; padding: 10px; border: 1px solid #334155; border-radius: 6px; }
 .performance-edit-list input[type=number], .performance-viewers input[type=number] { width: 90px; font-variant-numeric: tabular-nums; }
-.issue-lanes .lane-safe { background: #344b64; }
+.issue-lanes .lane-safe { z-index: 2; background: #225645; border: 1px solid #58b994; color: #d8f4e8; }
+.issue-lanes .lane-safe span { display: block; overflow: hidden; padding: 0 4px; color: #c8f5df; font-size: 9px; font-weight: 700; line-height: 16px; text-align: left; white-space: nowrap; text-overflow: ellipsis; }
 .issue-lanes .clean-key { color: #a7bdd8; }
 
 /* Shared workspace controls and panel hierarchy. */
@@ -2635,7 +2636,8 @@ body{background:var(--bg);color:var(--ink)}
 .selected-key { color: #7eafff; }
 .reviewed-clean-key { color: #58b994; }
 .lane-reviewed-clean { position: absolute; bottom: 17px; height: 15px; padding: 0 3px; background: #225645; border: 1px solid #58b994; color: #d8f4e8; font-size: 9px; overflow: hidden; white-space: nowrap; }
-.lane-safe { background: #34485d; border-color: #607a95; }
+.lane-safe { z-index: 2; background: #225645 !important; border: 1px solid #58b994; color: #d8f4e8; }
+.lane-safe span { display: block; overflow: hidden; padding: 0 4px; color: #c8f5df; font-size: 9px; font-weight: 700; line-height: 16px; text-align: left; white-space: nowrap; text-overflow: ellipsis; }
 .performance-workspace .performance-candidates > article { background: var(--surface); border-color: var(--line); border-radius: 6px; }
 .performance-workspace .performance-candidates > article.active { border-color: #7eafff; }
 .performance-candidates .attempt-state-clean { border-left: 3px solid #58b994; }
