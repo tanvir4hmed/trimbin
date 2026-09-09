@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Comments from "@/components/Comments";
 import Player, { type PlayerHandle } from "@/components/Player";
 import ShotBrief from "@/components/ShotBrief";
-import PerformanceWorkspace from "@/components/PerformanceWorkspace";
 import ReviewedRanges from "@/components/ReviewedRanges";
 import { draggedRange, rangeDragBounds, type TimelineDrag } from "@/lib/timeline-drag";
 import { useQuery } from "@tanstack/react-query";
@@ -344,11 +343,8 @@ export default function ShotReviewCockpit({
     "inspect",
   );
   useEffect(() => {
-    if (workspaceMode === "compare") {
-      playerA.current?.element()?.pause();
-      playerB.current?.element()?.pause();
-    }
-  }, [workspaceMode]);
+    if (takes.length < 2) setWorkspaceMode("inspect");
+  }, [takes.length]);
 
 
   useEffect(() => {
@@ -380,8 +376,11 @@ export default function ShotReviewCockpit({
     (chosenIndex > 0
       ? takes[chosenIndex - 1]
       : takes.find((take) => take.clip_id !== chosen?.clip_id));
-  const chooseTake = (clipId: string) => {
-    reviewRange.current = null;
+  const chooseTake = (
+    clipId: string,
+    preview?: { at: number; end: number },
+  ) => {
+    reviewRange.current = preview ? { clipId, end: preview.end } : null;
     pendingRange.current = null;
     const wanted = takes.find((take) => take.clip_id === clipId);
     if (!wanted) return;
@@ -391,13 +390,14 @@ export default function ShotReviewCockpit({
     });
     pendingSeek.current = {
       clipId: wanted.clip_id,
-      at: playheads[wanted.clip_id] ?? 0,
-      play: keepPlaying,
+      at: preview?.at ?? playheads[wanted.clip_id] ?? 0,
+      play: preview ? true : keepPlaying,
     };
     setAId(wanted.clip_id);
   };
   const a = chosen;
   const b = previous;
+  const showComparison = workspaceMode === "compare" && Boolean(previous);
   const selected = chosen;
   const cleanRanges = useQuery({
     queryKey: ["project", projectId, "attempts", selected?.clip_id ?? ""],
@@ -690,12 +690,16 @@ export default function ShotReviewCockpit({
       return;
     }
     // An issue opened from the shot list is an instruction to review that take,
-    // not to leave it parked as the reference. Promote it before seeking so
-    // the issue remains visible in the Reviewing player after the switch.
-    if (clipId !== chosen?.clip_id) chooseTake(clipId);
+    // not to leave it parked as the reference. Carry the exact issue range
+    // through the player swap, then play it in the Reviewing pane.
+    if (clipId !== chosen?.clip_id) {
+      setWorkspaceMode("inspect");
+      chooseTake(clipId, { at: finding.start_s, end: finding.end_s });
+    }
     setFocus({ clipId, finding });
     setInspectorTab("finding");
-    previewMoment(clipId, finding.start_s, finding.end_s);
+    if (clipId === chosen?.clip_id)
+      previewMoment(clipId, finding.start_s, finding.end_s);
   };
 
   const toggleBulkFinding = (clipId: string, finding: FindingEvent) => {
@@ -1136,44 +1140,49 @@ export default function ShotReviewCockpit({
           <button
             aria-pressed={workspaceMode === "compare"}
             onClick={() => setWorkspaceMode("compare")}
+            disabled={takes.length < 2}
+            title={
+              takes.length < 2
+                ? "Upload another take to compare performances."
+                : undefined
+            }
           >
-            Compare performance attempts
+            Compare performances
           </button>
         </nav>
-        <div className="inspect-preview-group" hidden={workspaceMode !== "inspect"}>
-          {takes.length > 1 && (
-            <div className="compare-toolbar" aria-label="Which take">
-              <label>Reviewing <select aria-label="Reviewing take"
-                value={chosen?.clip_id ?? ""} onChange={(e) => chooseTake(e.target.value)}>
-                {takes.map((take) => <option key={take.clip_id} value={take.clip_id}>{takeName(take)}</option>)}
-              </select></label>
-              {previous && (
-                <label className="compare-hint">
-                  Reference{" "}
-                  <select
-                    aria-label="Compare against another take"
-                    value={previous.clip_id}
-                    onChange={(e) => setReferenceId(e.target.value)}
-                  >
-                    {takes
-                      .filter((take) => take.clip_id !== chosen?.clip_id)
-                      .map((take) => (
-                        <option key={take.clip_id} value={take.clip_id}>
-                          {takeName(take)}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-              )}
-            </div>
-          )}
+        <div className="inspect-preview-group">
+          <div className="compare-toolbar" aria-label="Which take">
+            <label>Reviewing <select aria-label="Reviewing take"
+              value={chosen?.clip_id ?? ""} onChange={(e) => chooseTake(e.target.value)}>
+              {takes.map((take) => <option key={take.clip_id} value={take.clip_id}>{takeName(take)}</option>)}
+            </select></label>
+            {showComparison && previous && (
+              <label className="compare-hint">
+                Reference{" "}
+                <select
+                  aria-label="Compare against another take"
+                  value={previous.clip_id}
+                  onChange={(e) => setReferenceId(e.target.value)}
+                >
+                  {takes
+                    .filter((take) => take.clip_id !== chosen?.clip_id)
+                    .map((take) => (
+                      <option key={take.clip_id} value={take.clip_id}>
+                        {takeName(take)}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            )}
+          </div>
 
           <div
-            className={previous ? "compare-players" : "compare-players single"}
+            className={showComparison ? "compare-players" : "compare-players single"}
           >
-            {/* The take under Reviewing is always the primary, left-hand player.
-              The optional Reference take stays on the right for comparison. */}
-            {(previous
+            {/* Inspect keeps the reviewing take alone. Comparison explicitly
+                adds the reference player, so it never competes for space while
+                findings and clean ranges are being reviewed. */}
+            {(showComparison && previous
               ? [
                   { side: "a" as const, take: chosen, ref: playerA },
                   { side: "b" as const, take: previous, ref: playerB },
@@ -1302,40 +1311,6 @@ export default function ShotReviewCockpit({
             </div>
           )}
         </div>
-        {workspaceMode === "compare" && (
-          <PerformanceWorkspace
-            key={`${projectId}/${scene}/${shot}`}
-            projectId={projectId}
-            takes={takes}
-            analyses={analyses}
-            canEdit={canCurate}
-            reviewingClipId={chosen?.clip_id || ""}
-            referenceClipId={previous?.clip_id || ""}
-            onReviewingChange={chooseTake}
-            onReferenceChange={setReferenceId}
-            onAddRange={(take, item, revision) => {
-              setSelects((current) => [
-                ...current,
-                {
-                  segment_id: crypto.randomUUID(),
-                  clip_id: take.clip_id,
-                  take_no: take.take_no,
-                  attempt_id: item.id,
-                  attempt_revision: revision,
-                  source_in_s: item.start_s,
-                  source_out_s: item.end_s,
-                  position: current.length,
-                  reason: `${item.label}: ${item.note || "Human candidate selection"}`,
-                  created_by: you,
-                  origin: "human",
-                },
-              ]);
-              setNotice(
-                `${item.label} added to the shot draft. Save shot selects to confirm.`,
-              );
-            }}
-          />
-        )}
 
         <section className="issue-lanes">
           <header>
@@ -1343,7 +1318,7 @@ export default function ShotReviewCockpit({
               <p className="eyebrow">
                 TAKE ANALYSIS · USABLE RANGES &amp; ISSUES
               </p>
-              <h2>Every take on one clock</h2>
+              <h2>{showComparison ? "Every take on one clock" : "Reviewing take on one clock"}</h2>
             </div>
             <div className="lane-header-actions">
               <div className="lane-legend">
@@ -1430,7 +1405,9 @@ export default function ShotReviewCockpit({
             <span>{tc(duration * 0.75)}</span>
             <span>{tc(duration)}</span>
           </div>
-          {[chosen, previous].filter((take): take is Take => Boolean(take)).map((take) => {
+          {(showComparison ? [chosen, previous] : [chosen])
+            .filter((take): take is Take => Boolean(take))
+            .map((take) => {
             const analysis = analysisFor(analyses, take.clip_id);
             const findings = analysis?.findings ?? [];
             const markerEnds: number[] = [];
@@ -1598,7 +1575,7 @@ export default function ShotReviewCockpit({
                 </div>
               </div>
             );
-          })}
+            })}
         </section>
 
         <details className="performance-entry">
