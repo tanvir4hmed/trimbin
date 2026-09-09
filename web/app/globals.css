@@ -1911,6 +1911,8 @@ select {
 .player-badge { position: absolute; z-index: 2; left: 8px; top: 8px; padding: 4px 7px; background: rgba(3, 9, 17, .78); border: 1px solid transparent; border-radius: 4px; font-size: 11px; font-weight: 800; color: inherit; font-family: inherit; cursor: pointer; }
 .player-badge:hover { background: rgba(3, 9, 17, .92); border-color: var(--cockpit-blue); }
 .player-badge[aria-pressed="true"] { border-color: var(--cockpit-blue); }
+.player-badge small,.player-badge span { display:block; line-height:1.05; }
+.player-badge small { margin-bottom:2px; color:#8ea2bb; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; }
 
 .take-card-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(116px, 1fr)); gap: 7px; margin: 10px 0 18px; }
 .take-card { display: grid; gap: 6px; min-width: 0; padding: 10px; text-align: left; color: var(--cockpit-text); background: var(--cockpit-panel); border: 1px solid var(--cockpit-line); border-radius: 7px; }
@@ -2625,7 +2627,8 @@ body{background:var(--bg);color:var(--ink)}
 @media (max-width: 1000px) { .ingest-verify { grid-template-columns: 1fr; } }
 .lane-shot-select { position: absolute; bottom: 0; height: 15px; padding: 0 3px; border: 1px solid #7eafff; border-radius: 2px; background: #245998; color: #eff6ff; font-size: 9px; overflow: hidden; white-space: nowrap; }
 .lane-shot-select { display:flex; align-items:center; justify-content:space-between; gap:3px; cursor:ew-resize; touch-action:none; }
-.lane-shot-select .range-handle { display:block; flex:0 0 4px; height:100%; border-radius:2px; background:var(--amber); opacity:.95; box-shadow:0 0 0 1px #07111f; }
+.lane-shot-select .range-handle { display:block; flex:0 0 6px; height:100%; border-radius:3px; background:#3b70a6; opacity:1; box-shadow:none; }
+.lane-shot-select .range-handle:hover { background:#4f8cff; }
 .selected-key { color: #7eafff; }
 .reviewed-clean-key { color: #58b994; }
 .lane-reviewed-clean { position: absolute; bottom: 17px; height: 15px; padding: 0 3px; background: #225645; border: 1px solid #58b994; color: #d8f4e8; font-size: 9px; overflow: hidden; white-space: nowrap; }
@@ -2641,8 +2644,9 @@ body{background:var(--bg);color:var(--ink)}
 .project-next-step h2 { margin: 0; font-size: 18px; }
 .project-next-step p { margin: 5px 0 0; }
 .issue-lanes { max-height: none; overflow: visible; }
-.issue-lanes { position: sticky; top: 74px; z-index: 8; padding-bottom: 10px; background: var(--bg); }
+.issue-lanes { position: relative; padding-bottom: 10px; background: var(--bg); }
 .shot-cockpit { overflow: visible; }
+.compare-players { position:sticky; top:74px; z-index:9; padding-block:6px; background:var(--cockpit-bg); }
 .issue-lanes .lane-track { min-height: 48px; }
 .issue-lanes .lane-finding { min-height: 18px; }
 :where(.app-scroll) button { padding: 7px 10px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 5px; }
@@ -2725,11 +2729,14 @@ button:disabled { opacity: .48; cursor: not-allowed; }
 .range-inputs input { width: 58px; }
 .lane-track { height: 32px; }
 .lane-track { height: 54px; }
-.lane-shot-select { z-index: 4; top:50%; bottom:auto; height:36px; transform:translateY(-50%); border:1px solid #3b70a6; border-radius:4px; background:#285b91; color:#587c45; font-size:11px; cursor:default; }
+.lane-shot-select { z-index:4; top:50%; bottom:auto; height:36px; transform:translateY(-50%); padding:0; border:1px solid #3b70a6; border-radius:5px; background:#285b91; color:#69d8a8; font-size:11px; cursor:grab; }
+.lane-shot-select:active { cursor:grabbing; }
 .lane-shot-select .range-handle { cursor:ew-resize; }
 .lane-shot-select:hover { border-color:#69d8a8; }
 .lane-reviewed-clean { height: 13px; bottom: 14px; }
-.lane-finding { z-index: 5; height: 16px !important; font-size: 11px; border-radius:4px; }
+.lane-finding { z-index: 5; height: 16px !important; color:#07111f; font-size:11px; border-radius:4px; }
+.lane-finding.severity-note { background:#9db9cf; }
+.lane-finding.severity-blocking { background:#ef858b; }
 .finding-close { width: 26px; height: 26px; padding: 0; display: grid; place-items: center; font-size: 14px; }
 .policy-note { display: none; }
 .primary { background: #285b91 !important; border-color: #3b70a6 !important; }

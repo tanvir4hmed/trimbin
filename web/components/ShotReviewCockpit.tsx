@@ -25,7 +25,17 @@ import {
 } from "@/lib/queries";
 
 type Range = { from: number; to: number };
-type SegmentDrag = { id: string; edge: "in" | "out"; track: HTMLElement; duration: number };
+type SegmentDrag = {
+  id: string;
+  kind: "in" | "out" | "move";
+  track: HTMLElement;
+  duration: number;
+  min: number;
+  max: number;
+  pointerStart: number;
+  rangeStart: number;
+  rangeEnd: number;
+};
 type Focus = { clipId: string; finding: FindingEvent };
 const selectionSignature = (rows: CoverageSegment[]) =>
   JSON.stringify(
@@ -388,48 +398,68 @@ export default function ShotReviewCockpit({
   const [selects, setSelects] = useState<CoverageSegment[]>([]);
   const segmentDrag = useRef<SegmentDrag | null>(null);
   selectsRef.current = selects;
+
+  const segmentBounds = (segment: CoverageSegment, rows: CoverageSegment[]) => {
+    const take = takes.find((item) => item.clip_id === segment.clip_id);
+    const analysis = analysisFor(analyses, segment.clip_id);
+    const safe = take && analysis
+      ? rangesOutsideIssues(take.duration_s, analysis.findings)
+      : [{ from: 0, to: take?.duration_s ?? segment.source_out_s }];
+    const safeRange = safe.find(
+      (item) => item.from <= segment.source_in_s && item.to >= segment.source_out_s,
+    ) ?? safe.find(
+      (item) => item.to > segment.source_in_s && item.from < segment.source_out_s,
+    ) ?? { from: segment.source_in_s, to: segment.source_out_s };
+    const others = rows.filter(
+      (item) => item.segment_id !== segment.segment_id && item.clip_id === segment.clip_id,
+    );
+    const previous = others
+      .filter((item) => item.source_out_s <= segment.source_in_s)
+      .reduce((value, item) => Math.max(value, item.source_out_s), safeRange.from);
+    const next = others
+      .filter((item) => item.source_in_s >= segment.source_out_s)
+      .reduce((value, item) => Math.min(value, item.source_in_s), safeRange.to);
+    return { min: Math.max(safeRange.from, previous), max: Math.min(safeRange.to, next) };
+  };
+
   useEffect(() => {
     const move = (event: PointerEvent) => {
       const drag = segmentDrag.current;
       if (!drag) return;
       const rect = drag.track.getBoundingClientRect();
-      const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-      const time = ratio * drag.duration;
+      const delta = ((event.clientX - drag.pointerStart) / rect.width) * drag.duration;
+      const absolute = Math.max(0, Math.min(drag.duration, ((event.clientX - rect.left) / rect.width) * drag.duration));
+      const tolerance = Math.max(0.08, drag.duration * 0.003);
+      const snap = (value: number, target: number) =>
+        Math.abs(value - target) <= tolerance ? target : value;
       setSelects((rows) => rows.map((row) => {
         if (row.segment_id !== drag.id) return row;
-        const others = rows
-          .filter((item) => item.segment_id !== drag.id && item.clip_id === row.clip_id)
-          .map((item) => ({ from: item.source_in_s, to: item.source_out_s }));
-        const free = subtractRanges(
-          drag.edge === "in"
-            ? { from: 0, to: row.source_out_s - 0.05 }
-            : { from: row.source_in_s + 0.05, to: drag.duration },
-          others,
-        );
-        const boundary = drag.edge === "in"
-          ? Math.max(...free.map((item) => item.to).filter((value) => value <= row.source_out_s))
-          : Math.min(...free.map((item) => item.from).filter((value) => value >= row.source_in_s));
-        const next = drag.edge === "in"
-          ? Math.min(time, boundary)
-          : Math.max(time, boundary);
-        return drag.edge === "in" ? { ...row, source_in_s: next } : { ...row, source_out_s: next };
-      }));
-      const current = selectsRef.current.find((row) => row.segment_id === drag.id);
-      if (current) {
-        const next = drag.edge === "in"
-          ? { from: Math.min(time, current.source_out_s - 0.05), to: current.source_out_s }
-          : { from: current.source_in_s, to: Math.max(time, current.source_in_s + 0.05) };
-        if (next.to > next.from) {
-          setRange(next);
-          previewMoment(current.clip_id, next.from, next.to);
+        if (drag.kind === "move") {
+          const length = drag.rangeEnd - drag.rangeStart;
+          const wanted = drag.rangeStart + delta;
+          const snapped = snap(snap(wanted, drag.min), drag.max - length);
+          const source_in_s = Math.max(drag.min, Math.min(drag.max - length, snapped));
+          const source_out_s = source_in_s + length;
+          setRange({ from: source_in_s, to: source_out_s });
+          previewMoment(row.clip_id, source_in_s, source_out_s);
+          return { ...row, source_in_s, source_out_s };
         }
-      }
+        const next = drag.kind === "in"
+          ? Math.max(drag.min, Math.min(snap(absolute, drag.min), row.source_out_s - 0.05))
+          : Math.min(drag.max, Math.max(snap(absolute, drag.max), row.source_in_s + 0.05));
+        const updated = drag.kind === "in"
+          ? { ...row, source_in_s: next }
+          : { ...row, source_out_s: next };
+        setRange({ from: updated.source_in_s, to: updated.source_out_s });
+        previewMoment(row.clip_id, updated.source_in_s, updated.source_out_s);
+        return updated;
+      }));
     };
     const up = () => { segmentDrag.current = null; };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
     return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
-  }, []);
+  }, [analyses, takes]);
   const [selectPreviewIndex, setSelectPreviewIndex] = useState<number | null>(
     null,
   );
@@ -485,15 +515,34 @@ export default function ShotReviewCockpit({
           )
         : [item];
     });
+    const accepted: CoverageSegment[] = [];
+    for (const item of sanitized) {
+      const occupied = accepted
+        .filter((row) => row.clip_id === item.clip_id)
+        .map((row) => ({ from: row.source_in_s, to: row.source_out_s }));
+      for (const piece of subtractRanges(
+        { from: item.source_in_s, to: item.source_out_s },
+        occupied,
+      )) {
+        accepted.push({
+          ...item,
+          segment_id:
+            piece.from === item.source_in_s ? item.segment_id : crypto.randomUUID(),
+          source_in_s: piece.from,
+          source_out_s: piece.to,
+          position: accepted.length,
+        });
+      }
+    }
     if (
       coverageBase.current !== null &&
       coverageBase.current !== selectionSignature(selectsRef.current)
     )
       return;
     coverageBase.current = selectionSignature(incoming);
-    setSelects(sanitized);
-    if (selectionSignature(sanitized) !== selectionSignature(incoming))
-      setNotice("An issue overlaps a saved shot select. The select was cropped; save the updated range.");
+    setSelects(accepted);
+    if (selectionSignature(accepted) !== selectionSignature(incoming))
+      setNotice("Overlapping issue or select areas were removed. Review the adjusted ranges, then save.");
     setSelectsInitialized(true);
   }, [screen.data?.coverage_segments]);
 
@@ -755,6 +804,35 @@ export default function ShotReviewCockpit({
     );
   };
 
+  const updateSelectBoundary = (
+    index: number,
+    edge: "in" | "out",
+    value: number,
+  ) => {
+    setSelects((rows) => {
+      const item = rows[index];
+      if (!item || !Number.isFinite(value)) return rows;
+      const bounds = segmentBounds(item, rows);
+      const next = [...rows];
+      next[index] = edge === "in"
+        ? {
+            ...item,
+            source_in_s: Math.max(
+              bounds.min,
+              Math.min(value, item.source_out_s - 0.05),
+            ),
+          }
+        : {
+            ...item,
+            source_out_s: Math.min(
+              bounds.max,
+              Math.max(value, item.source_in_s + 0.05),
+            ),
+          };
+      return next;
+    });
+  };
+
   const constrainSelectionsToIssues = (rows: CoverageSegment[]) =>
     rows.flatMap((item) => {
       const analysis = analyses.find(
@@ -1000,10 +1078,8 @@ export default function ShotReviewCockpit({
                       onClick={() => chooseTake(take.clip_id)}
                       title={`Choose ${takeName(take)}`}
                     >
-                      {takeName(take).toUpperCase()}
-                      {take.clip_id === chosen?.clip_id && previous
-                        ? " · reviewing"
-                        : ""}
+                      <small>{side === "a" ? "Reviewing" : "Reference"}</small>
+                      <span>{takeName(take).toUpperCase()}</span>
                     </button>
                     <Player
                       ref={ref}
@@ -1263,14 +1339,21 @@ export default function ShotReviewCockpit({
                         const track = event.currentTarget.parentElement;
                         if (!track) return;
                         const handle = (event.target as HTMLElement).closest(".range-handle");
-                        if (!handle) return;
-                        const rect = handle.getBoundingClientRect();
-                        const edge = handle.classList.contains("range-handle-in") ? "in" : "out";
+                        const bounds = segmentBounds(segment, selectsRef.current);
                         segmentDrag.current = {
                           id: segment.segment_id,
-                          edge,
+                          kind: handle
+                            ? handle.classList.contains("range-handle-in")
+                              ? "in"
+                              : "out"
+                            : "move",
                           track,
                           duration: take.duration_s,
+                          min: bounds.min,
+                          max: bounds.max,
+                          pointerStart: event.clientX,
+                          rangeStart: segment.source_in_s,
+                          rangeEnd: segment.source_out_s,
                         };
                         event.preventDefault();
                       }}
@@ -1764,18 +1847,7 @@ export default function ShotReviewCockpit({
                               step="0.01"
                               value={item.source_in_s}
                               onChange={(event) =>
-                                setSelects((rows) =>
-                                  rows.map((row, at) =>
-                                    at === index
-                                      ? {
-                                          ...row,
-                                          source_in_s: Number(
-                                            event.target.value,
-                                          ),
-                                        }
-                                      : row,
-                                  ),
-                                )
+                                updateSelectBoundary(index, "in", Number(event.target.value))
                               }
                             />
                             <i>→</i>
@@ -1787,18 +1859,7 @@ export default function ShotReviewCockpit({
                               step="0.01"
                               value={item.source_out_s}
                               onChange={(event) =>
-                                setSelects((rows) =>
-                                  rows.map((row, at) =>
-                                    at === index
-                                      ? {
-                                          ...row,
-                                          source_out_s: Number(
-                                            event.target.value,
-                                          ),
-                                        }
-                                      : row,
-                                  ),
-                                )
+                                updateSelectBoundary(index, "out", Number(event.target.value))
                               }
                             />
                           </span>

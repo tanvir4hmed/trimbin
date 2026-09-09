@@ -184,14 +184,14 @@ export default function SceneCoveragePage({
     });
     setDragShot(null);
   };
-  const reorderEntry = (shot: number, targetKey: string) => {
-    if (!dragEntry || dragEntry.shot !== shot || dragEntry.key === targetKey)
+  const reorderEntry = (shot: number, sourceKey: string, targetKey: string) => {
+    if (sourceKey === targetKey)
       return;
     setTimeline((current) =>
       current.map((group) => {
         if (group.shot !== shot) return group;
         const from = group.entries.findIndex(
-          (entry) => entryKey(entry) === dragEntry.key,
+          (entry) => entryKey(entry) === sourceKey,
         );
         const to = group.entries.findIndex(
           (entry) => entryKey(entry) === targetKey,
@@ -450,23 +450,36 @@ export default function SceneCoveragePage({
                     <small>{item.entries.length} range{item.entries.length === 1 ? "" : "s"}</small>
                   </header>
                   <div className="sequence-ranges">
-                    {item.entries.length ? item.entries.map((entry, rangeIndex) => (
+                    {item.entries.length ? item.entries.map((entry) => (
                       <button
                         key={entryKey(entry)}
                         className={`sequence-range shot-${item.shot % 5}`}
                         draggable
                         onDragStart={(event) => {
                           event.stopPropagation();
+                          event.dataTransfer.setData("text/plain", entryKey(entry));
+                          event.dataTransfer.effectAllowed = "move";
                           setDragEntry({ shot: item.shot, key: entryKey(entry) });
                         }}
                         onDragOver={(event) => event.preventDefault()}
                         onDrop={(event) => {
                           event.stopPropagation();
-                          reorderEntry(item.shot, entryKey(entry));
+                          reorderEntry(
+                            item.shot,
+                            event.dataTransfer.getData("text/plain") || dragEntry?.key || "",
+                            entryKey(entry),
+                          );
                         }}
                         onClick={() => openEntry(entry)}
                       >
-                        <b>T{entry.take_no} · range {rangeIndex + 1}</b>
+                        <b>
+                          T{entry.take_no} · range{
+                            [...item.entries]
+                              .filter((candidate) => candidate.clip_id === entry.clip_id)
+                              .sort((a, b) => a.start_s - b.start_s || a.end_s - b.end_s)
+                              .findIndex((candidate) => entryKey(candidate) === entryKey(entry)) + 1
+                          }
+                        </b>
                         <small>{clock(entry.start_s)}–{clock(entry.end_s)}</small>
                       </button>
                     )) : (
