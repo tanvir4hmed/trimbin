@@ -40,3 +40,6 @@ docs/
 # machine, and a stray .env baked into a layer is a credential in a registry.
 **/.env
 **/.env.*
+
+# Local reference archive must never enter an application image.
+archive/

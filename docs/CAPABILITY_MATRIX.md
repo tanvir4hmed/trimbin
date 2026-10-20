@@ -1,0 +1,32 @@
+# Current capability and implementation evidence
+
+Static inspection on 20 October 2026. “Existing” means located in source, not verified against the live deployment. Phase 1 changes specifications and CI coverage; it does not implement the migration.
+
+| Area | Existing source evidence | Retain / required change | Phase |
+| --- | --- | --- | --- |
+| Upload/media | [uploads route](../api/app/routes/uploads.py), [storage](../api/app/services/storage.py), [ingest](../api/app/worker/ingest.py) | Retain ingest UX; replace provider-bound upload/storage with controlled staging and root registry | 3 |
+| Analysis | [full take](../api/app/services/full_take.py), [agent settings](../agents/trimbin_agents/config.py) | Existing provider integration; implement verified NVIDIA task adapters and new run identity | 4 |
+| Evidence/search | [search](../api/app/services/search.py), [ClickHouse migrations](../clickhouse) | Retain useful schema/query semantics; self-host and version index generations | 2, 5 |
+| Human corrections | [finding actions](../api/app/services/finding_actions.py), [attempts](../api/app/services/attempts.py) | Preserve corrections/receipts; move operational authority to PostgreSQL | 2, 5 |
+| Comparison reuse | [decision run hash](../api/app/services/decisions.py) | Existing key lacks model/prompt versions; replace before new inference is considered fresh | 4, 5 |
+| Scene assembly | [stringout](../api/app/services/stringout.py) | Existing selected scene ranges; convert with validated source timing | 6 |
+| Film sequence | [film](../api/app/services/film.py) | Existing occurrence IDs, second ranges, revisions and Firestore persistence; retain behavior through precise canonical contract | 6 |
+| Handoff | [exports](../api/app/services/exports.py) | Existing scene EDL/marker CSV, zero-based source timecode; new full scene/film FCP7 XML and native manifest | 7 |
+| Final video | No complete original-fed film render route identified | Implement immutable-revision render jobs, preflight and fidelity checks | 8 |
+| Evaluation | [measurement harness](../eval/run_measurement_eval.py), [misplacement harness](../eval/run_misplacement_eval.py), [fixture generator](../eval/fixtures/build_fixtures.py) | Useful deterministic/specialized checks; insufficient for comparative editorial model quality | 4, 9 |
+| Infrastructure | [Terraform environment](../infra/envs/demo), [backend deploy](../.github/workflows/deploy-backend.yml), [web deploy](../.github/workflows/deploy-web.yml) | Terraform resources plus imperative image rollout currently; target full Terraform infrastructure ownership | 2, 9, 10 |
+| CI | [CI workflow](../.github/workflows/ci.yml) | Phase 1 adds all-main-push coverage, independent concurrency and documentation checks; deployment triggers retained | 1 |
+
+## Verification and gaps
+
+No frozen paid-output evidence bundle was found in the inspected repository `eval` paths. No cloud export was fetched. Existing synthetic footage generators and a historical code tag are not paid-model answer evidence. The [evaluation protocol](MODEL_CONTRACT.md) specifies how to close this gap.
+
+Current export code rounds timecodes using rounded FPS and does not archive camera start timecode. These legacy limits must not leak into the new precision claims. Existing film history listing is not a complete retention specification. Existing UI playback can use proxy ranges without implying that a high-resolution movie file has been rendered.
+
+All future capability claims remain gated: real Token Factory access, PostgreSQL foundation, mounted-source processing, canonical timeline, actual Premiere import, original-fed video output and portable clean deployment. None is marked shipped because a design document exists.
+
+## Preserve and retire deliberately
+
+Preserve the Apache license, useful existing tests, working runtime and migration references until their replacements pass. Retired documentation/design assets have been moved outside the checkout to `D:\NVIDIA\archive\2026-10-20`; the manifest verifies the 53 original reference files. Legal attribution and truthful reuse history remain intact.
+
+Later phases archive obsolete implementation/configuration only when replacements no longer depend on them. Do not remove functioning source files simply because their provider will eventually change. Keep credentials, original media and private baseline outputs out of this archive and Git.

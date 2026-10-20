@@ -1,31 +1,32 @@
-# Every check that can run without credentials.
-#
-# Runs on pull requests, on pushes to non-main branches, and — the part that
-# matters for production — as a reusable workflow that deploy.yml calls before
-# it deploys. Main is intentionally covered only by that deploy gate, so one
-# push cannot create both a standalone CI run and a deploy-check run.
-#
-# It ran zero times before today. The triggers were `pull_request` and
-# `push: branches-ignore: [main]`, and the only way anything reaches production
-# here is a push to main, so the reusable gate is the only main check. The job was
-# even named "Agents & API" while every step ran in `agents/`.
+# Credential-free checks run for every push, including documentation-only main
+# commits. Backend deployment also calls this workflow as its required gate.
 
 name: CI
 
 on:
   pull_request:
   push:
-    branches-ignore: [main]
   workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # A standalone main check must not cancel the backend's reusable check.
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  documentation:
+    name: Documentation contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python tools/check_docs.py
+
   agents:
     name: Agents
     runs-on: ubuntu-latest

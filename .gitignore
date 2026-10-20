@@ -80,3 +80,6 @@ seg_*.ts
 # in the code beside the constants they justify.
 eval/misplacement_eval.json
 web/openapi.json
+
+# Local historical reference documents are deliberately excluded from commits.
+/archive/

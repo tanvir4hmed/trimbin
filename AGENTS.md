@@ -1,0 +1,17 @@
+# Project working agreement
+
+- Work directly on `main`, as the owner requested. Do not create a migration branch.
+- Read `docs/PRODUCT_DIRECTION.md`, `docs/QUALITY_STRATEGY.md`, `docs/BUILD_PLAN.md`, `docs/REQUIREMENTS.md`, `docs/CONFIGURATION.md` and `docs/PHASE_STATUS.md` before implementation.
+- Latest owner instruction approves Phase 1, necessary verification, the first milestone commit and push to main. Preserve automatic push-triggered deployment; do not wait for or poll deployment after pushing. All new infrastructure must be managed through Terraform. No new paid infrastructure or live inference experiment is included in Phase 1.
+- Finish and report the approved phase, then ask for approval of the next phase. Phases 2 through 10 are not yet approved. Do not infer approval of a later phase from an earlier one.
+- The owner selects one coding model for each entire phase. Do not split a phase across different coding models or delegate without explicit authorization.
+- Deliver a complete cloud-hosted workflow and reproducible portable software package. Originals reside on the deployment storage; browser uploads/staging and Token Factory inputs are disclosed. Future studio SSD/NAS and self-hosted GPU deployment is not an implemented offline/local capability and is not a release gate. Read docs/SUBMISSION_STRATEGY.md as well as the core planning documents.
+- Quality is non-negotiable. Target better results than the preserved paid-model baseline, with no accepted regression in critical tasks for lower price, easier implementation or deadline convenience. Apply the gates in `docs/QUALITY_STRATEGY.md`; fixtures, output-schema parity and speed are not proof of improved quality.
+- Consider current suitable models and verify account access; do not select only by low price, model size, version number or provider benchmarks. Check competition/license compatibility after quality evaluation and satisfy both before promoting a submission path. Report an unresolved conflict rather than silently weakening quality or ignoring rules.
+- Keep original media immutable. Human approval controls creative edits. Never fabricate source ranges, missing shots or a successful provider call.
+- Retain self-hosted ClickHouse. The proposed operational database and durable queue are PostgreSQL; do not silently switch database strategy.
+- Credentials go to GitHub Actions Secrets or ignored local configuration. Nonsecret configuration goes to GitHub Variables. Never print, commit or bundle secret values, credential files, original footage or the local archive.
+- Missing credentials must not block independent fixture/local work. Clearly label fixture results; real inference, deployment and external NLE validation remain separate release gates.
+- Do not alter the protected baseline tag or rewrite Git history. Retired reference files live outside this checkout at `D:\NVIDIA\archive\2026-10-20`. Keep an accidental in-repo `archive/` ignored by Git and container builds too. Preserve file hashes when moving references; never archive credentials.
+- Remove obsolete competition branding and obsolete implementation claims from active docs/UI as those phases replace them. Preserve legal notices, license attribution and truthful provenance; never claim reused work was invented from scratch.
+- Keep status and documentation aligned with tested behavior. Do not report planned features, historical test totals or concept visuals as completed evidence.
