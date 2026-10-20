@@ -2,13 +2,13 @@
 
 Updated 21 October 2026 Asia/Dhaka.
 
-Latest owner direction: revise the plan for a complete cloud-hosted editorial PoC now; implement through individually approved phases. Future studio hardware/software packaging is the direction, not a requirement to install locally during this hackathon. Kubernetes, autoscaling and local GPU certification are deferred. The owner has approved Phase 1, its milestone commit and push. Preserve automatic deployment and do not wait for deployment completion; all new infrastructure is Terraform-managed.
+Latest owner direction: revise the plan for a complete cloud-hosted editorial PoC now; implement through individually approved phases. Future studio hardware/software packaging is the direction, not a requirement to install locally during this hackathon. Kubernetes, autoscaling and local GPU certification are deferred. The owner approved Phase 1 and then authorized starting Phase 2 after its completion. Preserve automatic deployment and do not wait for deployment completion; all new infrastructure is Terraform-managed.
 
 | Phase | Status | Approval and evidence |
 | --- | --- | --- |
 | 0 Planning and archive | Updated locally | Rules, FAQ and overview rechecked. Cloud PoC scope, improvement ledger, network boundaries and future hardware claims aligned. Previous 53-file archive retained. No runtime or workflow changes in this update. |
 | 1 Specifications design and CI control | Complete; included in the start milestone | UX/data/model/export contracts, capability and baseline evidence matrix, workflow/network diagrams, Terraform rollout design, main CI coverage and external archive. Local checks passed; see verification below. |
-| 2 Configuration and self-hosted foundation | Not approved | Portable fixed service package; PostgreSQL and ClickHouse; secure configuration. |
+| 2 Configuration and self-hosted foundation | Implemented; local checks passed; container acceptance pending CI | Shared configuration, PostgreSQL revisions/jobs/outbox, pinned database package, recovery tools, Terraform target and CI lifecycle checks. Docker/WSL unavailable locally; no paid resources provisioned. |
 | 3 Deployment media ingest and processing | Not approved | Controlled upload/staging and mounted deployment roots, bounded jobs and source integrity. |
 | 4 NVIDIA adapters and quality evaluation | Not approved | Nemotron through Token Factory; actual access and comparative quality pending. |
 | 5 Evidence review and retrieval | Not approved | Preserve corrections and durable editorial state. |
@@ -35,3 +35,14 @@ Backend/frontend runtime suites and cloud deployment were not executed locally f
 The previous plan made local-PC demonstration and a hybrid local-to-Nebius path central acceptance requirements. The owner has replaced that with a complete cloud-hosted application that demonstrates a portable foundation. Customer hardware installation, offline inference, GPU purchasing and scaling are future work. Quality, original integrity, editorial authority, both exports, honest provenance and meaningful competition-platform use remain required.
 
 A cloud PoC is complete when its declared editorial workflow and release gates pass. This is not a claim that every future product benefit, NLE feature or physical package has been delivered. Read PRODUCT_DIRECTION.md and SUBMISSION_STRATEGY.md before proposing additional scope.
+
+## Phase 2 verification and limits
+
+- API regression: 521 passed, 23 skipped (5 new real-PostgreSQL tests require Docker/service access; 18 pre-existing skips).
+- Agent regression: 120 passed; lint, formatting and mypy passed.
+- Terraform portable environment: backend-free initialization and validation passed; no plan/apply or remote change.
+- Local credentials generated without outputting values; ignored paths verified. API/agent configuration references archived externally.
+- Real database migrations, concurrent writes/leases, role isolation, persistence and backup/restore are required by the added CI job; they were not run on this Windows host because Docker and WSL are absent. These checks are not reported as passing.
+- No live model calls, provider-secret registration, application data migration or legacy infrastructure retirement occurred. Existing auto-deploy remains enabled; no deployment polling after push.
+
+Phase 3 remains subject to owner approval. Full release still requires the declared model-quality, source-integrity and export gates.

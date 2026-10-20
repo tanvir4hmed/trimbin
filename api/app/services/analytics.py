@@ -55,7 +55,7 @@ async def client() -> AsyncClient:
                 port=settings.clickhouse_port,
                 username=settings.clickhouse_user,
                 password=settings.clickhouse_password,
-                secure=True,
+                secure=settings.clickhouse_secure,
                 query_limit=0,
                 connect_timeout=90,
                 # Generous on both, because the wait is not where the old comment

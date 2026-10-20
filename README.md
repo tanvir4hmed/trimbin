@@ -6,7 +6,7 @@ The quality target is to improve on the preserved paid-model output, without acc
 
 ## Current status
 
-Phase 1 specifications and CI coverage are prepared. The expanded cloud workflow, replacement configuration, new model integrations and full exports described here are proposed work, not completed capabilities. The existing application has not yet been migrated. Working code will be updated on `main` through individually approved phases.
+Phase 2 adds a shared configuration registry, portable database foundation, transactional state/job interfaces and Terraform host definitions. The expanded cloud workflow, replacement configuration, new model integrations and full exports described here are proposed work, not completed capabilities. The existing application has not yet been migrated. Working code will be updated on `main` through individually approved phases.
 
 - [Product direction and reasons for the expansion](docs/PRODUCT_DIRECTION.md)
 - [Submission story, improvements and evidence](docs/SUBMISSION_STRATEGY.md)
@@ -21,10 +21,11 @@ Phase 1 specifications and CI coverage are prepared. The expanded cloud workflow
 - [Editable and video export contract](docs/EXPORT_CONTRACT.md)
 - [Current capability matrix](docs/CAPABILITY_MATRIX.md)
 - [Terraform and deployment design](docs/DEPLOYMENT_DESIGN.md)
+- [Foundation setup, configuration checks and recovery](docs/FOUNDATION_SETUP.md)
 - [Phase status](docs/PHASE_STATUS.md)
 - [Security policy and planned controls](SECURITY.md)
 
-Reproducible setup instructions, tested model IDs, demo access and export compatibility will be added with the corresponding verified implementations. Do not use the planning documents as a claim that these integrations currently run.
+Foundation setup is documented above. Tested model IDs, migrated demo access and export compatibility will be added with their corresponding verified implementations. Do not use the planning documents as a claim that these integrations currently run.
 
 ## License
 

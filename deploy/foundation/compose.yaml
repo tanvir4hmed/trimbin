@@ -1,0 +1,48 @@
+name: trimbin-foundation
+services:
+  postgres:
+    image: postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: trimbin
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_admin
+    secrets: [postgres_admin, postgres_writer]
+    volumes:
+      - ${TRIMBIN_FOUNDATION_DATA:?Run tools/foundation.py init}/postgres:/var/lib/postgresql/data
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/10-users.sh:ro
+    ports: ["127.0.0.1:${TRIMBIN_POSTGRES_LOCAL_PORT:-5432}:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d trimbin"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [data]
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.8@sha256:7dfd56d5b9a5d17eb308bf79641b52c70e93800268e9f2137cad942b5e0e40c1
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD_FILE: /run/secrets/clickhouse_admin
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    secrets: [clickhouse_admin]
+    volumes:
+      - ${TRIMBIN_FOUNDATION_DATA:?Run tools/foundation.py init}/clickhouse:/var/lib/clickhouse
+    ports: ["127.0.0.1:${TRIMBIN_CLICKHOUSE_LOCAL_PORT:-8123}:8123"]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    ulimits:
+      nofile: {soft: 262144, hard: 262144}
+    networks: [data]
+networks:
+  data:
+    internal: true
+secrets:
+  postgres_admin:
+    file: ${TRIMBIN_FOUNDATION_SECRETS:?Run tools/foundation.py init}/postgres_admin
+  postgres_writer:
+    file: ${TRIMBIN_FOUNDATION_SECRETS:?Run tools/foundation.py init}/postgres_writer
+  clickhouse_admin:
+    file: ${TRIMBIN_FOUNDATION_SECRETS:?Run tools/foundation.py init}/clickhouse_admin

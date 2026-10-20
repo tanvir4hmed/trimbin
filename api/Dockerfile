@@ -15,6 +15,7 @@ WORKDIR /build
 # every push.
 COPY api/pyproject.toml ./
 RUN pip install --prefix=/install --no-cache-dir \
+    "psycopg[binary]>=3.2,<4" \
     "fastapi>=0.115.0" \
     "uvicorn[standard]>=0.32.0" \
     "pydantic>=2.9.0" \

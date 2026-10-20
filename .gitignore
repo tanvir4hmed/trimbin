@@ -14,6 +14,7 @@ gha-creds-*.json
 # ---------- terraform ----------
 .terraform/
 .terraform.lock.hcl
+!infra/envs/portable/.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 .terraform.tstate.lock.info
@@ -83,3 +84,8 @@ web/openapi.json
 
 # Local historical reference documents are deliberately excluded from commits.
 /archive/
+
+# Portable database volumes and private recovery artifacts.
+/.foundation-data/
+/foundation-backups/
+/.foundation-before-restore/

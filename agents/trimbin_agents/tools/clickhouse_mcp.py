@@ -310,7 +310,7 @@ def server_env() -> dict[str, str]:
     return {
         "CLICKHOUSE_HOST": settings.clickhouse_host,
         "CLICKHOUSE_PORT": str(settings.clickhouse_port),
-        "CLICKHOUSE_SECURE": "true",
+        "CLICKHOUSE_SECURE": str(settings.clickhouse_secure).lower(),
         "CLICKHOUSE_USER": settings.clickhouse_reader_user,
         "CLICKHOUSE_PASSWORD": settings.clickhouse_reader_password,
         "CLICKHOUSE_ALLOW_WRITE_ACCESS": "false",

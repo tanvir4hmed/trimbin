@@ -1,6 +1,6 @@
 # Credentials and configuration plan
 
-Status: proposed configuration contract for Phase 2. These names are not all implemented by the current application. Do not expect copying this list into an environment to migrate the runtime.
+Phase 2 implements the shared API/agent registry, portable core settings, `.env.example` and safe per-service capability reports. Optional partner integrations and reserved local-model settings below remain future contracts. Existing editorial routes are not migrated by copying this environment; see [foundation setup](FOUNDATION_SETUP.md).
 
 ## Storage and access policy
 
@@ -8,7 +8,7 @@ Put secret values in GitHub Actions Secrets, preferably in the approved deployme
 
 GitHub lists secret names but does not expose existing values back to the client. A successful inventory is not evidence that a credential still works. Do not create dummy secrets to make a deployment check green. [GitHub secret documentation](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets).
 
-## Planned variable registry
+## Configuration registry and reserved extensions
 
 | Name | Storage and requirement | Missing value behavior |
 | --- | --- | --- |
@@ -81,3 +81,7 @@ The current delivery is a cloud-hosted complete editorial PoC. Original/proxy/ex
 Open-model local serving can remove a model-provider per-token charge, but not workstation/power/storage/maintenance costs. An open model served through a paid API still incurs serving charges. Credits do not prove a model is deployable on the editor's machine, and exhaustion must not trigger a silent inferior model, sparse sampling, lower detail or proxy-based final render. Show a clear unavailable/budget state, preserve manual work and obtain approval for any new paid scope.
 
 Cost/resource settings are subordinate to [quality gates](QUALITY_STRATEGY.md). Every model/precision/sampling configuration promoted for use needs its own evidence. Optional partner services may remain disabled, but their absence cannot be hidden behind a claim that live quality was verified. A future offline profile would need to disable all external integrations and pass no-network verification; that work does not block this cloud edition. Token Factory remains outside the application's private service network unless provider-supported private connectivity is actually established and verified.
+
+## Phase 2 implementation evidence
+
+API settings now re-export the agent package registry. Legacy defaults remain under the `legacy-cloud` profile while portable development/cloud profiles are explicit. TLS is configurable in both ClickHouse consumers. Local database/session credentials were generated under ignored `.secrets/foundation`; no values were printed or registered as production GitHub secrets. Two replaced configuration source files are preserved with hashes outside the repo in `D:\NVIDIA\archive\2026-10-21-phase2`. Actual provider keys and the production host/DSN remain pending; local test credentials are not a production deployment configuration.

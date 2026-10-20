@@ -43,3 +43,7 @@ docs/
 
 # Local reference archive must never enter an application image.
 archive/
+.secrets/
+.foundation-data/
+foundation-backups/
+.foundation-before-restore/

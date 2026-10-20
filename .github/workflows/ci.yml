@@ -17,6 +17,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  foundation:
+    name: Portable database foundation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install API test dependencies
+        working-directory: api
+        run: uv sync --python 3.12 --all-extras --dev --locked
+      - name: Generate isolated local credentials
+        run: api/.venv/bin/python tools/foundation.py init
+      - name: Validate and start pinned services
+        run: |
+          api/.venv/bin/python tools/foundation.py config
+          api/.venv/bin/python tools/foundation.py up
+      - name: Migrate and check roles
+        run: |
+          api/.venv/bin/python tools/foundation.py migrate
+          api/.venv/bin/python tools/foundation.py check
+      - name: Verify transactions, leases, restart and backup restore
+        run: api/.venv/bin/python tools/foundation_verify.py
+      - name: Stop disposable services
+        if: always()
+        run: api/.venv/bin/python tools/foundation.py stop
+
   documentation:
     name: Documentation contracts
     runs-on: ubuntu-latest
@@ -222,6 +247,12 @@ jobs:
           terraform init -backend=false
           terraform validate
         working-directory: infra/bootstrap
+
+      - name: Validate portable foundation (no apply)
+        run: |
+          terraform init -backend=false
+          terraform validate
+        working-directory: infra/envs/portable
 
   secrets:
     name: Secret scan
