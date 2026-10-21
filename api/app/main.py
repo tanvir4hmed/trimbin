@@ -22,6 +22,7 @@ from .routes import (
     clips,
     dashboard,
     dataset,
+    evidence,
     film,
     inference,
     maintenance,
@@ -103,6 +104,27 @@ app.include_router(maintenance.router)
 app.include_router(ask.router)
 app.include_router(media_library.router)
 app.include_router(inference.router)
+app.include_router(evidence.router)
+
+
+@app.exception_handler(evidence.EvidenceError)
+async def evidence_error(request: Request, exc: evidence.EvidenceError) -> JSONResponse:
+    code = exc.code
+    status = (
+        404
+        if code.endswith("not_found")
+        else 409
+        if code.endswith("pending") or "changed" in code
+        else 503
+        if code.endswith(("unavailable", "not_configured"))
+        else 422
+    )
+    return JSONResponse(status_code=status, content={"detail": code})
+
+
+@app.exception_handler(evidence.InferenceError)
+async def inference_error(request: Request, exc: evidence.InferenceError) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": exc.code})
 
 
 @app.exception_handler(media_library.MediaError)

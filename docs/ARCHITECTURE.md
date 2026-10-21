@@ -87,3 +87,7 @@ Keep current valid analysis, human decisions, saved timelines and pinned export 
 ## Deployment control
 
 CI on main must run without paid provider keys. Real-model checks are explicit, budgeted integration jobs. The owner explicitly retains automatic deployment on matching main pushes. Current workflows deploy the existing runtime until later cutover; all new infrastructure is Terraform-managed. See [deployment design](DEPLOYMENT_DESIGN.md) for current ownership gaps and the target rollout. Container versions, dependency resolutions, schema migrations and model IDs are recorded. Runtime secrets are injected only into the services that require them and never into a browser bundle.
+
+## Phase 5 implementation update
+
+The dedicated [evidence workspace](EVIDENCE_SETUP.md) now connects registered deployment sources to original-frame analysis, human annotations/corrections/retractions, slate placement, pinned range selection, selected-text comparison/continuity and scoped text/vector retrieval. PostgreSQL owns revisions and jobs; complete ClickHouse snapshots serve retrieval. API and analysis have explicit provider egress in the portable package. Runtime acceptance remains deferred; this is implemented code, not measured model quality or verified deployment. Legacy editorial routes remain transitional. Canonical timeline assembly and both full exports remain later phases.

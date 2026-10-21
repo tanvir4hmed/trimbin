@@ -138,6 +138,7 @@ class Settings(BaseSettings):
     inference_max_output_tokens: int = Field(default=8192, ge=256, le=65536)
     inference_temperature: float = Field(default=0, ge=0, le=2, allow_inf_nan=False)
     inference_response_bytes: int = Field(default=8 * 1024**2, ge=1024, le=32 * 1024**2)
+    evidence_embedding_identity_path: str = ""
     media_backend: Literal["filesystem"] = "filesystem"
     originals_root: str = ""
     proxies_root: str = ""

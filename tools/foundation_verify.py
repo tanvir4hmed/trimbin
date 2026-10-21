@@ -14,7 +14,14 @@ def main():
 
     environment = {**os.environ, "FOUNDATION_TEST_DSN": foundation.dsn(admin=True)}
     subprocess.run(
-        [sys.executable, "-m", "pytest", "api/tests/test_foundation_postgres.py", "-q"],
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "api/tests/test_foundation_postgres.py",
+            "api/tests/test_evidence_postgres.py",
+            "-q",
+        ],
         cwd=foundation.ROOT,
         env=environment,
         check=True,

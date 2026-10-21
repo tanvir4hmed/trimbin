@@ -1,4 +1,4 @@
-"""Public configuration status only. Live evaluation is operator-only until Phase 5."""
+"""Public configuration status; evaluation remains operator-controlled."""
 
 from fastapi import APIRouter
 from trimbin_agents.config import placeholder
@@ -17,7 +17,7 @@ def status() -> dict:
         "live_verified": False,
         "quality_status": "not_evaluated",
         "speech": "adapter_unavailable",
-        "editorial_integration": "pending",
+        "editorial_integration": "portable_evidence_unverified",
         "status": "unavailable",
     }
     if settings.inference_mode == "fixture":

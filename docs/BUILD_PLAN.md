@@ -1,8 +1,8 @@
 # Phased build plan
 
-Updated 21 October 2026 Asia/Dhaka. Work branch: main. Phases 1 and 2 were implemented; the owner now authorized Phase 4 with placeholder credentials, deferred runtime testing, commit and push. The current implementation scope is Phase 4; later phases may follow the same credential-independent approach.
+Updated 21 October 2026 Asia/Dhaka. Work branch: main. The owner authorized Phase 5 grounded evidence review and retrieval. Continue with placeholder credentials and deferred runtime testing; static checks, commit and push are included.
 
-Latest owner instruction: implement Phase 4 with dummy placeholders and runtime testing deferred on main and push; preserve automatic deployment and stop without waiting for deployment. All new infrastructure is Terraform-managed. No new paid resources or live model experiments are included. Read [Product direction](PRODUCT_DIRECTION.md) and [Quality strategy](QUALITY_STRATEGY.md) before making build decisions.
+Latest owner instruction: implement Phase 5 on main; preserve automatic deployment and stop without waiting for deployment. All new infrastructure remains Terraform-managed. No new paid resources or live model experiments are included. Read [Product direction](PRODUCT_DIRECTION.md) and [Quality strategy](QUALITY_STRATEGY.md) before making build decisions.
 
 ## Why this edition exists
 
@@ -32,7 +32,7 @@ Re-read the official rules, overview and FAQ; inventoried actual workflow/config
 
 ## Phase approval process
 
-Before each phase, present its scope, observable result and any paid/external dependency. The owner approves that phase. Implement and report actual results and remaining limitations. The latest owner instruction defers runtime tests for Phase 4; keep static checks and automatic CI, record all acceptance gaps, and do not spend live credits. If a major choice changes scope or cost, return with the concrete changed proposal. No blanket permission to execute all phases is inferred.
+Before each phase, present its scope, observable result and any paid/external dependency. The owner approves that phase. Implement and report actual results and remaining limitations. The latest owner instruction defers runtime tests for Phases 4 and 5; keep static checks and automatic CI, record all acceptance gaps, and do not spend live credits. If a major choice changes scope or cost, return with the concrete changed proposal. No blanket permission to execute all phases is inferred.
 
 The owner approved the first implementation phase including commit/push, with existing push-triggered deployment preserved. Stop after push; do not poll deployment. Later phase proposals should state whether they include push and any new provisioning. Existing deployment is authorized by this instruction; new paid infrastructure is not.
 
@@ -93,6 +93,8 @@ Outputs: analyze/find/review/correct/select works across the new storage and mod
 Acceptance: authorization and project isolation; retractions and retries; failed runs retain previous complete evidence; stale writes rejected; reader cannot mutate the archive; unavailable models/search do not silently become empty successful results.
 
 Credentials: fixture mode is adequate for deterministic integration checks; provider-dependent quality is inherited from the open Phase 4 gate.
+
+Implementation status: the dedicated evidence workspace, revisioned commands, bounded analysis worker and ClickHouse projections are implemented. Runtime acceptance and real-model quality remain deferred. See [evidence setup](EVIDENCE_SETUP.md) for exact boundaries; automatic attempt segmentation and speech are not claimed.
 
 ## Phase 6 Canonical scene and film timeline
 

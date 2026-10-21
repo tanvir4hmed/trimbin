@@ -80,3 +80,7 @@ flowchart LR
 ```
 
 Phase 6 validates edit/revision behavior; Phases 7 and 8 independently validate exports. Phase 9 validates the complete journey with actual services.
+
+## Phase 5 implementation update
+
+The dedicated [evidence workspace](EVIDENCE_SETUP.md) now connects registered deployment sources to original-frame analysis, human annotations/corrections/retractions, slate placement, pinned range selection, selected-text comparison/continuity and scoped text/vector retrieval. PostgreSQL owns revisions and jobs; complete ClickHouse snapshots serve retrieval. API and analysis have explicit provider egress in the portable package. Runtime acceptance remains deferred; this is implemented code, not measured model quality or verified deployment. Legacy editorial routes remain transitional. Canonical timeline assembly and both full exports remain later phases.

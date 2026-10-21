@@ -7,6 +7,7 @@ import hashlib
 import json
 import math
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -119,6 +120,7 @@ async def run_task(
     catalog: dict[str, ModelProfile],
     *,
     fixture: dict | None = None,
+    check: Callable[[], None] | None = None,
 ) -> dict:
     request = TaskRequest.model_validate(request.model_dump())
     input_hash = fingerprint(request.model_dump(mode="json"))
@@ -200,10 +202,14 @@ async def run_task(
         )
         provider = TokenFactory(config)
         for index in range(config.inference_max_retries + 1):
+            if check:
+                check()
             attempt = {"number": index + 1, "usage": None, "cost_usd": None}
             started = time.monotonic()
             try:
                 raw = await provider.request("POST", "chat/completions", payload)
+                if check:
+                    check()
                 attempt.update(response_metadata(raw))
                 attempt["raw_response_hash"] = fingerprint(raw)
                 output = parse_output(raw, request)

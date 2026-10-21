@@ -1797,6 +1797,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/evidence/{project}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Workspace */
+        get: operations["workspace_evidence__project__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/evidence/{project}/commands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Edit */
+        post: operations["edit_evidence__project__commands_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/evidence/{project}/analyze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Analyze */
+        post: operations["analyze_evidence__project__analyze_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/evidence/{project}/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Compare */
+        post: operations["compare_evidence__project__compare_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/evidence/{project}/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run */
+        get: operations["run_evidence__project__runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/evidence/{project}/runs/{run_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel */
+        post: operations["cancel_evidence__project__runs__run_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/evidence/{project}/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Find */
+        post: operations["find_evidence__project__search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -1885,6 +2004,51 @@ export interface components {
              * Format: date-time
              */
             occurred_at: string;
+        };
+        /** AnalyzeCommand */
+        AnalyzeCommand: {
+            /**
+             * Command Id
+             * Format: uuid
+             */
+            command_id: string;
+            /** Expected Revision */
+            expected_revision: number;
+            /**
+             * Source Id
+             * Format: uuid
+             */
+            source_id: string;
+            /**
+             * Task
+             * @default visual
+             * @enum {string}
+             */
+            task: "visual" | "slate";
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "fixture" | "nebius";
+            /**
+             * Window Seconds
+             * @default 30
+             */
+            window_seconds: number;
+            /**
+             * Overlap Seconds
+             * @default 2
+             */
+            overlap_seconds: number;
+            /**
+             * Sample Every Seconds
+             * @default 2
+             */
+            sample_every_seconds: number;
+            /** Allowed Labels */
+            allowed_labels?: {
+                [key: string]: string[];
+            };
         };
         /**
          * Assignment
@@ -2205,6 +2369,29 @@ export interface components {
             /** Items */
             items: components["schemas"]["IngestResolution"][];
         };
+        /** CompareCommand */
+        CompareCommand: {
+            /**
+             * Command Id
+             * Format: uuid
+             */
+            command_id: string;
+            /** Expected Revision */
+            expected_revision: number;
+            /**
+             * Task
+             * @default comparison
+             * @enum {string}
+             */
+            task: "comparison" | "continuity";
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "fixture" | "nebius";
+            /** Brief */
+            brief: string;
+        };
         /** CoverageCommand */
         CoverageCommand: {
             /** Rev */
@@ -2477,6 +2664,47 @@ export interface components {
              * @constant
              */
             observation_time_unit: "seconds_relative_to_window_start";
+        };
+        /** EditCommand */
+        EditCommand: {
+            /**
+             * Command Id
+             * Format: uuid
+             */
+            command_id: string;
+            /** Expected Revision */
+            expected_revision: number;
+            /**
+             * Operation
+             * @enum {string}
+             */
+            operation: "note" | "correct" | "select" | "unselect" | "place";
+            /** Item Id */
+            item_id?: string | null;
+            note?: components["schemas"]["Note"] | null;
+            /**
+             * Decision
+             * @default accepted
+             * @enum {string}
+             */
+            decision: "accepted" | "uncertain" | "retracted";
+            /** Source Id */
+            source_id?: string | null;
+            /**
+             * Scene
+             * @default
+             */
+            scene: string;
+            /**
+             * Shot
+             * @default
+             */
+            shot: string;
+            /**
+             * Take
+             * @default
+             */
+            take: string;
         };
         /** EditorialDatasetRecord */
         EditorialDatasetRecord: {
@@ -3208,6 +3436,25 @@ export interface components {
              */
             description: string;
         };
+        /** Note */
+        Note: {
+            /**
+             * Source Id
+             * Format: uuid
+             */
+            source_id: string;
+            /** Start Us */
+            start_us: number;
+            /** End Us */
+            end_us: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "observation" | "moment" | "attempt" | "slate" | "continuity" | "speech";
+            /** Text */
+            text: string;
+        };
         /**
          * Override
          * @description An editor choosing a different take, and saying why.
@@ -3904,6 +4151,26 @@ export interface components {
             at_s: number;
             /** To S */
             to_s: number;
+        };
+        /** Search */
+        Search: {
+            /** Query */
+            query: string;
+            /**
+             * Mode
+             * @default text
+             * @enum {string}
+             */
+            mode: "text" | "semantic";
+            /** Source Id */
+            source_id?: string | null;
+            /** Kind */
+            kind?: string | null;
+            /**
+             * Limit
+             * @default 20
+             */
+            limit: number;
         };
         /**
          * SegmentObservation
@@ -7768,6 +8035,255 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    workspace_evidence__project__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_evidence__project__commands_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditCommand"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    analyze_evidence__project__analyze_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnalyzeCommand"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    compare_evidence__project__compare_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompareCommand"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_evidence__project__runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: number;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_evidence__project__runs__run_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: number;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    find_evidence__project__search_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Search"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

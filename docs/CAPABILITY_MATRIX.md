@@ -40,3 +40,7 @@ PostgreSQL integration tests and the container manifest are provided, but this P
 ## Phase 4 implementation evidence
 
 [Inference modules](../api/app/inference) and [operator setup](INFERENCE_SETUP.md) add task contracts, chat/image and embedding adapters, private provenance, model discovery and paired evaluation tooling. Placeholder examples keep live calls disabled. Runtime tests, actual provider access, speech serving and editorial integration remain pending; the implementation is not a measured quality improvement.
+
+## Phase 5 implementation update
+
+The dedicated [evidence workspace](EVIDENCE_SETUP.md) now connects registered deployment sources to original-frame analysis, human annotations/corrections/retractions, slate placement, pinned range selection, selected-text comparison/continuity and scoped text/vector retrieval. PostgreSQL owns revisions and jobs; complete ClickHouse snapshots serve retrieval. API and analysis have explicit provider egress in the portable package. Runtime acceptance remains deferred; this is implemented code, not measured model quality or verified deployment. Legacy editorial routes remain transitional. Canonical timeline assembly and both full exports remain later phases.

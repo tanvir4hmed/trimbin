@@ -11,7 +11,8 @@ services:
       - ${TRIMBIN_UPLOAD_STORE:?Provide originals and staging parent}:/media/upload-store
       - ${TRIMBIN_DERIVED_STORE:?Provide derivative directory}:/media/derived:ro
       - ${TRIMBIN_LIBRARY_STORE:?Provide mounted footage directory}:/media/library:ro
-    networks: [foundation]
+      - ${TRIMBIN_MODEL_CONFIG_STORE:?Provide private model configuration directory}:/model-config:ro
+    networks: [foundation, egress]
     read_only: true
     tmpfs: [/tmp:size=64m]
     mem_limit: 1g
@@ -34,7 +35,38 @@ services:
     cpus: 2
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
+  analysis:
+    image: ${TRIMBIN_APP_IMAGE:?Supply the tested immutable application image}
+    env_file: ${TRIMBIN_MEDIA_ENV_FILE:?Supply private container runtime configuration}
+    command: [python, -m, app.evidence.worker]
+    restart: unless-stopped
+    volumes:
+      - ${TRIMBIN_UPLOAD_STORE:?Provide originals and staging parent}:/media/upload-store:ro
+      - ${TRIMBIN_DERIVED_STORE:?Provide derivative directory}:/media/derived
+      - ${TRIMBIN_LIBRARY_STORE:?Provide mounted footage directory}:/media/library:ro
+      - ${TRIMBIN_MODEL_CONFIG_STORE:?Provide private model configuration directory}:/model-config:ro
+    networks: [foundation, egress]
+    read_only: true
+    tmpfs: [/tmp:size=64m]
+    mem_limit: 2g
+    cpus: 2
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+  projection:
+    image: ${TRIMBIN_APP_IMAGE:?Supply the tested immutable application image}
+    env_file: ${TRIMBIN_MEDIA_ENV_FILE:?Supply private container runtime configuration}
+    command: [python, -m, app.evidence.projection]
+    restart: unless-stopped
+    networks: [foundation]
+    read_only: true
+    tmpfs: [/tmp:size=64m]
+    mem_limit: 512m
+    cpus: 1
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
 networks:
+  egress:
+    driver: bridge
   foundation:
     external: true
     name: trimbin-foundation_data
