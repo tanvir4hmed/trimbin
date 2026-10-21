@@ -20,6 +20,7 @@ def main():
             "pytest",
             "api/tests/test_foundation_postgres.py",
             "api/tests/test_evidence_postgres.py",
+            "api/tests/test_timeline_postgres.py",
             "-q",
         ],
         cwd=foundation.ROOT,

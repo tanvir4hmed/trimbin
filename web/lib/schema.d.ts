@@ -1916,6 +1916,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/timelines/{project}/sources/{source_id}/timing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Timing */
+        post: operations["timing_timelines__project__sources__source_id__timing_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/timelines/{project}/{sequence_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read */
+        get: operations["read_timelines__project___sequence_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/timelines/{project}/{sequence_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** History */
+        get: operations["history_timelines__project___sequence_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/timelines/{project}/{sequence_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save */
+        post: operations["save_timelines__project___sequence_id__revisions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/timelines/{project}/{sequence_id}/selections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Selections */
+        get: operations["selections_timelines__project___sequence_id__selections_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/timelines/{project}/{sequence_id}/frames/{frame}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Frame Map */
+        get: operations["frame_map_timelines__project___sequence_id__frames__frame__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -2277,6 +2379,43 @@ export interface components {
             rev?: number | null;
             /** Take No */
             take_no: number;
+        };
+        /** Clip */
+        Clip: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Source Id
+             * Format: uuid
+             */
+            source_id: string;
+            /**
+             * Selection Id
+             * Format: uuid
+             */
+            selection_id: string;
+            /** In Frame */
+            in_frame: number;
+            /** Out Frame */
+            out_frame: number;
+            /**
+             * Muted
+             * @default false
+             */
+            muted: boolean;
+            /**
+             * Gain Db
+             * @default 0
+             */
+            gain_db: number;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
         };
         /** ClipAnalysisIdentity */
         ClipAnalysisIdentity: {
@@ -3985,6 +4124,13 @@ export interface components {
             /** Open Comments */
             open_comments: number;
         };
+        /** Rate */
+        Rate: {
+            /** Numerator */
+            numerator: number;
+            /** Denominator */
+            denominator: number;
+        };
         /** RecentDecision */
         RecentDecision: {
             /** Project Id */
@@ -4101,6 +4247,19 @@ export interface components {
              */
             note: string;
         };
+        /** Save */
+        Save: {
+            /**
+             * Command Id
+             * Format: uuid
+             */
+            command_id: string;
+            /** Expected Revision */
+            expected_revision: number;
+            sequence: components["schemas"]["Sequence"];
+            /** Clips */
+            clips: components["schemas"]["Clip"][];
+        };
         /** SceneFinding */
         SceneFinding: {
             /** Clip Id */
@@ -4212,6 +4371,43 @@ export interface components {
             findings?: components["schemas"]["trimbin_agents__contracts__base__Finding"][];
             /** Attempts */
             attempts?: components["schemas"]["PerformanceAttempt"][];
+        };
+        /** Sequence */
+        Sequence: {
+            /**
+             * Name
+             * @default Film
+             */
+            name: string;
+            fps?: components["schemas"]["Rate"];
+            /**
+             * Width
+             * @default 1920
+             */
+            width: number;
+            /**
+             * Height
+             * @default 1080
+             */
+            height: number;
+            /**
+             * Color
+             * @default rec709-sdr
+             * @constant
+             */
+            color: "rec709-sdr";
+            /**
+             * Audio Rate
+             * @default 48000
+             * @constant
+             */
+            audio_rate: 48000;
+            /**
+             * Conform
+             * @default preserve-speed-drop-duplicate-v1
+             * @constant
+             */
+            conform: "preserve-speed-drop-duplicate-v1";
         };
         /** SetState */
         SetState: {
@@ -8265,6 +8461,221 @@ export interface operations {
                 "application/json": components["schemas"]["Search"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    timing_timelines__project__sources__source_id__timing_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: number;
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_timelines__project___sequence_id__get: {
+        parameters: {
+            query?: {
+                revision?: number | null;
+            };
+            header?: never;
+            path: {
+                project: number;
+                sequence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    history_timelines__project___sequence_id__history_get: {
+        parameters: {
+            query?: {
+                before?: number;
+            };
+            header?: never;
+            path: {
+                project: number;
+                sequence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_timelines__project___sequence_id__revisions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: number;
+                sequence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Save"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    selections_timelines__project___sequence_id__selections_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: number;
+                sequence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    frame_map_timelines__project___sequence_id__frames__frame__get: {
+        parameters: {
+            query: {
+                revision: number;
+            };
+            header?: never;
+            path: {
+                project: number;
+                sequence_id: string;
+                frame: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

@@ -36,6 +36,7 @@ from .routes import (
     screens,
     session,
     structure,
+    timelines,
     uploads,
 )
 from .services import analytics
@@ -105,6 +106,7 @@ app.include_router(ask.router)
 app.include_router(media_library.router)
 app.include_router(inference.router)
 app.include_router(evidence.router)
+app.include_router(timelines.router)
 
 
 @app.exception_handler(evidence.EvidenceError)

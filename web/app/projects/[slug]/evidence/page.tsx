@@ -78,6 +78,7 @@ export default function EvidencePage({ params }: { params: Promise<{ slug: strin
 
   return <main className="shell" style={{ maxWidth: 1150, padding: "2rem" }}>
     <Link href={`/projects/${slug}/media`}>Media library</Link>
+    <Link href={`/projects/${slug}/timeline`}>Scene / film timeline</Link>
     <h1>Evidence workspace</h1>
     <p>Review source evidence, preserve corrections and select ranges for your edit.</p>
     {error && <p role="alert">{error}</p>}

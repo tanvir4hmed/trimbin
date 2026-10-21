@@ -1,8 +1,8 @@
 # Phased build plan
 
-Updated 21 October 2026 Asia/Dhaka. Work branch: main. The owner authorized Phase 5 grounded evidence review and retrieval. Continue with placeholder credentials and deferred runtime testing; static checks, commit and push are included.
+Updated 21 October 2026 Asia/Dhaka. Work branch: main. The owner authorized Phase 6 canonical scene and film timeline assembly. Continue with placeholder credentials and deferred runtime testing; static checks, commit and push are included.
 
-Latest owner instruction: implement Phase 5 on main; preserve automatic deployment and stop without waiting for deployment. All new infrastructure remains Terraform-managed. No new paid resources or live model experiments are included. Read [Product direction](PRODUCT_DIRECTION.md) and [Quality strategy](QUALITY_STRATEGY.md) before making build decisions.
+Latest owner instruction: implement Phase 6 on main; preserve automatic deployment and stop without waiting for deployment. All new infrastructure remains Terraform-managed. No new paid resources or live model experiments are included. Read [Product direction](PRODUCT_DIRECTION.md) and [Quality strategy](QUALITY_STRATEGY.md) before making build decisions.
 
 ## Why this edition exists
 
@@ -32,7 +32,7 @@ Re-read the official rules, overview and FAQ; inventoried actual workflow/config
 
 ## Phase approval process
 
-Before each phase, present its scope, observable result and any paid/external dependency. The owner approves that phase. Implement and report actual results and remaining limitations. The latest owner instruction defers runtime tests for Phases 4 and 5; keep static checks and automatic CI, record all acceptance gaps, and do not spend live credits. If a major choice changes scope or cost, return with the concrete changed proposal. No blanket permission to execute all phases is inferred.
+Before each phase, present its scope, observable result and any paid/external dependency. The owner approves that phase. Implement and report actual results and remaining limitations. The latest owner instruction defers runtime tests for Phases 4 through 6; keep static checks and automatic CI, record all acceptance gaps, and do not spend live credits. If a major choice changes scope or cost, return with the concrete changed proposal. No blanket permission to execute all phases is inferred.
 
 The owner approved the first implementation phase including commit/push, with existing push-triggered deployment preserved. Stop after push; do not poll deployment. Later phase proposals should state whether they include push and any new provisioning. Existing deployment is authorized by this instruction; new paid infrastructure is not.
 
@@ -105,6 +105,8 @@ Outputs: a user can approve a scene or film timeline ready for both export route
 Acceptance: same clip repeated at different ranges; fractional/mixed rates with explicit mapping; audio offsets; preserved saves after edits; failed saves/retries; missing sources flagged; draft acceptance does not overwrite another saved revision.
 
 Credentials: none for manual assembly and deterministic preview.
+
+Phase 6 implementation: canonical source-frame occurrences, rational conform, linked audio metadata, saved revision preview, manual arrangement and history restoration are added. Browser playback is approximate; actual conform/export acceptance remains pending. See [timeline setup](TIMELINE_SETUP.md).
 
 ## Phase 7 Editable timeline export
 

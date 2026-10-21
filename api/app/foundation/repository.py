@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Protocol
 from uuid import UUID, uuid4
@@ -82,11 +83,18 @@ class PostgresRepository:
         body: dict,
         actor: str,
         command_id: UUID,
+        *,
+        connection=None,
     ) -> dict:
         if expected < 0 or not actor or not kind or not document_id:
             raise ValueError("An actor, document identity and nonnegative revision are required")
         request_hash = fingerprint([kind, document_id, expected, body])
-        with psycopg.connect(self._dsn, row_factory=dict_row) as conn:
+        context = (
+            nullcontext(connection)
+            if connection is not None
+            else psycopg.connect(self._dsn, row_factory=dict_row)
+        )
+        with context as conn:
             # Serializes concurrent replays even when they target different documents.
             lock_key = f"{project_id}/{actor}/{command_id}"
             conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (lock_key,))
