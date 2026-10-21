@@ -6,7 +6,7 @@ The quality target is to improve on the preserved paid-model output, without acc
 
 ## Current status
 
-Phases 2 and 3 add shared configuration, self-hosted databases, transactional jobs and a portable media library: controlled resumable uploads, mounted-source indexing, proxy/audio/sprite processing, scoped playback and verified relinking. The media routes use PostgreSQL membership and need no GCP or inference credentials. The older editorial workflow has not yet been migrated to these sources; new AI integrations and both full exports remain later work. A new cloud host has not been selected or provisioned. Working code is updated on `main` through approved phases.
+Phases 2 and 3 add shared configuration, self-hosted databases, transactional jobs and a portable media library: controlled resumable uploads, mounted-source indexing, proxy/audio/sprite processing, scoped playback and verified relinking. The media routes use PostgreSQL membership and need no GCP or inference credentials. The older editorial workflow has not yet been migrated to these sources; Phase 4 now adds operator-facing Token Factory adapters and evaluation tooling, with runtime/live quality tests deferred. Editorial AI integration and both full exports remain later work. A new cloud host has not been selected or provisioned. Working code is updated on `main` through approved phases.
 
 - [Product direction and reasons for the expansion](docs/PRODUCT_DIRECTION.md)
 - [Submission story, improvements and evidence](docs/SUBMISSION_STRATEGY.md)
@@ -23,6 +23,7 @@ Phases 2 and 3 add shared configuration, self-hosted databases, transactional jo
 - [Terraform and deployment design](docs/DEPLOYMENT_DESIGN.md)
 - [Foundation setup, configuration checks and recovery](docs/FOUNDATION_SETUP.md)
 - [Media setup, limits and recovery](docs/MEDIA_SETUP.md)
+- [Model adapter setup and deferred evaluation](docs/INFERENCE_SETUP.md)
 - [Phase status](docs/PHASE_STATUS.md)
 - [Security policy and planned controls](SECURITY.md)
 

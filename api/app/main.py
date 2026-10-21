@@ -23,6 +23,7 @@ from .routes import (
     dashboard,
     dataset,
     film,
+    inference,
     maintenance,
     media_library,
     placements,
@@ -101,6 +102,7 @@ app.include_router(projects.router)
 app.include_router(maintenance.router)
 app.include_router(ask.router)
 app.include_router(media_library.router)
+app.include_router(inference.router)
 
 
 @app.exception_handler(media_library.MediaError)

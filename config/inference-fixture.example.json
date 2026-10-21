@@ -1,0 +1,18 @@
+{
+  "input_fingerprint": "1aed1c8c6a4cd1f1dbcfb468c64733af92f3d4f82d7ce907d6ca2830506705a8",
+  "output": {
+    "status": "ok",
+    "reason": "",
+    "findings": [],
+    "ranking": [
+      {
+        "candidate_id": "c1",
+        "reason": "Synthetic fixture answer, not a quality result.",
+        "citations": [
+          "e1"
+        ]
+      }
+    ],
+    "draft": []
+  }
+}

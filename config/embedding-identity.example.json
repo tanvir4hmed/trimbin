@@ -1,0 +1,11 @@
+{
+  "provider": "nebius-token-factory",
+  "model_id": "DUMMY_EMBEDDING_MODEL",
+  "revision": "unverified",
+  "precision": "unknown",
+  "deployment_generation": "replace-after-account-discovery",
+  "dimension": 768,
+  "normalization": "l2",
+  "preprocessing_version": "replace-with-actual-recipe",
+  "index_generation": "DUMMY_EMBEDDING_GENERATION"
+}

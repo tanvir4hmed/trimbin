@@ -1,0 +1,25 @@
+{
+  "manifest_sha256": "7cfc9f8b2c2feab88118fa85d2ce89aec709808e31f18582072d2d6eb572dee4",
+  "rows": [
+    {
+      "case_id": "fixture-1",
+      "metric_id": "event-recall",
+      "baseline": 0.5,
+      "candidate": 0.5,
+      "baseline_run": "fixture-b",
+      "candidate_run": "fixture-c",
+      "live_provenance_verified": false,
+      "contract_valid": true
+    },
+    {
+      "case_id": "fixture-2",
+      "metric_id": "event-recall",
+      "baseline": 0.5,
+      "candidate": 0.5,
+      "baseline_run": "fixture-b",
+      "candidate_run": "fixture-c",
+      "live_provenance_verified": false,
+      "contract_valid": true
+    }
+  ]
+}

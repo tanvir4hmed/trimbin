@@ -10,7 +10,7 @@ Latest owner direction: revise the plan for a complete cloud-hosted editorial Po
 | 1 Specifications design and CI control | Complete; included in the start milestone | UX/data/model/export contracts, capability and baseline evidence matrix, workflow/network diagrams, Terraform rollout design, main CI coverage and external archive. Local checks passed; see verification below. |
 | 2 Configuration and self-hosted foundation | Implemented; local checks passed; container acceptance pending CI | Shared configuration, PostgreSQL revisions/jobs/outbox, pinned database package, recovery tools and CI lifecycle checks. The unapplied GCP target was subsequently archived as an incorrect hosting assumption. Docker/WSL unavailable locally; no paid resources provisioned. |
 | 3 Deployment media ingest and processing | Implemented; local checks passed; database/container acceptance pending | Owner authorized phase start. Mounted roots, resumable upload, source integrity, derivatives, scoped playback, PostgreSQL jobs and media UI. |
-| 4 NVIDIA adapters and quality evaluation | Not approved | Nemotron through Token Factory; actual access and comparative quality pending. |
+| 4 NVIDIA adapters and quality evaluation | Adapter/evaluation implementation delivered; runtime tests deferred | Owner approved placeholder credentials and testing later. Model selection, live calls, speech path and comparative quality remain pending. |
 | 5 Evidence review and retrieval | Not approved | Preserve corrections and durable editorial state. |
 | 6 Canonical scene and film timeline | Not approved | Shared selected-range preview/export snapshot. |
 | 7 Editable timeline export | Not approved | Actual Premiere import/relink validation required. |
@@ -45,7 +45,7 @@ A cloud PoC is complete when its declared editorial workflow and release gates p
 - Real database migrations, concurrent writes/leases, role isolation, persistence and backup/restore are required by the added CI job; they were not run on this Windows host because Docker and WSL are absent. These checks are not reported as passing.
 - No live model calls, provider-secret registration, application data migration or legacy infrastructure retirement occurred. Existing auto-deploy remains enabled; no deployment polling after push.
 
-Phase 3 was subsequently authorized and implemented below. Phase 4 onward still requires owner approval. Full release requires the declared model-quality, source-integrity and export gates.
+Phase 3 was subsequently authorized and implemented below. Phase 4 was subsequently approved with runtime tests deferred. Full release requires the declared model-quality, source-integrity and export gates.
 
 ## Phase 3 verification and limits
 
@@ -58,4 +58,15 @@ Phase 3 was subsequently authorized and implemented below. Phase 4 onward still 
 - No live model calls or new provider credentials were used. Token Factory's separate 25 USD email and Toloka's 50 USD credit remain pending; neither blocks these media checks.
 - `npm ci` reports 13 dependency audit findings (4 moderate, 7 high, 2 critical). These existing dependency findings were not resolved by an unrelated forced upgrade; deployment readiness still requires triage.
 
-Commit/push delivery is separate from deployment acceptance. Do not poll deployment after push. Phase 4 may begin only after the owner's next approval.
+Commit/push delivery is separate from deployment acceptance. Do not poll deployment after push. The owner subsequently approved Phase 4 with dummy placeholders and deferred testing.
+
+## Phase 4 implementation and deferred acceptance
+
+- Implemented grounded task contracts, explicit fixture records, Token Factory chat/image transport, model discovery, bounded retries/errors, run provenance and generation hashes. Structured outputs cannot invent allowed source/candidate IDs or exceed source windows.
+- Added embeddings with explicit model/revision/precision/deployment/normalization/index identity and dimension checks; no index activation occurs here.
+- Added frozen-manifest checks, paired recording-group evaluation with uncertainty, critical-regression detection, WER helper and blind A/B review artifacts. Synthetic examples are not baseline outputs or quality results. Human review, provenance audit and full pipeline verification remain mandatory.
+- Added operator CLI, configuration-only status endpoint and setup instructions. Live runs require both a real key and explicit enablement; dummy values fail preflight. Current runtime defaults make no external inference call. No new GitHub secret was populated with a fake value.
+- Prepared eight deferred contract/transport/evaluation tests. At owner request, no local runtime suite, fixture execution, model discovery, benchmark or live call was run. Static lint/format, Python syntax, agent typing, generated API types and documentation checks are recorded separately from runtime acceptance.
+- Speech serving remains unavailable pending a verified audio adapter. Original-frame extraction/full-window orchestration and durable editorial evidence integration remain Phase 5 work. No best/latest model is claimed without account discovery and quality evidence.
+- Two prior configuration Git blobs were preserved outside Git at `D:\NVIDIA\archive\2026-10-21-phase4-config-reference`, with hashes. No functioning legacy analysis files were retired while later consumers still depend on them.
+- Existing CI/deployment remains enabled and may execute checks after push. No deployment polling, paid hosting, provider credential validation or complete editor cutover is included.

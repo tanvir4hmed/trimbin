@@ -1,0 +1,45 @@
+{
+  "schema_version": "inference-request-v1",
+  "project_id": 7,
+  "task": "comparison",
+  "sources": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "duration_us": 1000000
+    }
+  ],
+  "windows": [
+    {
+      "id": "w1",
+      "source_id": "00000000-0000-0000-0000-000000000001",
+      "start_us": 0,
+      "end_us": 1000000
+    }
+  ],
+  "frames": [],
+  "evidence": [
+    {
+      "id": "e1",
+      "source_id": "00000000-0000-0000-0000-000000000001",
+      "start_us": 0,
+      "end_us": 500000,
+      "text": "SYNTHETIC contract fixture only; no footage was analyzed.",
+      "modality": "editor"
+    }
+  ],
+  "candidates": [
+    {
+      "id": "c1",
+      "source_id": "00000000-0000-0000-0000-000000000001",
+      "start_us": 0,
+      "end_us": 500000
+    }
+  ],
+  "brief": "Synthetic candidate ranking contract",
+  "brief_revision": "fixture-b1",
+  "evidence_revision": "fixture-e1",
+  "recipe": "synthetic-contract-fixture-v1",
+  "allowed_labels": {},
+  "timestamp_origin": "video_start"
+}

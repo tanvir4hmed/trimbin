@@ -1,0 +1,42 @@
+[
+  {
+    "model_id": "DUMMY_REASONING_MODEL",
+    "revision": "unverified",
+    "precision": "unknown",
+    "modalities": [
+      "text"
+    ],
+    "response_format": "json_object",
+    "max_input_bytes": 16777216,
+    "max_frames": 0,
+    "license_url": "",
+    "deployment_generation": "replace-after-account-discovery"
+  },
+  {
+    "model_id": "DUMMY_VISION_MODEL",
+    "revision": "unverified",
+    "precision": "unknown",
+    "modalities": [
+      "text",
+      "image"
+    ],
+    "response_format": "json_object",
+    "max_input_bytes": 16777216,
+    "max_frames": 16,
+    "license_url": "",
+    "deployment_generation": "replace-after-account-discovery"
+  },
+  {
+    "model_id": "DUMMY_EMBEDDING_MODEL",
+    "revision": "unverified",
+    "precision": "unknown",
+    "modalities": [
+      "embedding"
+    ],
+    "response_format": "json_object",
+    "max_input_bytes": 16777216,
+    "max_frames": 0,
+    "license_url": "",
+    "deployment_generation": "replace-after-account-discovery"
+  }
+]

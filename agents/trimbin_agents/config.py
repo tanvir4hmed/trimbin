@@ -14,6 +14,15 @@ from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def placeholder(value: object) -> bool:
+    """Examples never count as a configured credential or model identity."""
+    return isinstance(value, str) and (
+        not value.strip()
+        or value.strip().lower().startswith(("dummy", "replace_me", "your_", "placeholder"))
+        or value.strip().startswith("<")
+    )
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="TRIMBIN_", env_file=".env", extra="ignore", hide_input_in_errors=True
@@ -122,6 +131,13 @@ class Settings(BaseSettings):
     reasoning_model: str = ""
     asr_model: str = ""
     embedding_version: str = ""
+    inference_live_enabled: bool = False
+    inference_catalog_path: str = ""
+    inference_timeout_seconds: int = Field(default=120, ge=1, le=600)
+    inference_max_retries: int = Field(default=1, ge=0, le=2)
+    inference_max_output_tokens: int = Field(default=8192, ge=256, le=65536)
+    inference_temperature: float = Field(default=0, ge=0, le=2, allow_inf_nan=False)
+    inference_response_bytes: int = Field(default=8 * 1024**2, ge=1024, le=32 * 1024**2)
     media_backend: Literal["filesystem"] = "filesystem"
     originals_root: str = ""
     proxies_root: str = ""
@@ -178,7 +194,11 @@ class Settings(BaseSettings):
         }
         result: dict[str, dict[str, object]] = {}
         for task, names in requirements.items():
-            missing = [f"TRIMBIN_{name.upper()}" for name in names if not getattr(self, name)]
+            missing = [
+                f"TRIMBIN_{name.upper()}"
+                for name in names
+                if not getattr(self, name) or placeholder(getattr(self, name))
+            ]
             result[task] = {
                 "status": "unavailable" if missing else "configured_unverified",
                 "missing": missing,

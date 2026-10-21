@@ -91,3 +91,11 @@ API settings now re-export the agent package registry. Legacy defaults remain un
 See [media setup](MEDIA_SETUP.md) for the implemented path and private configuration. `TRIMBIN_STAGING_ROOT` is required for controlled uploads; it must share a filesystem with uploaded originals. `TRIMBIN_MEDIA_ROOTS` maps aliases to operator-controlled mounted folders; `TRIMBIN_MEDIA_ROOT_PROJECTS` grants each alias to specific project IDs. Both use JSON. Mounted sources must also be inside `TRIMBIN_ALLOWED_MEDIA_ROOTS`.
 
 `TRIMBIN_MEDIA_THREADS` defaults to 2, `TRIMBIN_MEDIA_WORK_BYTES` to 2 GiB per attempt, `TRIMBIN_MEDIA_RESERVE_BYTES` to 1 GiB and `TRIMBIN_MEDIA_TIMEOUT_SECONDS` to 3600 per encoding operation. Exceeding a limit fails visibly. `TRIMBIN_TEAM_PASSES` is a private sign-in setting; PostgreSQL membership additionally controls project permissions. No example credential authorizes a production user.
+
+## Phase 4 placeholder and adapter configuration
+
+The owner explicitly requested dummy values and testing later. `.env.example` and ignored `.secrets/inference/runtime.env` now contain nonfunctional `DUMMY_...` provider/model examples. Real database/session/legacy values are not overwritten. Placeholders never satisfy live preflight and are not registered as working GitHub Secrets. See [adapter setup](INFERENCE_SETUP.md).
+
+New variables: `TRIMBIN_INFERENCE_LIVE_ENABLED=false`, `TRIMBIN_INFERENCE_CATALOG_PATH`, `TRIMBIN_INFERENCE_TIMEOUT_SECONDS=120`, `TRIMBIN_INFERENCE_MAX_RETRIES=1` (maximum 2), `TRIMBIN_INFERENCE_MAX_OUTPUT_TOKENS=8192`, `TRIMBIN_INFERENCE_TEMPERATURE=0`, and `TRIMBIN_INFERENCE_RESPONSE_BYTES=8388608`. These are bounded development defaults, not approved model-quality settings. Live CLI work also requires `--live`; do not run it until credits, rights and sample scope are ready. Model profiles require verified modalities and exact account IDs before use.
+
+No new runtime provider dependency is required for Phase 4: the API's existing aiohttp transport handles the documented endpoints. Optional partner tokens are placeholders only; no Tavily, LangSmith, Toloka or Tendem call is activated. Speech is explicitly unavailable until its supported provider/adapter is established.

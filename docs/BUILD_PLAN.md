@@ -1,8 +1,8 @@
 # Phased build plan
 
-Updated 21 October 2026 Asia/Dhaka. Work branch: main. Phases 1 and 2 were implemented; the owner now authorized Phase 3, including verification, commit and push. Phase 4 onward requires individual owner approval.
+Updated 21 October 2026 Asia/Dhaka. Work branch: main. Phases 1 and 2 were implemented; the owner now authorized Phase 4 with placeholder credentials, deferred runtime testing, commit and push. The current implementation scope is Phase 4; later phases may follow the same credential-independent approach.
 
-Latest owner instruction: start the next phase (Phase 3) on main and push; preserve automatic deployment and stop without waiting for deployment. All new infrastructure is Terraform-managed. No new paid resources or live model experiments are included. Read [Product direction](PRODUCT_DIRECTION.md) and [Quality strategy](QUALITY_STRATEGY.md) before making build decisions.
+Latest owner instruction: implement Phase 4 with dummy placeholders and runtime testing deferred on main and push; preserve automatic deployment and stop without waiting for deployment. All new infrastructure is Terraform-managed. No new paid resources or live model experiments are included. Read [Product direction](PRODUCT_DIRECTION.md) and [Quality strategy](QUALITY_STRATEGY.md) before making build decisions.
 
 ## Why this edition exists
 
@@ -32,7 +32,7 @@ Re-read the official rules, overview and FAQ; inventoried actual workflow/config
 
 ## Phase approval process
 
-Before each phase, present its scope, observable result and any paid/external dependency. The owner approves that phase. Implement and run checks appropriate to the change, report actual results and remaining limitations, and wait for the next phase approval. If a major choice changes scope or cost, return with the concrete changed proposal. No blanket permission to execute all phases is inferred.
+Before each phase, present its scope, observable result and any paid/external dependency. The owner approves that phase. Implement and report actual results and remaining limitations. The latest owner instruction defers runtime tests for Phase 4; keep static checks and automatic CI, record all acceptance gaps, and do not spend live credits. If a major choice changes scope or cost, return with the concrete changed proposal. No blanket permission to execute all phases is inferred.
 
 The owner approved the first implementation phase including commit/push, with existing push-triggered deployment preserved. Stop after push; do not poll deployment. Later phase proposals should state whether they include push and any new provisioning. Existing deployment is authorized by this instruction; new paid infrastructure is not.
 

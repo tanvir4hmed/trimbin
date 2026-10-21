@@ -59,3 +59,7 @@ Release requires supported improvement on declared primary goals, no accepted cr
 ## Evidence record
 
 Each result bundle contains dataset/split hashes, baseline/candidate identities, code build, machine and preprocessing, task outputs, per-case scores, aggregate uncertainty, blind review, failures, retries and measured time/cost. Private media/raw responses stay outside Git. Publish sanitized summaries only. Contract fixtures, live provider tests, NLE compatibility and export fidelity have separate status fields.
+
+## Phase 4 implementation boundary
+
+[Adapter setup](INFERENCE_SETUP.md) documents the implemented request/result validation, Token Factory transport, embedding identities, private run records and evaluation CLI. Runtime and quality testing were deferred by the owner. No account-accessible model ID or superior pipeline has been verified; actual baseline data and cleared gold annotations remain missing inputs. The current adapter accepts text evidence and explicit original-detail image assets; automatic window/frame preparation and editorial persistence are next-phase integration. Unsupported speech is a visible unavailable state, not a fabricated transcript.

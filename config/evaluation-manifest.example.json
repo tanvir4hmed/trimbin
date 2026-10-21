@@ -1,0 +1,34 @@
+{
+  "version": "evaluation-v1",
+  "frozen_at": "2026-10-21T00:00:00Z",
+  "minimum_independent_groups": 30,
+  "baseline_provenance_reference": "DUMMY_REPLACE_WITH_ACTUAL_BASELINE",
+  "candidate_identity_reference": "DUMMY_REPLACE_WITH_ACTUAL_RUN",
+  "cases": [
+    {
+      "id": "fixture-1",
+      "group": "fixture-group-1",
+      "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "split": "development",
+      "rights_reference": "synthetic-contract-only",
+      "annotation_reference": "synthetic-contract-only"
+    },
+    {
+      "id": "fixture-2",
+      "group": "fixture-group-2",
+      "source_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "split": "development",
+      "rights_reference": "synthetic-contract-only",
+      "annotation_reference": "synthetic-contract-only"
+    }
+  ],
+  "metrics": [
+    {
+      "id": "event-recall",
+      "direction": "higher",
+      "critical": true,
+      "primary": true,
+      "meaningful_improvement": 0.05
+    }
+  ]
+}

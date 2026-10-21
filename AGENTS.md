@@ -2,8 +2,8 @@
 
 - Work directly on `main`, as the owner requested. Do not create a migration branch.
 - Read `docs/PRODUCT_DIRECTION.md`, `docs/QUALITY_STRATEGY.md`, `docs/BUILD_PLAN.md`, `docs/REQUIREMENTS.md`, `docs/CONFIGURATION.md` and `docs/PHASE_STATUS.md` before implementation.
-- Latest owner instruction starts Phase 3 after the credit/account discussion. Implement media ingest and processing, verify, commit and push on main. Preserve the existing push workflow and do not poll deployment. All new infrastructure remains Terraform-managed; no new paid host or live inference is included.
-- Finish and report Phase 3, then request the next phase. The earlier instruction to start no phases was superseded by the explicit phase-start request. Do not infer a new paid host/budget or later-phase approval.
+- Latest owner instruction authorizes Phase 4 with clearly marked dummy credentials and deferred runtime testing. Implement adapters and evaluation tooling on main, perform static checks, commit and push. Preserve automatic CI/deployment; do not poll deployment. No paid call or new infrastructure is authorized by a placeholder.
+- The owner wants later phases to proceed with placeholders where needed; the current requested deliverable is Phase 4. Do not claim deferred live quality, container or export acceptance has passed. Report the next phase boundary explicitly.
 - GCP is not a requirement or the new hosting target. Its unapplied Phase 2 host draft was archived outside Git; existing legacy deployment remains until an approved cutover.
 - The owner selects one coding model for each entire phase. Do not split a phase across different coding models or delegate without explicit authorization.
 - Deliver a complete cloud-hosted workflow and reproducible portable software package. Originals reside on the deployment storage; browser uploads/staging and Token Factory inputs are disclosed. Future studio SSD/NAS and self-hosted GPU deployment is not an implemented offline/local capability and is not a release gate. Read docs/SUBMISSION_STRATEGY.md as well as the core planning documents.

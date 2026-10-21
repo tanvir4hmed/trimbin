@@ -36,3 +36,7 @@ Later phases archive obsolete implementation/configuration only when replacement
 [Media routes](../api/app/routes/media_library.py), [worker](../api/app/media/worker.py), [media page](../web/app/projects/[slug]/media/page.tsx) and [setup](MEDIA_SETUP.md) add mounted sources, resumable uploads, scoped range playback, source hashes, duplicate identity and durable media jobs. Generated footage tests verify selected timing/audio and immutability properties. This path uses PostgreSQL membership and filesystems without Google storage/Firestore/Pub/Sub calls. The legacy analysis and timeline consumers remain unchanged until their phases.
 
 PostgreSQL integration tests and the container manifest are provided, but this PC cannot run Docker/PostgreSQL. HDR proxy processing fails explicitly pending validated tone mapping. Neither broad camera-format support nor comparative AI quality nor a complete migrated editor is claimed.
+
+## Phase 4 implementation evidence
+
+[Inference modules](../api/app/inference) and [operator setup](INFERENCE_SETUP.md) add task contracts, chat/image and embedding adapters, private provenance, model discovery and paired evaluation tooling. Placeholder examples keep live calls disabled. Runtime tests, actual provider access, speech serving and editorial integration remain pending; the implementation is not a measured quality improvement.
