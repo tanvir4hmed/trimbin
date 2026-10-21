@@ -40,13 +40,13 @@ cd api
 .venv/Scripts/python.exe -m app.foundation.capabilities --service api --env-file ../.secrets/foundation/runtime.env
 ```
 
-Supported preflight service groups are API, worker, retrieval and inference. Media roots remain unset until Phase 3. Optional integrations are absent without credentials; manual foundation work does not depend on them. Provider/production credentials have not been registered from local test secrets. Do not copy a localhost development DSN into production GitHub Secrets.
+Supported preflight service groups are API, worker, retrieval and inference. Configure Phase 3 media roots as described in [media setup](MEDIA_SETUP.md). Optional integrations are absent without credentials; manual foundation work does not depend on them. Provider/production credentials have not been registered from local test secrets. Do not copy a localhost development DSN into production GitHub Secrets.
 
 `PostgresRepository` provides transactionally consistent state revisions, immutable version rows through its interface, command receipts and outbox records. Commands are project/actor scoped; a changed body under the same key conflicts. Caller authorization is required before invoking the repository; these primitives are not a public authentication boundary.
 
 `PostgresJobs` provides idempotent enqueue, transactional claim, lease renewal, expiry recovery, cancellation, bounded retries and fenced completion. Completion returning true means the current lease's result was accepted; a cancellation may make the resulting state cancelled rather than succeeded. Outbox delivery is at least once; Phase 5 consumers must deduplicate event IDs and preserve generation ordering. PostgreSQL locking follows [transaction-scoped advisory locks and row locks](https://www.postgresql.org/docs/17/explicit-locking.html).
 
-The checksum-protected `schema.sql` is migration version 1. Never edit an applied migration in place; later phases add numbered migrations and corresponding ledger handling. Legacy Firestore readers are deliberately not switched in Phase 2.
+The checksum-protected `schema.sql` is migration version 1. Never edit an applied migration in place; numbered migrations now extend it; version 2 adds media sources, uploads and project membership. Legacy Firestore readers are deliberately not switched in Phase 2.
 
 ## Backup and restore
 
@@ -65,17 +65,15 @@ api/.venv/Scripts/python.exe tools/foundation.py check
 
 Preserve/move the existing data directory deliberately before restore; never use routine `down -v` as a migration or recovery step. Recheck saved revisions, evidence counts and source references before reopening writers. CI performs this rehearsal with disposable records and verifies both stores after restart and restore.
 
-Changing a password file is not database password rotation. PostgreSQL initialization runs only on an empty data directory. Rotate database roles and consumers together through a separate operation, then verify access and backups. Cloud bootstrap refuses a changed credential manifest against its persistent private directory.
+Changing a password file is not database password rotation. PostgreSQL initialization runs only on an empty data directory. Rotate database roles and consumers together through a separate operation, then verify access and backups.
 
-## Terraform target and package
+## Package and hosting boundary
 
-[Portable Terraform](../infra/envs/portable) is an isolated environment with its own state prefix. It declares a fixed host, private subnet, data disk, service account and scoped artifact/secret access. The host uses external egress for installation; only IAP SSH ingress is allowed. HTTPS/editor deployment belongs to later cutover work. There is no Kubernetes or autoscaling.
+The unapplied Phase 2 GCP host draft was an incorrect hosting assumption. Its five tracked files were moved, with verified hashes, outside Git to `D:\NVIDIA\archive\2026-10-21-phase3-gcp-draft`. No live resource or Terraform state was changed. No new GCP hosting requirement is introduced.
 
-The data disk has `prevent_destroy`, and the VM has deletion protection. Boot image, package object and SHA256 are explicit inputs. Secret values never enter Terraform variables/state: bootstrap retrieves an existing Secret Manager JSON object through VM identity. Required secret keys are `postgres_admin`, `postgres_writer`, `clickhouse_admin`, `clickhouse_writer`, `clickhouse_reader`, `session_secret`; use the generated 64-character hex values.
+The foundation and [media package](MEDIA_SETUP.md) define provider-neutral services and volumes. A new host/provider and budget remain undecided; eventual new infrastructure must be Terraform-managed. Existing push-triggered deployment stays active until approved cutover.
 
-After staging/committing the desired source, `python tools/package_foundation.py` packages Git-tracked source only into ignored `.secrets/artifacts`. It does not upload anything. An approved operator publishes the immutable artifact, provides the matching hash/secret resource and initializes a separate backend before any apply. The bootstrap starts database containers; run migrations using the supplied Python environment before allowing application consumers. No image switch or production migration is hidden in host creation.
-
-Terraform validation was run without a backend. No apply, new paid host, remote secret deletion or legacy-resource destruction was performed. Existing push-triggered deployment stays active. The current app's imperative image rollout remains unchanged until the migration/cutover phase; the new infrastructure target is Terraform-owned.
+After staging/committing source, `python tools/package_foundation.py` packages Git-tracked source into ignored `.secrets/artifacts`. It does not upload or provision anything. Apply migrations before allowing application consumers. The package alone does not deploy the completed editor.
 
 ## Verification status
 

@@ -14,7 +14,9 @@
  * to put footage into.
  */
 
-import { use, useMemo } from "react";
+import { use, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { mediaRequest } from "@/lib/media";
 import PlacementInbox from "@/components/PlacementInbox";
 import Structure from "@/components/Structure";
 import Upload from "@/components/Upload";
@@ -25,6 +27,12 @@ export default function IngestPage({ params }: { params: Promise<{ slug: string 
   const { slug } = use(params);
   const projectId = projectIdFromSlug(slug);
   const screen = useProjectScreen(projectId);
+  const [portableMedia, setPortableMedia] = useState(false);
+  useEffect(() => {
+    void mediaRequest<{ enabled: boolean }>("/status")
+      .then((status) => setPortableMedia(status.enabled))
+      .catch(() => setPortableMedia(false));
+  }, []);
 
   // What actually arrived, so a planned shot with no footage is visibly
   // different from one that wrapped.
@@ -55,6 +63,7 @@ export default function IngestPage({ params }: { params: Promise<{ slug: string 
 
   return (
     <main className="ingest-page">
+      {portableMedia && <Link href={`/projects/${slug}/media`}>Open deployment media library</Link>}
       <Upload
         projectId={projectId}
         plan={screen.data.plan.scenes}

@@ -36,8 +36,12 @@ def fingerprint(value: object) -> str:
 
 
 def migrate(dsn: str) -> None:
-    schema = Path(__file__).with_name("schema.sql").read_text("utf-8")
-    digest = hashlib.sha256(schema.encode()).hexdigest()
+    directory = Path(__file__).parent
+    migrations = [(1, directory / "schema.sql")]
+    migrations.extend(
+        (int(path.name.split("_", 1)[0]), path)
+        for path in sorted((directory / "migrations").glob("*.sql"))
+    )
     with psycopg.connect(dsn) as conn:
         conn.execute("SELECT pg_advisory_xact_lock(72819412)")
         conn.execute("""
@@ -46,17 +50,21 @@ def migrate(dsn: str) -> None:
                 applied_at timestamptz NOT NULL DEFAULT clock_timestamp()
             )
         """)
-        previous = conn.execute(
-            "SELECT checksum FROM foundation_migrations WHERE version = 1"
-        ).fetchone()
-        if previous:
-            if previous[0] != digest:
-                raise RuntimeError("Applied foundation migration checksum changed")
-            return
-        conn.execute(schema)
-        conn.execute(
-            "INSERT INTO foundation_migrations(version, checksum) VALUES (1, %s)", (digest,)
-        )
+        for version, path in migrations:
+            schema = path.read_text("utf-8")
+            digest = hashlib.sha256(schema.encode()).hexdigest()
+            previous = conn.execute(
+                "SELECT checksum FROM foundation_migrations WHERE version = %s", (version,)
+            ).fetchone()
+            if previous:
+                if previous[0] != digest:
+                    raise RuntimeError("Applied foundation migration checksum changed")
+                continue
+            conn.execute(schema)
+            conn.execute(
+                "INSERT INTO foundation_migrations(version, checksum) VALUES (%s, %s)",
+                (version, digest),
+            )
 
 
 class PostgresRepository:

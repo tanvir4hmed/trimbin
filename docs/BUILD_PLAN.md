@@ -1,8 +1,8 @@
 # Phased build plan
 
-Prepared 20 October 2026 Asia Dhaka. Work branch: main. Phase 1 is approved, including verification, commit and push. Later phases require individual owner approval.
+Updated 21 October 2026 Asia/Dhaka. Work branch: main. Phases 1 and 2 were implemented; the owner now authorized Phase 3, including verification, commit and push. Phase 4 onward requires individual owner approval.
 
-Latest owner instruction: complete Phase 1 on main and push; preserve automatic deployment and stop without waiting for deployment. All new infrastructure is Terraform-managed. No new paid resources or live model experiments are included. Read [Product direction](PRODUCT_DIRECTION.md) and [Quality strategy](QUALITY_STRATEGY.md) before making build decisions.
+Latest owner instruction: start the next phase (Phase 3) on main and push; preserve automatic deployment and stop without waiting for deployment. All new infrastructure is Terraform-managed. No new paid resources or live model experiments are included. Read [Product direction](PRODUCT_DIRECTION.md) and [Quality strategy](QUALITY_STRATEGY.md) before making build decisions.
 
 ## Why this edition exists
 
@@ -52,7 +52,7 @@ Credentials: none for design/local checks; authenticated GitHub access for appro
 
 Scope: implement the new settings registry, `.env.example`, per-service capability checks and configuration tests. Create pinned portable service definitions for development and the fixed cloud deployment for ClickHouse and PostgreSQL with volumes, separate writer/reader users, migrations, health checks and backup/restore instructions. Support private local protocol settings rather than assuming a hosted HTTPS endpoint. Introduce operational repository/job interfaces and transactional schema compatible with existing revisions/outboxes.
 
-Prepare Terraform-managed infrastructure and bootstrap/rollout definitions following [deployment design](DEPLOYMENT_DESIGN.md). Preserve push-triggered deployment while replacing ownership deliberately; do not use imperative cloud mutations as the new source of infrastructure truth. Creating new paid resources still requires an approved host/budget.
+Select an approved host/provider before preparing Terraform-managed infrastructure and bootstrap/rollout definitions following [deployment design](DEPLOYMENT_DESIGN.md). Preserve push-triggered deployment while replacing ownership deliberately; do not use imperative cloud mutations as the new source of infrastructure truth. Creating new paid resources still requires an approved host/budget.
 
 Register available provider/deployment credentials in GitHub Secrets only when actually supplied; generate fresh self-hosted database and session secrets through ignored files or direct secure input. Optional integrations are disabled by missing keys. Record the exact legacy retirement map privately; remote secret removal waits for verified cutover.
 
@@ -66,7 +66,7 @@ Dependencies: container/runtime installation may be required on this PC; Docker 
 
 Scope: add deployment-mounted allowed-root registration plus authenticated controlled demo upload/staging, stable source IDs/fingerprints, rational rates and source timecode/audio metadata, resumable indexing, duplicate detection, safe local range delivery and media relinking. Adapt FFmpeg proxy/sprite/audio work to local sources and durable jobs. Bound temporary storage and CPU work; add useful unsupported-codec and missing-file outcomes. Original mounts are read-only; derivatives use separate roots.
 
-Outputs: footage on the deployment volume enters the workspace, plays after restart and remains available for export. A browser on another computer uploads/stages footage explicitly; its local path is not a server path. No customer-PC installation is required.
+Outputs: footage on the deployment volume enters the dedicated media library, with durable playback references and metadata for later timeline/export consumers. Legacy editorial routes migrate in later phases. A browser on another computer uploads/stages footage explicitly; its local path is not a server path. No customer-PC installation is required.
 
 Acceptance: unchanged source hashes; duplicate basenames distinguished; folder moves/root remapping; no symlink/path escape; interrupted job recovery; source/proxy timing checks; missing media and unsupported formats visible. A small controlled corpus is sufficient for engineering acceptance, not a terabyte throughput claim.
 

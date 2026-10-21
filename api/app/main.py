@@ -24,6 +24,7 @@ from .routes import (
     dataset,
     film,
     maintenance,
+    media_library,
     placements,
     projects,
     public,
@@ -65,7 +66,8 @@ app = FastAPI(
 # this with their session attached.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
+    allow_origins=settings.cors_origins
+    or [
         "https://trimbin.qlitch.com",
         "http://localhost:3000",
     ],
@@ -76,7 +78,8 @@ app.add_middleware(
     # routes were added, and the failure would have been a CORS preflight
     # rejection in the browser with a working endpoint behind it.
     allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "Range"],
+    expose_headers=["Content-Length", "Content-Range", "Accept-Ranges"],
 )
 
 app.include_router(public.router)
@@ -97,6 +100,24 @@ app.include_router(structure.router)
 app.include_router(projects.router)
 app.include_router(maintenance.router)
 app.include_router(ask.router)
+app.include_router(media_library.router)
+
+
+@app.exception_handler(media_library.MediaError)
+async def media_error(request: Request, exc: media_library.MediaError) -> JSONResponse:
+    code = exc.code
+    status_code = (
+        503
+        if code.endswith("not_configured")
+        else 404
+        if code.endswith("not_found")
+        else 403
+        if code in {"root_not_allowed", "invalid_media_ticket"}
+        else 409
+        if code in {"upload_offset_conflict", "source_not_retryable", "relink_fingerprint_mismatch"}
+        else 422
+    )
+    return JSONResponse(status_code=status_code, content={"detail": code})
 
 
 @app.exception_handler(analytics.Waking)

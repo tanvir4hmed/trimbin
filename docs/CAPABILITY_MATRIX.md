@@ -23,10 +23,16 @@ No frozen paid-output evidence bundle was found in the inspected repository `eva
 
 Current export code rounds timecodes using rounded FPS and does not archive camera start timecode. These legacy limits must not leak into the new precision claims. Existing film history listing is not a complete retention specification. Existing UI playback can use proxy ranges without implying that a high-resolution movie file has been rendered.
 
-All future capability claims remain gated: real Token Factory access, PostgreSQL foundation, mounted-source processing, canonical timeline, actual Premiere import, original-fed video output and portable clean deployment. None is marked shipped because a design document exists.
+Release gates still include real Token Factory access, database/container acceptance, the canonical timeline, actual Premiere import, original-fed video output and portable clean deployment. Implemented code and local fixture checks are distinguished from these gates below.
 
 ## Preserve and retire deliberately
 
 Preserve the Apache license, useful existing tests, working runtime and migration references until their replacements pass. Retired documentation/design assets have been moved outside the checkout to `D:\NVIDIA\archive\2026-10-20`; the manifest verifies the 53 original reference files. Legal attribution and truthful reuse history remain intact.
 
 Later phases archive obsolete implementation/configuration only when replacements no longer depend on them. Do not remove functioning source files simply because their provider will eventually change. Keep credentials, original media and private baseline outputs out of this archive and Git.
+
+## Phase 3 implementation evidence
+
+[Media routes](../api/app/routes/media_library.py), [worker](../api/app/media/worker.py), [media page](../web/app/projects/[slug]/media/page.tsx) and [setup](MEDIA_SETUP.md) add mounted sources, resumable uploads, scoped range playback, source hashes, duplicate identity and durable media jobs. Generated footage tests verify selected timing/audio and immutability properties. This path uses PostgreSQL membership and filesystems without Google storage/Firestore/Pub/Sub calls. The legacy analysis and timeline consumers remain unchanged until their phases.
+
+PostgreSQL integration tests and the container manifest are provided, but this PC cannot run Docker/PostgreSQL. HDR proxy processing fails explicitly pending validated tone mapping. Neither broad camera-format support nor comparative AI quality nor a complete migrated editor is claimed.

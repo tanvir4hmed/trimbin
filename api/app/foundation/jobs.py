@@ -43,7 +43,7 @@ class PostgresJobs:
                 raise Conflict("Job key reused with changed payload or retry policy")
             return row["id"]
 
-    def claim(self, lease_seconds: int = 120) -> dict | None:
+    def claim(self, lease_seconds: int = 120, kinds: list[str] | None = None) -> dict | None:
         if not 10 <= lease_seconds <= 3600:
             raise ValueError("Lease must be between 10 and 3600 seconds")
         with psycopg.connect(self._dsn, row_factory=dict_row) as conn:
@@ -59,12 +59,13 @@ class PostgresJobs:
                 """WITH candidate AS (
                     SELECT id FROM jobs WHERE state='queued' AND NOT cancel_requested
                       AND available_at <= clock_timestamp() AND attempts < max_attempts
+                      AND (%s::text[] IS NULL OR kind=ANY(%s::text[]))
                     ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1
                 )
                 UPDATE jobs SET state='running', attempts=attempts+1, lease_token=%s,
                     lease_until=clock_timestamp() + (%s * interval '1 second')
                 FROM candidate WHERE jobs.id=candidate.id RETURNING jobs.*""",
-                (uuid4(), lease_seconds),
+                (kinds, kinds, uuid4(), lease_seconds),
             ).fetchone()
 
     def heartbeat(self, job_id: UUID, token: UUID, lease_seconds: int = 120) -> bool:

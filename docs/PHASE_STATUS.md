@@ -2,14 +2,14 @@
 
 Updated 21 October 2026 Asia/Dhaka.
 
-Latest owner direction: revise the plan for a complete cloud-hosted editorial PoC now; implement through individually approved phases. Future studio hardware/software packaging is the direction, not a requirement to install locally during this hackathon. Kubernetes, autoscaling and local GPU certification are deferred. The owner approved Phase 1 and then authorized starting Phase 2 after its completion. Preserve automatic deployment and do not wait for deployment completion; all new infrastructure is Terraform-managed.
+Latest owner direction: revise the plan for a complete cloud-hosted editorial PoC now; implement through individually approved phases. Future studio hardware/software packaging is the direction, not a requirement to install locally during this hackathon. Kubernetes, autoscaling and local GPU certification are deferred. The owner approved Phases 1 and 2, then authorized Phase 3 after the credit/account discussion. Preserve automatic deployment and do not wait for deployment completion; all new infrastructure is Terraform-managed.
 
 | Phase | Status | Approval and evidence |
 | --- | --- | --- |
 | 0 Planning and archive | Updated locally | Rules, FAQ and overview rechecked. Cloud PoC scope, improvement ledger, network boundaries and future hardware claims aligned. Previous 53-file archive retained. No runtime or workflow changes in this update. |
 | 1 Specifications design and CI control | Complete; included in the start milestone | UX/data/model/export contracts, capability and baseline evidence matrix, workflow/network diagrams, Terraform rollout design, main CI coverage and external archive. Local checks passed; see verification below. |
-| 2 Configuration and self-hosted foundation | Implemented; local checks passed; container acceptance pending CI | Shared configuration, PostgreSQL revisions/jobs/outbox, pinned database package, recovery tools, Terraform target and CI lifecycle checks. Docker/WSL unavailable locally; no paid resources provisioned. |
-| 3 Deployment media ingest and processing | Not approved | Controlled upload/staging and mounted deployment roots, bounded jobs and source integrity. |
+| 2 Configuration and self-hosted foundation | Implemented; local checks passed; container acceptance pending CI | Shared configuration, PostgreSQL revisions/jobs/outbox, pinned database package, recovery tools and CI lifecycle checks. The unapplied GCP target was subsequently archived as an incorrect hosting assumption. Docker/WSL unavailable locally; no paid resources provisioned. |
+| 3 Deployment media ingest and processing | Implemented; local checks passed; database/container acceptance pending | Owner authorized phase start. Mounted roots, resumable upload, source integrity, derivatives, scoped playback, PostgreSQL jobs and media UI. |
 | 4 NVIDIA adapters and quality evaluation | Not approved | Nemotron through Token Factory; actual access and comparative quality pending. |
 | 5 Evidence review and retrieval | Not approved | Preserve corrections and durable editorial state. |
 | 6 Canonical scene and film timeline | Not approved | Shared selected-range preview/export snapshot. |
@@ -45,4 +45,17 @@ A cloud PoC is complete when its declared editorial workflow and release gates p
 - Real database migrations, concurrent writes/leases, role isolation, persistence and backup/restore are required by the added CI job; they were not run on this Windows host because Docker and WSL are absent. These checks are not reported as passing.
 - No live model calls, provider-secret registration, application data migration or legacy infrastructure retirement occurred. Existing auto-deploy remains enabled; no deployment polling after push.
 
-Phase 3 remains subject to owner approval. Full release still requires the declared model-quality, source-integrity and export gates.
+Phase 3 was subsequently authorized and implemented below. Phase 4 onward still requires owner approval. Full release requires the declared model-quality, source-integrity and export gates.
+
+## Phase 3 verification and limits
+
+- API regression: 552 passed, 30 skipped (11 real-PostgreSQL tests require the disposable database, one Windows symlink test requires permission, and 18 are pre-existing skips). Generated FFmpeg footage validates fractional frame rates, source hashes, proxy frame count/duration, delayed audio mapping and source timecode. Path/range/ticket and subprocess-limit tests also pass.
+- Frontend: typecheck, 40 tests and production Next build pass, including the media page and upload-prefix integrity checks.
+- Agents: 120 tests, Ruff lint/format and mypy pass. API Ruff lint/format passes.
+- Real PostgreSQL tests now include a worker-to-derivative publication check as well as source identity, upload crash/replay, lease fencing and permission checks. These are included in the CI foundation job; no passing CI/database/container result is claimed here.
+- Five files from the unapplied GCP host draft were archived outside Git at `D:\NVIDIA\archive\2026-10-21-phase3-gcp-draft`, with SHA256 verification. No live GCP resource, remote secret or Terraform state was changed. Hosting/provider choice remains pending; all new provisioning must use Terraform.
+- New media paths, membership and worker configuration are opt-in. Legacy analysis/timeline consumers and existing push deployment remain transitional. This phase does not deliver final exports or prove a complete migrated workflow.
+- No live model calls or new provider credentials were used. Token Factory's separate 25 USD email and Toloka's 50 USD credit remain pending; neither blocks these media checks.
+- `npm ci` reports 13 dependency audit findings (4 moderate, 7 high, 2 critical). These existing dependency findings were not resolved by an unrelated forced upgrade; deployment readiness still requires triage.
+
+Commit/push delivery is separate from deployment acceptance. Do not poll deployment after push. Phase 4 may begin only after the owner's next approval.

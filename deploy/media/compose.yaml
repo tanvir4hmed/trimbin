@@ -1,0 +1,40 @@
+# Run only after foundation services and migrations. This creates no cloud host.
+name: trimbin-media
+services:
+  api:
+    image: ${TRIMBIN_APP_IMAGE:?Supply the tested immutable application image}
+    env_file: ${TRIMBIN_MEDIA_ENV_FILE:?Supply private container runtime configuration}
+    command: [uvicorn, app.main:app, --host, "0.0.0.0", --port, "8080", --no-access-log]
+    restart: unless-stopped
+    ports: ["127.0.0.1:8080:8080"]
+    volumes:
+      - ${TRIMBIN_UPLOAD_STORE:?Provide originals and staging parent}:/media/upload-store
+      - ${TRIMBIN_DERIVED_STORE:?Provide derivative directory}:/media/derived:ro
+      - ${TRIMBIN_LIBRARY_STORE:?Provide mounted footage directory}:/media/library:ro
+    networks: [foundation]
+    read_only: true
+    tmpfs: [/tmp:size=64m]
+    mem_limit: 1g
+    cpus: 2
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+  worker:
+    image: ${TRIMBIN_APP_IMAGE:?Supply the tested immutable application image}
+    env_file: ${TRIMBIN_MEDIA_ENV_FILE:?Supply private container runtime configuration}
+    command: [python, -m, app.media.worker]
+    restart: unless-stopped
+    volumes:
+      - ${TRIMBIN_UPLOAD_STORE:?Provide originals and staging parent}:/media/upload-store:ro
+      - ${TRIMBIN_DERIVED_STORE:?Provide derivative directory}:/media/derived
+      - ${TRIMBIN_LIBRARY_STORE:?Provide mounted footage directory}:/media/library:ro
+    networks: [foundation]
+    read_only: true
+    tmpfs: [/tmp:size=64m]
+    mem_limit: 1g
+    cpus: 2
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+networks:
+  foundation:
+    external: true
+    name: trimbin-foundation_data

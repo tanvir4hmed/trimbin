@@ -14,7 +14,6 @@ gha-creds-*.json
 # ---------- terraform ----------
 .terraform/
 .terraform.lock.hcl
-!infra/envs/portable/.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 .terraform.tstate.lock.info

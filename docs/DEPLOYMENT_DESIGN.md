@@ -42,3 +42,7 @@ Use existing short-lived workload federation where supported. GitHub Secrets hol
 Phase 2 supplies service/configuration definitions and Terraform design implementation without silently buying a new host. Actual resource creation requires an approved host/budget. Later phases move data and runtime consumers incrementally. Before cutover: back up, validate restore, prove source/revision integrity, rehearse the deployment and document which old image/schema remains compatible.
 
 Rollback uses recorded compatible image/schema versions and preserved data; a code revert alone cannot undo a destructive migration. Do not delete old services, secrets or data before consumer and rollback audits. No new paid host, resource destruction, live model call or production-data migration occurs in Phase 1.
+
+## Phase 3 hosting correction
+
+GCP is not the new target or a requirement. The unapplied Phase 2 GCP host draft was archived outside Git with its hashes; no resources were changed. The [media Compose package](../deploy/media/compose.yaml) attaches API/worker to the foundation network, separates source/derivative mounts and declares process resource limits. It creates no host. Provider selection, Terraform provisioning, HTTPS and complete workflow cutover remain later approved work. Existing legacy push deployment is preserved; pushing Phase 3 does not automatically configure its new storage paths or PostgreSQL membership.

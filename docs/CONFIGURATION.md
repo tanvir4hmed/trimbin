@@ -72,7 +72,7 @@ Tendem integration uses its supported account/connector authentication. Do not i
 
 ## Credit planning
 
-Owner reports Token Factory 25 USD, LangSmith 100 USD, Tavily 25 USD and Tendem 50 USD received; Toloka 50 USD pending. These are separate offers, not a pooled budget. Expiry and account-specific feature coverage require confirmation. Live model evaluation should begin with a bounded approved sample and measured unit cost; additional paid runs or infrastructure require approved scope. Optional training, web research and external human evaluation are not core dependencies.
+Owner reports LangSmith 100 USD, Tavily 25 USD and Tendem 50 USD received. The separate Token Factory 25 USD email is still pending. Toloka 50 USD was not applied after its prefilled coupon errored during signup; support resolution is pending. These are separate offers, not a pooled budget. Expiry and account-specific feature coverage require confirmation. Live model evaluation should begin with a bounded approved sample and measured unit cost; additional paid runs or infrastructure require approved scope. Optional training, web research and external human evaluation are not core dependencies.
 
 ## Quality and deployment constraints
 
@@ -85,3 +85,9 @@ Cost/resource settings are subordinate to [quality gates](QUALITY_STRATEGY.md). 
 ## Phase 2 implementation evidence
 
 API settings now re-export the agent package registry. Legacy defaults remain under the `legacy-cloud` profile while portable development/cloud profiles are explicit. TLS is configurable in both ClickHouse consumers. Local database/session credentials were generated under ignored `.secrets/foundation`; no values were printed or registered as production GitHub secrets. Two replaced configuration source files are preserved with hashes outside the repo in `D:\NVIDIA\archive\2026-10-21-phase2`. Actual provider keys and the production host/DSN remain pending; local test credentials are not a production deployment configuration.
+
+## Phase 3 media settings
+
+See [media setup](MEDIA_SETUP.md) for the implemented path and private configuration. `TRIMBIN_STAGING_ROOT` is required for controlled uploads; it must share a filesystem with uploaded originals. `TRIMBIN_MEDIA_ROOTS` maps aliases to operator-controlled mounted folders; `TRIMBIN_MEDIA_ROOT_PROJECTS` grants each alias to specific project IDs. Both use JSON. Mounted sources must also be inside `TRIMBIN_ALLOWED_MEDIA_ROOTS`.
+
+`TRIMBIN_MEDIA_THREADS` defaults to 2, `TRIMBIN_MEDIA_WORK_BYTES` to 2 GiB per attempt, `TRIMBIN_MEDIA_RESERVE_BYTES` to 1 GiB and `TRIMBIN_MEDIA_TIMEOUT_SECONDS` to 3600 per encoding operation. Exceeding a limit fails visibly. `TRIMBIN_TEAM_PASSES` is a private sign-in setting; PostgreSQL membership additionally controls project permissions. No example credential authorizes a production user.

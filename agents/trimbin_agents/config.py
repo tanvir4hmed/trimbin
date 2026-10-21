@@ -127,6 +127,13 @@ class Settings(BaseSettings):
     proxies_root: str = ""
     export_root: str = ""
     allowed_media_roots: list[str] = Field(default_factory=list)
+    media_roots: dict[str, str] = Field(default_factory=dict)
+    media_root_projects: dict[str, list[int]] = Field(default_factory=dict)
+    staging_root: str = ""
+    media_threads: int = Field(default=2, ge=1, le=16)
+    media_work_bytes: int = Field(default=2 * 1024**3, ge=1024**2)
+    media_reserve_bytes: int = Field(default=1024**3, ge=0)
+    media_timeout_seconds: int = Field(default=3600, ge=10, le=86400)
     database_url: str = Field(default="", repr=False, exclude=True)
     clickhouse_secure: bool = True
     demo_pass: str = Field(default="", repr=False, exclude=True)
@@ -161,7 +168,7 @@ class Settings(BaseSettings):
                 "clickhouse_reader_user",
                 "clickhouse_reader_password",
             ),
-            "media": ("originals_root", "proxies_root", "export_root", "allowed_media_roots"),
+            "media": ("originals_root", "proxies_root", "staging_root", "allowed_media_roots"),
             "sessions": ("session_secret",),
             "vision": ("nebius_base_url", "nebius_api_key", "vision_model"),
             "reasoning": ("nebius_base_url", "nebius_api_key", "reasoning_model"),
