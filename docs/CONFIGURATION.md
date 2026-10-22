@@ -105,3 +105,7 @@ No new runtime provider dependency is required for Phase 4: the API's existing a
 `TRIMBIN_EVIDENCE_EMBEDDING_IDENTITY_PATH` points to a private JSON EmbeddingIdentity, matching the Phase 4 model catalog exactly (model/revision/precision/dimension/normalization/preprocessing/deployment generation). Empty means semantic retrieval is unavailable. No invented model name or dummy credential is accepted for a live request. Existing inference switches, model catalog and model limits apply to source analysis and comparison.
 
 The package now also runs `app.evidence.worker` and `app.evidence.projection`. API and analysis need the private `TRIMBIN_MODEL_CONFIG_STORE` bind mount at `/model-config`, with corresponding container paths in the runtime env. API semantic queries and the analysis service have an egress network for Token Factory; media/projection services stay on the internal foundation network. This is explicit network capability, not offline operation or a destination firewall. No host was provisioned. See [evidence setup](EVIDENCE_SETUP.md) for migration, limits and commands.
+
+## Phase 7 export storage
+
+Editable export reuses `TRIMBIN_EXPORT_ROOT` and PostgreSQL jobs; no additional credential is required. In the portable package, supply `TRIMBIN_EXPORT_STORE` and set the container runtime root to `/media/exports`. The export worker mounts this directory writable and the API read-only. Originals remain read-only for the worker. See [editable export setup](EDITABLE_EXPORT_SETUP.md) for bounded artifact and relink behavior.

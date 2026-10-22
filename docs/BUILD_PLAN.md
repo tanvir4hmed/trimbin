@@ -1,8 +1,8 @@
 # Phased build plan
 
-Updated 21 October 2026 Asia/Dhaka. Work branch: main. The owner authorized Phase 6 canonical scene and film timeline assembly. Continue with placeholder credentials and deferred runtime testing; static checks, commit and push are included.
+Updated 22 October 2026 Asia/Dhaka. Work branch: main. The owner authorized Phase 7 editable timeline export. Continue with placeholder credentials and deferred runtime testing; static checks, commit and push are included.
 
-Latest owner instruction: implement Phase 6 on main; preserve automatic deployment and stop without waiting for deployment. All new infrastructure remains Terraform-managed. No new paid resources or live model experiments are included. Read [Product direction](PRODUCT_DIRECTION.md) and [Quality strategy](QUALITY_STRATEGY.md) before making build decisions.
+Latest owner instruction: implement Phase 7 on main; preserve automatic deployment and stop without waiting for deployment. All new infrastructure remains Terraform-managed. No new paid resources or live model experiments are included. Read [Product direction](PRODUCT_DIRECTION.md) and [Quality strategy](QUALITY_STRATEGY.md) before making build decisions.
 
 ## Why this edition exists
 
@@ -32,7 +32,7 @@ Re-read the official rules, overview and FAQ; inventoried actual workflow/config
 
 ## Phase approval process
 
-Before each phase, present its scope, observable result and any paid/external dependency. The owner approves that phase. Implement and report actual results and remaining limitations. The latest owner instruction defers runtime tests for Phases 4 through 6; keep static checks and automatic CI, record all acceptance gaps, and do not spend live credits. If a major choice changes scope or cost, return with the concrete changed proposal. No blanket permission to execute all phases is inferred.
+Before each phase, present its scope, observable result and any paid/external dependency. The owner approves that phase. Implement and report actual results and remaining limitations. The latest owner instruction defers runtime tests for Phases 4 through 7; keep static checks and automatic CI, record all acceptance gaps, and do not spend live credits. If a major choice changes scope or cost, return with the concrete changed proposal. No blanket permission to execute all phases is inferred.
 
 The owner approved the first implementation phase including commit/push, with existing push-triggered deployment preserved. Stop after push; do not poll deployment. Later phase proposals should state whether they include push and any new provisioning. Existing deployment is authorized by this instruction; new paid infrastructure is not.
 
@@ -117,6 +117,8 @@ Outputs: selected scene/film timeline exported without re-encoding original medi
 Acceptance: schema/structure checks plus an actual Premiere import and original-media relink in a recorded version; repeated sources, ranges, clip order, audio and fractional-rate positions must match. XML parsing alone is not NLE compatibility. Never promise every NLE format or interchange of unsupported effects.
 
 Dependencies: actual NLE access may be delayed. Exporter development continues without it; Premiere validation remains visibly pending until tested.
+
+Phase 7 implementation: revision-pinned native/FCP7 export jobs, original hash verification, authenticated artifacts and local relink helper. XML scope is deliberately bounded; mixed-rate, scaling and nonzero audio-offset interchange remain blocked pending parity verification. Actual Premiere acceptance remains pending. See [editable export setup](EDITABLE_EXPORT_SETUP.md).
 
 ## Phase 8 Original-resolution scene and film rendering
 

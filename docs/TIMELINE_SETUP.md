@@ -10,7 +10,7 @@ Phase 6 implements `/projects/<slug>/timeline`, linked from Evidence workspace. 
 4. Save the approved revision. Concurrent changes cause a conflict and retain the draft. Retry unchanged saves reuses the command UUID. Reload discards the draft only after an explicit browser confirmation. Drafts do not survive browser closure; there is an unload warning.
 5. Preview or scrub the saved sequence. Unsaved edits do not change preview. Saved history can be brought back as a draft and saved as a new version; old versions remain immutable. Older versions are paginated, not deleted.
 
-Manual assembly has no model dependency. AI draft proposals remain disabled pending real grounding/quality acceptance. No editable XML or rendered movie is produced by this phase.
+Manual assembly has no model dependency. AI draft proposals remain disabled pending real grounding/quality acceptance. Phase 7 adds [editable XML/native handoff](EDITABLE_EXPORT_SETUP.md) for saved revisions; no rendered movie is produced yet.
 
 ## Timing, audio and source identity
 

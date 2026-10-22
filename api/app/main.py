@@ -22,6 +22,7 @@ from .routes import (
     clips,
     dashboard,
     dataset,
+    editable_exports,
     evidence,
     film,
     inference,
@@ -107,6 +108,7 @@ app.include_router(media_library.router)
 app.include_router(inference.router)
 app.include_router(evidence.router)
 app.include_router(timelines.router)
+app.include_router(editable_exports.router)
 
 
 @app.exception_handler(evidence.EvidenceError)

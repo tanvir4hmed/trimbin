@@ -2,6 +2,7 @@
 
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import EditableExports from "./EditableExports";
 import { currentToken } from "@/lib/auth";
 import { mediaRequest } from "@/lib/media";
 import { projectIdFromSlug } from "@/lib/slug";
@@ -127,9 +128,10 @@ export default function TimelinePage({ params }: { params: Promise<{ slug: strin
     <input aria-label="Sequence frame" type="range" min={0} max={Math.max(0, (saved?.body?.duration_frames ?? 1) - 1)} value={frame} onChange={e => { setPlaying(false); setFrame(Number(e.target.value)); }} />
     <p>Sequence frame {frame} / {saved?.body?.duration_frames ?? 0}{entry ? ` · Source frame ${Math.min(entry.out_frame - 1, target)} · ${entry.source.filename}` : ""}</p>
     {entry && <p>Quantization delta: {entry.quantization_seconds.numerator}/{entry.quantization_seconds.denominator} seconds. Linked source audio metadata is pinned with this occurrence.</p>}
+    <EditableExports key={endpoint} project={project} sequence={key} revision={saved?.revision ?? 0} dirty={dirty} />
     <h2>Saved revisions</h2>
     {versions.map(v => <button key={v.revision} disabled={busy} onClick={() => { if (!dirty || confirm("Replace the unsaved draft with this revision?")) void action(async () => { const old = await request<Snapshot>(`${endpoint}?revision=${v.revision}`); if (old.body) edit({ sequence: old.body.sequence, clips: old.body.clips.map(plain) }); }); }}>Use revision {v.revision} as draft</button>)}
     {versions.length > 0 && <button disabled={busy} onClick={() => void action(async () => { const more = await request<{ versions: typeof versions }>(`${endpoint}/history?before=${versions[versions.length - 1].revision}`); setVersions(v => [...v, ...more.versions]); })}>Older revisions</button>}
-    <p>Using history creates a draft; saving creates a new revision without rewriting history. AI drafts and exports are not enabled here.</p>
+    <p>Using history creates a draft; saving creates a new revision without rewriting history. AI drafts remain disabled; editable export uses the saved revision above.</p>
   </main>;
 }

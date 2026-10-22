@@ -12,6 +12,7 @@ services:
       - ${TRIMBIN_DERIVED_STORE:?Provide derivative directory}:/media/derived:ro
       - ${TRIMBIN_LIBRARY_STORE:?Provide mounted footage directory}:/media/library:ro
       - ${TRIMBIN_MODEL_CONFIG_STORE:?Provide private model configuration directory}:/model-config:ro
+      - ${TRIMBIN_EXPORT_STORE:?Provide export artifact directory}:/media/exports:ro
     networks: [foundation, egress]
     read_only: true
     tmpfs: [/tmp:size=64m]
@@ -57,6 +58,23 @@ services:
     env_file: ${TRIMBIN_MEDIA_ENV_FILE:?Supply private container runtime configuration}
     command: [python, -m, app.evidence.projection]
     restart: unless-stopped
+    networks: [foundation]
+    read_only: true
+    tmpfs: [/tmp:size=64m]
+    mem_limit: 512m
+    cpus: 1
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+  exports:
+    image: ${TRIMBIN_APP_IMAGE:?Supply the tested immutable application image}
+    env_file: ${TRIMBIN_MEDIA_ENV_FILE:?Supply private container runtime configuration}
+    command: [python, -m, app.exports.worker]
+    restart: unless-stopped
+    volumes:
+      - ${TRIMBIN_UPLOAD_STORE:?Provide originals and staging parent}:/media/upload-store:ro
+      - ${TRIMBIN_DERIVED_STORE:?Provide derivative directory}:/media/derived:ro
+      - ${TRIMBIN_LIBRARY_STORE:?Provide mounted footage directory}:/media/library:ro
+      - ${TRIMBIN_EXPORT_STORE:?Provide export artifact directory}:/media/exports
     networks: [foundation]
     read_only: true
     tmpfs: [/tmp:size=64m]
