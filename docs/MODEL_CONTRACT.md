@@ -1,6 +1,6 @@
 # Model tasks and quality evaluation protocol
 
-Phase 1 specification. No provider call, model-quality benchmark or account model discovery was performed in this phase. Follow [quality strategy](QUALITY_STRATEGY.md); cost does not justify a critical-task regression.
+Current task contract and evaluation policy, reconciled 23 October 2026. Real provider discovery and generated-footage execution have passed; paired editorial quality remains unverified. See [runtime evidence](AWS_CUTOVER.md) and [quality strategy](QUALITY_STRATEGY.md); cost does not justify a critical-task regression.
 
 ## Task boundaries
 
@@ -14,7 +14,7 @@ Phase 1 specification. No provider call, model-quality benchmark or account mode
 | Retrieval | Project-authorized corpus and query with compatible embedding generation | Ranked source ranges and citations; empty result distinct from unavailable index |
 | Draft assembly | Explicit allowed ranges, brief and timeline constraints | Ordered proposed occurrences with reasons; no save/overwrite until editor accepts |
 
-Nemotron through Token Factory must perform a meaningful supported task in the submitted route. A model name in a config file is insufficient. At Phase 4, discover account-accessible exact IDs, supported request modalities, limits, licenses and pricing. Record a real validated request before treating an adapter as live. Do not assume a reasoning endpoint supports video/audio or that similarly named models share an API.
+Nemotron through Token Factory must perform a meaningful supported task in the submitted route. A model name in a config file is insufficient. Discover account-accessible exact IDs, supported request modalities, limits, licenses and pricing before changing the configured model generation. Record a real validated request before treating an adapter as live. Do not assume a reasoning endpoint supports video/audio or that similarly named models share an API.
 
 Select task-specific open models on evidence, not a version label alone. No mandatory closed-model dependency is planned. Optional LangSmith, Tavily, Toloka and Tendem are not substitutes for missing footage truth or live model quality.
 
@@ -32,9 +32,9 @@ Embeddings identify model, dimension, normalization, preprocessing and index gen
 
 ## Baseline availability and corpus freeze
 
-The protected Git tag proves a code boundary only. Current repository evaluation scripts provide synthetic measurement tests and an embedding misplacement harness; they are not a frozen paid-model comparison dataset. No eligible historical output bundle was found in the inspected repository evaluation paths. Private cloud/account data was not queried; availability there is unknown.
+The protected Git tag proves a code boundary only. Current repository evaluation scripts provide synthetic measurement tests and an embedding misplacement harness; they are not a frozen paid-model comparison dataset. No eligible historical output bundle was found in the inspected repository evaluation paths. The cutover did not recover a historical paid-output corpus; no such baseline is claimed from the available generated-footage checks.
 
-Before Phase 4 comparisons, obtain cleared recordings and actual historical outputs with model/prompt/preprocessing provenance. If unavailable, record the gap and seek an explicitly budgeted baseline run; do not manufacture a baseline. Contract fixtures may proceed independently.
+Before comparative evaluation, obtain cleared recordings and actual historical outputs with model/prompt/preprocessing provenance. If unavailable, record the gap and seek an explicitly budgeted baseline run; do not manufacture a baseline. Contract fixtures may proceed independently.
 
 Freeze a manifest of source hashes, rights, whole-recording/set-group splits, labels, annotators, critical categories and metrics before candidate evaluation. Keep overlapping windows and related takes/setups out of different splits. Reserve a held-out test split untouched by prompt/model tuning. A small corpus is exploratory; sample size must support the intended claim, and weak uncertainty keeps the outcome inconclusive.
 
@@ -60,6 +60,8 @@ Release requires supported improvement on declared primary goals, no accepted cr
 
 Each result bundle contains dataset/split hashes, baseline/candidate identities, code build, machine and preprocessing, task outputs, per-case scores, aggregate uncertainty, blind review, failures, retries and measured time/cost. Private media/raw responses stay outside Git. Publish sanitized summaries only. Contract fixtures, live provider tests, NLE compatibility and export fidelity have separate status fields.
 
-## Phase 4 implementation boundary
+## Current runtime boundary
 
-[Adapter setup](INFERENCE_SETUP.md) documents the implemented request/result validation, Token Factory transport, embedding identities, private run records and evaluation CLI. Runtime and quality testing were deferred by the owner. No account-accessible model ID or superior pipeline has been verified; actual baseline data and cleared gold annotations remain missing inputs. The current adapter accepts text evidence and explicit original-detail image assets; automatic window/frame preparation and editorial persistence are next-phase integration. Unsupported speech is a visible unavailable state, not a fabricated transcript.
+[Adapter setup](INFERENCE_SETUP.md) describes the deployed transport, original-frame window preparation, validation, evidence persistence, eight-image batching and model identities. Real Nemotron vision/reasoning, Qwen embedding and CPU Whisper execution are recorded in [cutover evidence](AWS_CUTOVER.md). The endpoint's actual image limit was tested; larger inputs use validated batches and a reasoning merge rather than silent truncation. Provider aliases remain unpinned; preflight run records conservatively leave serving precision unattested. Current public catalog metadata is described separately in [cost/model sources](COST_ESTIMATE.md).
+
+CPU Whisper transcribes original audio in the retained editorial path. This does not imply every canonical evidence item has a transcript or that diarization/exhaustive attempt detection has passed. Unsupported input fails visibly. Historical paid outputs, cleared evaluation footage and independent annotations remain missing for the superiority claim.

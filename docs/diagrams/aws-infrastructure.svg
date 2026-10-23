@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1180" viewBox="0 0 1600 1180" role="img">
+<title>TRIMBIN / AWS infrastructure</title><desc>Terraform-owned runtime in us-east-1 • main-push release • encrypted persistent data</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#62758c"/></marker>
+<symbol id="browser" viewBox="0 0 36 36"><rect x="3" y="5" width="30" height="25" rx="3"/><path d="M3 12h30M8 8h1m4 0h1"/></symbol><symbol id="cloud" viewBox="0 0 36 36"><path d="M9 28a7 7 0 0 1-1-14 10 10 0 0 1 19-2 8 8 0 0 1 1 16Z"/></symbol><symbol id="shield" viewBox="0 0 36 36"><path d="m18 3 13 5v10c0 8-13 15-13 15S5 26 5 18V8Z"/><path d="m11 17 5 5 10-11"/></symbol><symbol id="compute" viewBox="0 0 36 36"><rect x="8" y="8" width="20" height="20" rx="3"/><path d="M13 2v6m10-6v6M13 28v6m10-6v6M2 13h6m-6 10h6m20-10h6m-6 10h6"/></symbol><symbol id="database" viewBox="0 0 36 36"><ellipse cx="18" cy="7" rx="13" ry="5"/><path d="M5 7v22c0 7 26 7 26 0V7M5 18c0 7 26 7 26 0"/></symbol><symbol id="disk" viewBox="0 0 36 36"><rect x="4" y="5" width="28" height="27" rx="4"/><path d="M4 23h28m-22 5h2m5 0h2"/><circle cx="18" cy="14" r="5"/></symbol><symbol id="code" viewBox="0 0 36 36"><path d="m12 8-9 10 9 10m12-20 9 10-9 10M21 4l-6 28"/></symbol><symbol id="ai" viewBox="0 0 36 36"><rect x="8" y="7" width="22" height="24" rx="6"/><path d="M19 2v5M3 15h5m-5 9h5m22-9h4m-4 9h4M13 24h12"/><circle cx="14" cy="16" r="1"/><circle cx="24" cy="16" r="1"/></symbol><symbol id="film" viewBox="0 0 36 36"><rect x="4" y="4" width="28" height="28" rx="3"/><path d="M10 4v28m16-28v28M4 12h6m-6 12h6m16-12h6m-6 12h6m-22-6h16"/></symbol><symbol id="queue" viewBox="0 0 36 36"><rect x="4" y="4" width="23" height="8" rx="2"/><rect x="8" y="15" width="23" height="8" rx="2"/><path d="M12 28h20m-4-4 4 4-4 4"/></symbol><symbol id="check" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/><path d="m9 18 6 6L28 11"/></symbol><symbol id="key" viewBox="0 0 36 36"><circle cx="11" cy="12" r="8"/><path d="m17 18 15 14m-9-8 5-5m-1 9 5-5"/></symbol><symbol id="human" viewBox="0 0 36 36"><circle cx="18" cy="10" r="7"/><path d="M5 33v-4a13 13 0 0 1 26 0v4"/></symbol><symbol id="export" viewBox="0 0 36 36"><path d="M15 5H5v27h26V22M18 3h15v15M33 3 16 20"/></symbol></defs>
+<rect width="1600" height="100%" fill="#f3f6fb"/>
+<rect width="1600" height="116" fill="#14243b"/>
+<text x="50" y="49" font-family="Arial,DejaVu Sans,sans-serif" font-size="32" font-weight="700" fill="#ffffff">TRIMBIN / AWS infrastructure</text>
+<text x="50" y="83" font-family="Arial,DejaVu Sans,sans-serif" font-size="17" font-weight="400" fill="#c8d6e8">Terraform-owned runtime in us-east-1 • main-push release • encrypted persistent data</text>
+<rect x="450" y="365" width="1090" height="620" rx="18" fill="#e8eef8" stroke="#b9c8dc" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="470" y="395" font-family="Arial,DejaVu Sans,sans-serif" font-size="17" font-weight="700" fill="#52647a">EC2 / trimbin • m7i-flex.xlarge • 4 vCPU / 16 GiB • no GPU</text>
+<path d="M360,230 L450,230" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="363" y="193" width="50.4" height="25" rx="5" fill="#f3f6fb"/>
+<text x="371" y="211" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">OIDC</text>
+<path d="M770,230 L840,230" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M610,175 L610,145 L1385,145 L1385,175" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="852" y="122" width="351.4" height="25" rx="5" fill="#f3f6fb"/>
+<text x="860" y="140" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">signed role permits release publication</text>
+<path d="M1000,305 L1000,350 L1000,425" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="1007" y="326" width="162.2" height="25" rx="5" fill="#f3f6fb"/>
+<text x="1015" y="344" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">pull exact digest</text>
+<path d="M1540,230 L1575,230 L1575,885 L1510,885" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" stroke-dasharray="8 6"/>
+<path d="M380,480 L490,480" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="384" y="446" width="84.8" height="25" rx="5" fill="#f3f6fb"/>
+<text x="392" y="464" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">HTTP :80</text>
+<path d="M790,480 L850,480" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M640,425 L640,405 L1350,405 L1350,425" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1000,555 L1000,605 L640,605 L640,650" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="652" y="580" width="119.19999999999999" height="25" rx="5" fill="#f3f6fb"/>
+<text x="660" y="598" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">state + jobs</text>
+<path d="M1000,555 L1000,650" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1150,510 L1180,510 L1180,620 L1350,620 L1350,650" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="1192" y="594" width="119.19999999999999" height="25" rx="5" fill="#f3f6fb"/>
+<text x="1200" y="612" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">source files</text>
+<path d="M640,780 L640,835" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1000,780 L1000,835" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1150,890 L1180,890 L1180,715 L1210,715" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M820,940 L820,1020 L220,1020 L220,830" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="257" y="994" width="394.4" height="25" rx="5" fill="#f3f6fb"/>
+<text x="265" y="1012" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">daily stopped-writer database + media backup</text>
+<rect x="60" y="179" width="300" height="130" rx="14" fill="#dbe3ef"/>
+<rect x="60" y="175" width="300" height="130" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="60" y="175" width="6" height="130" rx="3" fill="#2563eb"/>
+<use href="#code" x="77" y="193" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="125" y="213" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">GitHub main</text>
+<text x="80" y="244" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Required CI / public source</text>
+<text x="80" y="267" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Build API + web images</text>
+<rect x="450" y="179" width="320" height="130" rx="14" fill="#dbe3ef"/>
+<rect x="450" y="175" width="320" height="130" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="450" y="175" width="6" height="130" rx="3" fill="#c2410c"/>
+<use href="#key" x="467" y="193" width="34" height="34" fill="none" stroke="#c2410c" stroke-width="2"/>
+<text x="515" y="213" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Scoped IAM role</text>
+<text x="470" y="244" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">GitHub OIDC; main only</text>
+<text x="470" y="267" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">No stored AWS access key</text>
+<rect x="840" y="179" width="320" height="130" rx="14" fill="#dbe3ef"/>
+<rect x="840" y="175" width="320" height="130" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="840" y="175" width="6" height="130" rx="3" fill="#c2410c"/>
+<use href="#compute" x="857" y="193" width="34" height="34" fill="none" stroke="#c2410c" stroke-width="2"/>
+<text x="905" y="213" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Amazon ECR</text>
+<text x="860" y="244" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Immutable Git SHA tags</text>
+<text x="860" y="267" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Host pulls image digests</text>
+<rect x="1230" y="179" width="310" height="130" rx="14" fill="#dbe3ef"/>
+<rect x="1230" y="175" width="310" height="130" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="1230" y="175" width="6" height="130" rx="3" fill="#c2410c"/>
+<use href="#disk" x="1247" y="193" width="34" height="34" fill="none" stroke="#c2410c" stroke-width="2"/>
+<text x="1295" y="213" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Private S3 release</text>
+<text x="1250" y="244" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Exact commit + checksum</text>
+<text x="1250" y="267" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">SSM dispatch to the host</text>
+<rect x="60" y="429" width="320" height="130" rx="14" fill="#dbe3ef"/>
+<rect x="60" y="425" width="320" height="130" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="60" y="425" width="6" height="130" rx="3" fill="#c2410c"/>
+<use href="#shield" x="77" y="443" width="34" height="34" fill="none" stroke="#c2410c" stroke-width="2"/>
+<text x="125" y="463" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">CloudFront / WAF</text>
+<text x="80" y="494" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">HTTPS browser connection</text>
+<text x="80" y="517" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Existing DNS + certificate</text>
+<rect x="60" y="694" width="320" height="140" rx="14" fill="#dbe3ef"/>
+<rect x="60" y="690" width="320" height="140" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="60" y="690" width="6" height="140" rx="3" fill="#c2410c"/>
+<use href="#disk" x="77" y="708" width="34" height="34" fill="none" stroke="#c2410c" stroke-width="2"/>
+<text x="125" y="728" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Private S3 backup</text>
+<text x="80" y="759" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">PG dump + CH native backup</text>
+<text x="80" y="782" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Originals + export objects</text>
+<text x="80" y="805" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Versioned; separate state bucket</text>
+<rect x="490" y="429" width="300" height="130" rx="14" fill="#dbe3ef"/>
+<rect x="490" y="425" width="300" height="130" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="490" y="425" width="6" height="130" rx="3" fill="#2563eb"/>
+<use href="#cloud" x="507" y="443" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="555" y="463" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Nginx</text>
+<text x="510" y="494" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Only host-published service</text>
+<text x="510" y="517" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Security group: CF ranges</text>
+<rect x="850" y="429" width="300" height="130" rx="14" fill="#dbe3ef"/>
+<rect x="850" y="425" width="300" height="130" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="850" y="425" width="6" height="130" rx="3" fill="#2563eb"/>
+<use href="#code" x="867" y="443" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="915" y="463" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">FastAPI</text>
+<text x="870" y="494" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Scoped APIs + auth</text>
+<text x="870" y="517" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Provider egress when needed</text>
+<rect x="1210" y="429" width="300" height="130" rx="14" fill="#dbe3ef"/>
+<rect x="1210" y="425" width="300" height="130" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="1210" y="425" width="6" height="130" rx="3" fill="#2563eb"/>
+<use href="#browser" x="1227" y="443" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="1275" y="463" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Next.js</text>
+<text x="1230" y="494" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Web UI via Nginx</text>
+<text x="1230" y="517" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Separate app container</text>
+<rect x="490" y="654" width="300" height="130" rx="14" fill="#dbe3ef"/>
+<rect x="490" y="650" width="300" height="130" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="490" y="650" width="6" height="130" rx="3" fill="#2563eb"/>
+<use href="#database" x="507" y="668" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="555" y="688" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">PostgreSQL</text>
+<text x="510" y="719" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Internal Docker data network</text>
+<text x="510" y="742" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">No public database port</text>
+<rect x="850" y="654" width="300" height="130" rx="14" fill="#dbe3ef"/>
+<rect x="850" y="650" width="300" height="130" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="850" y="650" width="6" height="130" rx="3" fill="#7c3aed"/>
+<use href="#database" x="867" y="668" width="34" height="34" fill="none" stroke="#7c3aed" stroke-width="2"/>
+<text x="915" y="688" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">ClickHouse</text>
+<text x="870" y="719" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Internal Docker data network</text>
+<text x="870" y="742" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Read/write roles separated</text>
+<rect x="1210" y="654" width="300" height="130" rx="14" fill="#dbe3ef"/>
+<rect x="1210" y="650" width="300" height="130" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="1210" y="650" width="6" height="130" rx="3" fill="#c2410c"/>
+<use href="#disk" x="1227" y="668" width="34" height="34" fill="none" stroke="#c2410c" stroke-width="2"/>
+<text x="1275" y="688" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Encrypted disk</text>
+<text x="1230" y="719" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">40 GiB root + 200 GiB data</text>
+<text x="1230" y="742" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Persistent EBS /srv/trimbin</text>
+<rect x="490" y="839" width="660" height="105" rx="14" fill="#dbe3ef"/>
+<rect x="490" y="835" width="660" height="105" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="490" y="835" width="6" height="105" rx="3" fill="#2563eb"/>
+<use href="#queue" x="507" y="853" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="555" y="873" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Media / AI / index / export workers</text>
+<text x="510" y="904" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Separate containers; PostgreSQL leases and fenced completion</text>
+<rect x="1210" y="839" width="300" height="105" rx="14" fill="#dbe3ef"/>
+<rect x="1210" y="835" width="300" height="105" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="1210" y="835" width="6" height="105" rx="3" fill="#c2410c"/>
+<use href="#key" x="1227" y="853" width="34" height="34" fill="none" stroke="#c2410c" stroke-width="2"/>
+<text x="1275" y="873" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">SSM / runtime</text>
+<text x="1230" y="904" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Remote rollout + secret read</text>
+<text x="1230" y="927" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">No public SSH port</text>
+<rect x="40" y="1090" width="1520" height="72" rx="12" fill="#e3eaf4"/>
+<text x="60" y="1112" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">ECR + release S3 + SSM are authorized by the scoped deploy role. SSM encrypted runtime credentials stay outside Git.</text>
+<text x="60" y="1137" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">CloudFront-to-origin is HTTP, not end-to-end TLS. Single host; no load balancer, NAT gateway, managed DB or autoscaling.</text>
+</svg>

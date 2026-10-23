@@ -1,6 +1,6 @@
 # Quality strategy
 
-Owner policy recorded 20 October 2026 Asia Dhaka. Status: evaluation specification, not executed results. This policy takes priority over earlier suggestions that a lower-quality model could be accepted for lower cost, simpler implementation or schedule convenience.
+Owner policy recorded 20 October 2026 Asia Dhaka. Status: comparative evaluation policy; no paired superiority result. Runtime and generated-fixture engineering checks are recorded separately in [AWS cutover](AWS_CUTOVER.md). This policy takes priority over earlier suggestions that a lower-quality model could be accepted for lower cost, simpler implementation or schedule convenience.
 
 ## Acceptance target
 

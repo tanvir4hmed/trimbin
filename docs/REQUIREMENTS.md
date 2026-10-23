@@ -1,6 +1,6 @@
 # Product requirements and competition checks
 
-Status: proposed build requirements. Reviewed 20 October 2026 Asia Dhaka. Implementation status is maintained separately in PHASE_STATUS.md.
+Current product requirements and acceptance policy. Official rules, overview and FAQ rechecked 23 October 2026 Asia/Dhaka. Implementation and tested scope are maintained in [phase status](PHASE_STATUS.md) and [cutover evidence](AWS_CUTOVER.md); an acceptance requirement is not automatically a passed check.
 
 ## Product purpose
 

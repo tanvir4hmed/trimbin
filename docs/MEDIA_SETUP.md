@@ -1,5 +1,7 @@
 # Media ingest and storage
 
+[Media-to-export image](diagrams/editorial-workflow.png) · [Illustrated system design](SYSTEM_DESIGN.md)
+
 One [production Compose package](../deploy/production/compose.yaml) supplies the API, all workers, PostgreSQL and ClickHouse. All new and retained editorial routes use filesystem originals and the same PostgreSQL project/membership/source identities.
 
 Users can upload bounded, resumable 8 MiB chunks from the browser. Staging and originals reside under one `/media` mount so final publication is an atomic rename; separate bind mounts fail with EXDEV even on the same underlying disk. Completed originals are never overwritten. The media worker fingerprints the original, probes timing/codecs/color and creates separate proxy, sprite and audio derivatives. Publication transactionally queues editorial ingestion using that same source UUID. The older upload interface registers its completed original in this same registry.

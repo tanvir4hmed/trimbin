@@ -1,9 +1,9 @@
 """Check local Markdown targets and keep private reference archives out of Git."""
 
-from pathlib import Path
 import re
 import subprocess
 import sys
+from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 
@@ -12,6 +12,11 @@ def main() -> int:
     documents = [root / name for name in ("README.md", "AGENTS.md", "SECURITY.md")]
     documents.extend(sorted((root / "docs").rglob("*.md")))
     errors: list[str] = []
+    readme = (root / "README.md").read_text("utf-8")
+    for guide in sorted((root / "docs").rglob("*.md")):
+        target = guide.relative_to(root).as_posix()
+        if f"]({target})" not in readme:
+            errors.append(f"README.md: missing guide index entry {target}")
     for document in documents:
         for target in re.findall(r"\[[^\]]*\]\(([^)]+)\)", document.read_text("utf-8")):
             target = target.strip().strip("<>")
@@ -20,10 +25,14 @@ def main() -> int:
                 continue
             resolved = (document.parent / unquote(parsed.path)).resolve()
             if not resolved.is_relative_to(root) or not resolved.exists():
-                errors.append(f"{document.relative_to(root)}: invalid local target {target}")
-    tracked = subprocess.check_output(
-        ["git", "ls-files", "-z"], cwd=root
-    ).decode("utf-8").split("\0")
+                errors.append(
+                    f"{document.relative_to(root)}: invalid local target {target}"
+                )
+    tracked = (
+        subprocess.check_output(["git", "ls-files", "-z"], cwd=root)
+        .decode("utf-8")
+        .split("\0")
+    )
     errors.extend(
         f"Private archive tracked: {path}"
         for path in tracked

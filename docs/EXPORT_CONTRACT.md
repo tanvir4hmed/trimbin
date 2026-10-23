@@ -1,6 +1,6 @@
 # Export contract
 
-Phase 1 specification. Both exporters consume the same immutable [timeline revision](DATA_CONTRACT.md). Neither exporter is implemented by this document.
+Current export contract, reconciled 23 October 2026. Native/FCP7 ZIP export and original-fed MP4 render are implemented and exercised on generated footage. Both consume the same immutable [timeline revision](DATA_CONTRACT.md). Actual Premiere acceptance and wider fidelity/format validation remain open; see [cutover evidence](AWS_CUTOVER.md).
 
 ## Shared preflight
 
@@ -22,7 +22,7 @@ Phase 7 acceptance: import into a recorded Premiere version, relink originals, c
 
 ## Playable delivery
 
-Initial preset: MP4 container, H.264 video, AAC audio, explicit width/height/FPS, SDR Rec.709 and supported 8-bit output. Fix encoder/version and preset settings in the job manifest. An initial quality candidate may use CRF 16 and a slow CPU preset, but it must pass source-frame/editor review before becoming the release default; a CRF number is not proof of losslessness.
+Initial preset: MP4 container, H.264 video, AAC audio, explicit width/height/FPS, SDR Rec.709 and supported 8-bit output. Fix encoder/version and preset settings in the job manifest. The deployed recipe uses libx264 CRF 18 and the slow CPU preset. A generated-fixture source-frame check passed; comprehensive editor/fidelity acceptance remains open. A CRF number is not proof of losslessness.
 
 Use original source frames. Frame-accurate arbitrary cuts generally require decoding/re-encoding. No stream-copy guarantee. Preserve original pixel dimensions when sequence and source match; mixed dimensions require an explicit fit/letterbox choice, never hidden crop/upscale. HDR, unsupported color transforms, alpha and high-bit-depth preservation are blocked for the initial SDR preset until separately implemented and tested.
 

@@ -1,5 +1,7 @@
 # Trimbin architecture
 
+See the [illustrated design atlas](SYSTEM_DESIGN.md) for separate system, AWS infrastructure, AI/tooling and working-flow images, and [whole-application cost](COST_ESTIMATE.md) for a stated usage scenario.
+
 One browser application at https://trimbin.qleam.com routes through the existing CloudFront TLS distribution to Nginx on a Terraform-managed AWS instance. API and frontend are separate containers; workers run independently on the same host. Scaling and high availability are future work.
 
 ```mermaid

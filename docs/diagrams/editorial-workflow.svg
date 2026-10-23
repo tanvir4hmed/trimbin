@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1080" viewBox="0 0 1600 1080" role="img">
+<title>TRIMBIN / Media-to-export workflow</title><desc>One canonical timeline feeds both outputs • originals remain unchanged • human controls creative edits</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#62758c"/></marker>
+<symbol id="browser" viewBox="0 0 36 36"><rect x="3" y="5" width="30" height="25" rx="3"/><path d="M3 12h30M8 8h1m4 0h1"/></symbol><symbol id="cloud" viewBox="0 0 36 36"><path d="M9 28a7 7 0 0 1-1-14 10 10 0 0 1 19-2 8 8 0 0 1 1 16Z"/></symbol><symbol id="shield" viewBox="0 0 36 36"><path d="m18 3 13 5v10c0 8-13 15-13 15S5 26 5 18V8Z"/><path d="m11 17 5 5 10-11"/></symbol><symbol id="compute" viewBox="0 0 36 36"><rect x="8" y="8" width="20" height="20" rx="3"/><path d="M13 2v6m10-6v6M13 28v6m10-6v6M2 13h6m-6 10h6m20-10h6m-6 10h6"/></symbol><symbol id="database" viewBox="0 0 36 36"><ellipse cx="18" cy="7" rx="13" ry="5"/><path d="M5 7v22c0 7 26 7 26 0V7M5 18c0 7 26 7 26 0"/></symbol><symbol id="disk" viewBox="0 0 36 36"><rect x="4" y="5" width="28" height="27" rx="4"/><path d="M4 23h28m-22 5h2m5 0h2"/><circle cx="18" cy="14" r="5"/></symbol><symbol id="code" viewBox="0 0 36 36"><path d="m12 8-9 10 9 10m12-20 9 10-9 10M21 4l-6 28"/></symbol><symbol id="ai" viewBox="0 0 36 36"><rect x="8" y="7" width="22" height="24" rx="6"/><path d="M19 2v5M3 15h5m-5 9h5m22-9h4m-4 9h4M13 24h12"/><circle cx="14" cy="16" r="1"/><circle cx="24" cy="16" r="1"/></symbol><symbol id="film" viewBox="0 0 36 36"><rect x="4" y="4" width="28" height="28" rx="3"/><path d="M10 4v28m16-28v28M4 12h6m-6 12h6m16-12h6m-6 12h6m-22-6h16"/></symbol><symbol id="queue" viewBox="0 0 36 36"><rect x="4" y="4" width="23" height="8" rx="2"/><rect x="8" y="15" width="23" height="8" rx="2"/><path d="M12 28h20m-4-4 4 4-4 4"/></symbol><symbol id="check" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/><path d="m9 18 6 6L28 11"/></symbol><symbol id="key" viewBox="0 0 36 36"><circle cx="11" cy="12" r="8"/><path d="m17 18 15 14m-9-8 5-5m-1 9 5-5"/></symbol><symbol id="human" viewBox="0 0 36 36"><circle cx="18" cy="10" r="7"/><path d="M5 33v-4a13 13 0 0 1 26 0v4"/></symbol><symbol id="export" viewBox="0 0 36 36"><path d="M15 5H5v27h26V22M18 3h15v15M33 3 16 20"/></symbol></defs>
+<rect width="1600" height="100%" fill="#f3f6fb"/>
+<rect width="1600" height="116" fill="#14243b"/>
+<text x="50" y="49" font-family="Arial,DejaVu Sans,sans-serif" font-size="32" font-weight="700" fill="#ffffff">TRIMBIN / Media-to-export workflow</text>
+<text x="50" y="83" font-family="Arial,DejaVu Sans,sans-serif" font-size="17" font-weight="400" fill="#c8d6e8">One canonical timeline feeds both outputs • originals remain unchanged • human controls creative edits</text>
+<path d="M370,245 L450,245" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M760,245 L840,245" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1150,245 L1230,245" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1385,320 L1385,440" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1230,515 L1150,515" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M840,515 L760,515" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M450,515 L370,515" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M215,590 L215,710" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M215,590 L215,655 L605,655 L605,710" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="307" y="627" width="179.4" height="25" rx="5" fill="#f3f6fb"/>
+<text x="315" y="645" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">same saved revision</text>
+<path d="M215,860 L215,925 L995,925 L995,860" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="512" y="898" width="145.0" height="25" rx="5" fill="#f3f6fb"/>
+<text x="520" y="916" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">editable bundle</text>
+<path d="M760,785 L840,785" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1150,785 L1230,785" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="60" y="174" width="310" height="150" rx="14" fill="#dbe3ef"/>
+<rect x="60" y="170" width="310" height="150" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="60" y="170" width="6" height="150" rx="3" fill="#2563eb"/>
+<use href="#film" x="77" y="188" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="125" y="208" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">01 / Upload or mount</text>
+<text x="80" y="239" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Resumable 8 MiB chunks</text>
+<text x="80" y="262" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Allowed deployment roots</text>
+<text x="80" y="285" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Browser-local paths need upload</text>
+<rect x="450" y="174" width="310" height="150" rx="14" fill="#dbe3ef"/>
+<rect x="450" y="170" width="310" height="150" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="450" y="170" width="6" height="150" rx="3" fill="#2563eb"/>
+<use href="#database" x="467" y="188" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="515" y="208" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">02 / Register source</text>
+<text x="470" y="239" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Source identity + SHA256</text>
+<text x="470" y="262" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Project-scoped access</text>
+<text x="470" y="285" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Probe timebase and color</text>
+<rect x="840" y="174" width="310" height="150" rx="14" fill="#dbe3ef"/>
+<rect x="840" y="170" width="310" height="150" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="840" y="170" width="6" height="150" rx="3" fill="#2563eb"/>
+<use href="#compute" x="857" y="188" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="905" y="208" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">03 / Derive previews</text>
+<text x="860" y="239" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Proxy • sprite • audio</text>
+<text x="860" y="262" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Durable processing job</text>
+<text x="860" y="285" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Keep originals immutable</text>
+<rect x="1230" y="174" width="310" height="150" rx="14" fill="#dbe3ef"/>
+<rect x="1230" y="170" width="310" height="150" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="1230" y="170" width="6" height="150" rx="3" fill="#15803d"/>
+<use href="#ai" x="1247" y="188" width="34" height="34" fill="none" stroke="#15803d" stroke-width="2"/>
+<text x="1295" y="208" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">04 / Analyze originals</text>
+<text x="1250" y="239" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Nemotron visual evidence</text>
+<text x="1250" y="262" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">CPU Whisper speech path</text>
+<text x="1250" y="285" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Provider errors stay visible</text>
+<rect x="1230" y="444" width="310" height="150" rx="14" fill="#dbe3ef"/>
+<rect x="1230" y="440" width="310" height="150" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="1230" y="440" width="6" height="150" rx="3" fill="#2563eb"/>
+<use href="#human" x="1247" y="458" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="1295" y="478" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">05 / Human review</text>
+<text x="1250" y="509" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Inspect source-linked evidence</text>
+<text x="1250" y="532" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Correct uncertain observations</text>
+<text x="1250" y="555" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Failed rerun retains prior head</text>
+<rect x="840" y="444" width="310" height="150" rx="14" fill="#dbe3ef"/>
+<rect x="840" y="440" width="310" height="150" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="840" y="440" width="6" height="150" rx="3" fill="#2563eb"/>
+<use href="#check" x="857" y="458" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="905" y="478" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">06 / Select ranges</text>
+<text x="860" y="509" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Pin source/evidence versions</text>
+<text x="860" y="532" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Exact allowed source intervals</text>
+<text x="860" y="555" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">No fabricated missing footage</text>
+<rect x="450" y="444" width="310" height="150" rx="14" fill="#dbe3ef"/>
+<rect x="450" y="440" width="310" height="150" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="450" y="440" width="6" height="150" rx="3" fill="#2563eb"/>
+<use href="#film" x="467" y="458" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="515" y="478" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">07 / Save timeline</text>
+<text x="470" y="509" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Order • trim • mute • gain</text>
+<text x="470" y="532" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Frame-based canonical revision</text>
+<text x="470" y="555" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Conflict + retry protection</text>
+<rect x="60" y="444" width="310" height="150" rx="14" fill="#dbe3ef"/>
+<rect x="60" y="440" width="310" height="150" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="60" y="440" width="6" height="150" rx="3" fill="#2563eb"/>
+<use href="#shield" x="77" y="458" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="125" y="478" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">08 / Preflight</text>
+<text x="80" y="509" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Recheck originals and hashes</text>
+<text x="80" y="532" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Validate timing / space / format</text>
+<text x="80" y="555" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Block unsupported inputs</text>
+<rect x="60" y="714" width="310" height="150" rx="14" fill="#dbe3ef"/>
+<rect x="60" y="710" width="310" height="150" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="60" y="710" width="6" height="150" rx="3" fill="#2563eb"/>
+<use href="#export" x="77" y="728" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="125" y="748" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">09 / Editable handoff</text>
+<text x="80" y="779" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Native JSON + FCP7 XML ZIP</text>
+<text x="80" y="802" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Manifest + relink references</text>
+<text x="80" y="825" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Premiere acceptance pending</text>
+<rect x="450" y="714" width="310" height="150" rx="14" fill="#dbe3ef"/>
+<rect x="450" y="710" width="310" height="150" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="450" y="710" width="6" height="150" rx="3" fill="#2563eb"/>
+<use href="#export" x="467" y="728" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="515" y="748" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">10 / Render video</text>
+<text x="470" y="779" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Decode originals, not proxies</text>
+<text x="470" y="802" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Supported SDR H.264 / AAC</text>
+<text x="470" y="825" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Never cut the source files</text>
+<rect x="840" y="714" width="310" height="150" rx="14" fill="#dbe3ef"/>
+<rect x="840" y="710" width="310" height="150" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="840" y="710" width="6" height="150" rx="3" fill="#2563eb"/>
+<use href="#check" x="857" y="728" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="905" y="748" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">11 / Verify + download</text>
+<text x="860" y="779" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Pinned snapshot / artifact hash</text>
+<text x="860" y="802" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Format + frame checks</text>
+<text x="860" y="825" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Scoped authenticated access</text>
+<rect x="1230" y="714" width="310" height="150" rx="14" fill="#dbe3ef"/>
+<rect x="1230" y="710" width="310" height="150" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="1230" y="710" width="6" height="150" rx="3" fill="#2563eb"/>
+<use href="#disk" x="1247" y="728" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="1295" y="748" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">12 / Reopen + recover</text>
+<text x="1250" y="779" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Saved revisions persist</text>
+<text x="1250" y="802" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Leases / bounded job retry</text>
+<text x="1250" y="825" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Backup and restore evidence</text>
+<rect x="40" y="990" width="1520" height="72" rx="12" fill="#e3eaf4"/>
+<text x="60" y="1012" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Every failure is a visible state; jobs cannot publish invalid partial evidence as success. Human edits survive re-analysis.</text>
+<text x="60" y="1037" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Runtime checks used generated 1080p footage. Real-film quality, wider fidelity and actual Premiere import remain separate gates.</text>
+</svg>

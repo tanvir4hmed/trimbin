@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1100" viewBox="0 0 1600 1100" role="img">
+<title>TRIMBIN / AI and tooling</title><desc>Source-grounded analysis • external managed models • deterministic editing and export</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#62758c"/></marker>
+<symbol id="browser" viewBox="0 0 36 36"><rect x="3" y="5" width="30" height="25" rx="3"/><path d="M3 12h30M8 8h1m4 0h1"/></symbol><symbol id="cloud" viewBox="0 0 36 36"><path d="M9 28a7 7 0 0 1-1-14 10 10 0 0 1 19-2 8 8 0 0 1 1 16Z"/></symbol><symbol id="shield" viewBox="0 0 36 36"><path d="m18 3 13 5v10c0 8-13 15-13 15S5 26 5 18V8Z"/><path d="m11 17 5 5 10-11"/></symbol><symbol id="compute" viewBox="0 0 36 36"><rect x="8" y="8" width="20" height="20" rx="3"/><path d="M13 2v6m10-6v6M13 28v6m10-6v6M2 13h6m-6 10h6m20-10h6m-6 10h6"/></symbol><symbol id="database" viewBox="0 0 36 36"><ellipse cx="18" cy="7" rx="13" ry="5"/><path d="M5 7v22c0 7 26 7 26 0V7M5 18c0 7 26 7 26 0"/></symbol><symbol id="disk" viewBox="0 0 36 36"><rect x="4" y="5" width="28" height="27" rx="4"/><path d="M4 23h28m-22 5h2m5 0h2"/><circle cx="18" cy="14" r="5"/></symbol><symbol id="code" viewBox="0 0 36 36"><path d="m12 8-9 10 9 10m12-20 9 10-9 10M21 4l-6 28"/></symbol><symbol id="ai" viewBox="0 0 36 36"><rect x="8" y="7" width="22" height="24" rx="6"/><path d="M19 2v5M3 15h5m-5 9h5m22-9h4m-4 9h4M13 24h12"/><circle cx="14" cy="16" r="1"/><circle cx="24" cy="16" r="1"/></symbol><symbol id="film" viewBox="0 0 36 36"><rect x="4" y="4" width="28" height="28" rx="3"/><path d="M10 4v28m16-28v28M4 12h6m-6 12h6m16-12h6m-6 12h6m-22-6h16"/></symbol><symbol id="queue" viewBox="0 0 36 36"><rect x="4" y="4" width="23" height="8" rx="2"/><rect x="8" y="15" width="23" height="8" rx="2"/><path d="M12 28h20m-4-4 4 4-4 4"/></symbol><symbol id="check" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/><path d="m9 18 6 6L28 11"/></symbol><symbol id="key" viewBox="0 0 36 36"><circle cx="11" cy="12" r="8"/><path d="m17 18 15 14m-9-8 5-5m-1 9 5-5"/></symbol><symbol id="human" viewBox="0 0 36 36"><circle cx="18" cy="10" r="7"/><path d="M5 33v-4a13 13 0 0 1 26 0v4"/></symbol><symbol id="export" viewBox="0 0 36 36"><path d="M15 5H5v27h26V22M18 3h15v15M33 3 16 20"/></symbol></defs>
+<rect width="1600" height="100%" fill="#f3f6fb"/>
+<rect width="1600" height="116" fill="#14243b"/>
+<text x="50" y="49" font-family="Arial,DejaVu Sans,sans-serif" font-size="32" font-weight="700" fill="#ffffff">TRIMBIN / AI and tooling</text>
+<text x="50" y="83" font-family="Arial,DejaVu Sans,sans-serif" font-size="17" font-weight="400" fill="#c8d6e8">Source-grounded analysis • external managed models • deterministic editing and export</text>
+<path d="M460,245 L600,245" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="477" y="210" width="93.39999999999999" height="25" rx="5" fill="#f3f6fb"/>
+<text x="485" y="228" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">read only</text>
+<path d="M1000,245 L1140,245" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="1027" y="210" width="59.0" height="25" rx="5" fill="#f3f6fb"/>
+<text x="1035" y="228" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">audio</text>
+<path d="M800,310 L800,370 L260,370 L260,435" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="317" y="342" width="351.4" height="25" rx="5" fill="#f3f6fb"/>
+<text x="325" y="360" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">timestamped original-detail JPEG frames</text>
+<path d="M460,505 L600,505" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="472" y="470" width="93.39999999999999" height="25" rx="5" fill="#f3f6fb"/>
+<text x="480" y="488" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">validated</text>
+<path d="M1000,505 L1140,505" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="1018" y="470" width="84.8" height="25" rx="5" fill="#f3f6fb"/>
+<text x="1026" y="488" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">grounded</text>
+<path d="M1340,575 L1340,760" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" stroke-dasharray="8 6"/>
+<rect x="1346" y="662" width="119.19999999999999" height="25" rx="5" fill="#f3f6fb"/>
+<text x="1354" y="680" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">text vectors</text>
+<path d="M1340,310 L1340,435" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="1346" y="352" width="102.0" height="25" rx="5" fill="#f3f6fb"/>
+<text x="1354" y="370" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">transcript</text>
+<path d="M1140,835 L1000,835" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="1017" y="800" width="76.19999999999999" height="25" rx="5" fill="#f3f6fb"/>
+<text x="1025" y="818" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">768-dim</text>
+<path d="M1140,550 L1080,550 L1080,690 L800,690 L800,760" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="807" y="662" width="153.6" height="25" rx="5" fill="#f3f6fb"/>
+<text x="815" y="680" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">outbox snapshots</text>
+<path d="M600,835 L460,835" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="482" y="800" width="76.19999999999999" height="25" rx="5" fill="#f3f6fb"/>
+<text x="490" y="818" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">results</text>
+<rect x="60" y="179" width="400" height="135" rx="14" fill="#dbe3ef"/>
+<rect x="60" y="175" width="400" height="135" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="60" y="175" width="6" height="135" rx="3" fill="#2563eb"/>
+<use href="#film" x="77" y="193" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="125" y="213" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Immutable originals</text>
+<text x="80" y="244" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Registered source UUID + SHA256</text>
+<text x="80" y="267" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Measured stream timing / color</text>
+<rect x="600" y="179" width="400" height="135" rx="14" fill="#dbe3ef"/>
+<rect x="600" y="175" width="400" height="135" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="600" y="175" width="6" height="135" rx="3" fill="#2563eb"/>
+<use href="#film" x="617" y="193" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="665" y="213" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">FFmpeg / ffprobe</text>
+<text x="620" y="244" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Bounded decoding; preserve detail</text>
+<text x="620" y="267" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Preview proxies are separate</text>
+<rect x="1140" y="179" width="400" height="135" rx="14" fill="#dbe3ef"/>
+<rect x="1140" y="175" width="400" height="135" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="1140" y="175" width="6" height="135" rx="3" fill="#7c3aed"/>
+<use href="#ai" x="1157" y="193" width="34" height="34" fill="none" stroke="#7c3aed" stroke-width="2"/>
+<text x="1205" y="213" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">CPU Whisper large-v3</text>
+<text x="1160" y="244" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">int8 • VAD • 16 kHz windows</text>
+<text x="1160" y="267" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Speech runs on this AWS host</text>
+<rect x="60" y="439" width="400" height="140" rx="14" fill="#dbe3ef"/>
+<rect x="60" y="435" width="400" height="140" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="60" y="435" width="6" height="140" rx="3" fill="#15803d"/>
+<use href="#ai" x="77" y="453" width="34" height="34" fill="none" stroke="#15803d" stroke-width="2"/>
+<text x="125" y="473" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Nemotron 3.5 Super VL</text>
+<text x="80" y="504" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Token Factory vision endpoint</text>
+<text x="80" y="527" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Eight images / request; batch inputs</text>
+<text x="80" y="561" font-family="Arial,DejaVu Sans,sans-serif" font-size="13" font-weight="700" fill="#15803d">EXTERNAL HTTPS / METERED INFERENCE</text>
+<rect x="600" y="439" width="400" height="140" rx="14" fill="#dbe3ef"/>
+<rect x="600" y="435" width="400" height="140" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="600" y="435" width="6" height="140" rx="3" fill="#15803d"/>
+<use href="#ai" x="617" y="453" width="34" height="34" fill="none" stroke="#15803d" stroke-width="2"/>
+<text x="665" y="473" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Nemotron 3 Super</text>
+<text x="620" y="504" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">120B-A12B reasoning endpoint</text>
+<text x="620" y="527" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Merge batches; compare evidence</text>
+<text x="620" y="561" font-family="Arial,DejaVu Sans,sans-serif" font-size="13" font-weight="700" fill="#15803d">EXTERNAL HTTPS / NO SILENT FIXTURE FALLBACK</text>
+<rect x="1140" y="439" width="400" height="140" rx="14" fill="#dbe3ef"/>
+<rect x="1140" y="435" width="400" height="140" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="1140" y="435" width="6" height="140" rx="3" fill="#2563eb"/>
+<use href="#database" x="1157" y="453" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="1205" y="473" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">PostgreSQL evidence</text>
+<text x="1160" y="504" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Validated source/window references</text>
+<text x="1160" y="527" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Human corrections + pinned selections</text>
+<rect x="60" y="764" width="400" height="150" rx="14" fill="#dbe3ef"/>
+<rect x="60" y="760" width="400" height="150" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="60" y="760" width="6" height="150" rx="3" fill="#2563eb"/>
+<use href="#human" x="77" y="778" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="125" y="798" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Editor + deterministic tools</text>
+<text x="80" y="829" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Approve ranges; save a revision</text>
+<text x="80" y="852" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Native / FCP7 ZIP + original MP4</text>
+<text x="80" y="875" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Approved export needs no AI call</text>
+<rect x="600" y="764" width="400" height="150" rx="14" fill="#dbe3ef"/>
+<rect x="600" y="760" width="400" height="150" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="600" y="760" width="6" height="150" rx="3" fill="#7c3aed"/>
+<use href="#database" x="617" y="778" width="34" height="34" fill="none" stroke="#7c3aed" stroke-width="2"/>
+<text x="665" y="798" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Self-hosted ClickHouse</text>
+<text x="620" y="829" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Scoped text / vector retrieval</text>
+<text x="620" y="852" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Complete revisioned snapshots</text>
+<text x="620" y="875" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Indexes evidence, not video bytes</text>
+<rect x="1140" y="764" width="400" height="150" rx="14" fill="#dbe3ef"/>
+<rect x="1140" y="760" width="400" height="150" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="1140" y="760" width="6" height="150" rx="3" fill="#15803d"/>
+<use href="#ai" x="1157" y="778" width="34" height="34" fill="none" stroke="#15803d" stroke-width="2"/>
+<text x="1205" y="798" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Qwen3 Embedding 8B</text>
+<text x="1160" y="829" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Token Factory • 768 dimensions</text>
+<text x="1160" y="852" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">L2 normalization; identity matching</text>
+<text x="1160" y="875" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Query + corpus use same generation</text>
+<rect x="40" y="1010" width="1520" height="72" rx="12" fill="#e3eaf4"/>
+<text x="60" y="1032" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Tavily, LangSmith, Toloka and Tendem are optional credits, not active dependencies or verified integrations in this build.</text>
+<text x="60" y="1057" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Sampling and ASR accuracy require evaluation. No paired superiority, exhaustive event recall, offline GPU or full NLE claim.</text>
+</svg>

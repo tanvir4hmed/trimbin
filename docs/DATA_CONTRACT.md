@@ -1,6 +1,6 @@
 # Data, timing and recovery contract
 
-Phase 1 design for implementation in Phases 2–8. Existing second-based APIs remain unchanged until explicit adapters and migration checks exist. The examples describe the proposed v1 contract.
+Current data/timing contract, reconciled 23 October 2026. PostgreSQL, self-hosted ClickHouse and filesystem media are deployed. Retained second-based Film API calls translate to the same canonical frame timeline. Normative invariants below are distinguished from the tested subset in [cutover evidence](AWS_CUTOVER.md).
 
 ## Ownership
 
@@ -42,18 +42,20 @@ Example: at 24000/1001 FPS, source frames `[240,480)` are 240 frames, or 10.01 s
 
 New mutation commands carry `command_id` and `expected_revision`. In one transaction, authorize, validate all references, compare the current revision, store the new snapshot, insert the command receipt and outbox events. Replaying the same command/body returns the original result. Reusing a command ID with a different body is a conflict. A stale expected revision returns HTTP 409 and current revision metadata; the client retains its draft.
 
-Proposed API resources under `/v1/projects/{project_id}`:
+Current API routes (the public gateway adds `/api`; the application itself has no `/v1` prefix):
 
-| Operation | Resource | Result |
-| --- | --- | --- |
-| Register staged/allowed media | `POST /sources` | Asset and indexing job; validated server-relative root |
-| Request analysis | `POST /sources/{id}/analysis` | Run/job IDs and selected configuration |
-| Save timeline | `POST /sequences/{id}/revisions` | Immutable revision or conflict |
-| Read revision | `GET /sequences/{id}/revisions/{rev}` | Snapshot and source availability |
-| Export revision | `POST /sequences/{id}/revisions/{rev}/exports` | Preflight result and job ID |
-| Observe/cancel job | `GET /jobs/{id}`, `POST /jobs/{id}/cancel` | Scoped status or cancellation receipt |
+| Operation | Application route |
+| --- | --- |
+| Register allowed mounted source | `POST /media-library/{project}/sources` |
+| Begin/resume/complete upload | `/media-library/{project}/uploads` and its upload-ID routes |
+| Analyze registered evidence | `POST /evidence/{project}/analyze` |
+| Verify source timing | `POST /timelines/{project}/sources/{source_id}/timing` |
+| Save/read timeline | `POST /timelines/{project}/{sequence_id}/revisions`, `GET /timelines/{project}/{sequence_id}?revision=N` |
+| Export editable revision | `POST /editable-exports/{project}/sequences/{sequence_id}` |
+| Render saved revision | `POST /renders/{project}/sequences/{sequence_id}` |
+| Observe/cancel export work | Sequence job listings and `/editable-exports` or `/renders` project/job cancellation routes |
 
-These are proposed contracts, not existing endpoints. Keep old routes through an explicit compatibility adapter while consumers migrate. Conversion from old seconds requires source metadata and a recorded rounding report; missing metadata blocks migration of that item.
+The old Film API remains a compatibility facade, not a second writable state. Conversion from seconds requires verified source timing; invalid later ranges roll back the complete command. See the API OpenAPI schema and setup guides for request bodies rather than inventing a second interface.
 
 ## Durable work
 
@@ -67,7 +69,7 @@ Write output to a job-owned temporary path, verify it, then atomically publish o
 
 Retain current valid evidence, human corrections, all saved revisions needed by users and every pinned export dependency. History is not required to run inference on each playback. UI pagination (for example twenty visible versions) is not a retention policy. Purge only unreferenced derivatives/diagnostics through a dry-run reference report and an explicit retention policy.
 
-Migrate in dependency order: projects and memberships → source versions → evidence generations → corrections/selections → timeline revisions → outstanding jobs. Preserve old IDs through a mapping table; compare counts and reference integrity before switching readers. Failed runs never become the active complete generation. Keep old data/configuration until a verified cutover and rollback decision. No remote deletion is part of Phase 1.
+Migrate in dependency order: projects and memberships → source versions → evidence generations → corrections/selections → timeline revisions → outstanding jobs. Preserve old IDs through a mapping table; compare counts and reference integrity before switching readers. Failed runs never become the active complete generation. Keep old data/configuration until a verified cutover and rollback decision. No historical corpus was available to import during the AWS cutover; do not interpret a fresh owner workspace as migrated movie data. Retired configuration was hash-preserved outside Git.
 
 ## Implemented Phase 5 evidence state
 
@@ -75,7 +77,7 @@ PostgreSQL migration 003 adds immutable evidence items, analysis run manifests/r
 
 A correction cannot switch the source or exceed its registered duration. A later decision-only correction preserves earlier text/range edits. Selection pins effective evidence, source hash, range and evidence revision; later retraction or correction does not silently change that saved selection. Re-analysis never rewrites overlays. Changed model findings get new identities including generation provenance; old corrected findings remain historical for explicit reconciliation. Identical output is not assumed semantically equivalent across generations.
 
-Analysis publishes only after every requested window validates and the worker still holds its lease. A newer request prevents an older completed run becoming active. Failed/cancelled work preserves the previous head. The complete input manifests include actual sampled frame timestamps/hashes, task output, model/prompt/schema identity and retry metadata. Comparisons use pinned selected text; automatic speech or exhaustive attempt segmentation is not implemented.
+Analysis publishes only after every requested window validates and the worker still holds its lease. A newer request prevents an older completed run becoming active. Failed/cancelled work preserves the previous head. The complete input manifests include actual sampled frame timestamps/hashes, task output, model/prompt/schema identity and retry metadata. Canonical comparisons use pinned selected text. CPU Whisper is integrated into the retained editorial analysis path; exhaustive attempt segmentation and speech accuracy remain unvalidated, and not every canonical evidence item has an automatic transcript.
 
 ClickHouse migration 032 stores complete project/revision snapshots. Transactional outbox delivery is retryable and reader credentials are SELECT-only. Queries require the current PostgreSQL revision and a compatible embedding identity; stale/missing data cannot masquerade as an empty successful search. Whole-snapshot limits and exact cosine scoring are bounded PoC behavior, not a production ANN or terabyte benchmark. [Evidence setup](EVIDENCE_SETUP.md) records the operational limits.
 
@@ -83,7 +85,7 @@ ClickHouse migration 032 stores complete project/revision snapshots. Transaction
 
 `canonical_timeline` documents use independent keys `film` or `scene-<key>`. Existing `state_documents`, immutable `state_versions`, receipts and outbox support atomic saves. `timeline-v1` stores sequence settings, ordered unique occurrence IDs, half-open integer source frames, exact source FPS and computed integer sequence positions/durations with rational quantization deltas. Source hash, verified grid metadata, first audio stream/channels/sample rate/video offset, camera timecode string and selected evidence are pinned. Explicit save records editor approval. Current v1 supports linked first-stream audio, mute and attenuation from -60 to 0 dB; separate tracks and amplification remain outside this implementation.
 
-`source_timing` is a project/source/hash-keyed cache of bounded ffprobe frame-grid validation. Average FPS alone never authorizes conform. Timecode is preserved as a label; drop-frame parsing and actual NLE conform are Phase 7 gates. A saved revision can be read without overwriting it; historical evidence can be restored even after removing the current selection. Preview and future exporters read the same immutable snapshot, with `source_frame()` defining per-frame mapping. Browser proxy playback remains approximate. Routes and limitations are in [timeline setup](TIMELINE_SETUP.md).
+`source_timing` is a project/source/hash-keyed cache of bounded ffprobe frame-grid validation. Average FPS alone never authorizes conform. Timecode is preserved as a label; drop-frame parsing and actual NLE conform are Phase 7 gates. A saved revision can be read without overwriting it; historical evidence can be restored even after removing the current selection. Preview and both exporters read the same immutable snapshot, with `source_frame()` defining per-frame mapping. Browser proxy playback remains approximate. Routes and limitations are in [timeline setup](TIMELINE_SETUP.md).
 
 ## Implemented Phase 7 editable artifacts
 

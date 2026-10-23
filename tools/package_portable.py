@@ -75,6 +75,9 @@ def allowed(name: str) -> bool:
         return False
     return (
         path.suffix in EXTENSIONS
+        # Only authored documentation diagrams may be raster assets. Do not
+        # broaden this to footage, screenshots or private evaluation images.
+        or (path.parent == PurePosixPath("docs/diagrams") and path.suffix == ".png")
         or path.name in {"Dockerfile", ".dockerignore"}
         or path.suffix == ".Dockerfile"
     )

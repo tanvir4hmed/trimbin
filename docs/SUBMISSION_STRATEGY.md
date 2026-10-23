@@ -1,28 +1,28 @@
 # Submission strategy and evidence
 
-Reviewed 20 October 2026 Asia/Dhaka. Planning only; none of the proposed enhancements below has been certified complete.
+Reconciled 23 October 2026 Asia/Dhaka. AWS runtime and generated-footage checks are complete within [recorded limits](AWS_CUTOVER.md). This document plans the separate submission phase; quality superiority and Premiere acceptance remain unverified. Copy-ready English fields are in [submission article](SUBMISSION_ARTICLE.md).
 
 ## Positioning
 
 Proposed track: Best Apps and Agents. Deliver a coherent editorial application using Nemotron through Token Factory. Future hardware packaging does not make this a robotics/Physical AI project. The cloud PoC validates the delivered software experience and deployment boundaries; studio installation remains a product direction.
 
-Suggested narrative, to be rewritten against final evidence: Our earlier editorial workflow exposed the practical burden of large media transfers, infrastructure coupling and incomplete delivery. We expanded the foundation into a portable editing system using NVIDIA open models on Nebius, durable self-hosted services and an original-media export pipeline. This cloud demonstration completes the declared workflow and establishes a foundation for a future studio installation with suitable hardware.
+Evidence-bounded narrative: Our earlier editorial workflow exposed the practical burden of large media transfers, infrastructure coupling and incomplete delivery. We expanded the foundation into a portable editing system using NVIDIA open models on Nebius, durable self-hosted services and an original-media export pipeline. This cloud demonstration completes the declared workflow and establishes a foundation for a future studio installation with suitable hardware.
 
 Do not say every obstacle is solved, all cloud costs disappear, or offline performance is proven. Explain the specific completed improvements and the remaining deployment validation.
 
 ## Improvement ledger
 
-| Earlier limitation or risk | Proposed improvement | Proof to collect |
+| Earlier limitation | Delivered change | Actual evidence / remaining gate |
 | --- | --- | --- |
-| Media access tied to provider upload/storage workflow | Deployment-relative persistent media roots, stable identity and bounded processing | Staged/uploaded media survives restart; root remapping; source integrity |
-| Provider-specific mutable state and dispatch | PostgreSQL state/jobs/outbox; self-hosted ClickHouse evidence | Transaction/revision checks, worker recovery and clean redeploy |
-| Recurring model API dependency and uncertain replacement quality | Open-model task contracts plus genuine Nemotron on Token Factory | Exact model/run records, held-out quality and measured API cost; self-hosting is future |
-| Stale analysis or conflicting human edits | Versioned caches/indexes and preserved human corrections | Rerun, retry and stale-write scenarios |
-| Selected ranges without a unified delivery contract | One saved scene/film timeline shared by preview and exports | Repeated sources, source ranges, frame mapping, saved snapshot |
-| Limited interchange and no complete rendered-film route | Tested Premiere XML and original-fed video render | Actual NLE relink plus independent frame/audio export checks |
-| No packaged studio deployment proof | Reproducible cloud package with documented deployment dependencies | Fresh package deployment and persistence checks; no claim of local installation |
+| Provider-bound media/state/dispatch | Filesystem originals and PostgreSQL documents, jobs and receipts | Upload/hash checks, transaction tests and persistent preflight redeploys |
+| Managed analytics dependency | Self-hosted ClickHouse with bounded reader and complete projections | Live retrieval, automatic vectors and restored read/DDL boundaries |
+| Old model/runtime coupling | Real NVIDIA vision/reasoning via Token Factory, Qwen retrieval and CPU Whisper | Provider execution passed; paid-baseline/held-out superiority is not demonstrated |
+| Conflicting or stale edits | Pinned evidence, human overlays and canonical timeline revisions | Atomic rollback, stale revision and retry checks; old Film facade shares state |
+| Selected ranges without complete delivery | One frame timeline drives native/FCP7 ZIP and original-fed MP4 | Manifest/frame/hash checks and 1080p SDR fixture; actual Premiere import remains open |
+| Unresolved hosting/recovery | Terraform AWS host, encrypted persistent data, main release path and backups | Preflight app and fresh isolated DB restore; later push deployment not polled |
+| Future studio placement | Deployment-relative roots and container packaging | Architecture foundation only; no customer SSD/NAS/GPU or terabyte benchmark |
 
-The historical tag is evidence of the preserved code boundary, not evidence that a prior model answer was good. Record the final commit diff, dates, exact new capabilities and actual old outputs where available. Remove obsolete marketing while preserving ownership, licensing and accurate reused-work disclosures.
+The preserved historical source boundary supports truthful reuse disclosure; it does not prove prior AI answer quality. Use the [copy pack](SUBMISSION_ARTICLE.md), [diagrams](SYSTEM_DESIGN.md), [cost calculation](COST_ESTIMATE.md) and [submission checklist](SUBMISSION_CHECKLIST.md) instead of copying an outdated phase proposal.
 
 ## Rules and judge-facing evidence
 
@@ -34,7 +34,7 @@ The app can be hosted elsewhere while making qualifying inference calls. Token F
 
 Judge access must remain free and available until 16 December 2026, 02:00 Bangladesh, with credentials supplied if needed. Validate entrant eligibility, asset rights and licenses. Freeze the submitted commit and respect restrictions on submission changes after the deadline. [Official rules](https://nebiusglobalaihackathon.devpost.com/rules).
 
-## Proposed 2 minute 45 second demonstration
+## Planned 2 minute 45 second demonstration
 
 - 0:00-0:20: audience, large-media obstacle and reason for expanding the prior foundation.
 - 0:20-1:00: real cloud-hosted source analysis, identified Nemotron/Token Factory execution and source-linked evidence.

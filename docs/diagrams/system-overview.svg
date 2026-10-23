@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1080" viewBox="0 0 1600 1080" role="img">
+<title>TRIMBIN / System architecture</title><desc>Current AWS cloud PoC • one application • human-approved editing • 23 October 2026</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#62758c"/></marker>
+<symbol id="browser" viewBox="0 0 36 36"><rect x="3" y="5" width="30" height="25" rx="3"/><path d="M3 12h30M8 8h1m4 0h1"/></symbol><symbol id="cloud" viewBox="0 0 36 36"><path d="M9 28a7 7 0 0 1-1-14 10 10 0 0 1 19-2 8 8 0 0 1 1 16Z"/></symbol><symbol id="shield" viewBox="0 0 36 36"><path d="m18 3 13 5v10c0 8-13 15-13 15S5 26 5 18V8Z"/><path d="m11 17 5 5 10-11"/></symbol><symbol id="compute" viewBox="0 0 36 36"><rect x="8" y="8" width="20" height="20" rx="3"/><path d="M13 2v6m10-6v6M13 28v6m10-6v6M2 13h6m-6 10h6m20-10h6m-6 10h6"/></symbol><symbol id="database" viewBox="0 0 36 36"><ellipse cx="18" cy="7" rx="13" ry="5"/><path d="M5 7v22c0 7 26 7 26 0V7M5 18c0 7 26 7 26 0"/></symbol><symbol id="disk" viewBox="0 0 36 36"><rect x="4" y="5" width="28" height="27" rx="4"/><path d="M4 23h28m-22 5h2m5 0h2"/><circle cx="18" cy="14" r="5"/></symbol><symbol id="code" viewBox="0 0 36 36"><path d="m12 8-9 10 9 10m12-20 9 10-9 10M21 4l-6 28"/></symbol><symbol id="ai" viewBox="0 0 36 36"><rect x="8" y="7" width="22" height="24" rx="6"/><path d="M19 2v5M3 15h5m-5 9h5m22-9h4m-4 9h4M13 24h12"/><circle cx="14" cy="16" r="1"/><circle cx="24" cy="16" r="1"/></symbol><symbol id="film" viewBox="0 0 36 36"><rect x="4" y="4" width="28" height="28" rx="3"/><path d="M10 4v28m16-28v28M4 12h6m-6 12h6m16-12h6m-6 12h6m-22-6h16"/></symbol><symbol id="queue" viewBox="0 0 36 36"><rect x="4" y="4" width="23" height="8" rx="2"/><rect x="8" y="15" width="23" height="8" rx="2"/><path d="M12 28h20m-4-4 4 4-4 4"/></symbol><symbol id="check" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/><path d="m9 18 6 6L28 11"/></symbol><symbol id="key" viewBox="0 0 36 36"><circle cx="11" cy="12" r="8"/><path d="m17 18 15 14m-9-8 5-5m-1 9 5-5"/></symbol><symbol id="human" viewBox="0 0 36 36"><circle cx="18" cy="10" r="7"/><path d="M5 33v-4a13 13 0 0 1 26 0v4"/></symbol><symbol id="export" viewBox="0 0 36 36"><path d="M15 5H5v27h26V22M18 3h15v15M33 3 16 20"/></symbol></defs>
+<rect width="1600" height="100%" fill="#f3f6fb"/>
+<rect width="1600" height="116" fill="#14243b"/>
+<text x="50" y="49" font-family="Arial,DejaVu Sans,sans-serif" font-size="32" font-weight="700" fill="#ffffff">TRIMBIN / System architecture</text>
+<text x="50" y="83" font-family="Arial,DejaVu Sans,sans-serif" font-size="17" font-weight="400" fill="#c8d6e8">Current AWS cloud PoC • one application • human-approved editing • 23 October 2026</text>
+<path d="M360,225 L450,225" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="363" y="189" width="59.0" height="25" rx="5" fill="#f3f6fb"/>
+<text x="371" y="207" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">HTTPS</text>
+<path d="M770,225 L840,225" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="770" y="189" width="50.4" height="25" rx="5" fill="#f3f6fb"/>
+<text x="778" y="207" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">HTTP</text>
+<path d="M1160,225 L1230,225" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1000,280 L1000,360" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="1004" y="308" width="50.4" height="25" rx="5" fill="#f3f6fb"/>
+<text x="1012" y="326" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">/api</text>
+<path d="M840,420 L770,420" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1160,420 L1230,420" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M610,480 L610,600" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="617" y="526" width="196.6" height="25" rx="5" fill="#f3f6fb"/>
+<text x="625" y="544" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">durable jobs / outbox</text>
+<path d="M1160,665 L1230,665" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M1160,625 L1195,625 L1195,510 L1390,510 L1390,480" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M620,730 L620,780 L415,780 L415,840" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" stroke-dasharray="8 6"/>
+<rect x="407" y="753" width="196.6" height="25" rx="5" fill="#f3f6fb"/>
+<text x="415" y="771" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">sampled frames / text</text>
+<path d="M1000,730 L1000,840" fill="none" stroke="#62758c" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="1006" y="772" width="119.19999999999999" height="25" rx="5" fill="#f3f6fb"/>
+<text x="1014" y="790" font-family="Arial,DejaVu Sans,sans-serif" font-size="15" font-weight="400" fill="#52647a">source audio</text>
+<rect x="60" y="174" width="300" height="110" rx="14" fill="#dbe3ef"/>
+<rect x="60" y="170" width="300" height="110" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="60" y="170" width="6" height="110" rx="3" fill="#2563eb"/>
+<use href="#browser" x="77" y="188" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="125" y="208" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Editor browser</text>
+<text x="80" y="239" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Upload • review • timeline</text>
+<text x="80" y="262" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Preview • saved exports</text>
+<rect x="450" y="174" width="320" height="110" rx="14" fill="#dbe3ef"/>
+<rect x="450" y="170" width="320" height="110" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="450" y="170" width="6" height="110" rx="3" fill="#c2410c"/>
+<use href="#shield" x="467" y="188" width="34" height="34" fill="none" stroke="#c2410c" stroke-width="2"/>
+<text x="515" y="208" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">CloudFront + WAF</text>
+<text x="470" y="239" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">trimbin.qleam.com</text>
+<text x="470" y="262" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">TLS viewer connection</text>
+<rect x="840" y="174" width="320" height="110" rx="14" fill="#dbe3ef"/>
+<rect x="840" y="170" width="320" height="110" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="840" y="170" width="6" height="110" rx="3" fill="#c2410c"/>
+<use href="#cloud" x="857" y="188" width="34" height="34" fill="none" stroke="#c2410c" stroke-width="2"/>
+<text x="905" y="208" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Nginx gateway</text>
+<text x="860" y="239" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Only public host port: 80</text>
+<text x="860" y="262" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Routes web and API</text>
+<rect x="1230" y="174" width="310" height="110" rx="14" fill="#dbe3ef"/>
+<rect x="1230" y="170" width="310" height="110" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="1230" y="170" width="6" height="110" rx="3" fill="#2563eb"/>
+<use href="#browser" x="1247" y="188" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="1295" y="208" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Next.js frontend</text>
+<text x="1250" y="239" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">One editorial application</text>
+<text x="1250" y="262" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Private project workspace</text>
+<rect x="60" y="364" width="300" height="370" rx="14" fill="#dbe3ef"/>
+<rect x="60" y="360" width="300" height="370" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="60" y="360" width="6" height="370" rx="3" fill="#7c3aed"/>
+<use href="#shield" x="77" y="378" width="34" height="34" fill="none" stroke="#7c3aed" stroke-width="2"/>
+<text x="125" y="398" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Declared boundary</text>
+<text x="80" y="429" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Originals stay on host storage.</text>
+<text x="80" y="452" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Browser uploads cross internet.</text>
+<text x="80" y="475" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Token Factory is external.</text>
+<text x="80" y="498" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">No local GPU is provisioned.</text>
+<text x="80" y="521" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">No zero-upload/offline claim.</text>
+<text x="80" y="544" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">One host; no HA or autoscale.</text>
+<text x="80" y="567" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Quality / NLE gates stay open.</text>
+<rect x="450" y="364" width="320" height="120" rx="14" fill="#dbe3ef"/>
+<rect x="450" y="360" width="320" height="120" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="450" y="360" width="6" height="120" rx="3" fill="#2563eb"/>
+<use href="#database" x="467" y="378" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="515" y="398" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">PostgreSQL 17</text>
+<text x="470" y="429" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Projects • membership • edits</text>
+<text x="470" y="452" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Revisions • receipts • queue</text>
+<rect x="840" y="364" width="320" height="120" rx="14" fill="#dbe3ef"/>
+<rect x="840" y="360" width="320" height="120" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="840" y="360" width="6" height="120" rx="3" fill="#2563eb"/>
+<use href="#code" x="857" y="378" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="905" y="398" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">FastAPI / app.main</text>
+<text x="860" y="429" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Auth • scoped APIs • media</text>
+<text x="860" y="452" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">One canonical film state</text>
+<rect x="1230" y="364" width="310" height="120" rx="14" fill="#dbe3ef"/>
+<rect x="1230" y="360" width="310" height="120" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="1230" y="360" width="6" height="120" rx="3" fill="#7c3aed"/>
+<use href="#database" x="1247" y="378" width="34" height="34" fill="none" stroke="#7c3aed" stroke-width="2"/>
+<text x="1295" y="398" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">ClickHouse 26.8</text>
+<text x="1250" y="429" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Evidence / search / history</text>
+<text x="1250" y="452" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Writer + constrained reader</text>
+<rect x="450" y="604" width="710" height="130" rx="14" fill="#dbe3ef"/>
+<rect x="450" y="600" width="710" height="130" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="450" y="600" width="6" height="130" rx="3" fill="#2563eb"/>
+<use href="#queue" x="467" y="618" width="34" height="34" fill="none" stroke="#2563eb" stroke-width="2"/>
+<text x="515" y="638" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Independent worker containers</text>
+<text x="470" y="669" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Media • editorial • evidence • projection • vectors</text>
+<text x="470" y="692" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Editable export • original-fed render • leases + retries</text>
+<rect x="1230" y="604" width="310" height="130" rx="14" fill="#dbe3ef"/>
+<rect x="1230" y="600" width="310" height="130" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="1230" y="600" width="6" height="130" rx="3" fill="#c2410c"/>
+<use href="#disk" x="1247" y="618" width="34" height="34" fill="none" stroke="#c2410c" stroke-width="2"/>
+<text x="1295" y="638" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Encrypted EBS</text>
+<text x="1250" y="669" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Originals • derivatives</text>
+<text x="1250" y="692" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Exports • DB data • cache</text>
+<rect x="60" y="844" width="710" height="140" rx="14" fill="#dbe3ef"/>
+<rect x="60" y="840" width="710" height="140" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="60" y="840" width="6" height="140" rx="3" fill="#15803d"/>
+<use href="#ai" x="77" y="858" width="34" height="34" fill="none" stroke="#15803d" stroke-width="2"/>
+<text x="125" y="878" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">Nebius Token Factory / managed inference</text>
+<text x="80" y="909" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">NVIDIA Nemotron vision + reasoning</text>
+<text x="80" y="932" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Qwen embeddings • HTTPS outbound • metered usage</text>
+<text x="80" y="966" font-family="Arial,DejaVu Sans,sans-serif" font-size="13" font-weight="700" fill="#15803d">EXTERNAL SERVICE — NOT SELF-HOSTED ON THE AWS INSTANCE</text>
+<rect x="840" y="844" width="700" height="140" rx="14" fill="#dbe3ef"/>
+<rect x="840" y="840" width="700" height="140" rx="14" fill="white" stroke="#cbd6e5"/>
+<rect x="840" y="840" width="6" height="140" rx="3" fill="#7c3aed"/>
+<use href="#ai" x="857" y="858" width="34" height="34" fill="none" stroke="#7c3aed" stroke-width="2"/>
+<text x="905" y="878" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#14243b">CPU Whisper / same AWS host</text>
+<text x="860" y="909" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">large-v3 • int8 • bounded 16 kHz windows + VAD</text>
+<text x="860" y="932" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Persistent model cache • no separate speech API</text>
+<text x="860" y="966" font-family="Arial,DejaVu Sans,sans-serif" font-size="13" font-weight="700" fill="#7c3aed">LOCAL PROCESSING ON THE DEPLOYMENT HOST</text>
+<rect x="40" y="990" width="1520" height="72" rx="12" fill="#e3eaf4"/>
+<text x="60" y="1012" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Arrows show principal calls/data paths; replies are omitted. Icons are schematic service glyphs, not vendor certification.</text>
+<text x="60" y="1037" font-family="Arial,DejaVu Sans,sans-serif" font-size="16" font-weight="400" fill="#52647a">Original-fed exports preserve source files; generated-fixture success does not prove general movie quality or Premiere acceptance.</text>
+</svg>

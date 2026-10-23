@@ -33,7 +33,7 @@ GitHub uses OIDC scoped to `tanvir4hmed/trimbin` main. Actual repository Variabl
 - Embeddings: `Qwen/Qwen3-Embedding-8B`, explicitly requested 768 dimensions with L2 normalization.
 - Speech: `Systran/faster-whisper-large-v3`, CPU int8, persistent model cache.
 
-The real vision endpoint rejects more than eight images per request. The adapter batches larger supplied frame sets, validates every batch and merges observations using NVIDIA reasoning; it does not silently discard excess images. Twelve-image execution (8 + 4) and the reasoning merge were exercised on generated footage. Frames come from originals, with source/window labels and bounded sampling. This is sampled visual analysis, not proof of detecting every transient event. Managed aliases do not pin weight revisions or disclose provider precision. No successful fixture call was substituted for a provider result.
+The real vision endpoint rejects more than eight images per request. The adapter batches larger supplied frame sets, validates every batch and merges observations using NVIDIA reasoning; it does not silently discard excess images. Twelve-image execution (8 + 4) and the reasoning merge were exercised on generated footage. Frames come from originals, with source/window labels and bounded sampling. This is sampled visual analysis, not proof of detecting every transient event. Managed aliases do not pin weight revisions; serving precision was conservatively recorded as undisclosed for these runs. The later public catalog advertises BF16 vision and FP4 reasoning without per-request attestation; see [model/price sources](COST_ESTIMATE.md). No successful fixture call was substituted for a provider result.
 
 ## Runtime evidence
 

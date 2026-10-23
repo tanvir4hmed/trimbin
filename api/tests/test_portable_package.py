@@ -21,6 +21,8 @@ def test_package_filters_local_credentials_media_and_archive():
         "deploy/production/api.Dockerfile",
         "deploy/production/web.Dockerfile",
         ".env.example",
+        "docs/diagrams/system-overview.png",
+        "docs/diagrams/system-overview.svg",
     ]:
         assert allowed(name)
     for name in [
@@ -29,6 +31,8 @@ def test_package_filters_local_credentials_media_and_archive():
         "api/archive/a.py",
         "web/node_modules/a.js",
         "api/footage.mp4",
+        "api/private-frame.png",
+        "docs/private-footage.png",
         "../api/app.py",
         ".secrets/key.json",
     ]:

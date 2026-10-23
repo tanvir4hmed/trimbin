@@ -21,3 +21,7 @@ The live URL is https://trimbin.qleam.com. AWS infrastructure is Terraform-manag
 Verification: Linux API 602 passed / 18 skipped; agents 122 passed; web 40 passed; API/agent lint and format, agent types, web types/build, generated schema, real provider calls and scoped runtime workflow checks. Recovery evidence and exact fixture scope are recorded in [AWS cutover](AWS_CUTOVER.md). A pushed commit is not a verified completion of its later deployment.
 
 No recovered historical corpus or paid-model baseline was found. Quality superiority, Premiere compatibility acceptance, terabyte throughput and offline/local GPU operation are not claimed. The [quality strategy](QUALITY_STRATEGY.md) remains in force. Missing quality/NLE evidence prevents those submission claims, not truthful reporting of the running cloud workflow.
+
+## Documentation reconciliation
+
+The 23 October follow-up reconciles the active contracts, UX, security, setup and submission strategy with the AWS cutover. [README](../README.md) indexes every guide; the documentation check enforces this coverage. Four separate PNG/SVG diagrams, the English submission copy pack/checklist and a whole-application basic-usage cost calculation are included. Runtime baseline commit: d047555. No later deployment result, video publication, judge access or outstanding quality/NLE acceptance is inferred from this documentation update.

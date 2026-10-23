@@ -4,7 +4,7 @@ This is the disposable database development/CI fixture, not a second production 
 
 ## Requirements and versions
 
-Use Python 3.12 and uv, Docker Engine/Desktop with Compose v2, and enough free disk for database files plus a complete cold backup. On Windows, Docker needs a working Linux-container backend. This development PC has neither Docker nor WSL, so container lifecycle verification runs in the added GitHub CI job rather than being claimed as locally tested.
+Use Python 3.12 and uv, Docker Engine/Desktop with Compose v2, and enough free disk for database files plus a complete cold backup. On Windows, Docker needs a working Linux-container backend. This development PC has neither Docker nor WSL, so container verification runs on the authorized AWS host and in GitHub CI rather than being claimed as executed on this PC.
 
 PostgreSQL 17 and ClickHouse 26.8 LTS are pinned by registry digest in [Compose](../deploy/foundation/compose.yaml); Python dependencies are resolved in the API and agent `uv.lock` files. ClickHouse needs the current text/vector index support used by the retained evidence migrations. Text indexes became production-ready in 26.2; [26.8 is an LTS release](https://clickhouse.com/blog/clickHouse-release-26-08). Updating a digest requires rerunning schema, isolation and restore checks.
 

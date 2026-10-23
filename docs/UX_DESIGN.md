@@ -1,6 +1,6 @@
 # Editorial workflow design
 
-Phase 1 specification, 20 October 2026. This is the implementation contract for later phases, not a screenshot or evidence of shipped exports. Read [product direction](PRODUCT_DIRECTION.md), [data contract](DATA_CONTRACT.md) and [export contract](EXPORT_CONTRACT.md).
+Current workflow design, reconciled 23 October 2026. The interaction requirements below are a design contract, not a claim that every proposed convenience control is implemented. The actual deployed/tested subset is described at the end and in [cutover evidence](AWS_CUTOVER.md). Read [product direction](PRODUCT_DIRECTION.md), [data contract](DATA_CONTRACT.md) and [export contract](EXPORT_CONTRACT.md).
 
 ## Workspace structure
 
@@ -79,12 +79,12 @@ flowchart LR
   Preflight --> Blocked[Resolve missing or unsupported source]
 ```
 
-Phase 6 validates edit/revision behavior; Phases 7 and 8 independently validate exports. Phase 9 validates the complete journey with actual services.
+## Current implementation and acceptance
 
-## Phase 5 implementation update
+The browser exposes shared project/media/evidence/timeline views. The old studio and film entry pages lead into the canonical application; the old Film API saves the same revisioned timeline. The timeline UI provides selection/range editing, saved versions, preview and editable/video job actions. Source missing/unsupported cases remain explicit; previews do not supply final export frames.
 
-The dedicated [evidence workspace](EVIDENCE_SETUP.md) now connects registered deployment sources to original-frame analysis, human annotations/corrections/retractions, slate placement, pinned range selection, selected-text comparison/continuity and scoped text/vector retrieval. PostgreSQL owns revisions and jobs; complete ClickHouse snapshots serve retrieval. API and analysis have explicit provider egress in the portable package. Runtime acceptance remains deferred; this is implemented code, not measured model quality or verified deployment. Legacy editorial routes remain transitional. Canonical timeline assembly and both full exports remain later phases.
+AWS preflight exercised upload, original-fed analysis, human selections, canonical save, compatibility retry, native/FCP7 downloads, semantic retrieval and a 1080p SDR render. These are generated-footage engineering checks. Actual Premiere import, held-out editorial quality, broad camera-format coverage and a full accessibility audit have not been certified. A cross-page unified job drawer and every proposed interaction in this design must not be presented as individually accepted without UI evidence.
 
-## Phase 6 implementation update
+![Media to export workflow](diagrams/editorial-workflow.png)
 
-The [canonical timeline](TIMELINE_SETUP.md) adds source-frame scene/film editing, linked audio metadata, exact saved conform mapping, revision history and approximate browser preview over the portable media path. Existing revision/receipt storage is reused; no new service or AI credential is needed. Runtime and export acceptance remain pending.
+Separate [system, infrastructure and AI diagrams](SYSTEM_DESIGN.md) document actual deployment and provider boundaries.

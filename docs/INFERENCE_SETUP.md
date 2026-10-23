@@ -1,5 +1,7 @@
 # Inference runtime
 
+[AI and tooling image](diagrams/ai-and-tooling.png) · [Model API cost calculations](COST_ESTIMATE.md)
+
 Production uses Nebius Token Factory with NVIDIA Nemotron vision and reasoning, Qwen embeddings and local CPU Whisper transcription. The API's grounded evidence worker and retained editorial agents use the same configured providers and source registry. No Vertex/Gemini SDK or self-hosted GPU is used.
 
 Models and identities are versioned in [production catalog](../config/model-profiles.production.json) and [embedding identity](../config/embedding-identity.production.json). See [configuration](CONFIGURATION.md) for secret delivery. Live calls require `inference_mode=nebius`, the explicit live switch and a real key. Fixtures are accepted only in development and are labelled as such.
