@@ -233,11 +233,11 @@ async def process(job: dict, config: Settings) -> None:
             )
             origin = source["metadata"]["video_start"]
             origin = Fraction(origin["numerator"], origin["denominator"])
-            spans = windows(
-                plan["sources"][0]["duration_us"],
-                plan["window_seconds"] * 1000000,
-                plan["overlap_seconds"] * 1000000,
-            )
+            interval = plan["sample_every_seconds"] * 1000000
+            frame_limit = catalog[config.vision_model].max_frames if catalog else 8
+            length = min(plan["window_seconds"] * 1000000, frame_limit * interval)
+            overlap = min(plan["overlap_seconds"] * 1000000, max(0, length - interval))
+            spans = windows(plan["sources"][0]["duration_us"], length, overlap)
             total_frames = 0
             for index, (start, end) in enumerate(spans):
                 frames, assets = [], {}

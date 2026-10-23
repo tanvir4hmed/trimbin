@@ -171,6 +171,7 @@ export function announce(): void {
 }
 
 export function signOut(): void {
+  void fetch("/api/auth/logout", { method: "POST", keepalive: true });
   cached = null;
   try {
     localStorage.removeItem(TOKEN_KEY);

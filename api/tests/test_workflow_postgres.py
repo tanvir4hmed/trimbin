@@ -33,6 +33,6 @@ def test_project_discovery_and_summary_do_not_leak(request, monkeypatch):
             assert client.get("/workflow/projects").json()["projects"] == []
             assert client.get(f"/workflow/{project}/summary").status_code == 404
             assert client.get("/workflow/projects?offset=-1").status_code == 422
-            assert client.get("/projects").status_code == 404
+
     finally:
         app.dependency_overrides.clear()

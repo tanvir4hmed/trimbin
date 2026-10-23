@@ -10,13 +10,12 @@ import hashlib
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from pathlib import Path
-from tempfile import TemporaryDirectory
 from typing import Any
 from uuid import UUID, uuid4, uuid5
 
+from trimbin_agents.content import Part
+
 from . import analysis_store, attempt_detection, identify, shots, storage
-from .ffmpeg_ops import remux
 
 log = logging.getLogger(__name__)
 
@@ -272,84 +271,63 @@ async def analyse_clip(
     candidates: list[dict] = []
 
     try:
-        with TemporaryDirectory() as tmp:
-            work = Path(tmp)
-            for window in windows:
-                if assert_owned:
-                    await assert_owned()
-                source = work / f"window-{window.index:04d}.ts"
-                if not storage.download_proxy_range(
-                    f"p{project_id}/{clip_id}", source, window.start_s, window.end_s
-                ):
-                    raise RuntimeError(
-                        f"proxy window {window.start_s:.2f}-{window.end_s:.2f} is missing"
-                    )
+        for window in windows:
+            if assert_owned:
+                await assert_owned()
+            source = storage.resolve_source(project_id, clip_id)
+            video = Part.from_video_window(source, window.start_s, window.duration_s, str(clip_id))
 
-                video = await remux(
-                    source,
-                    work / f"window-{window.index:04d}.mp4",
-                    window.duration_s,
-                )
-                if video is None:
-                    raise RuntimeError(
-                        f"proxy window {window.start_s:.2f}-{window.end_s:.2f} cannot be read"
-                    )
+            observation = await observer.run(
+                video,
+                duration_s=window.duration_s,
+                briefing=briefing,
+            )
+            segment_id = uuid5(
+                run_id,
+                f"segment/{window.index}/{window.start_s:.3f}/{window.end_s:.3f}",
+            )
+            searchable = " ".join(
+                [
+                    observation.description,
+                    observation.transcript,
+                    *observation.actions,
+                    *observation.objects,
+                ]
+            )
+            embedding = await identify.embed_text(
+                searchable,
+                subject=f"segment {segment_id}",
+            )
+            if len(embedding) != EMBEDDING_DIMENSIONS:
+                embedding = [0.0] * EMBEDDING_DIMENSIONS
 
-                observation = await observer.run(
-                    video.read_bytes(),
-                    duration_s=window.duration_s,
-                    briefing=briefing,
-                )
-                segment_id = uuid5(
-                    run_id,
-                    f"segment/{window.index}/{window.start_s:.3f}/{window.end_s:.3f}",
-                )
-                searchable = " ".join(
-                    [
-                        observation.description,
-                        observation.transcript,
-                        *observation.actions,
-                        *observation.objects,
-                    ]
-                )
-                embedding = await identify.embed_text(
-                    searchable,
-                    subject=f"segment {segment_id}",
-                )
-                if len(embedding) != EMBEDDING_DIMENSIONS:
-                    embedding = [0.0] * EMBEDDING_DIMENSIONS
-
-                segments.append(
-                    {
-                        "segment_id": segment_id,
-                        "run_id": run_id,
-                        "project_id": project_id,
-                        "clip_id": clip_id,
-                        "window_index": window.index,
-                        "start_s": window.start_s,
-                        "end_s": window.end_s,
-                        "description": observation.description,
-                        "transcript": observation.transcript,
-                        "actions": observation.actions,
-                        "objects": observation.objects,
-                        "speakers": observation.speakers,
-                        "shot_size": observation.shot_size,
-                        "camera_motion": observation.camera_motion,
-                        "observation_json": observation.model_dump_json(),
-                        "embedding": embedding,
-                        "model_id": agent_settings.analyst_model,
-                        "prompt_version": PROMPT_VERSION,
-                    }
-                )
-                moment_candidates.extend(
-                    _absolute_moments(observation, window, segment_id, embedding)
-                )
-                candidates.extend(_absolute_findings(observation, window, segment_id))
-                attempt_candidates.extend(
-                    attempt_detection.absolute_attempts(observation, window, segment_id)
-                )
-                source.unlink(missing_ok=True)
-
+            segments.append(
+                {
+                    "segment_id": segment_id,
+                    "run_id": run_id,
+                    "project_id": project_id,
+                    "clip_id": clip_id,
+                    "window_index": window.index,
+                    "start_s": window.start_s,
+                    "end_s": window.end_s,
+                    "description": observation.description,
+                    "transcript": observation.transcript,
+                    "actions": observation.actions,
+                    "objects": observation.objects,
+                    "speakers": observation.speakers,
+                    "shot_size": observation.shot_size,
+                    "camera_motion": observation.camera_motion,
+                    "observation_json": observation.model_dump_json(),
+                    "embedding": embedding,
+                    "model_id": agent_settings.analyst_model,
+                    "prompt_version": PROMPT_VERSION,
+                }
+            )
+            moment_candidates.extend(_absolute_moments(observation, window, segment_id, embedding))
+            candidates.extend(_absolute_findings(observation, window, segment_id))
+            attempt_candidates.extend(
+                attempt_detection.absolute_attempts(observation, window, segment_id)
+            )
         for measured in await analysis_store.raw_findings(project_id, clip_id):
             start = max(0.0, min(float(measured["start_s"]), duration_s))
             end = max(0.0, min(float(measured["end_s"]), duration_s))

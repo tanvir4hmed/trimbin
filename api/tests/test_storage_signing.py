@@ -1,89 +1,35 @@
-"""Tests for how an upload URL gets signed.
+"""Upload grants must reject tampering, expiration and unbounded uploads."""
 
-This exists because the deployed service could not sign one at all while every
-test passed. Signing needs a private key; a developer machine has one in a key
-file and a Cloud Run instance has none, by design. The default code path assumes
-the key is there, so the failure appeared only on a real instance, on the first
-real upload, as a 500.
-
-So these tests are about which signing path is chosen, not about the signature.
-"""
-
-from __future__ import annotations
+import time
 
 import pytest
 
-from app.services import storage
+from app.services import file_capabilities as grants
 
 
-class FakeCredentials:
-    """Stands in for whatever google.auth.default returns.
-
-    Shaped by what the real code inspects: a local key file exposes a signer,
-    the metadata server does not.
-    """
-
-    def __init__(self, *, signer=None, signer_email=None, email=None, valid=True):
-        self.token = "an-access-token"
-        self.valid = valid
-        self.refreshed = False
-        if signer is not None:
-            self.signer = signer
-        if signer_email is not None:
-            self.signer_email = signer_email
-        if email is not None:
-            self.service_account_email = email
-
-    def refresh(self, request):
-        self.refreshed = True
-        self.valid = True
-
-
-@pytest.fixture
-def credentials(monkeypatch):
-    def install(creds):
-        monkeypatch.setattr(storage.google.auth, "default", lambda scopes: (creds, "trimbin"))
-        return creds
-
-    return install
-
-
-def test_a_local_key_file_signs_locally(credentials):
-    """A key file needs no IAM call, so asking for one would add a network
-    round trip and a permission requirement to every upload for nothing."""
-    credentials(
-        FakeCredentials(signer=object(), signer_email="dev@trimbin.iam.gserviceaccount.com")
+@pytest.fixture(autouse=True)
+def signing(monkeypatch):
+    monkeypatch.setattr(
+        grants.settings, "session_secret", "unit-test-secret-with-at-least-32-characters"
     )
-    assert storage._signer() == {}
 
 
-def test_cloud_run_signs_through_iam(credentials):
-    """No signer means no key, which means the library must be told to use
-    signBlob instead — which it only does when handed an email and a token."""
-    creds = credentials(FakeCredentials(email="trimbin-api@trimbin.iam.gserviceaccount.com"))
-    signer = storage._signer()
-    assert signer["service_account_email"] == "trimbin-api@trimbin.iam.gserviceaccount.com"
-    assert signer["access_token"] == creds.token
+def test_roundtrip_is_scoped_to_object_and_size():
+    token = grants.issue_upload("p7/clip/original.mov", 1234, time.time() + 30)
+    assert grants.verify_upload(token) == ("p7/clip/original.mov", 1234)
 
 
-def test_an_expired_token_is_refreshed_first(credentials):
-    """The token is being handed to IAM as proof of identity. A stale one is
-    rejected there, and the error names the signature rather than the token."""
-    creds = credentials(
-        FakeCredentials(email="trimbin-api@trimbin.iam.gserviceaccount.com", valid=False)
-    )
-    storage._signer()
-    assert creds.refreshed
+def test_modified_payload_is_refused():
+    token = grants.issue_upload("p7/clip/original.mov", 1234, time.time() + 30)
+    with pytest.raises(ValueError):
+        grants.verify_upload("x" + token[1:])
 
 
-def test_an_unnamed_account_is_an_error_not_a_bad_signature(credentials):
-    """The metadata server answers 'default' until asked for the real address.
-    Passing that through produces a signature IAM cannot attribute, and an error
-    about signing rather than about identity."""
-    credentials(FakeCredentials(email="default"))
-    with pytest.raises(RuntimeError, match="identity"):
-        storage._signer()
+def test_expired_upload_is_refused():
+    with pytest.raises(ValueError, match="expired"):
+        grants.verify_upload(grants.issue_upload("p7/clip/a", 1, time.time() - 1))
 
-    credentials(FakeCredentials())
-    with pytest.raises(RuntimeError, match="identity"):
-        storage._signer()
+
+def test_unbounded_upload_is_refused():
+    with pytest.raises(ValueError):
+        grants.verify_upload(grants.issue_upload("p7/clip/a", 0, time.time() + 30))

@@ -1,6 +1,6 @@
 # Product direction
 
-Owner decision: 20 October 2026, Asia/Dhaka. This supersedes the earlier requirement to install and demonstrate a local PC edition during this hackathon. Implementation still proceeds through individually approved phases.
+Owner decision: 20 October 2026, Asia/Dhaka. This supersedes the earlier requirement to install and demonstrate a local PC edition during this hackathon. The owner subsequently authorized completion of the remaining non-demo AWS cutover in one continuous execution; see BUILD_PLAN.md.
 
 ## What we are delivering now
 

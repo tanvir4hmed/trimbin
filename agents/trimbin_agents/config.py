@@ -1,4 +1,4 @@
-"""Shared API/agent registry; legacy defaults preserve the deployed runtime.
+"""Shared API/agent configuration for the canonical Trimbin runtime.
 
 Portable profiles are explicit. Capability reporting describes configuration,
 not successful connections or verified model quality.
@@ -30,26 +30,27 @@ class Settings(BaseSettings):
 
     project_id: str = "trimbin"
 
-    region: str = "us-central1"
-
-    model_location: str = "global"
+    region: str = "us-east-1"
 
     slate_model: str = Field(
-        default="gemini-3.6-flash",
-        description="Runs on every clip. Low thinking, low resolution, opening seconds only.",
+        default="nvidia/Nemotron-3.5-Super-VL",
+        description="Runs on every clip. Source-resolution frames from the opening seconds.",
     )
 
     analyst_model: str = Field(
-        default="gemini-3.6-flash",
-        description="Best on video of the current family, and cheaper than the generation before.",
+        default="nvidia/Nemotron-3.5-Super-VL",
+        description=(
+            "Timestamped original frames and CPU-ASR evidence; "
+            "comparative quality requires evaluation."
+        ),
     )
 
     archivist_model: str = Field(
-        default="gemini-3.6-flash",
+        default="nvidia/nemotron-3-super-120b-a12b",
         description="Text in, query out. Never sees video.",
     )
 
-    embedding_model: str = "gemini-embedding-2"
+    embedding_model: str = ""
 
     embedding_dimensions: int = 768
 
@@ -69,7 +70,7 @@ class Settings(BaseSettings):
     max_takes_per_comparison: int = Field(
         default=8,
         description=(
-            "Gemini accepts ten videos per request; eight leaves room for the "
+            "At most eight candidates are compared per panel request with the "
             "prompt and the measurements. Larger groups are bracketed."
         ),
     )
@@ -81,17 +82,11 @@ class Settings(BaseSettings):
 
     request_timeout_s: int = 300
 
-    originals_bucket: str = "trimbin-originals"
-
-    proxies_bucket: str = "trimbin-proxies"
-
-    artifacts_bucket: str = "trimbin-artifacts"
-
     clickhouse_url: str = ""
 
     clickhouse_host: str = ""
 
-    clickhouse_port: int = 8443
+    clickhouse_port: int = 8123
 
     clickhouse_reader_user: str = ""
 
@@ -103,9 +98,7 @@ class Settings(BaseSettings):
 
     cdn_base_url: str = ""
 
-    ingest_topic: str = "trimbin-ingest"
-
-    scheduler_service_account: str = ""
+    editorial_queue: str = "trimbin-editorial"
 
     scheduler_audience: str = ""
 
@@ -116,6 +109,8 @@ class Settings(BaseSettings):
     guest_pass: str = Field(default="", repr=False, exclude=True)
 
     team_passes: str = Field(default="", repr=False, exclude=True)
+    lead_editor_email: str = "tanvir4hmed@gmail.com"
+    maintenance_token: str = Field(default="", repr=False, exclude=True)
 
     demo_project_id: int = 9
 
@@ -123,7 +118,7 @@ class Settings(BaseSettings):
 
     signed_url_ttl_hours: int = 6
 
-    profile: Literal["legacy-cloud", "development", "cloud-poc"] = "legacy-cloud"
+    profile: Literal["development", "cloud-poc"] = "development"
     inference_mode: Literal["fixture", "nebius"] = "fixture"
     nebius_base_url: str = ""
     nebius_api_key: str = Field(default="", repr=False, exclude=True)
@@ -132,6 +127,9 @@ class Settings(BaseSettings):
     asr_model: str = ""
     embedding_version: str = ""
     inference_live_enabled: bool = False
+    vision_sample_fps: float = Field(default=2, ge=0.5, le=8)
+    vision_max_frames: int = Field(default=8, ge=1, le=8)
+    model_cache_root: str = "/model-cache"
     inference_catalog_path: str = ""
     inference_timeout_seconds: int = Field(default=120, ge=1, le=600)
     inference_max_retries: int = Field(default=1, ge=0, le=2)
@@ -152,7 +150,7 @@ class Settings(BaseSettings):
     media_reserve_bytes: int = Field(default=1024**3, ge=0)
     media_timeout_seconds: int = Field(default=3600, ge=10, le=86400)
     database_url: str = Field(default="", repr=False, exclude=True)
-    clickhouse_secure: bool = True
+    clickhouse_secure: bool = False
     demo_pass: str = Field(default="", repr=False, exclude=True)
     cors_origins: list[str] = Field(default_factory=list)
     tavily_api_key: str = Field(default="", repr=False, exclude=True)
@@ -160,9 +158,7 @@ class Settings(BaseSettings):
     job_max_attempts: int = Field(default=3, ge=1, le=10)
 
     @model_validator(mode="after")
-    def validate_portable(self) -> Settings:
-        if self.profile != "legacy-cloud" and "embedding_model" not in self.model_fields_set:
-            self.embedding_model = ""
+    def validate_runtime(self) -> Settings:
         if not 1 <= self.clickhouse_port <= 65535:
             raise ValueError("ClickHouse port must be between 1 and 65535")
         if self.nebius_base_url:
@@ -189,8 +185,8 @@ class Settings(BaseSettings):
             "sessions": ("session_secret",),
             "vision": ("nebius_base_url", "nebius_api_key", "vision_model"),
             "reasoning": ("nebius_base_url", "nebius_api_key", "reasoning_model"),
-            "speech": ("nebius_base_url", "nebius_api_key", "asr_model"),
-            "semantic_search": ("embedding_model", "embedding_version"),
+            "speech": ("asr_model", "model_cache_root"),
+            "semantic_search": ("embedding_model", "evidence_embedding_identity_path"),
             "web_research": ("tavily_api_key",),
         }
         result: dict[str, dict[str, object]] = {}
@@ -207,17 +203,16 @@ class Settings(BaseSettings):
         if self.inference_mode == "fixture":
             for task in ("vision", "reasoning", "speech"):
                 result[task] = {"status": "fixture_only", "missing": []}
-        if self.profile != "legacy-cloud":
-            if self.clickhouse_user in {"default", self.clickhouse_reader_user}:
-                result["evidence_writer"] = {
-                    "status": "unavailable",
-                    "reason": "Separate non-admin writer required",
-                }
-            if len(self.session_secret) < 32:
-                result["sessions"] = {
-                    "status": "unavailable",
-                    "reason": "Session secret must have 32+ characters",
-                }
+        if self.clickhouse_user in {"default", self.clickhouse_reader_user}:
+            result["evidence_writer"] = {
+                "status": "unavailable",
+                "reason": "Separate non-admin writer required",
+            }
+        if len(self.session_secret) < 32:
+            result["sessions"] = {
+                "status": "unavailable",
+                "reason": "Session secret must have 32+ characters",
+            }
         return result
 
 

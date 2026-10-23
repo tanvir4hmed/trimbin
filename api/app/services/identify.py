@@ -76,16 +76,9 @@ def _client():
     stops it, so there is nothing to amortise, and a cached client would keep a
     connection open across the gap.
     """
-    from google import genai
+    from trimbin_agents.runtime import Client
 
-    return genai.Client(
-        vertexai=True,
-        project=settings.project_id,
-        # The current Gemini family is published to the global endpoint only.
-        # Asking us-central1 returns a 404 that reads as if the model does not
-        # exist, when it exists and is served elsewhere.
-        location=settings.model_location,
-    )
+    return Client()
 
 
 async def still_from(clip: Path, out_path: Path) -> Path | None:
@@ -235,7 +228,7 @@ async def embed(source: Path, work: Path, clip_id: UUID, duration_s: float) -> l
         return []
 
     try:
-        from google.genai import types
+        from trimbin_agents import content as types
 
         client = _client()
         vectors = []
@@ -269,7 +262,7 @@ async def embed_text(text: str, *, subject: str = "segment") -> list[float]:
         return []
 
     try:
-        from google.genai import types
+        from trimbin_agents import content as types
 
         response = await _client().aio.models.embed_content(
             model=settings.embedding_model,

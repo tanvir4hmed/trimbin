@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from google import genai
-from google.genai import types
 from pydantic import BaseModel
 
+from .. import content as types
+from .. import runtime as genai
 from ..common.errors import AgentFailure, text_of
 from ..config import settings
 from ..contracts.base import Finding, TimeRange
@@ -61,15 +61,11 @@ class SegmentAgent:
     """A single-window observer, never a take chooser."""
 
     def __init__(self, client: genai.Client | None = None) -> None:
-        self._client = client or genai.Client(
-            vertexai=True,
-            project=settings.project_id,
-            location=settings.model_location,
-        )
+        self._client = client or genai.Client()
 
     async def run(
         self,
-        video: bytes,
+        video: bytes | types.Part,
         *,
         duration_s: float,
         briefing: str = "",
@@ -79,7 +75,9 @@ class SegmentAgent:
             "All finding timecodes must be local to 00:00 of this window."
         )
         contents: list[object] = [
-            types.Part.from_bytes(data=video, mime_type="video/mp4"),
+            types.Part.from_bytes(data=video, mime_type="video/mp4")
+            if isinstance(video, bytes)
+            else video,
             PROMPT,
             RUBRIC,
             context,

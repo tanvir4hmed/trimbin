@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from fractions import Fraction
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
@@ -20,13 +21,18 @@ MAX_ITEMS = 5000
 
 
 class EvidenceStore:
-    def __init__(self, dsn: str):
+    def __init__(self, dsn: str, *, connection=None):
         if not dsn:
             raise EvidenceError("evidence_not_configured")
         self.dsn = dsn
+        self._connection = connection
 
     def connection(self):
-        return psycopg.connect(self.dsn, row_factory=dict_row)
+        return (
+            nullcontext(self._connection)
+            if self._connection is not None
+            else psycopg.connect(self.dsn, row_factory=dict_row)
+        )
 
     @staticmethod
     def authorize_writer(conn, project: int, actor: str) -> None:

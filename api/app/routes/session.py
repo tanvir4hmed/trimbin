@@ -55,6 +55,12 @@ async def options() -> dict:
     return sessions.available()
 
 
+@router.post("/logout")
+async def logout(response: Response):
+    response.delete_cookie("trimbin_session", path="/", secure=True, httponly=True, samesite="lax")
+    return {"signed_out": True}
+
+
 @router.post("/pass")
 async def redeem_pass(
     body: PassRequest,
@@ -93,8 +99,18 @@ async def redeem_pass(
     # Not cached anywhere, by anything.
     response.headers["Cache-Control"] = "no-store"
 
+    token = sessions.mint(session)
+    response.set_cookie(
+        "trimbin_session",
+        token,
+        max_age=sessions.TTL_SECONDS,
+        secure=True,
+        httponly=True,
+        samesite="lax",
+        path="/",
+    )
     return {
-        "token": sessions.mint(session),
+        "token": token,
         "email": session.email,
         "name": session.name,
         "role": session.role,

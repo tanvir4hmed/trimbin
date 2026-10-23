@@ -35,7 +35,7 @@ class TestWindowCoverage:
 class TestRecommendationGate:
     @pytest.mark.asyncio
     async def test_no_recommendation_is_written_until_every_take_is_fully_analysed(
-        self, monkeypatch: pytest.MonkeyPatch
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         async def load(*args) -> list[dict]:
             return [
@@ -198,9 +198,11 @@ class _Observer:
 class TestEndToEndPersistenceShape:
     @pytest.mark.asyncio
     async def test_the_0058_issue_is_persisted_once_with_two_evidence_windows(
-        self, monkeypatch: pytest.MonkeyPatch
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         clip_id = uuid4()
+        original = tmp_path / "original.mp4"
+        original.write_bytes(b"immutable source")
         runs: list[dict] = []
         stored_segments: list[dict] = []
         stored_findings: list[dict] = []
@@ -245,7 +247,7 @@ class TestEndToEndPersistenceShape:
         monkeypatch.setattr(full_take.analysis_store, "record_finding_events", record_findings)
         monkeypatch.setattr(full_take.analysis_store, "raw_findings", no_measured_findings)
         monkeypatch.setattr(full_take.storage, "download_proxy_range", download)
-        monkeypatch.setattr(full_take, "remux", remux)
+        monkeypatch.setattr(full_take.storage, "resolve_source", lambda *args: original)
         monkeypatch.setattr(full_take.identify, "embed_text", embed)
         monkeypatch.setattr(full_take.shots, "get", shot)
         monkeypatch.setattr(full_take.shots, "briefing", lambda *args: "")
@@ -259,6 +261,7 @@ class TestEndToEndPersistenceShape:
             agent=_Observer(),
         )
 
+        assert original.read_bytes() == b"immutable source"
         assert result["status"] == "completed"
         assert result["covered_until_s"] == 70.0
         assert len(stored_segments) == 2

@@ -1,0 +1,92 @@
+name: Deploy Trimbin
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: trimbin-production
+  cancel-in-progress: false
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+  images:
+    needs: checks
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: [api, web]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.TRIMBIN_AWS_DEPLOY_ROLE }}
+          aws-region: us-east-1
+      - uses: aws-actions/amazon-ecr-login@v2
+      - uses: docker/setup-buildx-action@v3
+      - name: Check immutable release image
+        id: existing
+        env:
+          COMPONENT: ${{ matrix.component }}
+        run: |
+          if aws ecr describe-images --repository-name "trimbin-$COMPONENT" --image-ids "imageTag=$GITHUB_SHA" >/dev/null 2>&1; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: docker/build-push-action@v6
+        if: steps.existing.outputs.exists != 'true'
+        with:
+          context: .
+          file: deploy/production/${{ matrix.component }}.Dockerfile
+          push: true
+          tags: ${{ vars.TRIMBIN_ECR_REGISTRY }}/trimbin-${{ matrix.component }}:${{ github.sha }}
+          cache-from: type=gha,scope=trimbin-${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=trimbin-${{ matrix.component }}
+  deploy:
+    needs: images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.TRIMBIN_AWS_DEPLOY_ROLE }}
+          aws-region: us-east-1
+      - name: Package the exact committed release
+        env:
+          RELEASE_BUCKET: ${{ vars.TRIMBIN_RELEASE_BUCKET }}
+        run: |
+          git archive --format=tar.gz --output=source.tgz "$GITHUB_SHA"
+          sha256sum source.tgz > source.sha256
+          aws s3 cp source.tgz "s3://$RELEASE_BUCKET/$GITHUB_SHA/source.tgz" --only-show-errors
+          aws s3 cp source.sha256 "s3://$RELEASE_BUCKET/$GITHUB_SHA/source.sha256" --only-show-errors
+      - name: Roll out through SSM without SSH credentials
+        env:
+          TRIMBIN_INSTANCE: ${{ vars.TRIMBIN_AWS_INSTANCE_ID }}
+          RELEASE_BUCKET: ${{ vars.TRIMBIN_RELEASE_BUCKET }}
+          ECR_REGISTRY: ${{ vars.TRIMBIN_ECR_REGISTRY }}
+        run: |
+          python deploy/production/dispatch.py > command.json
+          command_id=$(aws ssm send-command --cli-input-json file://command.json --query Command.CommandId --output text)
+          for attempt in $(seq 1 180); do
+            status=$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$TRIMBIN_INSTANCE" --query Status --output text 2>/dev/null || echo Pending)
+            if [ "$status" = Success ]; then
+              echo 'Trimbin release succeeded'
+              exit 0
+            fi
+            case "$status" in
+              Failed|Cancelled|TimedOut|Cancelling)
+                aws ssm get-command-invocation --command-id "$command_id" --instance-id "$TRIMBIN_INSTANCE" --query '{status:Status,stdout:StandardOutputContent,stderr:StandardErrorContent}'
+                exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo 'Trimbin deployment exceeded its wait limit' >&2
+          exit 1
+      - name: Invalidate previous frontend responses
+        env:
+          DISTRIBUTION: ${{ vars.TRIMBIN_CLOUDFRONT_DISTRIBUTION }}
+        run: aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION" --paths '/*' >/dev/null

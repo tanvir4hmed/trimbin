@@ -17,9 +17,9 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from google.cloud import firestore, pubsub_v1
-
 from ..config import settings
+from ..foundation import documents
+from ..foundation.dispatch import DurablePublisher
 from . import analysis_queue
 
 log = logging.getLogger(__name__)
@@ -62,21 +62,21 @@ ALL_STATES = frozenset(
     }
 )
 
-_db: firestore.AsyncClient | None = None
-_publisher: pubsub_v1.PublisherClient | None = None
+_db: documents.AsyncClient | None = None
+_publisher: DurablePublisher | None = None
 
 
-def db() -> firestore.AsyncClient:
+def db() -> documents.AsyncClient:
     global _db
     if _db is None:
-        _db = firestore.AsyncClient(project=settings.project_id)
+        _db = documents.AsyncClient(project=settings.project_id)
     return _db
 
 
-def publisher() -> pubsub_v1.PublisherClient:
+def publisher() -> DurablePublisher:
     global _publisher
     if _publisher is None:
-        _publisher = pubsub_v1.PublisherClient()
+        _publisher = DurablePublisher()
     return _publisher
 
 
@@ -227,8 +227,8 @@ async def record_missing(job_id: UUID, missing: list[UUID]) -> None:
     ref = db().collection(COLLECTION).document(str(job_id))
     await ref.update(
         {
-            "failed_items": firestore.Increment(len(missing)),
-            "failures": firestore.ArrayUnion(
+            "failed_items": documents.Increment(len(missing)),
+            "failures": documents.ArrayUnion(
                 [
                     {"clip_id": str(c), "reason": "not found in storage after upload"}
                     for c in missing
@@ -252,7 +252,7 @@ async def record_progress(job_id: UUID, clip_id: UUID, ok: bool, reason: str = "
     """
     ref = db().collection(COLLECTION).document(str(job_id))
 
-    @firestore.async_transactional
+    @documents.async_transactional
     async def count(transaction) -> tuple[int, int, int]:
         snapshot = await ref.get(transaction=transaction)
         d = snapshot.to_dict() or {}
@@ -278,7 +278,7 @@ async def record_progress(job_id: UUID, clip_id: UUID, ok: bool, reason: str = "
                 item for item in d.get("failures", []) if str(item.get("clip_id")) != str(clip_id)
             ]
         if not ok:
-            update["failures"] = firestore.ArrayUnion([{"clip_id": str(clip_id), "reason": reason}])
+            update["failures"] = documents.ArrayUnion([{"clip_id": str(clip_id), "reason": reason}])
 
         # Every clip accounted for, one way or the other. A job with failures
         # still finishes — "done" describes the work, not the outcome, and the
@@ -330,7 +330,7 @@ async def record_placement(
         .document(str(job_id))
         .update(
             {
-                "items": firestore.ArrayUnion(
+                "items": documents.ArrayUnion(
                     [
                         {
                             "clip_id": str(clip_id),
@@ -360,7 +360,7 @@ async def mark_verified(job_id: UUID, clip_ids: set[str]) -> None:
     """Persist per-item commit state so refresh returns to the same batch."""
     ref = db().collection(COLLECTION).document(str(job_id))
 
-    @firestore.async_transactional
+    @documents.async_transactional
     async def update(transaction) -> None:
         snapshot = await ref.get(transaction=transaction)
         if not snapshot.exists:
@@ -392,7 +392,7 @@ async def save_ingest_draft(job_id: UUID, clip_id: UUID, draft: dict) -> None:
     """Save one verification choice before the batch is committed."""
     ref = db().collection(COLLECTION).document(str(job_id))
 
-    @firestore.async_transactional
+    @documents.async_transactional
     async def update(transaction) -> None:
         snapshot = await ref.get(transaction=transaction)
         if not snapshot.exists:
@@ -428,7 +428,7 @@ async def abandon(job_id: UUID, reason: str) -> None:
             {
                 "state": State.FAILED,
                 "finished_at": datetime.now(UTC),
-                "failures": firestore.ArrayUnion([{"clip_id": "", "reason": reason}]),
+                "failures": documents.ArrayUnion([{"clip_id": "", "reason": reason}]),
             }
         )
     )
@@ -478,10 +478,10 @@ async def enqueue_ingest(
     been uploaded — which is both wrong and the least helpful thing it could
     say. This was exactly that bug.
     """
-    topic = publisher().topic_path(settings.project_id, settings.ingest_topic)
+    topic = publisher().topic_path(settings.project_id, settings.editorial_queue)
 
     for clip_id in clip_ids:
-        publisher().publish(
+        future = publisher().publish(
             topic,
             b"",
             job_id=str(job_id),
@@ -499,6 +499,8 @@ async def enqueue_ingest(
             auto_organize="true" if auto_organize else "false",
         )
 
+        await asyncio.to_thread(future.result, timeout=30)
+
     log.info("queued %d clips for job %s, project %d", len(clip_ids), job_id, project_id)
 
 
@@ -509,7 +511,7 @@ async def enqueue_analysis(
     force: bool = False,
 ) -> int:
     """Queue independent full-take work, one retryable message per clip."""
-    topic = publisher().topic_path(settings.project_id, settings.ingest_topic)
+    topic = publisher().topic_path(settings.project_id, settings.editorial_queue)
     queued = 0
     for clip in clips:
         clip_id = str(clip["clip_id"])

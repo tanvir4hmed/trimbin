@@ -21,9 +21,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
-from google import genai
-from google.genai import types
-
+from .. import content as types
+from .. import runtime as genai
 from ..common.errors import AgentFailure, text_of
 from ..config import settings
 from ..contracts.analysis import (
@@ -72,13 +71,11 @@ OUTLIER_RATIO = 1.6
 
 class AnalystAgent:
     def __init__(self, client: genai.Client | None = None) -> None:
-        self._client = client or genai.Client(
-            vertexai=True,
-            project=settings.project_id,
-            location=settings.model_location,
-        )
+        self._client = client or genai.Client()
 
-    async def run(self, request: AnalysisRequest, clip_bytes: dict[UUID, bytes]) -> AnalysisResult:
+    async def run(
+        self, request: AnalysisRequest, clip_bytes: dict[UUID, bytes | types.Part]
+    ) -> AnalysisResult:
         """Compare the takes of one shot and return a verdict with its reasoning."""
         if len(request.clips) > settings.max_takes_per_comparison:
             return await self._bracket(request, clip_bytes)
@@ -147,7 +144,7 @@ class AnalystAgent:
         self,
         request: AnalysisRequest,
         technical: list[SpecialistReport],
-        clip_bytes: dict[UUID, bytes],
+        clip_bytes: dict[UUID, bytes | types.Part],
     ) -> AnalysisResult:
         """The takes are technically equivalent, so the reasons have to be found.
 
@@ -156,11 +153,13 @@ class AnalystAgent:
         completion evidence. Performance preference belongs to the human and is
         never sent to the chief as a ranking signal.
         """
-        parts = [
-            types.Part.from_bytes(data=clip_bytes[c.clip_id], mime_type="video/mp4")
-            for c in request.clips
-            if c.clip_id in clip_bytes
-        ]
+        parts: list[types.Part] = []
+        for clip in request.clips:
+            data = clip_bytes.get(clip.clip_id)
+            if isinstance(data, bytes):
+                parts.append(types.Part.from_bytes(data=data, mime_type="video/mp4"))
+            elif isinstance(data, types.Part):
+                parts.append(data)
 
         continuity = await self._specialist(CONTINUITY, parts, request)
         reports = technical + continuity
@@ -242,7 +241,7 @@ class AnalystAgent:
     async def _bracket(
         self,
         request: AnalysisRequest,
-        clip_bytes: dict[UUID, bytes],
+        clip_bytes: dict[UUID, bytes | types.Part],
     ) -> AnalysisResult:
         """Compare in rounds when the group is larger than a single request.
 

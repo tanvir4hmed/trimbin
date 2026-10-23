@@ -20,7 +20,7 @@ def store():
     migrate(DSN)  # Idempotent migration ledger, no duplicate schema.
     project = uuid4().int % (2**62)
     with psycopg.connect(DSN) as conn:
-        conn.execute("INSERT INTO projects VALUES (%s, 'test')", (project,))
+        conn.execute("INSERT INTO projects(id,name) VALUES (%s, 'test')", (project,))
     return PostgresRepository(DSN), PostgresJobs(DSN), project
 
 

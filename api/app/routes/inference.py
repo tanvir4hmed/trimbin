@@ -16,8 +16,8 @@ def status() -> dict:
         "live_enabled": settings.inference_live_enabled,
         "live_verified": False,
         "quality_status": "not_evaluated",
-        "speech": "adapter_unavailable",
-        "editorial_integration": "portable_evidence_unverified",
+        "speech": "cpu_whisper_configured" if settings.asr_model else "unavailable",
+        "editorial_integration": "canonical_editorial_and_evidence",
         "status": "unavailable",
     }
     if settings.inference_mode == "fixture":

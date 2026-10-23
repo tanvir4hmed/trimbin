@@ -24,6 +24,7 @@ from .routes import (
     dataset,
     editable_exports,
     evidence,
+    files,
     film,
     inference,
     maintenance,
@@ -74,7 +75,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins
     or [
-        "https://trimbin.qlitch.com",
+        "https://trimbin.qleam.com",
         "http://localhost:3000",
     ],
     allow_credentials=True,
@@ -113,6 +114,22 @@ app.include_router(timelines.router)
 app.include_router(editable_exports.router)
 app.include_router(renders.router)
 app.include_router(workflow.router)
+app.include_router(files.router)
+
+
+@app.get("/health")
+async def health():
+    return {"status": "alive", "runtime": "trimbin"}
+
+
+@app.get("/ready")
+async def ready():
+    from .services.jobs import db
+
+    async with db().connection() as conn:
+        await conn.execute("SELECT 1 FROM projects LIMIT 1")
+    await (await analytics.client()).query("SELECT 1 FROM clips LIMIT 1")
+    return {"status": "ready", "runtime": "trimbin"}
 
 
 @app.exception_handler(evidence.EvidenceError)

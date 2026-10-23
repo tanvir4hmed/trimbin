@@ -1,0 +1,42 @@
+[
+  {
+    "model_id": "nvidia/Nemotron-3.5-Super-VL",
+    "revision": "provider-alias-unpinned",
+    "precision": "provider-undisclosed",
+    "modalities": [
+      "text",
+      "image"
+    ],
+    "response_format": "json_object",
+    "max_input_bytes": 100663296,
+    "max_frames": 8,
+    "license_url": "https://github.com/NVIDIA-NeMo/Nemotron/blob/main/docs/nemotron/super35/README.md",
+    "deployment_generation": "trimbin-tokenfactory-2026-10-23"
+  },
+  {
+    "model_id": "nvidia/nemotron-3-super-120b-a12b",
+    "revision": "provider-alias-unpinned",
+    "precision": "provider-undisclosed",
+    "modalities": [
+      "text"
+    ],
+    "response_format": "json_object",
+    "max_input_bytes": 16777216,
+    "max_frames": 0,
+    "license_url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
+    "deployment_generation": "trimbin-tokenfactory-2026-10-23"
+  },
+  {
+    "model_id": "Qwen/Qwen3-Embedding-8B",
+    "revision": "provider-alias-unpinned",
+    "precision": "provider-undisclosed",
+    "modalities": [
+      "embedding"
+    ],
+    "response_format": "json_object",
+    "max_input_bytes": 8388608,
+    "max_frames": 0,
+    "license_url": "https://huggingface.co/Qwen/Qwen3-Embedding-8B",
+    "deployment_generation": "trimbin-tokenfactory-2026-10-23"
+  }
+]

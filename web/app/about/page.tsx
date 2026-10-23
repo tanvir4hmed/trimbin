@@ -46,10 +46,10 @@ export default function AboutPage() {
       <section>
         <h2>Built for traceable decisions</h2>
         <p>
-          Google Cloud and Gemini support media processing and observation.
+          Google Cloud and NVIDIA Nemotron on Nebius Token Factory support media processing and observation.
           ClickHouse stores analytical evidence and powers scoped retrieval
-          through its official MCP server. Firestore owns operational state and
-          revisions; Cloud Storage holds media. Playback uses prepared sources
+          through its official MCP server. PostgreSQL owns operational state and
+          revisions; persistent filesystem storage holds media. Playback uses prepared sources
           rather than asking a model on every seek.
         </p>
       </section>

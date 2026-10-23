@@ -202,6 +202,10 @@ async def derivatives(
             "192k",
             "-avoid_negative_ts",
             "disabled",
+            # The MP4 default movie timescale (1000) rounds audio edit-list
+            # offsets to milliseconds. Match AAC's clock to preserve alignment.
+            "-movie_timescale",
+            "48000",
             "-movflags",
             "+faststart",
             str(work / "proxy.mp4"),

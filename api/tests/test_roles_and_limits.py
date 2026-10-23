@@ -162,85 +162,24 @@ class TestTheByteCap:
 
 
 class TestTheMaintenanceRouteIsClosed:
-    """Who may trigger the sweep.
-
-    The first version accepted any request carrying any Authorization header,
-    beside a comment claiming Cloud Run had already checked. It had not: this
-    service has an allUsers invoker binding because the public pages need one,
-    so Cloud Run lets everybody through and the application is the only gate.
-
-    A check-shaped thing with a confident comment is worse than no check, since
-    the comment stops anyone looking.
-    """
-
-    def test_no_header_is_refused(self) -> None:
-        from app.routes.maintenance import _is_the_scheduler
-
-        assert not _is_the_scheduler(None)
-
-    def test_something_that_is_not_a_bearer_token_is_refused(self) -> None:
-        from app.routes.maintenance import _is_the_scheduler
-
-        assert not _is_the_scheduler("Basic abcdef")
-
-    def test_an_unset_expected_account_refuses_rather_than_guesses(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """A maintenance route that runs for whoever asks is worse than one that
-        never runs."""
+    def test_unconfigured_refuses_every_request(self, monkeypatch):
         from app.routes import maintenance
 
-        monkeypatch.setattr(maintenance.settings, "scheduler_service_account", "")
+        monkeypatch.setattr(maintenance.settings, "maintenance_token", "")
         assert not maintenance._is_the_scheduler("Bearer anything")
 
-    def test_a_valid_token_from_the_wrong_account_is_refused(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """The signature being good is not the question. Plenty of accounts can
-        mint a valid Google token; one of them is ours."""
+    @pytest.mark.parametrize("header", [None, "Basic ours", "Bearer wrong", "Bearer ours-extra"])
+    def test_wrong_credentials_are_refused(self, monkeypatch, header):
         from app.routes import maintenance
 
-        monkeypatch.setattr(
-            maintenance.settings,
-            "scheduler_service_account",
-            "sched@trimbin.iam.gserviceaccount.com",
-        )
-        monkeypatch.setattr(
-            maintenance.id_token,
-            "verify_oauth2_token",
-            lambda *a, **k: {"email": "someone-else@example.com"},
-        )
-        assert not maintenance._is_the_scheduler("Bearer good-but-wrong")
+        monkeypatch.setattr(maintenance.settings, "maintenance_token", "ours")
+        assert not maintenance._is_the_scheduler(header)
 
-    def test_the_scheduler_itself_is_accepted(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_exact_service_token_is_accepted(self, monkeypatch):
         from app.routes import maintenance
 
-        monkeypatch.setattr(
-            maintenance.settings,
-            "scheduler_service_account",
-            "Sched@trimbin.iam.gserviceaccount.com",
-        )
-        monkeypatch.setattr(
-            maintenance.id_token,
-            "verify_oauth2_token",
-            lambda *a, **k: {"email": "sched@trimbin.iam.gserviceaccount.com"},
-        )
+        monkeypatch.setattr(maintenance.settings, "maintenance_token", "ours")
         assert maintenance._is_the_scheduler("Bearer ours")
-
-    def test_a_token_that_does_not_verify_is_refused(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from app.routes import maintenance
-
-        monkeypatch.setattr(
-            maintenance.settings,
-            "scheduler_service_account",
-            "sched@trimbin.iam.gserviceaccount.com",
-        )
-
-        def reject(*a, **k):
-            raise ValueError("Token expired")
-
-        monkeypatch.setattr(maintenance.id_token, "verify_oauth2_token", reject)
-        assert not maintenance._is_the_scheduler("Bearer stale")
 
 
 class TestCuratingIsNotCommenting:

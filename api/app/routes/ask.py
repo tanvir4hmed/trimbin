@@ -150,7 +150,7 @@ async def ask(
         # This is set only after the search completed through the official
         # read-only MCP path. It gives deploy smoke tests a stable signal that
         # does not depend on Cloud Logging choosing textPayload vs jsonPayload.
-        "execution_path": "mcp-clickhouse",
+        "execution_path": "clickhouse-readonly-http",
     }
 
 
@@ -160,14 +160,10 @@ async def _embed(description: str) -> list[float] | None:
     Returns None after one retry. The caller may still run a purely structured
     query, but must not turn a failed semantic search into a false empty result.
     """
-    from google import genai
-    from google.genai import types
+    from trimbin_agents import content as types
+    from trimbin_agents import runtime as genai
 
-    client = genai.Client(
-        vertexai=True,
-        project=settings.project_id,
-        location=settings.model_location,
-    )
+    client = genai.Client()
     for attempt in range(2):
         try:
             response = await client.aio.models.embed_content(

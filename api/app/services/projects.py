@@ -12,9 +12,8 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from google.cloud import firestore
-
-from . import jobs, members
+from ..foundation import documents
+from . import jobs
 
 log = logging.getLogger(__name__)
 
@@ -117,7 +116,7 @@ async def create(name: str, owner_email: str, is_public: bool = False) -> int:
     """
     counter = jobs.db().collection("counters").document("project_id")
 
-    @firestore.async_transactional
+    @documents.async_transactional
     async def allocate(transaction) -> int:
         snapshot = await counter.get(transaction=transaction)
         current = (snapshot.to_dict() or {}).get("value", 0) if snapshot.exists else 0
@@ -144,7 +143,7 @@ async def create(name: str, owner_email: str, is_public: bool = False) -> int:
 
 
 async def add_member(project_id: int, email: str) -> None:
-    await _doc(project_id).update({"member_emails": firestore.ArrayUnion([email.lower()])})
+    await _doc(project_id).update({"member_emails": documents.ArrayUnion([email.lower()])})
 
 
 async def for_member(email: str, *, states: set[str] | None = None) -> list[Project]:
@@ -230,7 +229,7 @@ def open_to_readers(project: Project | None) -> bool:
     """
     if project is None or project.state != "active":
         return False
-    return project.is_public or members.is_staff(project.owner_email)
+    return project.is_public
 
 
 def can_work(project: Project | None, email: str | None) -> bool:
@@ -260,7 +259,7 @@ async def change(
     """Rename or move through archive/trash with optimistic concurrency."""
     ref = _doc(project_id)
 
-    @firestore.async_transactional
+    @documents.async_transactional
     async def apply(transaction) -> None:
         snapshot = await ref.get(transaction=transaction)
         if not snapshot.exists:

@@ -8,9 +8,9 @@ from typing import Literal
 from uuid import UUID
 
 from fastapi import HTTPException
-from google.cloud import firestore
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from ..foundation import documents
 from . import analysis_store, revisions
 from .jobs import db
 
@@ -167,7 +167,7 @@ async def history(project_id: int, clip_id: UUID) -> AttemptHistory:
     async for snap in (
         reference(project_id, clip_id)
         .collection("versions")
-        .order_by("rev", direction=firestore.Query.DESCENDING)
+        .order_by("rev", direction=documents.Query.DESCENDING)
         .limit(30)
         .stream()
     ):
@@ -201,7 +201,7 @@ async def save(project_id: int, clip_id: UUID, body: AttemptSave, actor: str) ->
         )
         historical_ids = {str(row[0]) for row in found.result_rows}
 
-    @firestore.async_transactional
+    @documents.async_transactional
     async def commit(transaction):
         snapshot = await ref.get(transaction=transaction)
         replay = await receipt.get(transaction=transaction)

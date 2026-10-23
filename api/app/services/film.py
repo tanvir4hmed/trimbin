@@ -1,18 +1,16 @@
-"""Independent project film sequences with revision-safe source-range snapshots."""
+"""Film compatibility contracts and scene coverage; canonical state is in film_canonical."""
 
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import datetime
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from fastapi import HTTPException
-from google.cloud import firestore
 from pydantic import BaseModel, Field, model_validator
 
-from . import attempts, revisions, stringout, structure
+from . import stringout, structure
 from .analytics import _many
-from .jobs import db
 
 
 class FilmRange(BaseModel):
@@ -179,30 +177,6 @@ async def coverage(project_id: int) -> FilmCoverage:
     return FilmCoverage(preview=preview, scene_count=len(scene_ids), omissions=omissions)
 
 
-async def history(project_id: int) -> FilmHistory:
-    query = (
-        db()
-        .collection("film_sequences")
-        .document(str(project_id))
-        .collection("versions")
-        .order_by("rev", direction=firestore.Query.DESCENDING)
-        .limit(20)
-    )
-    return FilmHistory(
-        versions=[FilmVersion.model_validate(s.to_dict()) async for s in query.stream()]
-    )
-
-
-async def read_version(project_id: int, revision: int) -> FilmState:
-    ref = db().collection("film_sequences").document(str(project_id))
-    snap = await ref.collection("versions").document(str(revision)).get()
-    if not snap.exists:
-        raise HTTPException(404, "No such saved film revision.")
-    document = snap.to_dict() or {}
-    ids = list({UUID(row["clip_id"]) for row in document.get("ranges", [])})
-    return materialize(project_id, document, await sources(project_id, ids=ids, limit=1000))
-
-
 async def sources(
     project_id: int, *, ids: list[UUID] | None = None, offset: int = 0, limit: int = 100
 ) -> list[FilmSource]:
@@ -263,13 +237,6 @@ def materialize(project_id: int, document: dict, available: list[FilmSource]) ->
     )
 
 
-async def read(project_id: int) -> FilmState:
-    snap = await db().collection("film_sequences").document(str(project_id)).get()
-    document = snap.to_dict() or {} if snap.exists else {}
-    ids = list({UUID(row["clip_id"]) for row in document.get("ranges", [])})
-    return materialize(project_id, document, await sources(project_id, ids=ids, limit=1000))
-
-
 def validate_sources(ranges: list[FilmRange], available: list[FilmSource]) -> None:
     by_id = {source.clip_id: source for source in available}
     for row in ranges:
@@ -280,61 +247,3 @@ def validate_sources(ranges: list[FilmRange], available: list[FilmSource]) -> No
             )
         if row.end_s > source.duration_s + 0.001:
             raise HTTPException(422, "A selected range extends beyond its source duration.")
-
-
-async def save(project_id: int, body: FilmSave, actor: str) -> FilmState:
-    available = await sources(project_id, ids=list({r.clip_id for r in body.ranges}), limit=1000)
-    validate_sources(body.ranges, available)
-    for clip_ref, attempt_ref, attempt_rev in {
-        (r.clip_id, r.attempt_id, r.attempt_revision)
-        for r in body.ranges
-        if r.attempt_id or r.attempt_revision
-    }:
-        await attempts.validate_reference(project_id, clip_ref, attempt_ref, attempt_rev)
-    ref = db().collection("film_sequences").document(str(project_id))
-    revision_ref = ref.collection("versions").document(str(body.rev + 1))
-    payload = {
-        "project_id": project_id,
-        "name": body.name.strip() or "Film sequence",
-        "ranges": [r.model_dump(mode="json") for r in body.ranges],
-        "updated_by": actor,
-        "updated_at": datetime.now(UTC),
-        "command_id": str(body.command_id),
-        "rev": body.rev + 1,
-    }
-
-    @firestore.async_transactional
-    async def commit(transaction):
-        # Every immutable version is also a persistent receipt for its command,
-        # including a retry arriving after a colleague's subsequent save.
-        receipt = await revision_ref.get(transaction=transaction)
-        recorded = receipt.to_dict() or {} if receipt.exists else {}
-        if (
-            recorded.get("command_id") == str(body.command_id)
-            and recorded.get("updated_by") == actor
-        ):
-            if (
-                recorded.get("ranges") != payload["ranges"]
-                or recorded.get("name") != payload["name"]
-            ):
-                raise HTTPException(409, "A retry key cannot be reused for a different sequence.")
-            return recorded
-        snap = await ref.get(transaction=transaction)
-        previous = snap.to_dict() or {} if snap.exists else {}
-        if (
-            previous.get("command_id") == str(body.command_id)
-            and previous.get("updated_by") == actor
-        ):
-            if (
-                previous.get("ranges") != payload["ranges"]
-                or previous.get("name") != payload["name"]
-            ):
-                raise HTTPException(409, "A retry key cannot be reused for a different sequence.")
-            return previous
-        revisions.check(body.rev, int(previous.get("rev", 0)))
-        transaction.set(ref, payload)
-        transaction.set(revision_ref, payload)
-        return payload
-
-    committed = await commit(db().transaction())
-    return materialize(project_id, committed, available)

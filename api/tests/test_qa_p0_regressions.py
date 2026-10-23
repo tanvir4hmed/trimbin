@@ -433,7 +433,7 @@ class TestP01GuestEntryOpensAProduct:
     is a rule now: the team's own active productions are open to readers.
     """
 
-    def test_the_team_s_work_is_open_to_readers(self) -> None:
+    def test_private_team_work_is_not_open_to_readers(self) -> None:
         from app.services import members, projects
 
         class P:
@@ -441,7 +441,7 @@ class TestP01GuestEntryOpensAProduct:
             is_public = False
             owner_email = members.LEAD_EDITOR
 
-        assert projects.open_to_readers(P()) is True
+        assert projects.open_to_readers(P()) is False
 
     def test_a_deleted_project_is_open_to_nobody(self) -> None:
         """The exact failure. A removed production must not be the thing a
@@ -514,7 +514,7 @@ class TestTheClientCanDoTheWork:
             project_id = 7
             owner_email = members.LEAD_EDITOR
             member_emails: list[str] = []
-            is_public = False
+            is_public = True
             state = "active"
             rev = 0
 

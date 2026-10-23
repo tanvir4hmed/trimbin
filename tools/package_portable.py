@@ -31,6 +31,7 @@ ROOT_FILES = {
     ".dockerignore",
     ".env.example",
     ".gitignore",
+    ".gitattributes",
 }
 EXTENSIONS = {
     ".py",
@@ -104,9 +105,9 @@ def package(ref: str, output: Path) -> str:
         "LICENSE",
         "web/package-lock.json",
         "api/uv.lock",
-        "deploy/portable/compose.yaml",
-        "deploy/portable/api.Dockerfile",
-        "web/portable.Dockerfile",
+        "deploy/production/compose.yaml",
+        "deploy/production/api.Dockerfile",
+        "deploy/production/web.Dockerfile",
     }
     if not required <= {n for n, _, _ in entries}:
         raise ValueError("Commit does not contain the complete portable package")

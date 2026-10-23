@@ -128,6 +128,19 @@ async def process(
     object_path = storage.object_for(project_id, clip_id)
     if object_path is None:
         raise Rejected("not found in storage")
+    if not object_path.startswith("source:"):
+        from ..config import settings
+        from ..media.store import MediaStore
+
+        await asyncio.to_thread(
+            MediaStore(settings.database_url).register,
+            project_id,
+            "uploads",
+            object_path,
+            uploaded_by,
+            clip_id,
+            True,
+        )
 
     job = await jobs.get_job(job_id)
     previous = (

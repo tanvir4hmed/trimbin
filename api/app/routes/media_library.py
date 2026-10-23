@@ -1,4 +1,4 @@
-"""Authenticated portable ingest; legacy uploads remain separate until cutover."""
+"""Authenticated filesystem media library sharing project and editorial identities."""
 
 from __future__ import annotations
 

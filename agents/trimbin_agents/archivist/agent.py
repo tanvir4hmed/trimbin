@@ -15,9 +15,8 @@ from __future__ import annotations
 
 import logging
 
-from google import genai
-from google.genai import types
-
+from .. import content as types
+from .. import runtime as genai
 from ..common.errors import AgentFailure, text_of
 from ..config import settings
 from ..contracts.base import Strict
@@ -77,11 +76,7 @@ trying. Never a consolation result presented as an answer."""
 
 class ArchivistAgent:
     def __init__(self, client: genai.Client | None = None) -> None:
-        self._client = client or genai.Client(
-            vertexai=True,
-            project=settings.project_id,
-            location=settings.model_location,
-        )
+        self._client = client or genai.Client()
 
     async def plan(self, question: str) -> SearchPlan:
         """Question in, filters out. No SQL, and no answer."""

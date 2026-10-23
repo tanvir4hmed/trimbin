@@ -46,7 +46,9 @@ def role_of(email: str | None) -> Role:
     if not email:
         return "guest"
     normalised = email.strip().lower()
-    if normalised == LEAD_EDITOR:
+    from ..config import settings
+
+    if normalised == settings.lead_editor_email.lower():
         return "lead"
     if normalised in EDITORS:
         return "editor"

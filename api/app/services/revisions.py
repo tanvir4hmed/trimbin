@@ -30,8 +30,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
-from google.cloud import firestore
 
+from ..foundation import documents
 from .jobs import db
 
 log = logging.getLogger(__name__)
@@ -111,7 +111,7 @@ async def bump(
     """
     ref = db().collection(collection).document(doc_id)
 
-    @firestore.async_transactional
+    @documents.async_transactional
     async def write(transaction) -> int:
         snapshot = await ref.get(transaction=transaction)
         current = (snapshot.to_dict() or {}).get("rev", 0) if snapshot.exists else 0

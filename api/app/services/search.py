@@ -20,9 +20,8 @@ not write SQL. That was a response to finding the MCP wrapper's safety check
 resting on a keyword regex beside a comment claiming a read-only user existed —
 it did not.
 
-**The statement is executed through the official `mcp-clickhouse` server**, as
-the ClickHouse track requires the database to be used at runtime, and the
-read-only user the comment described now exists: SELECT on ten named objects,
+**The statement executes through the read-only HTTP archive adapter**, retaining
+the same scoped query contracts. The read-only user holds SELECT on named objects,
 under a profile with `readonly = 1 CONST`.
 
 Those are different questions. Who composes the statement is about correctness —
@@ -103,7 +102,7 @@ _REQUEST_MCP: ContextVar[Any | None] = ContextVar("trimbin_search_mcp", default=
 
 @asynccontextmanager
 async def execution_session() -> AsyncIterator[None]:
-    """Share one official MCP subprocess for all queries in one search.
+    """Share one scoped archive adapter across all branches in a search.
 
     Missing reader configuration is deliberately not hidden. We yield without
     a shared session so `_execute` follows its normal fail-closed path and

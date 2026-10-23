@@ -1,0 +1,144 @@
+name: trimbin
+x-app: &app
+  image: ${TRIMBIN_APP_IMAGE:?Set immutable API image digest}
+  restart: unless-stopped
+  env_file: /srv/trimbin/private/runtime.env
+  environment:
+    HF_HOME: /model-cache/huggingface
+    HF_HUB_CACHE: /model-cache/huggingface/hub
+    HF_XET_CACHE: /model-cache/huggingface/xet
+    XDG_CACHE_HOME: /model-cache
+    HF_HUB_DISABLE_XET: "1"
+  networks: [data, egress]
+  read_only: true
+  tmpfs: ["/tmp:size=256m,mode=1777"]
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+  logging:
+    driver: json-file
+    options: {max-size: 10m, max-file: "3"}
+  volumes: &media
+    - /srv/trimbin/media/originals:/media/originals:ro
+    - /srv/trimbin/media/staging:/media/staging:ro
+    - /srv/trimbin/media/derived:/media/derived
+    - /srv/trimbin/media/library:/media/library:ro
+    - /srv/trimbin/media/exports:/media/exports
+    - /srv/trimbin/model-cache:/model-cache
+services:
+  postgres:
+    image: postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: trimbin
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_admin
+    secrets: [postgres_admin, postgres_writer]
+    volumes:
+      - /srv/trimbin/postgres:/var/lib/postgresql/data
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/10-users.sh:ro
+    networks: [data]
+    mem_limit: 1g
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U postgres -d trimbin]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.8@sha256:7dfd56d5b9a5d17eb308bf79641b52c70e93800268e9f2137cad942b5e0e40c1
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD_FILE: /run/secrets/clickhouse_admin
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    secrets: [clickhouse_admin]
+    volumes:
+      - /srv/trimbin/clickhouse:/var/lib/clickhouse
+      - /srv/trimbin/backups/clickhouse:/backups
+      - ./clickhouse.xml:/etc/clickhouse-server/config.d/trimbin.xml:ro
+    networks: [data]
+    mem_limit: 3g
+    ulimits:
+      nofile: {soft: 262144, hard: 262144}
+    healthcheck:
+      test: [CMD, wget, --spider, -q, http://localhost:8123/ping]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+  bootstrap:
+    <<: *app
+    restart: "no"
+    env_file: [/srv/trimbin/private/runtime.env, /srv/trimbin/private/bootstrap.env]
+    command: [python, /opt/trimbin/tools/production_bootstrap.py]
+    mem_limit: 1g
+  api:
+    <<: *app
+    mem_limit: 1g
+    volumes:
+      # One mount permits atomic staging -> original rename (separate binds return EXDEV).
+      - /srv/trimbin/media:/media
+      - /srv/trimbin/media/derived:/media/derived:ro
+      - /srv/trimbin/media/library:/media/library:ro
+      - /srv/trimbin/media/exports:/media/exports:ro
+      - /srv/trimbin/model-cache:/model-cache
+  media:
+    <<: *app
+    env_file: /srv/trimbin/private/media.env
+    command: [python, -m, app.media.worker]
+    mem_limit: 1g
+  editorial:
+    <<: *app
+    command: [python, -m, app.worker.editorial]
+    mem_limit: 4g
+    tmpfs: ["/tmp:size=2g,mode=1777"]
+  analysis:
+    <<: *app
+    command: [python, -m, app.evidence.worker]
+    mem_limit: 1536m
+  projection:
+    <<: *app
+    env_file: /srv/trimbin/private/media.env
+    command: [python, -m, app.evidence.projection]
+    mem_limit: 512m
+  vectors:
+    <<: *app
+    command: [python, -m, app.evidence.vectors]
+    mem_limit: 512m
+  exports:
+    <<: *app
+    env_file: /srv/trimbin/private/media.env
+    command: [python, -m, app.exports.worker]
+    mem_limit: 512m
+  renders:
+    <<: *app
+    env_file: /srv/trimbin/private/media.env
+    command: [python, -m, app.renders.worker]
+    mem_limit: 1536m
+  web:
+    image: ${TRIMBIN_WEB_IMAGE:?Set immutable frontend image digest}
+    restart: unless-stopped
+    networks: [egress]
+    read_only: true
+    user: "10001:10001"
+    tmpfs: [/tmp:size=64m, "/app/.next/cache:size=64m,uid=10001,gid=10001"]
+    mem_limit: 512m
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+  gateway:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    ports: ["80:8088"]
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks: [egress]
+    user: "10001:10001"
+    read_only: true
+    tmpfs: [/tmp:size=64m]
+    mem_limit: 128m
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+networks:
+  data: {internal: true}
+  egress: {}
+secrets:
+  postgres_admin: {file: /srv/trimbin/private/postgres_admin}
+  postgres_writer: {file: /srv/trimbin/private/postgres_writer}
+  clickhouse_admin: {file: /srv/trimbin/private/clickhouse_admin}

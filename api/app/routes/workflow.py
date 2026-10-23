@@ -18,7 +18,8 @@ async def projects(principal: User, response: Response, offset: int = Query(0, g
         with MediaStore(settings.database_url).connection() as conn:
             return conn.execute(
                 "SELECT p.id,p.name,m.role FROM projects p JOIN project_members m "
-                "ON m.project_id=p.id WHERE m.email=%s ORDER BY p.id LIMIT 50 OFFSET %s",
+                "ON m.project_id=p.id WHERE m.email=%s AND p.state='active' "
+                "ORDER BY p.id LIMIT 50 OFFSET %s",
                 (principal.email, offset),
             ).fetchall()
 

@@ -8,9 +8,8 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException
 
-from app.services import film, jobs
+from app.services import jobs
 
 
 class Store:
@@ -29,7 +28,7 @@ class Store:
     def update(self, ref, payload):
         data = self.data.setdefault(ref.path, {})
         for key, value in payload.items():
-            if isinstance(value, jobs.firestore.ArrayUnion):
+            if isinstance(value, jobs.documents.ArrayUnion):
                 data[key] = data.get(key, []) + list(value.values)
             else:
                 data[key] = deepcopy(value)
@@ -52,34 +51,9 @@ class Reference:
 @pytest.fixture
 def store(monkeypatch):
     memory = Store()
-    monkeypatch.setattr(film, "db", lambda: memory)
     monkeypatch.setattr(jobs, "db", lambda: memory)
-    monkeypatch.setattr(film.firestore, "async_transactional", lambda fn: fn)
+    monkeypatch.setattr(jobs.documents, "async_transactional", lambda fn: fn)
     return memory
-
-
-@pytest.mark.asyncio
-async def test_film_save_retry_conflict_and_immutable_history(store, monkeypatch):
-    async def sources(*args, **kwargs):
-        return []
-
-    monkeypatch.setattr(film, "sources", sources)
-    command = film.FilmSave(rev=0, command_id=uuid4(), name="Assembly", ranges=[])
-    first = await film.save(9, command, "editor@example.com")
-    retry = await film.save(9, command, "editor@example.com")
-    assert first.rev == retry.rev == 1
-    assert len(store.data) == 2
-    snapshot = deepcopy(store.data["film_sequences/9/versions/1"])
-    with pytest.raises(HTTPException) as conflict:
-        await film.save(9, command.model_copy(update={"command_id": uuid4()}), "other@example.com")
-    assert conflict.value.status_code == 409
-    with pytest.raises(HTTPException):
-        await film.save(
-            9, command.model_copy(update={"name": "Changed retry"}), "editor@example.com"
-        )
-    second = command.model_copy(update={"rev": 1, "command_id": uuid4(), "name": "New order"})
-    assert (await film.save(9, second, "editor@example.com")).rev == 2
-    assert store.data["film_sequences/9/versions/1"] == snapshot
 
 
 @pytest.mark.asyncio

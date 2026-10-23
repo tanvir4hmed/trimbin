@@ -9,8 +9,8 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException
-from google.cloud import firestore
 
+from ..foundation import documents
 from . import analysis_store, revisions
 from .jobs import db
 
@@ -82,7 +82,7 @@ async def commit(
         command_ref(project_id, clip_id, finding_id, actor, command_key) if command_key else None
     )
 
-    @firestore.async_transactional
+    @documents.async_transactional
     async def write(transaction) -> Committed:
         if receipt:
             previous = await receipt.get(transaction=transaction)

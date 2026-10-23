@@ -19,6 +19,8 @@ def main():
             "-m",
             "pytest",
             "api/tests/test_foundation_postgres.py",
+            "api/tests/test_editorial_postgres.py",
+            "api/tests/test_film_canonical_postgres.py",
             "api/tests/test_evidence_postgres.py",
             "api/tests/test_timeline_postgres.py",
             "api/tests/test_exports_postgres.py",

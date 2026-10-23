@@ -22,7 +22,6 @@ import tempfile
 from pathlib import Path
 
 from .measure import (
-    EMBED_FRAME_HEIGHT,
     GOP_SECONDS,
     MEASURE_FPS,
     MEASURE_HEIGHT,
@@ -31,7 +30,6 @@ from .measure import (
     PROXY_FPS,
     PROXY_HEIGHT,
     SEGMENT_SECONDS,
-    SLATE_HEIGHT,
     SPRITE_COLUMNS,
     SPRITE_INTERVAL_S,
     SPRITE_WIDTH,
@@ -512,7 +510,7 @@ async def extract_head(source: Path, out_path: Path, seconds: float) -> Path | N
             str(source),
             "-an",  # the board is read, not heard
             "-vf",
-            f"scale=-2:{SLATE_HEIGHT}",
+            "scale=trunc(iw/2)*2:trunc(ih/2)*2",
             "-c:v",
             "libx264",
             "-preset",
@@ -601,7 +599,7 @@ async def extract_frames(source: Path, out_dir: Path, count: int, duration_s: fl
             "-i",
             str(source),
             "-vf",
-            f"fps=1/{interval:.3f},scale=-2:{EMBED_FRAME_HEIGHT}",
+            f"fps=1/{interval:.3f}",
             "-frames:v",
             str(count),
             "-q:v",

@@ -203,6 +203,9 @@ async def current_principal(request: Request) -> Principal:
     would make every public page require a login it does not need.
     """
     header = request.headers.get("Authorization", "")
+    cookies = getattr(request, "cookies", {})
+    if not header and cookies.get("trimbin_session"):
+        header = "Bearer " + cookies["trimbin_session"]
     if not header.startswith("Bearer "):
         return Principal(email=None)
 

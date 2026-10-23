@@ -19,8 +19,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from fastapi import HTTPException
-from google.cloud import firestore
 
+from ..foundation import documents
 from .jobs import db
 
 log = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ async def add_scene(project_id: int, scene: int, heading: str, scene_code: str =
 async def _edit_scene(project_id: int, scene: int, change: Callable[[dict], dict]) -> Scene:
     lock = db().collection("structure_locks").document(str(project_id))
 
-    @firestore.async_transactional
+    @documents.async_transactional
     async def write(transaction):
         lock_snapshot = await lock.get(transaction=transaction)
         version = (lock_snapshot.to_dict() or {}).get("rev", 0)
@@ -255,7 +255,7 @@ async def ensure_slate_codes(project_id: int, scene_code: str, shot_code: str) -
         return 0, 0
     lock = db().collection("structure_locks").document(str(project_id))
 
-    @firestore.async_transactional
+    @documents.async_transactional
     async def ensure(transaction):
         lock_snapshot = await lock.get(transaction=transaction)
         version = (lock_snapshot.to_dict() or {}).get("rev", 0)

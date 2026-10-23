@@ -14,8 +14,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from google.cloud import firestore
-
+from ..foundation import documents
 from . import decisions, revisions
 from .analytics import client
 from .jobs import db
@@ -56,7 +55,7 @@ async def commit_coverage(
     event_ref = db().collection(COLLECTION).document(event_id)
     now = datetime.now(UTC)
 
-    @firestore.async_transactional
+    @documents.async_transactional
     async def write(transaction) -> Committed:
         snapshot = await shot_ref.get(transaction=transaction)
         current = snapshot.to_dict() or {} if snapshot.exists else {}
@@ -135,7 +134,7 @@ async def commit(
     event_ref = db().collection(COLLECTION).document(event_id)
     now = datetime.now(UTC)
 
-    @firestore.async_transactional
+    @documents.async_transactional
     async def write(transaction) -> Committed:
         snapshot = await shot_ref.get(transaction=transaction)
         current = snapshot.to_dict() or {} if snapshot.exists else {}

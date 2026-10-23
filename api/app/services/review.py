@@ -20,12 +20,13 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from uuid import UUID
 
+from trimbin_agents.content import Part
+
 from . import analysis_store, assessment, criteria, storage
 from . import decisions as decisions_service
 from . import ranges as ranges_service
 from . import shots as shots_service
 from .analytics import client
-from .ffmpeg_ops import remux
 
 log = logging.getLogger(__name__)
 
@@ -311,36 +312,18 @@ async def _load(project_id: int, group_id: int, subgroup_id: int) -> list[dict]:
     return takes
 
 
-async def _fetch_windows(project_id: int, takes: list[dict], work: Path) -> dict[UUID, bytes]:
-    """Assemble the window the panel watches, one take at a time.
-
-    From the proxy, not the original — see storage.download_proxy_window for why
-    that is a fairness decision rather than a shortcut.
-
-    Failures are per-take and non-fatal. A setup where one proxy is missing is
-    still worth judging on the rest, and that take then gets no verdict rather
-    than the whole shot getting none.
-    """
-    windows: dict[UUID, bytes] = {}
-
+async def _fetch_windows(project_id: int, takes: list[dict], work: Path) -> dict[UUID, Part]:
+    """Read bounded original windows for the comparative panel; never preview proxies."""
+    windows = {}
     for take in takes:
         clip_id = take["clip_id"]
         try:
-            segments = work / f"{clip_id}.ts"
-            if not storage.download_proxy_window(
-                f"p{project_id}/{clip_id}", segments, PANEL_WINDOW_S
-            ):
-                continue
-
-            # Remuxed, not re-encoded. Gemini wants a container it can seek in,
-            # and the video stream is already exactly what we want to send.
-            window = await remux(segments, work / f"{clip_id}.mp4", PANEL_WINDOW_S)
-            if window is not None:
-                windows[clip_id] = window.read_bytes()
-            segments.unlink(missing_ok=True)
-        except Exception:
-            log.exception("could not prepare take %s for the panel", clip_id)
-
+            source = storage.resolve_source(project_id, clip_id)
+            windows[clip_id] = Part.from_video_window(
+                source, 0, min(PANEL_WINDOW_S, take["duration_s"]), str(clip_id)
+            )
+        except (FileNotFoundError, ValueError):
+            log.warning("Original unavailable for panel take %s", clip_id)
     return windows
 
 

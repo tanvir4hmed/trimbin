@@ -8,12 +8,12 @@ from app.config import Settings
 from app.foundation.repository import fingerprint
 
 
-def test_single_registry_and_legacy_compatibility():
+def test_single_registry_and_self_hosted_defaults():
     assert Settings is AgentSettings
     settings = Settings(_env_file=None)
-    assert settings.profile == "legacy-cloud"
-    assert settings.clickhouse_secure is True
-    assert settings.clickhouse_port == 8443
+    assert settings.profile == "development"
+    assert settings.clickhouse_secure is False
+    assert settings.clickhouse_port == 8123
 
 
 def test_portable_settings_have_no_secret_fallback():

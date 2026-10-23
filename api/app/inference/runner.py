@@ -255,7 +255,12 @@ async def embed(
         raise InferenceError("embedding_identity_mismatch")
     if identity.deployment_generation != profile.deployment_generation:
         raise InferenceError("embedding_identity_mismatch")
-    payload = {"model": identity.model_id, "input": texts, "encoding_format": "float"}
+    payload = {
+        "model": identity.model_id,
+        "input": texts,
+        "dimensions": identity.dimension,
+        "encoding_format": "float",
+    }
     request_bytes = len(json.dumps(payload).encode())
     if request_bytes > profile.max_input_bytes:
         raise InferenceError("model_input_limit_exceeded")

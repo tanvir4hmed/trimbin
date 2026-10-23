@@ -1,6 +1,6 @@
 # Portable foundation setup and recovery
 
-Implemented in Phase 2, 21 October 2026. This provides configuration, database services and operational interfaces. Existing editorial routes still use the previous cloud storage/state integrations until their migration phases. Selecting a new profile does not migrate data or deploy the completed editor.
+This is the disposable database development/CI fixture, not a second production application. The completed AWS cutover uses the same PostgreSQL/ClickHouse primitives through deploy/production/compose.yaml. Current production evidence is in [AWS cutover](AWS_CUTOVER.md).
 
 ## Requirements and versions
 
@@ -31,7 +31,7 @@ The PostgreSQL admin applies migrations; `trimbin_writer` has DML rights, not sc
 
 ## Configuration and interfaces
 
-API and agents now import the same Settings registry in `agents/trimbin_agents/config.py`. `legacy-cloud` preserves existing deployed defaults; `development` and `cloud-poc` explicitly identify portable configuration. Cloud PoC rejects fixture inference. Secrets are excluded from settings repr/dumps. ClickHouse TLS and port are configurable in both API and MCP paths.
+API and agents now import the same Settings registry in `agents/trimbin_agents/config.py`. The supported profiles are `development` and `cloud-poc`; the retired legacy-cloud profile is removed. Cloud PoC rejects fixture inference. Secrets are excluded from settings repr/dumps. ClickHouse TLS and port are configurable for API and read-only HTTP retrieval.
 
 The generated environment has no default model IDs for the portable inference path. Capability reports distinguish missing configuration, fixture-only behavior and configured-but-unverified capabilities. They do not certify provider access, model quality or migrated API routes.
 
@@ -46,7 +46,7 @@ Supported preflight service groups are API, worker, retrieval and inference. Con
 
 `PostgresJobs` provides idempotent enqueue, transactional claim, lease renewal, expiry recovery, cancellation, bounded retries and fenced completion. Completion returning true means the current lease's result was accepted; a cancellation may make the resulting state cancelled rather than succeeded. Outbox delivery is at least once; Phase 5 consumers must deduplicate event IDs and preserve generation ordering. PostgreSQL locking follows [transaction-scoped advisory locks and row locks](https://www.postgresql.org/docs/17/explicit-locking.html).
 
-The checksum-protected `schema.sql` is migration version 1. Never edit an applied migration in place; numbered migrations now extend it; version 2 adds media sources, uploads and project membership. Legacy Firestore readers are deliberately not switched in Phase 2.
+The checksum-protected `schema.sql` is migration version 1. Never edit an applied migration in place; numbered migrations now extend it; version 2 adds media sources, uploads and project membership. The cutover document adapter now uses PostgreSQL for retained editorial consumers too.
 
 ## Backup and restore
 
@@ -71,7 +71,7 @@ Changing a password file is not database password rotation. PostgreSQL initializ
 
 The unapplied Phase 2 GCP host draft was an incorrect hosting assumption. Its five tracked files were moved, with verified hashes, outside Git to `D:\NVIDIA\archive\2026-10-21-phase3-gcp-draft`. No live resource or Terraform state was changed. No new GCP hosting requirement is introduced.
 
-The foundation and [media package](MEDIA_SETUP.md) define provider-neutral services and volumes. A new host/provider and budget remain undecided; eventual new infrastructure must be Terraform-managed. Existing push-triggered deployment stays active until approved cutover.
+Production hosting is now the authorized AWS Terraform deployment. See [deployment design](DEPLOYMENT_DESIGN.md) and [media setup](MEDIA_SETUP.md). Old GCP push workflows were retired; the new main workflow builds and deploys the canonical application.
 
 After staging/committing source, `python tools/package_foundation.py` packages Git-tracked source into ignored `.secrets/artifacts`. It does not upload or provision anything. Apply migrations before allowing application consumers. The package alone does not deploy the completed editor.
 
@@ -79,4 +79,4 @@ After staging/committing source, `python tools/package_foundation.py` packages G
 
 Local configuration/unit and existing regression tests are recorded in [phase status](PHASE_STATUS.md). The GitHub `Portable database foundation` job starts the pinned services, applies migrations, checks permissions, runs concurrent revision/replay/lease tests, restarts the stores and restores a cold backup.
 
-Docker-based acceptance remains unverified on this PC. Do not interpret skipped PostgreSQL tests as passed, or a pushed commit as a successful deployment. Per owner instruction, deployment completion is not polled.
+Docker-based runtime and real PostgreSQL tests were executed on the authorized AWS host; exact counts and recovery scope are in [AWS cutover](AWS_CUTOVER.md). The PC still has no Docker backend. Do not interpret skipped tests as passed or a pushed commit as completion of its deployment. The final push deployment is not polled.

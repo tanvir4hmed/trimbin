@@ -1,38 +1,4 @@
-"""The ClickHouse MCP client, read-only for real this time.
-
-Every search an editor runs goes through the official `mcp-clickhouse` server,
-which is how the ClickHouse track requires the database to be used at runtime.
-
-This file once opened with the same claim and did not earn it. It said a
-read-only database user was the primary defence and the keyword regex below was
-a convenience; there was no read-only user, the connection was the admin one,
-and the regex was the only thing between a model-written statement and the
-production archive. A regex over SQL is a filter, not a boundary — a subquery, a
-comment splicing a keyword, a function whose name contains a forbidden word are
-all ordinary SQL and none of them are what the pattern was written for.
-
-The user now exists. `trimbin_reader` holds SELECT on named objects and nothing
-else — each granted explicitly by the migration that creates the object, so the
-list grows only when somebody writes the grant — under a profile with
-`readonly = 1 CONST`. Const so it cannot be turned off mid-session, which is the
-difference between a setting and a guarantee.
-See `clickhouse/migrations/011_readonly_user.sql`.
-
-(This said "ten named objects" until the count reached thirty-four. A number in
-a comment is a claim that stops being true without anything failing, which is the
-mistake this file's opening paragraph is about — so it names the mechanism now
-rather than the total.)
-
-So the layers, in the order they actually stop something:
-
-  1. the server refuses anything but SELECT, whatever statement arrives
-  2. the grant limits which objects a SELECT can even name
-  3. the scope filter is appended by us and never asked for in the prompt
-  4. the regex rejects the obvious before it costs a round trip
-
-Only the first two are boundaries. The other two are courtesies, and this file
-now says which is which.
-"""
+"""Read-only ClickHouse queries with server-enforced grants and project scope."""
 
 from __future__ import annotations
 
@@ -150,7 +116,7 @@ def scope_clause(project_id: int | None) -> str:
 
 
 class ClickHouseMCP:
-    """Thin wrapper over the official mcp-clickhouse server."""
+    """Scoped query interface; the retained class name preserves existing callers."""
 
     def __init__(self, session: Any = None) -> None:
         self._session = session
@@ -319,24 +285,32 @@ def server_env() -> dict[str, str]:
     }
 
 
+class HTTPReader:
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
+        from types import SimpleNamespace
+
+        import aiohttp
+
+        if name != "run_query":
+            raise QueryFailed("Unsupported archive operation")
+        env = server_env()
+        scheme = "https" if settings.clickhouse_secure else "http"
+        url = f"{scheme}://{settings.clickhouse_host}:{settings.clickhouse_port}/"
+        auth = aiohttp.BasicAuth(env["CLICKHOUSE_USER"], env["CLICKHOUSE_PASSWORD"])
+        sql = arguments["query"].rstrip().rstrip(";") + " FORMAT JSON"
+        async with (
+            aiohttp.ClientSession(
+                auth=auth, timeout=aiohttp.ClientTimeout(total=QUERY_TIMEOUT_S)
+            ) as client,
+            client.post(url, data=sql.encode(), params={"database": "default"}) as response,
+        ):
+            if response.status != 200:
+                raise QueryFailed(f"Archive query failed (HTTP {response.status})")
+            payload = await response.json(content_type=None)
+        return SimpleNamespace(structuredContent=payload["data"])
+
+
 @asynccontextmanager
 async def session() -> AsyncIterator[ClickHouseMCP]:
-    """Start the official mcp-clickhouse server and talk to it over stdio.
-
-    Per request rather than held open. The API scales to zero and a subprocess
-    owned by an instance that may be stopped mid-query is a leak with a delay on
-    it; starting one costs a few hundred milliseconds against a search that
-    already waits on a model.
-    """
-    from mcp import ClientSession, StdioServerParameters
-    from mcp.client.stdio import stdio_client
-
-    params = StdioServerParameters(
-        command="uvx",
-        args=["--quiet", "mcp-clickhouse"],
-        env=server_env(),
-    )
-
-    async with stdio_client(params) as (read, write), ClientSession(read, write) as mcp:
-        await mcp.initialize()
-        yield ClickHouseMCP(session=mcp)
+    server_env()  # Fail closed if read-only credentials are missing.
+    yield ClickHouseMCP(session=HTTPReader())

@@ -19,6 +19,7 @@ import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
+from . import storage
 from .analytics import client
 from .measure import RawMeasurements
 
@@ -76,7 +77,7 @@ async def write(
                 # Who put it here. Written as an empty string since the first
                 # week, so the archive could not answer "who uploaded this".
                 uploaded_by,
-                f"gs://{object_path}",
+                storage.originals_uri(object_path),
                 proxy_uri,
                 sprite_uri,
                 int(measurements.duration_s * 1000),
@@ -230,7 +231,7 @@ async def write_unusable(
                 _captured_at(measurements),
                 datetime.now(UTC),
                 "",
-                f"gs://{object_path}",
+                storage.originals_uri(object_path),
                 "",
                 "",
                 int(max(measurements.duration_s, 0) * 1000),

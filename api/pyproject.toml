@@ -13,10 +13,7 @@ dependencies = [
     # clickhouse-connect's async client needs aiohttp, and does not declare it.
     "clickhouse-connect>=0.8.0",
     "aiohttp>=3.10.0",
-    "google-cloud-storage>=2.18.0",
-    "google-cloud-firestore>=2.19.0",
-    "google-cloud-pubsub>=2.23.0",
-    "google-cloud-secret-manager>=2.20.0",
+    "google-auth[requests]>=2.35,<3",
     # The API imports trimbin_agents: the contracts, the analyst, the review
     # margin. It did so without declaring it, which worked because the local
     # virtualenv had it installed editable and nothing else ever built this

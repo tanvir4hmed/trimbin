@@ -3,7 +3,7 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from google.cloud import firestore
+from ..foundation import documents
 
 LEASE = timedelta(minutes=15)
 ACTIVE = {"pending", "queued", "processing"}
@@ -18,7 +18,7 @@ def active(data: dict, now: datetime) -> bool:
 
 
 async def reserve(client, ref, attributes: dict) -> bool:
-    @firestore.async_transactional
+    @documents.async_transactional
     async def command(transaction):
         data = (await ref.get(transaction=transaction)).to_dict() or {}
         now = datetime.now(UTC)
@@ -41,7 +41,7 @@ async def reserve(client, ref, attributes: dict) -> bool:
 
 
 async def published(client, ref, dispatch_id: str, *, message_id: str = "", error: str = ""):
-    @firestore.async_transactional
+    @documents.async_transactional
     async def command(transaction):
         data = (await ref.get(transaction=transaction)).to_dict() or {}
         # A fast worker may already have finished before publish() returns.
@@ -64,7 +64,7 @@ async def claim(client, ref, dispatch_id: str) -> tuple[str, str]:
     """Return claimed/busy/obsolete and a unique, fenced execution token."""
     worker_id = str(uuid4())
 
-    @firestore.async_transactional
+    @documents.async_transactional
     async def command(transaction):
         data = (await ref.get(transaction=transaction)).to_dict() or {}
         now = datetime.now(UTC)
@@ -92,7 +92,7 @@ async def claim(client, ref, dispatch_id: str) -> tuple[str, str]:
 async def advance(
     client, ref, dispatch_id: str, worker_id: str, state: str, error: str = ""
 ) -> bool:
-    @firestore.async_transactional
+    @documents.async_transactional
     async def command(transaction):
         data = (await ref.get(transaction=transaction)).to_dict() or {}
         if (

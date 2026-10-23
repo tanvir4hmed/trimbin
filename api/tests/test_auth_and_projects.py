@@ -124,21 +124,15 @@ class TestAudienceVerification:
 
 class TestReadAccess:
     @pytest.mark.asyncio
-    async def test_the_teams_work_is_readable_without_an_account(self, monkeypatch) -> None:
-        """A judge with three minutes will not create an account, and asking
-        them to is the difference between being evaluated and being skipped.
-
-        This used to be one id from config. That id was project 1, project 1
-        was deleted, and every signed-out visitor then landed in an empty
-        application — so the demo is a rule now, not a row: the team's own
-        active productions are open to readers."""
+    async def test_private_team_work_requires_an_account(self, monkeypatch) -> None:
         from app.services import members
 
         async def team_owned(project_id: int):
             return FakeProject(project_id, is_public=False, owner=members.LEAD_EDITOR)
 
         monkeypatch.setattr(auth.projects, "get", team_owned)
-        await Principal(email=None).assert_can_read(1)
+        with pytest.raises(HTTPException):
+            await Principal(email=None).assert_can_read(1)
 
     @pytest.mark.asyncio
     async def test_a_deleted_project_is_readable_by_nobody(self, monkeypatch) -> None:
@@ -245,7 +239,7 @@ class TestCommentingAndOverruling:
         from app.services import members
 
         async def team_owned(project_id: int):
-            return FakeProject(project_id, is_public=False, owner=members.LEAD_EDITOR)
+            return FakeProject(project_id, is_public=True, owner=members.LEAD_EDITOR)
 
         monkeypatch.setattr(auth.projects, "get", team_owned)
         await Principal(email="a-judge@example.com").assert_can_comment(1)

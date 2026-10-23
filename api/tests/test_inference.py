@@ -185,3 +185,50 @@ def test_evaluation_cannot_hide_critical_regression():
 def test_word_errors_include_insertions_and_silence():
     assert word_error_rate("one two", "one three") == 0.5
     assert word_error_rate("", "invented words") == 2.0
+
+
+@pytest.mark.asyncio
+async def test_embedding_requests_the_index_dimension_and_normalizes(monkeypatch):
+    from app.inference.contracts import EmbeddingIdentity
+    from app.inference.runner import embed
+
+    config = Settings(
+        _env_file=None,
+        inference_mode="nebius",
+        inference_live_enabled=True,
+        nebius_api_key="unit-test-only-not-a-key",
+        nebius_base_url="https://api.tokenfactory.nebius.com/v1",
+    )
+    identity = EmbeddingIdentity(
+        model_id="test/embedding",
+        revision="r1",
+        precision="fp32",
+        deployment_generation="g1",
+        dimension=3,
+        normalization="l2",
+        preprocessing_version="text-v1",
+        index_generation="index-v1",
+    )
+    profile = ModelProfile(
+        model_id=identity.model_id,
+        revision="r1",
+        precision="fp32",
+        deployment_generation="g1",
+        modalities=["embedding"],
+        max_input_bytes=10000,
+        max_frames=0,
+    )
+
+    async def provider(self, method, endpoint, payload):
+        assert payload["dimensions"] == 3
+        return {"data": [{"index": 0, "embedding": [3.0, 4.0, 0.0]}]}
+
+    monkeypatch.setattr(TokenFactory, "request", provider)
+    result = await embed(
+        ["A real editorial observation"],
+        identity,
+        config,
+        {profile.model_id: profile},
+        project_id=1,
+    )
+    assert result["vectors"][0] == pytest.approx([0.6, 0.8, 0])

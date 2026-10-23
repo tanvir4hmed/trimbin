@@ -15,9 +15,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from google import genai
-from google.genai import types
-
+from .. import content as types
+from .. import runtime as genai
 from ..common.errors import AgentFailure, Unreadable, text_of
 from ..config import settings
 from ..contracts.base import ClipRef, Confidence
@@ -70,11 +69,7 @@ MIN_GROUP_FOR_COMPARISON = 3
 
 class SlateAgent:
     def __init__(self, client: genai.Client | None = None) -> None:
-        self._client = client or genai.Client(
-            vertexai=True,
-            project=settings.project_id,
-            location=settings.model_location,
-        )
+        self._client = client or genai.Client()
 
     async def run(self, request: SlateRequest, clip_head: bytes) -> SlateResult:
         """Read the board, or say honestly that there was none to read."""
@@ -119,9 +114,6 @@ class SlateAgent:
                     # Reading characters off a board needs no deliberation, and
                     # thinking budget is charged whether it helped or not.
                     thinking_config=types.ThinkingConfig(thinking_budget=0),
-                    # Low resolution is enough for large hand-written figures and
-                    # costs a fraction of the tokens per frame.
-                    media_resolution=types.MediaResolution.MEDIA_RESOLUTION_LOW,
                     temperature=0.0,
                 ),
             )

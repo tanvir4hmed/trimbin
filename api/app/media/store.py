@@ -25,7 +25,8 @@ class MediaStore:
     def allowed(self, project: int, email: str, permission: str) -> bool:
         with self.connection() as conn:
             row = conn.execute(
-                "SELECT role FROM project_members WHERE project_id=%s AND email=%s",
+                "SELECT m.role FROM project_members m JOIN projects p ON p.id=m.project_id "
+                "WHERE m.project_id=%s AND m.email=%s AND p.state='active'",
                 (project, email.lower()),
             ).fetchone()
         roles = {
@@ -43,13 +44,17 @@ class MediaStore:
             (project, f"Project {project}"),
         )
 
-    def register(self, project: int, alias: str, relative: str, actor: str) -> dict:
+    def register(
+        self, project: int, alias: str, relative: str, actor: str, source_id=None, editorial=False
+    ) -> dict:
         with self.connection() as conn:
             self.ensure_project(conn, project)
-            return self._register(conn, project, alias, relative, actor)
+            return self._register(conn, project, alias, relative, actor, source_id, editorial)
 
     @staticmethod
-    def _register(conn, project: int, alias: str, relative: str, actor: str) -> dict:
+    def _register(
+        conn, project: int, alias: str, relative: str, actor: str, source_id=None, editorial=False
+    ) -> dict:
         conn.execute(
             "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
             (f"media/{project}/{alias}/{relative}",),
@@ -61,11 +66,16 @@ class MediaStore:
         ).fetchone()
         if existing:
             return existing
-        source_id, job_id = uuid4(), uuid4()
+        source_id, job_id = source_id or uuid4(), uuid4()
         conn.execute(
             """INSERT INTO jobs(id,project_id,kind,payload,dedup_key,max_attempts)
                VALUES (%s,%s,'media_index',%s,%s,3)""",
-            (job_id, project, Jsonb({"source_id": str(source_id)}), str(source_id)),
+            (
+                job_id,
+                project,
+                Jsonb({"source_id": str(source_id), "editorial_origin": editorial}),
+                str(source_id),
+            ),
         )
         return conn.execute(
             """INSERT INTO media_sources
@@ -140,6 +150,10 @@ class MediaStore:
                    result=%s,error_code=NULL WHERE id=%s""",
                 (Jsonb({"fingerprint": fingerprint}), job["id"]),
             )
+            if not job["payload"].get("editorial_origin"):
+                from ..foundation.editorial_bridge import enqueue_source
+
+                enqueue_source(conn, job)
 
     def retry(self, project: int, source_id: UUID) -> None:
         with self.connection() as conn:

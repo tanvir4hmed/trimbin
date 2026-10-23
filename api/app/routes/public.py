@@ -38,7 +38,7 @@ async def mcp_evidence(response: Response) -> dict[str, Any]:
     """Public, checkable statement of the runtime search boundary."""
     _cached(response)
     return {
-        "runtime": "official mcp-clickhouse over stdio",
+        "runtime": "self-hosted ClickHouse read-only HTTP",
         "identity": "dedicated ClickHouse read-only user",
         "project_scoped": True,
         "direct_fallback": False,

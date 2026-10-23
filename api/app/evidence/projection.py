@@ -70,6 +70,21 @@ def deliver(config: Settings, limit: int = 20) -> int:
         finally:
             archive.close()
         with store.connection() as conn:
+            if config.inference_mode == "nebius" and config.evidence_embedding_identity_path:
+                from uuid import uuid4
+
+                from psycopg.types.json import Jsonb
+
+                conn.execute(
+                    "INSERT INTO jobs(id,project_id,kind,payload,dedup_key,max_attempts) "
+                    "VALUES (%s,%s,'evidence_vectors',%s,%s,3) ON CONFLICT DO NOTHING",
+                    (
+                        uuid4(),
+                        event["project_id"],
+                        Jsonb({"revision": snapshot["revision"]}),
+                        f"vectors/{snapshot['revision']}/{fingerprint(embedding_identity(config).model_dump())}",
+                    ),
+                )
             conn.execute(
                 "UPDATE outbox SET delivered_at=clock_timestamp() WHERE event_id=%s",
                 (event["event_id"],),

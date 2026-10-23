@@ -358,7 +358,7 @@ async def test_nonzero_video_origin_and_delayed_audio(config, footage, tmp_path)
     result = await derivatives(shifted, work, meta, config, lambda: None, lambda _: None)
     original_offset = Fraction(meta["audio"][0]["start_time"]) - seconds(meta["video_start"])
     proxy_offset = Fraction(result["proxy_metadata"]["audio"][0]["start_time"])
-    # AAC encoding adds up to one 1024-sample priming frame.
+    # AAC encoding adds up to one 1024-sample priming frame plus one tick.
     assert abs(proxy_offset - original_offset) <= Fraction(1025, 48000)
 
 

@@ -25,6 +25,7 @@ class FakePublisher:
 
     def publish(self, topic, data, **attributes):
         self.published.append((topic, data, attributes))
+        return FakeFuture()
 
 
 class FakeFuture:
@@ -86,7 +87,7 @@ class Store:
 
 @pytest.fixture(autouse=True)
 def transactional_double(monkeypatch):
-    monkeypatch.setattr(jobs.firestore, "async_transactional", lambda fn: fn)
+    monkeypatch.setattr(jobs.documents, "async_transactional", lambda fn: fn)
 
 
 @pytest.fixture

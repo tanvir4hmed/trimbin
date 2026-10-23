@@ -18,8 +18,8 @@ def test_package_filters_local_credentials_media_and_archive():
     for name in [
         "web/package-lock.json",
         "LICENSE",
-        "deploy/portable/api.Dockerfile",
-        "web/portable.Dockerfile",
+        "deploy/production/api.Dockerfile",
+        "deploy/production/web.Dockerfile",
         ".env.example",
     ]:
         assert allowed(name)
@@ -46,11 +46,14 @@ def test_empty_or_fixture_evidence_cannot_pass(tmp_path):
     assert any("invalid_evidence" in f for f in failures)
 
 
-def test_portable_routes_do_not_mount_legacy_operations():
+def test_compatibility_entrypoint_is_the_canonical_application():
     from app.portable import app
 
-    paths = {r.path for r in app.routes}
+    paths = set(app.openapi()["paths"])
     assert "/workflow/projects" in paths
     assert "/renders/{project}/jobs/{job_id}/download" in paths
     assert "/health" in paths
-    assert not any(p.startswith(("/film", "/uploads", "/maintenance")) for p in paths)
+    from app.main import app as canonical
+
+    assert app is canonical
+    assert any(p.startswith("/uploads") for p in paths)

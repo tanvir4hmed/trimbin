@@ -20,7 +20,7 @@ def workspace():
     migrate(DSN)
     project, source, job = uuid4().int % (2**62), uuid4(), uuid4()
     with psycopg.connect(DSN) as conn:
-        conn.execute("INSERT INTO projects VALUES (%s,'evidence-test')", (project,))
+        conn.execute("INSERT INTO projects(id,name) VALUES (%s,'evidence-test')", (project,))
         conn.execute(
             "INSERT INTO project_members VALUES (%s,'editor@example.test','editor')", (project,)
         )
