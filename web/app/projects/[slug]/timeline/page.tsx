@@ -3,6 +3,7 @@
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import EditableExports from "./EditableExports";
+import RenderExports from "./RenderExports";
 import { currentToken } from "@/lib/auth";
 import { mediaRequest } from "@/lib/media";
 import { projectIdFromSlug } from "@/lib/slug";
@@ -128,6 +129,7 @@ export default function TimelinePage({ params }: { params: Promise<{ slug: strin
     <input aria-label="Sequence frame" type="range" min={0} max={Math.max(0, (saved?.body?.duration_frames ?? 1) - 1)} value={frame} onChange={e => { setPlaying(false); setFrame(Number(e.target.value)); }} />
     <p>Sequence frame {frame} / {saved?.body?.duration_frames ?? 0}{entry ? ` · Source frame ${Math.min(entry.out_frame - 1, target)} · ${entry.source.filename}` : ""}</p>
     {entry && <p>Quantization delta: {entry.quantization_seconds.numerator}/{entry.quantization_seconds.denominator} seconds. Linked source audio metadata is pinned with this occurrence.</p>}
+    <RenderExports key={`render-${endpoint}`} project={project} sequence={key} revision={saved?.revision ?? 0} dirty={dirty} />
     <EditableExports key={endpoint} project={project} sequence={key} revision={saved?.revision ?? 0} dirty={dirty} />
     <h2>Saved revisions</h2>
     {versions.map(v => <button key={v.revision} disabled={busy} onClick={() => { if (!dirty || confirm("Replace the unsaved draft with this revision?")) void action(async () => { const old = await request<Snapshot>(`${endpoint}?revision=${v.revision}`); if (old.body) edit({ sequence: old.body.sequence, clips: old.body.clips.map(plain) }); }); }}>Use revision {v.revision} as draft</button>)}

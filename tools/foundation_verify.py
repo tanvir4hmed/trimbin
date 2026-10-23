@@ -22,6 +22,7 @@ def main():
             "api/tests/test_evidence_postgres.py",
             "api/tests/test_timeline_postgres.py",
             "api/tests/test_exports_postgres.py",
+            "api/tests/test_renders_postgres.py",
             "-q",
         ],
         cwd=foundation.ROOT,

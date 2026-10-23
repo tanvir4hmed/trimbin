@@ -1,8 +1,8 @@
 # Phased build plan
 
-Updated 22 October 2026 Asia/Dhaka. Work branch: main. The owner authorized Phase 7 editable timeline export. Continue with placeholder credentials and deferred runtime testing; static checks, commit and push are included.
+Updated 23 October 2026 Asia/Dhaka. Work branch: main. The owner authorized Phase 8 original-fed video rendering. Continue with placeholder credentials and deferred runtime testing; static checks, commit and push are included.
 
-Latest owner instruction: implement Phase 7 on main; preserve automatic deployment and stop without waiting for deployment. All new infrastructure remains Terraform-managed. No new paid resources or live model experiments are included. Read [Product direction](PRODUCT_DIRECTION.md) and [Quality strategy](QUALITY_STRATEGY.md) before making build decisions.
+Latest owner instruction: implement Phase 8 on main; preserve automatic deployment and stop without waiting for deployment. All new infrastructure remains Terraform-managed. No new paid resources or live model experiments are included. Read [Product direction](PRODUCT_DIRECTION.md) and [Quality strategy](QUALITY_STRATEGY.md) before making build decisions.
 
 ## Why this edition exists
 
@@ -161,3 +161,5 @@ Keep customer/on-premises installation, hardware procurement/certification, full
 ## Documents maintained with the build
 
 Product direction, quality strategy, requirements, architecture, configuration and phase status start here. Phase 1 refines the evaluation protocol and adds the UX specification, data/timeline contract and current capability matrix. Later phases add reproducible development/package setup, the fixed cloud deployment runbook, tested export compatibility, measured quality/resource results, network boundaries and final submission guide. Every diagram must match the implemented path; no historical claims or conceptual screens are passed off as runtime proof.
+
+Phase 8 implementation: original-fed SDR MP4 jobs, bounded lossless raw scratch, sample-boundary audio, progress/cancel and streamed downloads. Initial preset rejects mixed-rate/scaling/HDR/unknown color metadata. Runtime fidelity and the broader render release gate remain pending. See [render setup](RENDER_SETUP.md). Phase 9 requires the next owner approval.

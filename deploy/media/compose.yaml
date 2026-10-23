@@ -82,6 +82,23 @@ services:
     cpus: 1
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
+  renders:
+    image: ${TRIMBIN_APP_IMAGE:?Supply the tested immutable application image}
+    env_file: ${TRIMBIN_MEDIA_ENV_FILE:?Supply private container runtime configuration}
+    command: [python, -m, app.renders.worker]
+    restart: unless-stopped
+    volumes:
+      - ${TRIMBIN_UPLOAD_STORE:?Provide originals and staging parent}:/media/upload-store:ro
+      - ${TRIMBIN_DERIVED_STORE:?Provide derivative directory}:/media/derived:ro
+      - ${TRIMBIN_LIBRARY_STORE:?Provide mounted footage directory}:/media/library:ro
+      - ${TRIMBIN_EXPORT_STORE:?Provide export artifact directory}:/media/exports
+    networks: [foundation]
+    read_only: true
+    tmpfs: [/tmp:size=64m]
+    mem_limit: 2g
+    cpus: 2
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
 networks:
   egress:
     driver: bridge

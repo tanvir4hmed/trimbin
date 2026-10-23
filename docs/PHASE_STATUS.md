@@ -1,6 +1,6 @@
 # Phase status
 
-Updated 22 October 2026 Asia/Dhaka.
+Updated 23 October 2026 Asia/Dhaka.
 
 Latest owner direction: revise the plan for a complete cloud-hosted editorial PoC now; implement through individually approved phases. Future studio hardware/software packaging is the direction, not a requirement to install locally during this hackathon. Kubernetes, autoscaling and local GPU certification are deferred. The owner approved Phases 1 and 2, then authorized Phase 3 after the credit/account discussion. Preserve automatic deployment and do not wait for deployment completion; all new infrastructure is Terraform-managed.
 
@@ -14,7 +14,7 @@ Latest owner direction: revise the plan for a complete cloud-hosted editorial Po
 | 5 Evidence review and retrieval | Implemented; runtime acceptance deferred | Owner approved Phase 5. Durable corrections/selections, analysis worker, scoped review/search, complete ClickHouse projections and setup documentation. Static verification recorded below. |
 | 6 Canonical scene and film timeline | Implemented; runtime acceptance deferred | Owner approved. Frame-based scene/film snapshots, manual assembly, saved preview, undo/redo, history and timing verification path. |
 | 7 Editable timeline export | Implemented for documented subset; runtime/NLE acceptance deferred | Native snapshot and FCP7 XML bundles, durable jobs, source hashes and relink helper. Mixed-rate/scaling/audio-offset XML gates remain open. |
-| 8 Original-resolution video rendering | Not approved | Original-fed render and audio/frame correctness required. |
+| 8 Original-resolution video rendering | Implemented for documented SDR subset; runtime acceptance deferred | Owner authorized continue. Original-fed MP4, bounded scratch, jobs/cancel/progress and downloads. Fidelity gate remains open. |
 | 9 Complete cloud workflow and portability verification | Not approved | Full workflow, clean redeploy, root/endpoint remapping, persistence and measured quality; no actual studio install required. |
 | 10 Deployment cleanup and submission | Not approved | Explicit host budget, rollout, judge access, final config retirement and publication scope. |
 
@@ -96,3 +96,11 @@ Revision-pinned native and FCP7 XML ZIP exports are available from the portable 
 XML currently supports same-rate/same-dimension CFR cuts, repeated occurrences, supported camera timecodes and aligned mono/stereo first-stream audio with mute/gain. Mixed-rate conform, scaling, nonzero audio offsets and other unsupported cases are explicit XML errors; native manifests preserve their canonical metadata. These limitations remain gates, not passing compatibility claims. Actual Premiere import/relink and frame/audio validation are pending.
 
 Static verification: Ruff lint/format, Python compilation, generated API/TypeScript, frontend typecheck, Compose YAML, documentation links and diff hygiene. Added deferred format/relink and PostgreSQL export request tests. No local pytest, export worker execution, source scan, database/container or NLE test was run. Prior references and hash manifest are outside Git in `D:\NVIDIA\archive\2026-10-21-phase7`. Phase 8 original-fed rendering is the next approval boundary.
+
+## Phase 8 implementation and verification boundary
+
+Original-fed MP4 rendering pins the approved timeline revision and source hashes. The initial CPU preset uses lossless raw video/float PCM scratch and one H.264 CRF 18 slow / AAC 320 kbps delivery encode. Same-rate, same-dimension progressive square-pixel explicit Rec.709 limited-range 8-bit 4:2:0 footage is supported by the implementation; other formats are rejected, never silently downgraded. Mono duplication, stereo first-stream selection, source audio offsets, silence/mute and gain are explicit. This is lossy delivery, not a bit-identical copy or verified Premiere equivalent.
+
+Jobs expose stages and completed cuts, cancellation and errors. Source hashes are checked before and after processing; complete output publication is lease-fenced. Downloads use short-lived scoped tickets and streaming file responses. Disk/time/threads are bounded by existing media configuration; defaults only suit small fixtures. No scale, throughput or runtime fidelity result is claimed.
+
+Static checks cover Ruff, Python compilation, API schema/TypeScript, Compose parsing and documentation links. Deferred tests cover sample-boundary rounding, color rejection, original-frame trimming, silence and request replay/isolation. Actual FFmpeg, PostgreSQL, browser, cancellation/recovery and 4K fidelity acceptance were not run locally. CI/deploy triggers remain enabled and unpolled. Reference snapshots and hashes are outside Git in `D:\NVIDIA\archive\2026-10-22-phase8`. Phase 9 remains the next approval boundary.

@@ -109,3 +109,7 @@ The package now also runs `app.evidence.worker` and `app.evidence.projection`. A
 ## Phase 7 export storage
 
 Editable export reuses `TRIMBIN_EXPORT_ROOT` and PostgreSQL jobs; no additional credential is required. In the portable package, supply `TRIMBIN_EXPORT_STORE` and set the container runtime root to `/media/exports`. The export worker mounts this directory writable and the API read-only. Originals remain read-only for the worker. See [editable export setup](EDITABLE_EXPORT_SETUP.md) for bounded artifact and relink behavior.
+
+## Phase 8 render worker
+
+The `renders` service in deploy/media/compose.yaml shares the export volume with the read-only API mount and reads originals read-only. It claims only `timeline_render` jobs. No API key is required. Existing `TRIMBIN_MEDIA_WORK_BYTES`, `TRIMBIN_MEDIA_RESERVE_BYTES`, `TRIMBIN_MEDIA_TIMEOUT_SECONDS` and `TRIMBIN_MEDIA_THREADS` apply; raw original-resolution scratch can be large. The default 2 GiB work limit is for small fixtures, not movie-length output. See [render setup](RENDER_SETUP.md) for sizing and acceptance boundaries. No new host or Terraform resource is provisioned.

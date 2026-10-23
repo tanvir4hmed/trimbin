@@ -32,6 +32,7 @@ from .routes import (
     projects,
     public,
     quality,
+    renders,
     review,
     scenes,
     screens,
@@ -109,6 +110,7 @@ app.include_router(inference.router)
 app.include_router(evidence.router)
 app.include_router(timelines.router)
 app.include_router(editable_exports.router)
+app.include_router(renders.router)
 
 
 @app.exception_handler(evidence.EvidenceError)

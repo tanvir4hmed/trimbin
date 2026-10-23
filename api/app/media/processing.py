@@ -99,7 +99,7 @@ async def probe(path: Path, check: Callable[[], None] = lambda: None) -> dict:
             "-show_entries",
             "format=duration,start_time,format_name:format_tags=timecode:"
             "stream=index,codec_type,codec_name,width,height,avg_frame_rate,r_frame_rate,"
-            "time_base,start_pts,start_time,duration_ts,duration,nb_frames,pix_fmt,"
+            "time_base,start_pts,start_time,duration_ts,duration,nb_frames,pix_fmt,field_order,"
             "color_space,color_transfer,color_primaries,color_range,sample_aspect_ratio,"
             "sample_rate,channels,channel_layout:stream_tags=timecode:stream_side_data=rotation",
             "-of",
