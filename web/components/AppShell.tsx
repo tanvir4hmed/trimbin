@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import PortableShell, { portablePath } from "@/components/PortableShell";
 import UploadTray from "@/components/UploadTray";
 import ProjectTeam from "@/components/ProjectTeam";
 import { api } from "@/lib/api";
@@ -22,6 +23,8 @@ const SUPPORT = [
 ] as const;
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  if (portablePath(pathname)) return <PortableShell>{children}</PortableShell>;
   return (
     <Suspense fallback={<div className="waiting">Opening workspace…</div>}>
       <WorkspaceShell>{children}</WorkspaceShell>

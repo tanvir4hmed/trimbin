@@ -1,0 +1,30 @@
+# Overlay deploy/media/compose.yaml. Existing deployment remains unchanged.
+services:
+  api:
+    command: [uvicorn, app.portable:app, --host, "0.0.0.0", --port, "8080", --no-access-log]
+  web:
+    image: ${TRIMBIN_WEB_IMAGE:?Supply immutable frontend image digest}
+    restart: unless-stopped
+    networks: [egress]
+    read_only: true
+    tmpfs: [/tmp:size=64m, "/app/.next/cache:size=64m,uid=10001,gid=10001"]
+    mem_limit: 1g
+    cpus: 1
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+  gateway:
+    image: ${TRIMBIN_GATEWAY_IMAGE:?Supply approved nginx image digest}
+    restart: unless-stopped
+    ports: ["127.0.0.1:${TRIMBIN_WEB_PORT:-8088}:8088"]
+    volumes:
+      # Relative to the first Compose file (deploy/media/compose.yaml).
+      - ../portable/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks: [egress]
+    depends_on: [api, web]
+    read_only: true
+    tmpfs: [/tmp:size=64m]
+    user: "10001:10001"
+    mem_limit: 128m
+    cpus: 1
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]

@@ -91,7 +91,7 @@ export default function MediaPage({ params }: { params: Promise<{ slug: string }
   }
 
   return <main className="shell" style={{ maxWidth: 1100, padding: "2rem" }}>
-    <Link href={`/projects/${slug}/ingest`}>Back to ingest</Link>
+    <Link href="/studio">Back to projects</Link>
     <h1>Media library</h1>
     <Link href={`/projects/${slug}/evidence`}>Review evidence and select ranges</Link>
     <p>Upload footage or index files already mounted on this deployment. Originals remain unchanged.</p>

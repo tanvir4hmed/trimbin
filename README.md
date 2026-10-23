@@ -4,6 +4,10 @@ Trimbin is being expanded into a complete editorial application demonstrated as 
 
 The quality target is to improve on the preserved paid-model output, without accepting worse critical results to save cost or simplify implementation. Self-hosted open models provide a route away from recurring inference API bills; actual quality, hardware needs and total costs must be measured. Editors approve the creative decisions. The competition version also needs a genuine NVIDIA Nemotron operation on Nebius.
 
+## Portable workflow entry
+
+Phase 9 adds `/studio` for sign-in, authorized projects and connected media → evidence → timeline → exports. See the [portable package and acceptance runbook](docs/PORTABLE_WORKFLOW.md). Initial MP4 and XML format limits remain explicit; runtime deployment, live model quality and export fidelity are not yet verified. Existing automatic deployment is unchanged until approved cutover.
+
 ## Current status
 
 Phases 2 and 3 add shared configuration, self-hosted databases, transactional jobs and a portable media library: controlled resumable uploads, mounted-source indexing, proxy/audio/sprite processing, scoped playback and verified relinking. The media routes use PostgreSQL membership and need no GCP or inference credentials. The older editorial workflow has not yet been migrated to these sources; Phase 4 now adds operator-facing Token Factory adapters and evaluation tooling, with runtime/live quality tests deferred. Phase 5 adds a dedicated grounded evidence workspace with durable review/corrections/selections and scoped text/vector retrieval; see [evidence setup](docs/EVIDENCE_SETUP.md). Runtime acceptance and live quality remain deferred. Phase 6 adds [canonical scene/film timelines](docs/TIMELINE_SETUP.md) and saved-revision preview; Phase 7 adds [native/FCP7 editable export](docs/EDITABLE_EXPORT_SETUP.md) for a documented subset. Runtime/NLE acceptance and final video rendering remain pending. A new cloud host has not been selected or provisioned. Working code is updated on `main` through approved phases.

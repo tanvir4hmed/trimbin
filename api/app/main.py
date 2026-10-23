@@ -40,6 +40,7 @@ from .routes import (
     structure,
     timelines,
     uploads,
+    workflow,
 )
 from .services import analytics
 
@@ -111,6 +112,7 @@ app.include_router(evidence.router)
 app.include_router(timelines.router)
 app.include_router(editable_exports.router)
 app.include_router(renders.router)
+app.include_router(workflow.router)
 
 
 @app.exception_handler(evidence.EvidenceError)

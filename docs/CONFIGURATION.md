@@ -113,3 +113,7 @@ Editable export reuses `TRIMBIN_EXPORT_ROOT` and PostgreSQL jobs; no additional 
 ## Phase 8 render worker
 
 The `renders` service in deploy/media/compose.yaml shares the export volume with the read-only API mount and reads originals read-only. It claims only `timeline_render` jobs. No API key is required. Existing `TRIMBIN_MEDIA_WORK_BYTES`, `TRIMBIN_MEDIA_RESERVE_BYTES`, `TRIMBIN_MEDIA_TIMEOUT_SECONDS` and `TRIMBIN_MEDIA_THREADS` apply; raw original-resolution scratch can be large. The default 2 GiB work limit is for small fixtures, not movie-length output. See [render setup](RENDER_SETUP.md) for sizing and acceptance boundaries. No new host or Terraform resource is provisioned.
+
+## Phase 9 portable workflow package
+
+The [portable workflow runbook](PORTABLE_WORKFLOW.md) connects `/studio` and PostgreSQL project discovery to media, evidence, timeline and both exports. The dedicated portable API avoids mounting legacy operational routes. The optional Compose overlay adds a frontend and loopback gateway without changing current deployment. Build recipes use API/frontend dependency locks and require approved base images; the complete-source packager reads immutable Git blobs. Runtime portability, quality and recovery remain unverified. Actual cloud cutover and per-service credential minimization remain Phase 10 work.

@@ -95,3 +95,7 @@ The dedicated [evidence workspace](EVIDENCE_SETUP.md) now connects registered de
 ## Phase 6 implementation update
 
 The [canonical timeline](TIMELINE_SETUP.md) adds source-frame scene/film editing, linked audio metadata, exact saved conform mapping, revision history and approximate browser preview over the portable media path. Existing revision/receipt storage is reused; no new service or AI credential is needed. Runtime and export acceptance remain pending.
+
+## Phase 9 portable workflow package
+
+The [portable workflow runbook](PORTABLE_WORKFLOW.md) connects `/studio` and PostgreSQL project discovery to media, evidence, timeline and both exports. The dedicated portable API avoids mounting legacy operational routes. The optional Compose overlay adds a frontend and loopback gateway without changing current deployment. Build recipes use API/frontend dependency locks and require approved base images; the complete-source packager reads immutable Git blobs. Runtime portability, quality and recovery remain unverified. Actual cloud cutover and per-service credential minimization remain Phase 10 work.
