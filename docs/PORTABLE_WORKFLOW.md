@@ -1,6 +1,6 @@
-# Complete workflow package and acceptance
+# Full workflow build/rehearsal package and acceptance
 
-Phase 9 implementation, 23 October 2026. Runtime tests remain deferred by owner instruction. This page describes the runnable package and required rehearsal; it is not evidence that a clean deployment, live quality comparison or complete workflow has passed. No paid host is provisioned or chosen here.
+Phase 9 implementation, 23 October 2026. Runtime tests remain deferred by owner instruction. This package is a build/rehearsal aid for the planned Phase 10 unified cutover. It is not a second product path to deploy beside the legacy app. Phase 10 will fold needed routes into one canonical runtime and remove this separate portable entry/overlay after the unified app works. This page is not evidence that clean deployment, live quality or complete migration has passed. No paid host is provisioned or chosen here.
 
 ## Editor entry and authority
 
@@ -8,7 +8,7 @@ Open `/studio`, sign in with an operator-issued team account, and choose a Postg
 
 Use [media project bootstrap](../tools/media_project.py) to grant each exact account owner/editor/viewer membership. Team-pass authentication is reused; use strong distinct per-account codes and a 32+ character session signing secret. Do not grant private membership to a shared guest-pass identity: shared handles are not individual authentication. Password rotation does not revoke already-issued sessions; rotate signing secret to invalidate all sessions when necessary. No credential is embedded in frontend build arguments. TLS is required before exposing sign-in beyond loopback.
 
-The portable API entrypoint `app.portable:app` mounts auth, workflow, media, inference, evidence, timelines and both export routes. Legacy operational endpoints are absent. Existing legacy code/SDK packages remain in the source and dependency lock until Phase 10's retirement audit; that is not a requirement for GCP infrastructure or credentials on this workflow. OAuth is optional; password sign-in works without it. `/health` is process liveness only, not database, worker or model readiness.
+The rehearsal API entrypoint `app.portable:app` mounts auth, workflow, media, inference, evidence, timelines and both export routes. Legacy operational endpoints are absent. Phase 10 must merge required features into one canonical API/UI and remove the split entrypoints after feature/data reconciliation. Existing legacy code/SDK packages remain until that audited replacement. OAuth is optional in this entry; the final identity policy is a Phase 10 decision. `/health` is process liveness only, not database, worker or model readiness.
 
 ## Build the package
 
@@ -43,9 +43,9 @@ API dependency installation uses `uv sync --locked`; frontend uses `npm ci`. Ima
 docker compose --env-file /absolute/private/compose.env -f deploy/media/compose.yaml -f deploy/portable/compose.yaml up -d
 ```
 
-The overlay adds the frontend and gateway and switches only its API process to the portable entrypoint. It retains the foundation external network and distinct media, analysis, projection, editable export and render workers. It does not alter the existing automatic deployment workflows. Foundation must already be running and migrated. Point the browser at loopback port 8088 (or configured port); `/` redirects to `/studio`. The original API loopback port 8080 remains available for operator debugging.
+The rehearsal overlay adds the frontend and gateway and switches only its API process to the portable entrypoint. It retains the foundation external network and distinct media, analysis, projection, editable export and render workers. GitHub's legacy deploy workflows are currently manually disabled. Foundation must already be running and migrated. Point the browser at loopback port 8088 (or configured port); `/` redirects to `/studio`. The original API loopback port 8080 remains available for operator debugging.
 
-The gateway strips `/api`, streams upload/download bodies, forwards authorization/ranges and refreshes Docker service DNS. Access logs are disabled to avoid routine signed-ticket logging; inspect all upstream/error logging policies before public exposure. Upload requests remain bounded to the existing 8 MiB chunk protocol; do not send whole movie bodies through a single request. External HTTPS ingress, rate limiting and public judge access are Phase 10 cutover work. API/analysis have configured provider egress; fonts in the existing root layout also use Google's font CDN. This is not an air-gapped package.
+The gateway strips `/api`, streams upload/download bodies, forwards authorization/ranges and refreshes Docker service DNS. Access logs are disabled to avoid routine signed-ticket logging; inspect all upstream/error logging policies before public exposure. Upload requests remain bounded to the existing 8 MiB chunk protocol; do not send whole movie bodies through a single request. External HTTPS ingress and rate limiting belong to Phase 10. Public judge access, video recording and submission are Phase 11. API/analysis have configured provider egress; fonts in the existing root layout also use Google's font CDN. This is not an air-gapped package.
 
 The overlay currently uses one private env file across application services, as the earlier media manifest does. That means workers can receive credentials they do not need. Per-service secret minimization is a cutover hardening gate, not a completed property of this rehearsal package.
 
@@ -79,4 +79,4 @@ Capture `docker stats --no-stream` repeatedly during the run and use an independ
 
 Attach operator-reviewed evidence files to each gate as `{ "path": "relative/report.json", "sha256": "...", "fixture_only": false }`, set its status to passed only after the actual check, and retain failure notes. `python tools/workflow_acceptance.py check <record>` checks required metadata and local evidence hashes, rejecting missing/fixture evidence. It does not inspect the truth of a report or approve release by itself. Evidence must never be committed if it contains private footage, credentials or customer details.
 
-Phase 9 runtime acceptance remains pending until these observations exist. Phase 10 cutover, secret retirement, publication and judging access require the next approval. Future workstation GPU sizing, local-only inference, offline operation and terabyte performance remain outside current claims.
+Phase 9 runtime acceptance remains pending until these observations exist. Phase 10's single cutover, data migration and replaced-secret retirement have not started. Phase 11 handles video/judge access/submission. Future workstation GPU sizing, local-only inference, offline operation and terabyte performance remain outside current claims.

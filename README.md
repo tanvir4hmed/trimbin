@@ -4,9 +4,9 @@ Trimbin is being expanded into a complete editorial application demonstrated as 
 
 The quality target is to improve on the preserved paid-model output, without accepting worse critical results to save cost or simplify implementation. Self-hosted open models provide a route away from recurring inference API bills; actual quality, hardware needs and total costs must be measured. Editors approve the creative decisions. The competition version also needs a genuine NVIDIA Nemotron operation on Nebius.
 
-## Portable workflow entry
+## Current build and cutover plan
 
-Phase 9 adds `/studio` for sign-in, authorized projects and connected media → evidence → timeline → exports. See the [portable package and acceptance runbook](docs/PORTABLE_WORKFLOW.md). Initial MP4 and XML format limits remain explicit; runtime deployment, live model quality and export fidelity are not yet verified. Existing automatic deployment is unchanged until approved cutover.
+Phases 1–9 add a replacement workflow in stages, but legacy and new paths still coexist in source. The next implementation phase is planned as one complete app/data/AI/infra cutover, not a parallel portable product. The separate [Phase 9 package](docs/PORTABLE_WORKFLOW.md) is a rehearsal aid. Its runtime, migration and export gates have not passed. Demo recording and submission have been split into Phase 11 after cutover acceptance. No new host is selected or provisioned.
 
 ## Current status
 

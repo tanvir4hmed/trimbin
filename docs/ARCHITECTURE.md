@@ -86,7 +86,7 @@ Keep current valid analysis, human decisions, saved timelines and pinned export 
 
 ## Deployment control
 
-CI on main must run without paid provider keys. Real-model checks are explicit, budgeted integration jobs. The owner explicitly retains automatic deployment on matching main pushes. Current workflows deploy the existing runtime until later cutover; all new infrastructure is Terraform-managed. See [deployment design](DEPLOYMENT_DESIGN.md) for current ownership gaps and the target rollout. Container versions, dependency resolutions, schema migrations and model IDs are recorded. Runtime secrets are injected only into the services that require them and never into a browser bundle.
+CI on main must run without paid provider keys. Real-model checks are explicit, budgeted integration jobs. The deployment workflows are currently manually disabled; the planned unified deployment should return to automatic main-push rollout after Phase 10 cutover acceptance. New infrastructure is Terraform-managed. See [deployment design](DEPLOYMENT_DESIGN.md) for current ownership gaps and the target rollout. Container versions, dependency resolutions, schema migrations and model IDs are recorded. Runtime secrets are injected only into the services that require them and never into a browser bundle.
 
 ## Phase 5 implementation update
 
@@ -96,6 +96,6 @@ The dedicated [evidence workspace](EVIDENCE_SETUP.md) now connects registered de
 
 The [canonical timeline](TIMELINE_SETUP.md) adds source-frame scene/film editing, linked audio metadata, exact saved conform mapping, revision history and approximate browser preview over the portable media path. Existing revision/receipt storage is reused; no new service or AI credential is needed. Runtime and export acceptance remain pending.
 
-## Phase 9 portable workflow package
+## Phase 9 unified-cutover rehearsal package
 
-The [portable workflow runbook](PORTABLE_WORKFLOW.md) connects `/studio` and PostgreSQL project discovery to media, evidence, timeline and both exports. The dedicated portable API avoids mounting legacy operational routes. The optional Compose overlay adds a frontend and loopback gateway without changing current deployment. Build recipes use API/frontend dependency locks and require approved base images; the complete-source packager reads immutable Git blobs. Runtime portability, quality and recovery remain unverified. Actual cloud cutover and per-service credential minimization remain Phase 10 work.
+The [portable workflow runbook](PORTABLE_WORKFLOW.md) connects `/studio` and PostgreSQL project discovery to media, evidence, timeline and both exports for isolated build rehearsal. The separate API entrypoint and Compose overlay are not the planned product cutover. Phase 10 folds required features into one canonical application, migrates all recoverable data, and retires replaced infrastructure/AI configuration in one coordinated release. Build recipes use API/frontend dependency locks and require approved base images; the complete-source packager reads immutable Git blobs. Runtime portability, quality and recovery remain unverified. Demo recording and judge submission are separate Phase 11 work.

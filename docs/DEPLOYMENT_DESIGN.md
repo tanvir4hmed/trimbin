@@ -2,13 +2,13 @@
 
 Phase 1 decision, 20 October 2026: the owner explicitly requested that pushes continue to deploy automatically and that work stop after pushing, without waiting for deployment. This supersedes earlier planning text proposing deployment-disabled migration.
 
-## Current pipeline retained
+## Legacy pipeline configuration
 
-CI now runs for every push and pull request, including documentation-only main commits. Backend deployment still calls the same CI as a required gate. Separate concurrency groups prevent a standalone run from cancelling the backend's reusable gate. Some checks run twice on backend-changing pushes; this is intentional until a later unified pipeline can preserve equivalent gates.
+CI is configured for every push and pull request, including documentation-only main commits. Backend deployment calls the same CI as a required gate. Separate concurrency groups prevent a standalone run from cancelling the backend's reusable gate. Some checks run twice on backend-changing pushes; this is intentional until a later unified pipeline can preserve equivalent gates.
 
-Backend deploy triggers on main changes to API, agents, ClickHouse, infrastructure and its workflow. Web deploy triggers on main web/workflow changes and has its existing web checks. Documentation-only changes do not necessarily redeploy either service. This first milestone removes old agent documents, which matches the backend filter. Neither workflow is disabled in Phase 1. Destroy stays manual with typed confirmation; it is never invoked by normal push.
+Backend deploy is configured to trigger on main changes to API, agents, ClickHouse, infrastructure and its workflow. Web deploy is configured to trigger on main web/workflow changes and has its existing web checks. Documentation-only changes do not necessarily redeploy either service. GitHub currently reports both deployment workflows as manually disabled. Destroy stays manual with typed confirmation; it is never invoked by normal push.
 
-The deployment workflows still operate the existing runtime. Push success is not deployment success. Phase 1 does not poll Actions or wait for its smoke tests.
+If re-enabled, the old deployment workflows operate the existing GCP runtime. Do not re-enable them as part of the new cutover. Push success is not deployment success. The replacement workflow belongs to Phase 10, and its successful rollout must be verified as a cutover gate.
 
 ## Terraform ownership
 
@@ -45,4 +45,12 @@ Rollback uses recorded compatible image/schema versions and preserved data; a co
 
 ## Phase 3 hosting correction
 
-GCP is not the new target or a requirement. The unapplied Phase 2 GCP host draft was archived outside Git with its hashes; no resources were changed. The [media Compose package](../deploy/media/compose.yaml) attaches API/worker to the foundation network, separates source/derivative mounts and declares process resource limits. It creates no host. Provider selection, Terraform provisioning, HTTPS and complete workflow cutover remain later approved work. Existing legacy push deployment is preserved; pushing Phase 3 does not automatically configure its new storage paths or PostgreSQL membership.
+GCP is not the new target or a requirement. The unapplied Phase 2 GCP host draft was archived outside Git with its hashes; no resources were changed. The [media Compose package](../deploy/media/compose.yaml) attaches API/worker to the foundation network, separates source/derivative mounts and declares process resource limits. It creates no host. Provider selection, Terraform provisioning, HTTPS and complete workflow cutover remain later approved work. The legacy deployment files remain in the repository but GitHub currently has both deployment workflows manually disabled. Pushing Phase 3 did not configure its new storage paths or PostgreSQL membership.
+
+## 23 October 2026: current deployment status and revised phase boundary
+
+GitHub Actions reports the backend and web deployment workflows as manually disabled. A push to `main` therefore does not currently deploy the app, regardless of triggers in the workflow files. Do not enable those old GCP workflows: they still provision or deploy the legacy runtime. Phase 10 will produce one replacement deployment workflow for the unified application, after its target, credentials and budget are selected. Phase 11 is reserved for the demo and submission after that cutover passes acceptance.
+
+The accessible GCP project `trimbin` is marked `DELETE_REQUESTED` and billing is disabled. The available Cloud Asset Inventory query found no application Cloud Run services, VMs, GCS buckets or load balancer there, but the project is deleting and some direct queries failed. Another active project could not be fully inventoried with the current permissions. Managed ClickHouse Cloud was not inspected. These observations do not prove that all old data is gone or recoverable.
+
+Phase 10 begins with read-only inventory of the ClickHouse organization/service, Terraform state and backups, and all reachable project/media stores. No destructive action or cutover proceeds until a restorable source is identified and its records/files are reconciled. If the source cannot be recovered, stop and record the exact data-loss decision before rebuilding from any remaining local archive. The replacement is one canonical application/runtime/configuration; the Phase 9 portable overlay is a rehearsal artifact and will not ship as a parallel product.

@@ -2,7 +2,7 @@
 
 Updated 23 October 2026 Asia/Dhaka.
 
-Latest owner direction: revise the plan for a complete cloud-hosted editorial PoC now; implement through individually approved phases. Future studio hardware/software packaging is the direction, not a requirement to install locally during this hackathon. Kubernetes, autoscaling and local GPU certification are deferred. The owner approved Phases 1 and 2, then authorized Phase 3 after the credit/account discussion. Preserve automatic deployment and do not wait for deployment completion; all new infrastructure is Terraform-managed.
+Latest owner direction: Phase 10 will be planned as one complete application/infra/data/AI cutover, not a second portable editor beside the legacy app. Demo/submission is a separate Phase 11 after cutover acceptance. This change is planning only; neither phase has been authorized to execute. The owner will choose the build model when Phase 10 starts. Do not presume a host, budget, model or missing data source. Deployment workflows are currently disabled in GitHub, and no deployment should be inferred from a push.
 
 | Phase | Status | Approval and evidence |
 | --- | --- | --- |
@@ -16,9 +16,10 @@ Latest owner direction: revise the plan for a complete cloud-hosted editorial Po
 | 7 Editable timeline export | Implemented for documented subset; runtime/NLE acceptance deferred | Native snapshot and FCP7 XML bundles, durable jobs, source hashes and relink helper. Mixed-rate/scaling/audio-offset XML gates remain open. |
 | 8 Original-resolution video rendering | Implemented for documented SDR subset; runtime acceptance deferred | Owner authorized continue. Original-fed MP4, bounded scratch, jobs/cancel/progress and downloads. Fidelity gate remains open. |
 | 9 Complete cloud workflow and portability verification | Integration/package implementation delivered; runtime acceptance deferred | Owner authorized Phase 9. Studio entry, scoped project discovery, portable API/package, acceptance register. No clean redeploy or quality result claimed. |
-| 10 Deployment cleanup and submission | Not approved | Explicit host budget, rollout, judge access, final config retirement and publication scope. |
+| 10 Unified application, data and infrastructure cutover | Planned; not started/approved | One canonical app, data recovery/migration, model/infra replacement, acceptance, coordinated cutover and retirement of replaced configuration. Missing-source data gate is explicit. |
+| 11 Demo and submission | Planned; not started/approved | Separate recording, judge walkthrough, factual video and submission after Phase 10 passes. |
 
-Existing deployment workflows still target the previous runtime and remain enabled as explicitly requested. Moving old agent documentation matches the backend path filter. Push success will not be reported as verified deployment success. No new credentials or resources were provisioned in Phase 1. The protected baseline tag remains recoverable. The 53-file reference archive is now outside Git at `D:\NVIDIA\archive\2026-10-20`, with all original hashes verified.
+Existing deployment workflow files still target the previous runtime. GitHub currently marks both workflows manually disabled; moving old agent documentation matched the backend path filter but does not mean deployment occurred. Push success will not be reported as verified deployment success. No new credentials or resources were provisioned in Phase 1. The protected baseline tag remains recoverable. The 53-file reference archive is now outside Git at `D:\NVIDIA\archive\2026-10-20`, with all original hashes verified.
 
 ## Phase 1 verification
 
@@ -69,7 +70,7 @@ Commit/push delivery is separate from deployment acceptance. Do not poll deploym
 - Prepared eight deferred contract/transport/evaluation tests. At owner request, no local runtime suite, fixture execution, model discovery, benchmark or live call was run. Static lint/format, Python syntax, agent typing, generated API types and documentation checks are recorded separately from runtime acceptance.
 - Speech serving remains unavailable pending a verified audio adapter. Original-frame extraction/full-window orchestration and durable editorial evidence integration remain Phase 5 work. No best/latest model is claimed without account discovery and quality evidence.
 - Two prior configuration Git blobs were preserved outside Git at `D:\NVIDIA\archive\2026-10-21-phase4-config-reference`, with hashes. No functioning legacy analysis files were retired while later consumers still depend on them.
-- Existing CI/deployment remains enabled and may execute checks after push. No deployment polling, paid hosting, provider credential validation or complete editor cutover is included.
+- CI remains push-triggered. GitHub currently marks both deployment workflows manually disabled, so no deployment should be inferred from a push. No deployment polling, paid hosting, provider credential validation or complete editor cutover is included.
 
 ## Phase 5 implementation and verification boundary
 
@@ -111,6 +112,14 @@ The `/studio` entry provides password sign-in and PostgreSQL-scoped project disc
 
 Added complete-source immutable Git packaging, frontend/backend locked-dependency image recipes, frontend/gateway Compose overlay, private configuration placeholders, and a clean-deploy/remap/recovery runbook. Packaging includes the frontend and license and excludes local private/media/archive files. No container was built or started, no paid host/model was used, and no existing deployment was cut over. Image digests, TLS ingress and per-service secret minimization still require cutover validation.
 
-Added deferred package/evidence-policy tests and PostgreSQL-backed project isolation tests. Static checks cover Python lint/format/syntax, generated API types, TypeScript, Compose parsing, documentation links and diff hygiene. Reference snapshots/hashes are outside Git in `D:\NVIDIA\archive\2026-10-23-phase9`. Deployment remains enabled and will not be polled.
+Added deferred package/evidence-policy tests and PostgreSQL-backed project isolation tests. Static checks cover Python lint/format/syntax, generated API types, TypeScript, Compose parsing, documentation links and diff hygiene. Reference snapshots/hashes are outside Git in `D:\NVIDIA\archive\2026-10-23-phase9`. Deployment workflows are now manually disabled in GitHub; no deployment is assumed.
 
 Phase 9 verification is not complete: the owner continues to defer runtime testing. The private evidence register starts with all gates pending; clean redeploy, changed roots/endpoints, live Nemotron, held-out baseline comparison, original-frame/audio/NLE correctness, browser flow, restart/restore and peak resource measurements must still run. The register checks evidence presence/hashes, not factual correctness. Do not equate implementation delivery with these release gates passing. Phase 10 remains the next approval boundary.
+
+## Phase 10/11 planning revision
+
+Owner asked to make Phase 10 one full migration/cutover and move demo work into Phase 11. The Phase 9 portable runtime is a build and rehearsal artifact, not a separate editor to ship in parallel. Phase 10 must unify all current product journeys, projects/accounts, media, jobs, AI and exports into one canonical deployed application; remove the GCP/managed-service/Vertex paths actually replaced; and verify backups, restore, rollback and data integrity before one coordinated route cutover. Phase 11 alone handles recording, judge access and submission after Phase 10 acceptance.
+
+Data is the first hard stop: read-only GCP checks on 23 October showed project `trimbin` as `DELETE_REQUESTED`, billing disabled, and no application Cloud Run/VM/GCS bucket/load-balancer entries in the accessible Cloud Asset Inventory result. Managed ClickHouse and a second GCP project could not be fully verified; some IAM/WIF/logging metadata remains. Find real backup/source snapshots and inventory managed ClickHouse before promising migration. If the source data is unrecoverable, obtain an explicit data-loss scope decision. Do not seed fake history, delete rollback copies, or claim full migration without a reconciled ledger.
+
+Phase 10 model selection is intentionally deferred until the user starts implementation and selects one coding model for the phase. Protected baseline tag and all pushed phase commits remain intact. The plan revision itself is not approval to provision, destroy, migrate production data, reveal credential values, make model calls, publish a video or submit the hackathon entry.
